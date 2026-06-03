@@ -75,6 +75,7 @@ export default function VideoPlayer({
   const containerRef = useRef(null)
   const controlsTimerRef = useRef(null)
   const [streamStartTime] = useState(Date.now)
+  const [showMacHelp, setShowMacHelp] = useState(false)
 
   useEffect(() => { volumeRef.current = volume }, [volume])
 
@@ -282,6 +283,11 @@ export default function VideoPlayer({
             <span className="text-[12px] text-white/70 font-medium">{formatViewers(streamInfo.viewer_count)} viewers</span>
           )}
           <LiveBadge />
+          <button onClick={() => setShowMacHelp(true)} className="text-white/40 hover:text-white transition-colors cursor-pointer ml-1" title="Ayuda macOS" aria-label="Ayuda">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -351,6 +357,37 @@ export default function VideoPlayer({
 
       {showClips && <ClipPlayer channel={channel} onClose={() => setShowClips(false)} />}
       {showVods && <VodPlayer channel={channel} onClose={() => setShowVods(false)} />}
+
+      {showMacHelp && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowMacHelp(false)}>
+          <div className="bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-bold text-sm tracking-wide">🖥️ macOS — Primeros pasos</h3>
+              <button onClick={() => setShowMacHelp(false)} className="text-text-muted hover:text-white cursor-pointer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-text-secondary">
+              <p><span className="text-white font-medium">Si la app no se abre</span> por la protección de macOS:</p>
+              <div className="bg-black/40 rounded-lg p-3 font-mono text-[12px] text-white/80 break-all select-all">
+                xattr -dr com.apple.quarantine /Applications/BlinkStream.app
+              </div>
+              <p className="text-[12px]">Pega esto en <strong className="text-white">Terminal</strong> y ya puedes abrir la app normal.</p>
+              <hr className="border-white/10" />
+              <p><span className="text-white font-medium">Streamlink</span> (más calidades):</p>
+              <div className="bg-black/40 rounded-lg p-3 font-mono text-[12px] text-white/80 break-all select-all">
+                brew install streamlink
+              </div>
+              <hr className="border-white/10" />
+              <p className="text-[12px] text-text-muted">
+                Atajos: <kbd className="px-1 py-0.5 bg-white/10 rounded text-[11px]">Espacio</kbd> Play/Pausa ·
+                <kbd className="px-1 py-0.5 bg-white/10 rounded text-[11px] ml-1">M</kbd> Silenciar ·
+                <kbd className="px-1 py-0.5 bg-white/10 rounded text-[11px] ml-1">F</kbd> Pantalla completa
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
