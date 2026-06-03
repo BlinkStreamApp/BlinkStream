@@ -1,0 +1,47 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "BlinkStream",
+  "version": "0.2.0",
+  "identifier": "com.blinkstream.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "BlinkStream",
+        "width": 1280,
+        "height": 720,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "devtools": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://*.jtvnw.net https://*.ttvnw.net https://id.twitch.tv; script-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://id.twitch.tv; style-src 'self' https://oncbojnqxpxctwnhehau.supabase.co; frame-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://id.twitch.tv https://clips.twitch.tv https://player.twitch.tv; child-src 'self' https://*.twitch.tv https://player.twitch.tv; connect-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://7tv.io https://*.twitch.tv https://*.jtvnw.net https://*.ttvnw.net https://*.cloudfront.net https://api.betterttv.net https://api.7tv.app https://api.frankerfacez.com https://cdn.betterttv.com https://cdn.7tv.app https://cdn.frankerfacez.com wss://irc-ws.chat.twitch.tv:443 wss://irc.chat.twitch.tv:443; img-src 'self' https://*.twitch.tv https://*.jtvnw.net https://static-cdn.jtvnw.net https://*.ttvnw.net https://cdn.betterttv.com https://cdn.betterttv.net https://cdn.7tv.app https://cdn.frankerfacez.com data:; media-src 'self' https://*.twitch.tv https://*.jtvnw.net https://static-cdn.jtvnw.net https://*.ttvnw.net https://*.cloudfront.net blob:; font-src 'self' data:;"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "BlinkStream Team",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "externalBin": [
+      "binaries/streamlink"
+    ]
+  },
+  "plugins": {}
+}

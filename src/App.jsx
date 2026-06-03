@@ -1,0 +1,378 @@
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import ChannelSearch from './components/ChannelSearch'
+import StreamInfo from './components/StreamInfo'
+import HomeScreen from './components/HomeScreen'
+import Settings from './components/Settings'
+import AboutDialog from './components/AboutDialog'
+import ConfirmDialog from './components/ConfirmDialog'
+import Onboarding from './components/Onboarding'
+import { BlinkStreamLogo } from './components/BlinkStreamLogo'
+
+const VideoPlayer = lazy(() => import('./components/VideoPlayer'))
+const Chat = lazy(() => import('./components/Chat'))
+
+function PlayerFallback() {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-bg-primary">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-2 border-twitch border-t-transparent rounded-full animate-spin" />
+        <span className="text-[13px] text-text-muted">Cargando reproductor...</span>
+      </div>
+    </div>
+  )
+}
+
+function ChatFallback() {
+  return (
+    <div className="w-96 min-w-[320px] max-w-[440px] border-l border-bg-tertiary/30 flex items-center justify-center bg-bg-primary">
+      <div className="w-8 h-8 border-2 border-twitch border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
+
+function TitleBar() {
+  const win = typeof window !== 'undefined' ? getCurrentWindow() : null
+
+  const handleMinimize = () => { try { win?.minimize() } catch { try { getCurrentWindow().minimize() } catch {} } }
+  const handleMaximize = () => { try { win?.toggleMaximize() } catch { try { getCurrentWindow().toggleMaximize() } catch {} } }
+  const handleClose = () => { try { win?.close() } catch { try { getCurrentWindow().close() } catch {} } }
+
+  return (
+    <div data-tauri-drag-region className="flex items-center h-8 bg-bg-primary border-b border-bg-tertiary/20 select-none shrink-0">
+      <div className="flex-1" data-tauri-drag-region />
+      <div className="flex h-full">
+        <button onClick={handleMinimize} className="w-10 h-full flex items-center justify-center text-text-muted/40 hover:text-text-secondary hover:bg-hover transition-colors cursor-pointer" data-tauri-drag-region="false">
+          <svg width="10" height="10" viewBox="0 0 12 12"><rect x="1" y="5.5" width="10" height="1" fill="currentColor"/></svg>
+        </button>
+        <button onClick={handleMaximize} className="w-10 h-full flex items-center justify-center text-text-muted/40 hover:text-text-secondary hover:bg-hover transition-colors cursor-pointer" data-tauri-drag-region="false">
+          <svg width="10" height="10" viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
+        </button>
+        <button onClick={handleClose} className="w-10 h-full flex items-center justify-center text-text-muted/40 hover:text-white hover:bg-red-500 transition-colors cursor-pointer" data-tauri-drag-region="false">
+          <svg width="10" height="10" viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.3"/></svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+import { useAuth } from './hooks/useAuth'
+import { mergeFavorites, addCloudFavorite, removeCloudFavorite, fetchFollowedChannels } from './utils/favoritesSync'
+import { Toast, useLiveAlerts } from './hooks/useLiveAlerts'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { validateToken, clearStoredToken } from './utils/twitch'
+function ChatIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M20 14.5A2.5 2.5 0 0 1 17.5 17H7l-4 4V5.5A2.5 2.5 0 0 1 5.5 3h12A2.5 2.5 0 0 1 20 5.5z"/></svg> }
+function ChatOffIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M20 14.5A2.5 2.5 0 0 1 17.5 17H7l-4 4V5.5A2.5 2.5 0 0 1 5.5 3h12A2.5 2.5 0 0 1 20 5.5z"/><path d="M2 2l20 20"/></svg> }
+function SettingsIcon() { return <svg width="20" height="20" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M26.7,12.3c-2.1,0.4-4,0-4.7-1.3c-0.7-1.3-0.2-3.1,1.3-4.7c-1.3-1.3-3-2.2-4.8-2.8C17.8,5.6,16.5,7,15,7s-2.8-1.4-3.5-3.5C9.7,4.1,8.1,5,6.8,6.3c1.5,1.6,2,3.5,1.3,4.7c-0.7,1.3-2.6,1.7-4.7,1.3C3.1,13.1,3,14.1,3,15s0.1,1.9,0.3,2.7c2.1-0.4,4,0,4.7,1.3c0.7,1.3,0.2,3.1-1.3,4.7c1.3,1.3,3,2.2,4.8,2.8c0.7-2.1,2-3.5,3.5-3.5s2.8,1.4,3.5,3.5c1.8-0.5,3.4-1.5,4.8-2.8c-1.5-1.6-2-3.5-1.3-4.7c0.7-1.3,2.6-1.7,4.7-1.3c0.2-0.9,0.3-1.8,0.3-2.7S26.9,13.1,26.7,12.3z"/><circle cx="15" cy="15" r="4"/></svg> }
+
+const CHAT_BREAKPOINT = 600
+const MAX_RECENT = 8
+
+function loadFrom(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
+  } catch { return fallback }
+}
+
+function saveTo(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* ignore */ }
+}
+
+function loadFavorites() { return loadFrom('blinkstream_favorites', []).filter(f => typeof f === 'string') }
+function loadRecent() { return loadFrom('blinkstream_recent', []).filter(f => typeof f === 'string') }
+function loadVolume() { const v = Number(localStorage.getItem('blinkstream_volume')); return isNaN(v) ? 100 : v }
+function loadTheatre() { return localStorage.getItem('blinkstream_theatre') === 'true' }
+
+function App() {
+  useEffect(() => {
+    const accent = localStorage.getItem('blinkstream_accent') || 'purple'
+    document.documentElement.setAttribute('data-accent', accent)
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('popout')) {
+      try { window.close() } catch { /* ignore */ }
+    }
+  }, [])
+    const [channel, setChannel] = useState('')
+  const [quality, setQuality] = useState('best')
+  const [favorites, setFavorites] = useState(loadFavorites)
+  const [recentChannels, setRecentChannels] = useState(loadRecent)
+  const [volume, setVolume] = useState(loadVolume)
+  const [theatreMode, setTheatreMode] = useState(loadTheatre)
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  const [showChat, setShowChat] = useState(window.innerWidth >= CHAT_BREAKPOINT)
+  const [compact, setCompact] = useState(() => localStorage.getItem('blinkstream_compact') === 'true')
+  const [showSettings, setShowSettings] = useState(false)
+  const [showAbout, setShowAbout] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return !localStorage.getItem('blinkstream_onboarded')
+  })
+
+  const finishOnboarding = () => {
+    localStorage.setItem('blinkstream_onboarded', '1')
+    setShowOnboarding(false)
+  }
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyK' || e.code === 'KeyP')) {
+        e.preventDefault()
+        if (!theatreMode) {
+          const input = document.querySelector('header input[type="text"]')
+          if (input) input.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [theatreMode])
+
+  const { isLoggedIn, user, avatar, loading: authLoading, login, logout, getTwitchToken } = useAuth()
+
+  useEffect(() => {
+    let cancelled = false
+    const check = async () => {
+      const token = getTwitchToken()
+      if (!token) return
+      const valid = await validateToken(token)
+      if (!cancelled && !valid) {
+        clearStoredToken()
+        logout()
+      }
+    }
+    check()
+    const interval = setInterval(check, 10 * 60 * 1000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [isLoggedIn, getTwitchToken, logout])
+
+  const { alerts, dismissAlert } = useLiveAlerts(favorites)
+
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    if (windowWidth < CHAT_BREAKPOINT) setShowChat(false)
+  }, [windowWidth])
+
+  useEffect(() => { saveTo('blinkstream_favorites', favorites) }, [favorites])
+  useEffect(() => { saveTo('blinkstream_recent', recentChannels) }, [recentChannels])
+  useEffect(() => { localStorage.setItem('blinkstream_quality', quality) }, [quality])
+  useEffect(() => { localStorage.setItem('blinkstream_volume', String(volume)) }, [volume])
+  useEffect(() => { localStorage.setItem('blinkstream_theatre', String(theatreMode)) }, [theatreMode])
+
+  const username = user?.username || user?.identities?.[0]?.identity_data?.login || null
+
+  useEffect(() => {
+    if (!username) return
+    const token = getTwitchToken()
+    if (!token) return
+
+    Promise.all([
+      mergeFavorites(favorites, username),
+      fetchFollowedChannels(token),
+    ]).then(([merged, follows]) => {
+      const allChannels = [...new Set([...merged, ...follows])]
+      if (allChannels.length > favorites.length) {
+        setFavorites(allChannels)
+      }
+    }).catch(() => {
+      mergeFavorites(favorites, username).then(merged => {
+        if (merged.length > favorites.length) setFavorites(merged)
+      })
+    })
+  }, [username])
+
+  const selectChannel = useCallback((name) => {
+    setChannel(name)
+    setRecentChannels(prev => {
+      const filtered = prev.filter(c => c !== name)
+      return [name, ...filtered].slice(0, MAX_RECENT)
+    })
+  }, [])
+
+  const toggleFavorite = useCallback((name) => {
+    setFavorites(prev => {
+      const isRemoving = prev.includes(name)
+      if (username) {
+        if (isRemoving) { removeCloudFavorite(username, name) }
+        else { addCloudFavorite(username, name) }
+      }
+      return isRemoving ? prev.filter(f => f !== name) : [...prev, name]
+    })
+  }, [username])
+
+  const removeRecent = useCallback((name) => {
+    setRecentChannels(prev => prev.filter(c => c !== name))
+  }, [])
+
+  const handleCloseSettings = useCallback(() => {
+    setShowSettings(false)
+    setCompact(localStorage.getItem('blinkstream_compact') === 'true')
+  }, [])
+
+  return (
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className={`h-screen w-screen flex flex-col bg-bg-primary text-text-primary ${theatreMode ? 'theatre-mode' : ''} ${compact ? 'compact-mode' : ''}`}>
+      {showOnboarding && <Onboarding onFinish={finishOnboarding} />}
+
+      <TitleBar />
+
+        <header className={`flex items-center gap-3 px-4 py-2 bg-bg-secondary/50 backdrop-blur-xl border-b border-white/[0.04] shrink-0 select-none relative z-10 ${theatreMode ? 'opacity-0 max-h-0 overflow-hidden pointer-events-none' : ''} transition-all duration-300`}>
+          <div className="flex items-center gap-3 mr-1.5 cursor-pointer" onClick={() => { if (channel) setChannel('') }} title={channel ? 'Volver al inicio' : 'BlinkStream'}>
+            <BlinkStreamLogo size={30} />
+            <span className="text-base font-extrabold tracking-tight hidden sm:inline">
+              <span className="text-text-primary">Blink</span>
+              <span className="bg-gradient-to-r from-twitch to-fuchsia-400 bg-clip-text text-transparent font-bold">Stream</span>
+            </span>
+          </div>
+          <div className="w-px h-6 bg-bg-tertiary mx-1.5" />
+          <ChannelSearch onSelect={selectChannel} currentChannel={channel} />
+          <div className="flex-1" />
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors btn-press"
+              title="Configuración"
+            >
+              <SettingsIcon />
+            </button>
+            {isLoggedIn ? (
+              <div className="relative z-[9998]">
+                <button
+                  onClick={() => setShowUserMenu(p => !p)}
+                  className="w-8 h-8 rounded-full bg-twitch flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-twitch/50 transition-all shrink-0 overflow-hidden"
+                  title={username || 'Usuario'}
+                >
+                  {avatar ? (
+                      <img src={avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white text-[13px] font-bold select-none">
+                        {(username || 'U').charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                </button>
+                {showUserMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary border border-bg-tertiary/60 rounded-xl shadow-2xl z-[9999] overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+                    <div className="px-4 py-3 border-b border-bg-tertiary/40">
+                      <p className="text-[12px] font-medium text-text-primary truncate">{username}</p>
+                      <p className="text-[10px] text-text-muted">Conectado</p>
+                    </div>
+                    <button
+                      onClick={() => { setShowUserMenu(false); setShowLogoutConfirm(true) }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-[12px] text-text-secondary hover:bg-hover hover:text-red-400 cursor-pointer transition-colors"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l4-4-4-4"/><path d="M20 12H9"/></svg>
+                      Cerrar sesión
+                    </button>
+                  </div>
+                )}
+                {showUserMenu && (
+                  <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={login}
+                disabled={authLoading}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium text-white bg-twitch hover:bg-twitch-dark disabled:opacity-50 cursor-pointer transition-colors btn-press"
+                title="Iniciar sesión con Twitch"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
+                <span className="hidden sm:inline">{authLoading ? '...' : 'Twitch'}</span>
+              </button>
+            )}
+            {channel && (
+              <button
+                onClick={() => setShowChat(p => !p)}
+                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors btn-press"
+                title={showChat ? 'Ocultar chat' : 'Mostrar chat'}
+              >
+                {showChat ? <ChatIcon /> : <ChatOffIcon />}
+              </button>
+            )}
+          </div>
+        </header>
+
+      <div className="flex flex-1 min-h-0">
+        <div className={`flex flex-col min-h-0 animate-fade-in ${showChat && !theatreMode ? 'flex-1' : 'w-full'}`}>
+          {channel ? (
+            <>
+              {!theatreMode && <StreamInfo channel={channel} isFavorite={favorites.includes(channel)} onToggleFavorite={() => toggleFavorite(channel)} />}
+              <div className={`flex-1 min-h-0 flex items-center justify-center ${theatreMode ? '' : 'p-3'}`}>
+              <Suspense fallback={<PlayerFallback />}>
+                <VideoPlayer
+                  channel={channel}
+                  quality={quality}
+                  onQualityChange={setQuality}
+                  volume={volume}
+                  onVolumeChange={setVolume}
+                  theatreMode={theatreMode}
+                  onToggleTheatre={() => setTheatreMode(p => !p)}
+                />
+              </Suspense>
+              </div>
+            </>
+          ) : (
+            <HomeScreen
+              onSelect={selectChannel}
+              onToggleFavorite={toggleFavorite}
+              favorites={favorites}
+              recentChannels={recentChannels}
+              onRemoveRecent={removeRecent}
+              onShowAbout={() => setShowAbout(true)}
+            />
+          )}
+        </div>
+
+        {showChat && channel && !theatreMode && (
+          <div className="w-96 min-w-[320px] max-w-[440px] border-l border-bg-tertiary/30 transition-all duration-300">
+            <Suspense fallback={<ChatFallback />}>
+              <Chat
+                channel={channel}
+                isLoggedIn={isLoggedIn}
+                twitchToken={getTwitchToken()}
+                twitchUsername={username || localStorage.getItem('blinkstream_twitch_username')}
+              />
+            </Suspense>
+          </div>
+        )}
+      </div>
+
+      {showSettings && <Settings onClose={handleCloseSettings} />}
+      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+      {showLogoutConfirm && (
+        <ConfirmDialog
+          title="Cerrar sesión"
+          message="¿Estás seguro de que quieres cerrar sesión? Tus favoritos en la nube se conservarán."
+          confirmText="Cerrar sesión"
+          onConfirm={() => { setShowLogoutConfirm(false); logout() }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
+
+      {alerts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+          {alerts.map(a => (
+            <Toast
+              key={a.id}
+              channel={a.channel}
+              message={a.message}
+              logo={a.logo}
+              onClick={() => selectChannel(a.channel)}
+              onDismiss={() => dismissAlert(a.channel)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default App

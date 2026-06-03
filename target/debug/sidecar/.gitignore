@@ -1,0 +1,14 @@
+# Build artifacts
+build/
+ct2-server
+ct2-server.exe
+ct2-server-*.exe
+ct2-server-*-linux-gnu
+ct2-server-*-apple-darwin
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
