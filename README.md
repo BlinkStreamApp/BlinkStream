@@ -43,8 +43,8 @@
 
 ### Windows
 Descarga el instalador desde [Releases](https://github.com/TU_USUARIO/blinkstream/releases):
-- `BlinkStream_1.0.0_x64-setup.exe` (NSIS)
-- `BlinkStream_1.0.0_x64_en-US.msi`
+- `BlinkStream_X.X.X_x64-setup.exe` (NSIS)
+- `BlinkStream_X.X.X_x64_en-US.msi`
 
 ### macOS
 ```bash
