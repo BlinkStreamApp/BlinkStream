@@ -303,8 +303,9 @@ dependencies = [
 
 [[package]]
 name = "blinkstream"
-version = "0.2.0"
+version = "1.0.1"
 dependencies = [
+ "libc",
  "log",
  "regex-lite",
  "reqwest 0.12.28",
