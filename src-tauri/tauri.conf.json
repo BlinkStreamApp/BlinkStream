@@ -39,9 +39,7 @@
     "macOS": {
       "minimumSystemVersion": "11.0"
     },
-    "externalBin": [
-      "binaries/streamlink"
-    ]
+    "externalBin": []
   },
   "plugins": {}
 }
