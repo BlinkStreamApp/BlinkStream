@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import Hls from 'hls.js'
-import { getDirectStreamUrl, getStreamInfo } from '../utils/twitch'
+import { getStreamInfo } from '../utils/twitch'
 import { formatViewers } from '../utils/format'
 import QualitySelector from './QualitySelector'
 import ClipPlayer from './ClipPlayer'
@@ -89,15 +89,11 @@ export default function VideoPlayer({
       setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
     } catch (e) { console.warn('Streamlink fallback — get_stream_url failed:', e) }
 
+    // Fallback directo desde Rust (evita CORS del WebView macOS)
     try {
-      const url = await getDirectStreamUrl(ch, 'chunked')
+      const url = await invoke('get_direct_stream_url', { channel: ch })
       setStreamUrl(url); setUsingFallback(true); setLoading(false); isFetchingRef.current = false; return
-    } catch (e) { console.warn('Direct stream fallback (chunked) failed:', e) }
-
-    try {
-      const url = await getDirectStreamUrl(ch, 'audio_only')
-      setStreamUrl(url); setUsingFallback(true); setLoading(false); isFetchingRef.current = false; return
-    } catch (e) { console.warn('Direct stream fallback (audio_only) failed:', e) }
+    } catch (e) { console.warn('Rust direct fallback failed:', e) }
 
     setError(`No se pudo cargar ${ch}. ¿Está online?`)
     setLoading(false); isFetchingRef.current = false

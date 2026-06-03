@@ -491,6 +491,81 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
     ))
 }
 
+/// Obtiene la URL del stream directamente desde la API de Twitch (GQL + Usher).
+/// Esto evita las restricciones CORS del WebView al usar reqwest desde el backend Rust.
+#[tauri::command]
+async fn get_direct_stream_url(channel: String) -> Result<String, String> {
+    validate_channel(&channel)?;
+
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .build()
+        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
+
+    // ── Step 1: Obtener access token vía GraphQL de Twitch ──
+    let gql_body = serde_json::json!({
+        "query": format!(
+            "{{ streamPlaybackAccessToken(channelName: \"{}\", params: {{platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\"}}) {{ value signature }} }}",
+            channel
+        )
+    });
+
+    let gql_res = client
+        .post("https://gql.twitch.tv/gql")
+        .header("Client-ID", "kimne78kx3ncx6brgo4mv6wki5h1ko")
+        .header("Content-Type", "application/json")
+        .json(&gql_body)
+        .send()
+        .await
+        .map_err(|e| format!("Error conectando con Twitch GQL: {}", e))?;
+
+    if !gql_res.status().is_success() {
+        return Err(format!("Twitch GQL respondió con HTTP {}", gql_res.status()));
+    }
+
+    let gql_data: serde_json::Value = gql_res
+        .json()
+        .await
+        .map_err(|e| format!("Error parseando respuesta GQL: {}", e))?;
+
+    let token = gql_data["data"]["streamPlaybackAccessToken"]["value"]
+        .as_str()
+        .ok_or_else(|| "No se pudo obtener token de acceso de Twitch".to_string())?
+        .to_string();
+    let sig = gql_data["data"]["streamPlaybackAccessToken"]["signature"]
+        .as_str()
+        .ok_or_else(|| "No se pudo obtener signature de Twitch".to_string())?
+        .to_string();
+
+    // ── Step 2: Obtener playlist HLS de Usher ──
+    let p = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    let usher_url = format!(
+        "https://usher.ttvnw.net/api/channel/hls/{}.m3u8?player=twitchweb&token={}&sig={}&allow_audio_only=true&allow_source=true&type=any&p={}",
+        urlencoding::encode(&channel),
+        urlencoding::encode(&token),
+        urlencoding::encode(&sig),
+        p
+    );
+
+    let usher_res = client
+        .get(&usher_url)
+        .header("Client-ID", "kimne78kx3ncx6brgo4mv6wki5h1ko")
+        .send()
+        .await
+        .map_err(|e| format!("Error conectando con Twitch Usher: {}", e))?;
+
+    if !usher_res.status().is_success() {
+        return Err(format!("Twitch Usher respondió con HTTP {}", usher_res.status()));
+    }
+
+    // Devolver la URL final (después de redirecciones)
+    Ok(usher_res.url().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -502,6 +577,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_stream_url,
             get_available_qualities,
+            get_direct_stream_url,
             get_twitch_clip_url,
             get_vod_manifest_url,
             start_recording,
