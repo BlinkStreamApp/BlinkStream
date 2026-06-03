@@ -82,6 +82,18 @@ jobs:
         if: runner.os == 'macOS'
         run: pnpm tauri build --target ${{ matrix.target }}
 
+      - name: Ad-hoc sign macOS app (evita Gatekeeper)
+        if: runner.os == 'macOS'
+        run: |
+          APP_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/BlinkStream.app"
+          if [ -d "$APP_PATH" ]; then
+            echo "🔏 Firmando app con ad-hoc signature..."
+            codesign --force --deep --sign - "$APP_PATH"
+            echo "✅ App firmada correctamente"
+          else
+            echo "⚠️ App bundle no encontrado en $APP_PATH"
+          fi
+
       - name: Build Rust (Windows)
         if: runner.os == 'Windows'
         run: pnpm tauri build --target ${{ matrix.target }}
