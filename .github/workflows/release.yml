@@ -76,18 +76,15 @@ jobs:
       # ── Rust backend (bundles específicos por plataforma) ──
       - name: Build Rust (Linux - deb + AppImage)
         if: runner.os == 'Linux'
-        working-directory: src-tauri
-        run: cargo tauri build --target ${{ matrix.target }} --bundles deb,appimage
+        run: pnpm tauri build --target ${{ matrix.target }} --bundles deb,appimage
 
       - name: Build Rust (macOS)
         if: runner.os == 'macOS'
-        working-directory: src-tauri
-        run: cargo tauri build --target ${{ matrix.target }}
+        run: pnpm tauri build --target ${{ matrix.target }}
 
       - name: Build Rust (Windows)
         if: runner.os == 'Windows'
-        working-directory: src-tauri
-        run: cargo tauri build --target ${{ matrix.target }}
+        run: pnpm tauri build --target ${{ matrix.target }}
 
       # ── Upload artifacts (nombres únicos por target) ──
       - name: Upload Linux
