@@ -101,7 +101,7 @@ jobs:
           APP_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/BlinkStream.app"
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg"
           mkdir -p "$DMG_PATH"
-          DMG_NAME="BlinkStream_1.0.1_$(echo ${{ matrix.target }} | sed 's/-apple-darwin//').dmg"
+          DMG_NAME="BlinkStream_1.0.2_$(echo ${{ matrix.target }} | sed 's/-apple-darwin//').dmg"
           
           echo "📦 Creando DMG firmado..."
           hdiutil create -volname "BlinkStream" \
