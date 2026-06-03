@@ -12,7 +12,7 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{Read, Write};
 
 pub fn try_lock_single_instance(name: &str) -> bool {
     let lock_dir = single_instance_lock_dir();
@@ -235,7 +235,7 @@ fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
     Err(format!("Streamlink no está instalado.\n\nInstálalo con: {}", INSTALL_CMD))
 }
 
-fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<String, String> {
+fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<(String, String), String> {
     let binary = find_streamlink(app)?;
 
     let mut cmd = Command::new(&binary);
@@ -254,36 +254,45 @@ fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<String, String> {
             }
         })?;
 
+    // Tomar pipes ANTES de wait_timeout para evitar ECHILD en Unix
+    let stdout_handle = child.stdout.take();
+    let stderr_handle = child.stderr.take();
+
     let timeout = Duration::from_secs(10);
-    let status = match child
+    let _status = match child
         .wait_timeout(timeout)
         .map_err(|e| format!("Error esperando a streamlink: {}", e))?
     {
         Some(status) => status,
         None => {
             let _ = child.kill();
-            child.wait().ok();
+            let _ = child.wait();
             return Err(
-                "Streamlink tardó más de 10 segundos. Usando fallback directo.".into(),
+                "Streamlink tardó más de 10 segundos.".into(),
             );
         }
     };
 
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("Error leyendo salida: {}", e))?;
-
-    if status.success() {
-        let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if url.is_empty() {
-            Err("Streamlink no devolvió una URL. ¿Está el canal en vivo?".into())
-        } else {
-            Ok(url)
+    // Leer stdout/stderr manualmente desde los pipes tomados
+    let stdout = match stdout_handle {
+        Some(mut handle) => {
+            let mut buf = String::new();
+            handle.read_to_string(&mut buf).map_err(|e| format!("Error leyendo stdout: {}", e))?;
+            buf
         }
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        Err(format!("Streamlink falló: {}", stderr))
-    }
+        None => String::new(),
+    };
+
+    let stderr = match stderr_handle {
+        Some(mut handle) => {
+            let mut buf = String::new();
+            handle.read_to_string(&mut buf).map_err(|e| format!("Error leyendo stderr: {}", e))?;
+            buf
+        }
+        None => String::new(),
+    };
+
+    Ok((stdout, stderr))
 }
 
 static RECORDING: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
@@ -303,7 +312,7 @@ fn start_recording(app: AppHandle, channel: String, output_path: String) -> Resu
 
     let child = cmd.spawn().map_err(|e| format!("No se pudo iniciar grabación: {}", e))?;
     let pid = child.id();
-    let mut rec = RECORDING.lock().map_err(|e| e.to_string())?;
+    let mut rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
     *rec = Some(child);
 
     Ok(format!("Grabando (PID: {})", pid))
@@ -311,7 +320,7 @@ fn start_recording(app: AppHandle, channel: String, output_path: String) -> Resu
 
 #[tauri::command]
 fn stop_recording() -> Result<String, String> {
-    let mut rec = RECORDING.lock().map_err(|e| e.to_string())?;
+    let mut rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(mut child) = rec.take() {
         let _ = child.kill();
         let _ = child.wait();
@@ -324,22 +333,28 @@ fn stop_recording() -> Result<String, String> {
 #[tauri::command]
 fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Result<String, String> {
     validate_channel(&channel)?;
-    run_streamlink(&app, &[&format!("twitch.tv/{}", channel), &quality, "--stream-url"])
+    let (stdout, stderr) = run_streamlink(&app, &[&format!("twitch.tv/{}", channel), &quality, "--stream-url"])?;
+    let url = stdout.trim().to_string();
+    if url.is_empty() {
+        Err(format!("Streamlink no devolvió URL. stderr: {}", stderr.trim()))
+    } else {
+        Ok(url)
+    }
 }
 
 #[tauri::command]
 fn get_available_qualities(app: AppHandle, channel: String) -> Result<Vec<String>, String> {
     validate_channel(&channel)?;
-    let output = run_streamlink(&app, &[&format!("twitch.tv/{}", channel), "--stream-url"])?;
+    let (_stdout, stderr) = run_streamlink(&app, &[&format!("twitch.tv/{}", channel)])?;
 
-    let qualities: Vec<String> = output
+    let qualities: Vec<String> = stderr
         .lines()
         .filter_map(|line| {
             let line = line.trim();
-            if !line.starts_with("Available streams:") {
+            if !line.contains("Available streams:") {
                 return None;
             }
-            let parts = line.strip_prefix("Available streams:")?;
+            let parts = line.split("Available streams:").nth(1)?;
             Some(
                 parts
                     .split(',')
@@ -360,9 +375,8 @@ fn get_available_qualities(app: AppHandle, channel: String) -> Result<Vec<String
     if qualities.is_empty() {
         Ok(vec![
             "audio_only".into(),
-            "160p30".into(),
-            "360p30".into(),
-            "480p30".into(),
+            "160p".into(),
+            "360p".into(),
             "720p60".into(),
             "1080p60".into(),
         ])
