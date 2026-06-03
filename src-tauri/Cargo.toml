@@ -31,3 +31,4 @@ regex-lite = "0.1"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 urlencoding = "2"
 tokio = { version = "1", features = ["full"] }
+libc = "0.2"
