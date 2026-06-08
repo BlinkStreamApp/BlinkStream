@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.2-e94560" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.0.3-e94560" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
 </p>
@@ -23,11 +23,11 @@
 | 📺 **Streams en vivo** | Reproducción de streams de Twitch con streamlink + ffmpeg |
 | 🎬 **Clips** | Visualización de clips con calidad seleccionable |
 | 📼 **VODs** | Reproducción de videos bajo demanda (VOD) |
-| 💬 **Chat IRC** | Chat en tiempo real con soporte de emotes (BTTV, 7TV, FFZ) |
+| 💬 **Chat IRC** | Chat en tiempo real con emotes (BTTV, 7TV, FFZ) y toggle de posición a la derecha |
 | 🔐 **Login OAuth** | Autenticación con Twitch vía Supabase Edge Functions |
 | ⭐ **Favoritos** | Sigue canales y sincroniza con la nube |
 | 👥 **Follows** | Importa tus canales seguidos de Twitch |
-| 🔍 **Búsqueda** | Busca canales con autocompletado |
+| 🔍 **Búsqueda** | Busca canales con autocompletado, resultados con lives primero y spinner de carga |
 | 🖥️ **Info del stream** | Título, viewers, uptime, tags, juego |
 | 🎭 **Modo teatro** | Experiencia inmersiva sin distracciones |
 | 🎨 **UI responsive** | Adaptable de 800px a 1920px |
@@ -36,13 +36,18 @@
 | 🔒 **CSP restrictivo** | Política de seguridad sin wildcards |
 | 🚀 **Lazy loading** | Chat y reproductor cargan bajo demanda |
 | 💾 **Cache inteligente** | sessionStorage con TTL para carga instantánea |
+| 🔄 **Auto-updater** | La app se actualiza sola desde GitHub Releases |
+| 🔔 **Notificaciones nativas** | Alertas de live en Windows Toast / macOS Notification Center |
+| 🔑 **Keychain seguro** | Tokens de Twitch guardados en Windows Credential Manager / macOS Keychain / Linux Secret Service |
+| ⚠️ **Mensajes de error** | Errores informativos con contexto, código y sugerencias de solución |
+| 📝 **Logging en producción** | Registro estructurado de eventos para diagnóstico sin afectar rendimiento |
 
 ---
 
 ## 📦 Instalación
 
 ### Windows
-Descarga el instalador desde [Releases](https://github.com/TU_USUARIO/blinkstream/releases):
+Descarga el instalador desde [Releases](https://github.com/BlinkStreamApp/BlinkStream/releases) — o simplemente abre la app, que se actualiza sola:
 - `BlinkStream_X.X.X_x64-setup.exe` (NSIS)
 - `BlinkStream_X.X.X_x64_en-US.msi`
 
@@ -65,7 +70,7 @@ sudo apt install streamlink
 ### Requisitos
 - **Node.js** 18+
 - **pnpm** 9+
-- **Rust** 1.77+
+- **Rust** 1.88.0+ (toolchain version pinneado en rust-toolchain.toml)
 - **streamlink** (instalado en el PATH)
 
 ### Windows
@@ -102,7 +107,7 @@ El workflow `.github/workflows/release.yml` compila automáticamente para Window
 ```
 blinkstream/
 ├── src/                     # Frontend React + Tailwind
-│   ├── components/          # 15 componentes JSX
+│   ├── components/          # 16 componentes JSX
 │   │   ├── HomeScreen.jsx   # Menú principal (grid, carousel, sidebar)
 │   │   ├── VideoPlayer.jsx  # Reproductor HLS.js + controles
 │   │   ├── Chat.jsx         # IRC + BTTV/7TV/FFZ
@@ -114,7 +119,7 @@ blinkstream/
 │   ├── src/
 │   │   ├── lib.rs           # Comandos Tauri, streamlink, single-instance
 │   │   └── main.rs          # Entrypoint
-│   ├── Cargo.toml           # Dependencias Rust (~14 crates)
+│   ├── Cargo.toml           # Dependencias Rust (~18 crates)
 │   └── tauri.conf.json      # Configuración Tauri + CSP + bundle
 └── .github/workflows/       # CI/CD
     └── release.yml          # Build multiplataforma automático
@@ -128,7 +133,7 @@ blinkstream/
 |------|-----------|
 | **Desktop shell** | Tauri v2.11 |
 | **Frontend** | React 19 + Tailwind CSS 3 |
-| **Backend** | Rust 1.77 (tokio async) |
+| **Backend** | Rust 1.88.0 (tokio async) |
 | **Empaquetado** | Vite 8 |
 | **Streaming** | HLS.js + streamlink + ffmpeg |
 | **Auth** | Supabase Edge Functions + Twitch OAuth |
@@ -143,10 +148,12 @@ blinkstream/
 |-----------|-------|
 | **Instalador Windows** | 3.7 MB (NSIS) / 5.3 MB (MSI) |
 | **Bundle JS inicial** | 277 KB (853 KB con lazy chunks) |
-| **Dependencias Rust** | 14 crates |
-| **Componentes React** | 15 |
+| **Dependencias Rust** | 18 crates |
+| **Componentes React** | 16 |
 | **Cobertura CSP** | 9 directivas, 0 wildcards |
 | **Defectos Vigía** | 0 críticos · 0 altos · 0 medios · 0 bajos |
+| **Plataformas** | Windows, macOS (ARM + Intel), Linux |
+| **Seguridad** | Capabilities restringidas, timeouts HTTP, validación de rutas, rustls-tls |
 
 ---
 
