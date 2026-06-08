@@ -151,6 +151,8 @@ jobs:
 
       - name: Generate macOS .sig for DMG
         if: runner.os == 'macOS'
+        env:
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: |
           VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
           if [ "${{ matrix.target }}" = "aarch64-apple-darwin" ]; then
@@ -160,10 +162,16 @@ jobs:
           fi
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/$DMG_NAME"
           echo "🔏 Generando signature para auto-updater..."
-          pnpm tauri signer sign \
-            --private-key "${{ secrets.TAURI_PRIVATE_KEY }}" \
-            --password "${{ secrets.TAURI_KEY_PASSWORD }}" \
-            "$DMG_PATH"
+          if [ -n "$TAURI_KEY_PASSWORD" ]; then
+            pnpm tauri signer sign \
+              --private-key "${{ secrets.TAURI_PRIVATE_KEY }}" \
+              --password "$TAURI_KEY_PASSWORD" \
+              "$DMG_PATH"
+          else
+            pnpm tauri signer sign \
+              --private-key "${{ secrets.TAURI_PRIVATE_KEY }}" \
+              "$DMG_PATH"
+          fi
           echo "✅ Signature: ${DMG_NAME}.sig"
 
       - name: Build Rust (Windows)
