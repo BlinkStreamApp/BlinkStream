@@ -5,19 +5,19 @@
   "platforms": {
     "windows-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_x64-setup.exe"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_Win_x64.exe"
     },
     "darwin-aarch64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_arm64.dmg"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_macOS_arm64.dmg"
     },
     "darwin-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_x64.dmg"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_macOS_x64.dmg"
     },
     "linux-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/blinkstream_1.1.0_amd64.deb"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_Linux_x86_64.deb"
     }
   }
 }
