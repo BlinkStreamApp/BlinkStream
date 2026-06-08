@@ -151,8 +151,6 @@ jobs:
 
       - name: Generate macOS .sig for DMG
         if: runner.os == 'macOS'
-        env:
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
         run: |
           VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
           if [ "${{ matrix.target }}" = "aarch64-apple-darwin" ]; then
@@ -161,12 +159,13 @@ jobs:
             DMG_NAME="BlinkStream_${VERSION}_macOS_x64.dmg"
           fi
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/$DMG_NAME"
-          echo "🔏 Instalando minisign y generando signature..."
-          brew install minisign
-          echo "$TAURI_PRIVATE_KEY" > /tmp/tauri-key.minisign
-          minisign -Sm "$DMG_PATH" -s /tmp/tauri-key.minisign
-          mv "${DMG_PATH}.minisig" "${DMG_PATH}.sig"
-          rm -f /tmp/tauri-key.minisign
+          echo "🔏 Generando signature para auto-updater..."
+          # Anular TAURI_KEY_PASSWORD para que el CLI no lo use (hereda del job-level env)
+          unset TAURI_KEY_PASSWORD
+          # Escribir clave a archivo y firmar inline
+          python3 -c "import os; open('/tmp/tauri-key.pem','w').write(os.environ['TAURI_PRIVATE_KEY'].strip())"
+          npx @tauri-apps/cli signer sign --private-key "$(cat /tmp/tauri-key.pem)" "$DMG_PATH"
+          rm -f /tmp/tauri-key.pem
           echo "✅ Signature: ${DMG_NAME}.sig"
 
       - name: Build Rust (Windows)
