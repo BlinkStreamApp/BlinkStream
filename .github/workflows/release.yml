@@ -163,13 +163,22 @@ jobs:
           fi
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/$DMG_NAME"
           echo "🔏 Generando signature para auto-updater..."
-          # Escribir clave desde env var usando Python (evita problemas de shell con base64)
-          python3 -c "import os; open('/tmp/tauri-key.pem','w').write(os.environ['TAURI_PRIVATE_KEY'])"
+          # DEBUG: verificar qué hay realmente en la variable de entorno
+          python3 -c "
+import os
+key = os.environ.get('TAURI_PRIVATE_KEY', '')
+print(f'Key length: {len(key)}')
+print(f'Char at 10: ord={ord(key[10])} char={repr(key[10])}')
+print(f'First 30 chars: {repr(key[:30])}')
+"
+          # Escribir clave desde env var usando Python
+          python3 -c "import os; open('/tmp/tauri-key.pem','w').write(os.environ.get('TAURI_PRIVATE_KEY',''))"
           KEY_LEN=$(wc -c < /tmp/tauri-key.pem)
-          echo "Key file length: ${KEY_LEN} bytes"
-          # Validar que la clave sea base64 válido
-          python3 -c "import base64; base64.b64decode(open('/tmp/tauri-key.pem','rb').read())" || {
-            echo "ERROR: clave privada no es base64 válido (${KEY_LEN} bytes). Verificar TAURI_PRIVATE_KEY"
+          echo "File length: ${KEY_LEN} bytes"
+          # Validar con strict=True (falla si hay caracteres inválidos)
+          python3 -c "import base64; base64.b64decode(open('/tmp/tauri-key.pem','rb').read(), validate=True)" || {
+            echo "ERROR: clave privada tiene caracteres inválidos"
+            hexdump -C /tmp/tauri-key.pem | head -5
             exit 1
           }
           if [ -n "$TAURI_KEY_PASSWORD" ]; then
