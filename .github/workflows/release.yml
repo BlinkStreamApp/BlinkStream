@@ -28,6 +28,9 @@ jobs:
             artifact: windows-x64
 
     runs-on: ${{ matrix.os }}
+    env:
+      TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+      TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -101,7 +104,8 @@ jobs:
           APP_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/macos/BlinkStream.app"
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg"
           mkdir -p "$DMG_PATH"
-          DMG_NAME="BlinkStream_1.0.2_$(echo ${{ matrix.target }} | sed 's/-apple-darwin//').dmg"
+          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          DMG_NAME="BlinkStream_${VERSION}_$(echo ${{ matrix.target }} | sed 's/-apple-darwin//').dmg"
           
           echo "📦 Creando DMG firmado..."
           hdiutil create -volname "BlinkStream" \
@@ -159,3 +163,99 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
             src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+
+      # ── Upload .sig files for auto-updater ──
+      - name: Upload signatures
+        uses: actions/upload-artifact@v4
+        with:
+          name: signatures-${{ matrix.artifact }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
+          if-no-files-found: ignore
+
+  # ── Generar updater.json con todas las signatures ──
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all signatures
+        uses: actions/download-artifact@v4
+        with:
+          pattern: signatures-*
+          merge-multiple: true
+
+      - name: Build updater.json
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Construyendo updater.json para v$VERSION"
+
+          # Template base
+          cat > updater.json << EOF
+          {
+            "version": "$VERSION",
+            "notes": "Novedades de BlinkStream v$VERSION",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {}
+          }
+          EOF
+
+          # Función para añadir plataforma
+          add_platform() {
+            local platform="$1"
+            local sig_file="$2"
+            local url="$3"
+            local sig=""
+
+            if [ -f "$sig_file" ]; then
+              sig=$(cat "$sig_file")
+            fi
+
+            # Usar node/jq para insertar en JSON
+            node -e "
+              const fs = require('fs');
+              const data = JSON.parse(fs.readFileSync('updater.json', 'utf8'));
+              data.platforms['$platform'] = {
+                signature: '$sig',
+                url: '$url'
+              };
+              fs.writeFileSync('updater.json', JSON.stringify(data, null, 2) + '\n');
+            "
+          }
+
+          add_platform "windows-x86_64" \
+            "BlinkStream_*.exe.sig" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/BlinkStream_${VERSION}_x64-setup.exe"
+
+          add_platform "darwin-aarch64" \
+            "BlinkStream_*.dmg.sig" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/BlinkStream_${VERSION}_arm64.dmg"
+
+          add_platform "darwin-x86_64" \
+            "BlinkStream_*.dmg.sig" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/BlinkStream_${VERSION}_x64.dmg"
+
+          add_platform "linux-x86_64" \
+            "blinkstream_*.deb.sig" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/blinkstream_${VERSION}_amd64.deb"
+
+          echo "updater.json generado:"
+          cat updater.json
+
+      - name: Upload updater.json to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: updater.json
+
+      - name: Commit updater.json to repo
+        run: |
+          git config user.name "BlinkStream Bot"
+          git config user.email "bot@blinkstream.app"
+          git add updater.json
+          git diff --cached --exit-code || git commit -m "Update updater.json for v$VERSION"
+          git push

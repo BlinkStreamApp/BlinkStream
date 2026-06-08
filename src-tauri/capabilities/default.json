@@ -12,16 +12,25 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "core:window:allow-start-dragging",
-    "process:default",
-    "shell:default",
     "opener:default",
-    "fs:default",
-    "fs:allow-write",
-    "fs:allow-write-text-file",
     "dialog:default",
     "dialog:allow-save",
     "core:event:default",
     "core:event:allow-listen",
-    "core:event:allow-emit"
+    "core:event:allow-emit",
+    {
+      "identifier": "fs:allow-write",
+      "scope": {
+        "allow": ["$DESKTOP/**", "$DOCUMENTS/**", "$DOWNLOAD/**"]
+      }
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "scope": {
+        "allow": ["$DESKTOP/**", "$DOCUMENTS/**", "$DOWNLOAD/**"]
+      }
+    },
+    "notification:default",
+    "updater:default"
   ]
 }

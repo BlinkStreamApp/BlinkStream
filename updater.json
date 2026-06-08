@@ -1,0 +1,23 @@
+{
+  "version": "1.1.0",
+  "notes": "Novedades de BlinkStream v1.1.0:\n- Auto-updater: la app se actualiza sola\n- Notificaciones nativas cuando tus canales favoritos se conectan\n- Keychain: tu token de Twitch ahora está seguro\n- Varias mejoras de rendimiento y estabilidad",
+  "pub_date": "2026-06-08T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "",
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_x64-setup.exe"
+    },
+    "darwin-aarch64": {
+      "signature": "",
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_arm64.dmg"
+    },
+    "darwin-x86_64": {
+      "signature": "",
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_x64.dmg"
+    },
+    "linux-x86_64": {
+      "signature": "",
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/blinkstream_1.1.0_amd64.deb"
+    }
+  }
+}

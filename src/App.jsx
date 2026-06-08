@@ -11,6 +11,14 @@ import { BlinkStreamLogo } from './components/BlinkStreamLogo'
 const VideoPlayer = lazy(() => import('./components/VideoPlayer'))
 const Chat = lazy(() => import('./components/Chat'))
 
+import { useAuth } from './hooks/useAuth'
+import { mergeFavorites, addCloudFavorite, removeCloudFavorite, fetchFollowedChannels } from './utils/favoritesSync'
+import { Toast, useLiveAlerts } from './hooks/useLiveAlerts'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { check } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
+import { validateToken, clearStoredToken } from './utils/twitch'
+
 function PlayerFallback() {
   return (
     <div className="flex-1 flex items-center justify-center bg-bg-primary">
@@ -54,11 +62,6 @@ function TitleBar() {
     </div>
   )
 }
-import { useAuth } from './hooks/useAuth'
-import { mergeFavorites, addCloudFavorite, removeCloudFavorite, fetchFollowedChannels } from './utils/favoritesSync'
-import { Toast, useLiveAlerts } from './hooks/useLiveAlerts'
-import { getCurrentWindow } from '@tauri-apps/api/window'
-import { validateToken, clearStoredToken } from './utils/twitch'
 function ChatIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M20 14.5A2.5 2.5 0 0 1 17.5 17H7l-4 4V5.5A2.5 2.5 0 0 1 5.5 3h12A2.5 2.5 0 0 1 20 5.5z"/></svg> }
 function ChatOffIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M20 14.5A2.5 2.5 0 0 1 17.5 17H7l-4 4V5.5A2.5 2.5 0 0 1 5.5 3h12A2.5 2.5 0 0 1 20 5.5z"/><path d="M2 2l20 20"/></svg> }
 function SettingsIcon() { return <svg width="20" height="20" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M26.7,12.3c-2.1,0.4-4,0-4.7-1.3c-0.7-1.3-0.2-3.1,1.3-4.7c-1.3-1.3-3-2.2-4.8-2.8C17.8,5.6,16.5,7,15,7s-2.8-1.4-3.5-3.5C9.7,4.1,8.1,5,6.8,6.3c1.5,1.6,2,3.5,1.3,4.7c-0.7,1.3-2.6,1.7-4.7,1.3C3.1,13.1,3,14.1,3,15s0.1,1.9,0.3,2.7c2.1-0.4,4,0,4.7,1.3c0.7,1.3,0.2,3.1-1.3,4.7c1.3,1.3,3,2.2,4.8,2.8c0.7-2.1,2-3.5,3.5-3.5s2.8,1.4,3.5,3.5c1.8-0.5,3.4-1.5,4.8-2.8c-1.5-1.6-2-3.5-1.3-4.7c0.7-1.3,2.6-1.7,4.7-1.3c0.2-0.9,0.3-1.8,0.3-2.7S26.9,13.1,26.7,12.3z"/><circle cx="15" cy="15" r="4"/></svg> }
@@ -103,6 +106,10 @@ function App() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [showChat, setShowChat] = useState(window.innerWidth >= CHAT_BREAKPOINT)
   const [compact, setCompact] = useState(() => localStorage.getItem('blinkstream_compact') === 'true')
+  const [chatOnRight, setChatOnRight] = useState(() => {
+    try { return localStorage.getItem('blinkstream_chat_side') !== 'left' }
+    catch { return true }
+  })
   const [showSettings, setShowSettings] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -139,7 +146,7 @@ function App() {
       if (!token) return
       const valid = await validateToken(token)
       if (!cancelled && !valid) {
-        clearStoredToken()
+        await clearStoredToken()
         logout()
       }
     }
@@ -147,6 +154,28 @@ function App() {
     const interval = setInterval(check, 10 * 60 * 1000)
     return () => { cancelled = true; clearInterval(interval) }
   }, [isLoggedIn, getTwitchToken, logout])
+
+  useEffect(() => {
+    let cancelled = false
+    const check = async () => {
+      try {
+        const update = await check()
+        if (!cancelled && update) {
+          const proceed = window.confirm(
+            `Nueva versión ${update.version} disponible.\n${update.body || ''}\n\n¿Descargar e instalar ahora?`
+          )
+          if (proceed) {
+            await update.downloadAndInstall()
+            await relaunch()
+          }
+        }
+      } catch (e) {
+        console.warn('Error checking for updates:', e)
+      }
+    }
+    const timer = setTimeout(check, 3000)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [])
 
   const { alerts, dismissAlert } = useLiveAlerts(favorites)
 
@@ -214,6 +243,7 @@ function App() {
   const handleCloseSettings = useCallback(() => {
     setShowSettings(false)
     setCompact(localStorage.getItem('blinkstream_compact') === 'true')
+    setChatOnRight(localStorage.getItem('blinkstream_chat_side') !== 'left')
   }, [])
 
   return (
@@ -300,7 +330,7 @@ function App() {
           </div>
         </header>
 
-      <div className="flex flex-1 min-h-0">
+      <div className={`flex flex-1 min-h-0 ${!chatOnRight ? 'flex-row-reverse' : ''}`}>
         <div className={`flex flex-col min-h-0 animate-fade-in ${showChat && !theatreMode ? 'flex-1' : 'w-full'}`}>
           {channel ? (
             <>
@@ -315,6 +345,8 @@ function App() {
                   onVolumeChange={setVolume}
                   theatreMode={theatreMode}
                   onToggleTheatre={() => setTheatreMode(p => !p)}
+                  compact={compact}
+                  onToggleCompact={() => setCompact(p => { const next = !p; localStorage.setItem('blinkstream_compact', String(next)); return next; })}
                 />
               </Suspense>
               </div>
@@ -332,7 +364,7 @@ function App() {
         </div>
 
         {showChat && channel && !theatreMode && (
-          <div className="w-96 min-w-[320px] max-w-[440px] border-l border-bg-tertiary/30 transition-all duration-300">
+          <div className={`w-96 min-w-[320px] max-w-[440px] ${chatOnRight ? 'border-l' : 'border-r'} border-bg-tertiary/30 transition-all duration-300`}>
             <Suspense fallback={<ChatFallback />}>
               <Chat
                 channel={channel}

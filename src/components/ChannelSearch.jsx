@@ -8,6 +8,7 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
   const [error, setError] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searching, setSearching] = useState(false)
   const [selectedIdx, setSelectedIdx] = useState(-1)
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
@@ -33,12 +34,14 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
     if (val.length < 2) { setSuggestions([]); return }
 
     debounceRef.current = setTimeout(async () => {
+      setSearching(true)
       try {
         const results = await searchChannels(val)
         setSuggestions(results.filter(r => r.login !== currentChannel).slice(0, 6))
         setShowSuggestions(true)
         setSelectedIdx(-1)
       } catch { setSuggestions([]) }
+      finally { setSearching(false) }
     }, 250)
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
@@ -99,7 +102,11 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
           aria-label="Buscar canal de Twitch"
           autoComplete="off"
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted/40 bg-bg-tertiary/40 px-1.5 py-0.5 rounded border border-bg-tertiary/30 select-none">Ctrl+K</span>
+        {searching ? (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-twitch border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted/40 bg-bg-tertiary/40 px-1.5 py-0.5 rounded border border-bg-tertiary/30 select-none">Ctrl+K</span>
+        )}
         {error && <span className="absolute -bottom-5 left-0 text-red-400/80 text-[11px] whitespace-nowrap">{error}</span>}
       </form>
 
