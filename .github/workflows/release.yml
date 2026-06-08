@@ -165,7 +165,11 @@ jobs:
           echo "🔏 Generando signature para auto-updater..."
           # Escribir clave a archivo temporal desde env var (evita errores de keychain en macOS CI)
           printf '%s\n' "$TAURI_PRIVATE_KEY" > /tmp/tauri-key.pem
-          # Verificar que el archivo se escribió correctamente
+          # Validar que la clave sea base64 válido (falla temprano si está corrupta)
+          if ! base64 -d /tmp/tauri-key.pem > /dev/null 2>&1; then
+            echo "ERROR: la clave privada no es base64 válido. Verificar GitHub Secret TAURI_PRIVATE_KEY"
+            exit 1
+          fi
           if [ ! -s /tmp/tauri-key.pem ]; then echo "ERROR: clave privada vacía"; exit 1; fi
           if [ -n "$TAURI_KEY_PASSWORD" ]; then
             pnpm tauri signer sign \
