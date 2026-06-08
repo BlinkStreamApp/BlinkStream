@@ -163,25 +163,19 @@ jobs:
           fi
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/$DMG_NAME"
           echo "🔏 Generando signature para auto-updater..."
-          # DEBUG: verificar qué hay realmente en la variable de entorno
-          python3 -c "import os; k=os.environ.get('TAURI_PRIVATE_KEY',''); print(f'Len: {len(k)}'); print(f'Pos10: ord={ord(k[10])} chr={repr(k[10])}'); print(f'First30: {repr(k[:30])}')"
-          # Escribir clave desde env var usando Python
-          python3 -c "import os; open('/tmp/tauri-key.pem','w').write(os.environ.get('TAURI_PRIVATE_KEY',''))"
-          KEY_LEN=$(wc -c < /tmp/tauri-key.pem)
-          echo "File len: ${KEY_LEN} bytes"
-          # Validar con validate=True (falla si hay caracteres inválidos)
-          python3 -c "import base64; base64.b64decode(open('/tmp/tauri-key.pem','rb').read(), validate=True)" || { echo "ERROR: clave inválida"; python3 -c "import sys; data=open('/tmp/tauri-key.pem','rb').read()[:30]; print(' '.join(f'{b:02x}' for b in data))"; exit 1; }
+          # Pasar clave inline (no como ruta). El CLI de Tauri en macOS
+          # trata la ruta del archivo como contenido inline, causando
+          # "Invalid symbol 45" porque decodifica el string de la ruta.
           if [ -n "$TAURI_KEY_PASSWORD" ]; then
             pnpm tauri signer sign \
-              --private-key /tmp/tauri-key.pem \
+              --private-key "$TAURI_PRIVATE_KEY" \
               --password "$TAURI_KEY_PASSWORD" \
               "$DMG_PATH"
           else
             pnpm tauri signer sign \
-              --private-key /tmp/tauri-key.pem \
+              --private-key "$TAURI_PRIVATE_KEY" \
               "$DMG_PATH"
           fi
-          rm -f /tmp/tauri-key.pem
           echo "✅ Signature: ${DMG_NAME}.sig"
 
       - name: Build Rust (Windows)
