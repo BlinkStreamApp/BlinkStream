@@ -51,18 +51,20 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
     setTags([])
     setStreamType(null)
 
-    Promise.all([
-      fetch(`https://api.twitch.tv/helix/streams?user_login=${channel}`, {
-        headers: getHeaders(),
-        signal: AbortSignal.timeout(6000),
-      }).then(res => res.ok ? res.json() : null).catch(() => null),
-      fetch('https://gql.twitch.tv/gql', {
-        method: 'POST',
-        headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: buildGqlQuery(channel) }),
-        signal: AbortSignal.timeout(6000),
-      }).then(res => res.ok ? res.json() : null).catch(() => null),
-    ]).then(([helixData, gqlData]) => {
+    ;(async () => {
+      const helixHeaders = await getHeaders()
+      const [helixData, gqlData] = await Promise.all([
+        fetch(`https://api.twitch.tv/helix/streams?user_login=${channel}`, {
+          headers: helixHeaders,
+          signal: AbortSignal.timeout(6000),
+        }).then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('https://gql.twitch.tv/gql', {
+          method: 'POST',
+          headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: buildGqlQuery(channel) }),
+          signal: AbortSignal.timeout(6000),
+        }).then(res => res.ok ? res.json() : null).catch(() => null),
+      ])
       if (cancelled) return
 
       const gqlUser = gqlData?.data?.user
@@ -98,7 +100,7 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
       }
 
       setLoading(false)
-    }).catch(() => { if (!cancelled) setLoading(false) })
+    })().catch(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
   }, [channel])

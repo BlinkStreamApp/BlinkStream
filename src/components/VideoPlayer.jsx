@@ -44,13 +44,14 @@ function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
 
 export default function VideoPlayer({
   channel, quality, onQualityChange, volume, onVolumeChange,
-  theatreMode, onToggleTheatre,
+  theatreMode, onToggleTheatre, compact, onToggleCompact,
 }) {
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
   const volumeRef = useRef(volume)
   const reconnTimerRef = useRef(null)
   const isFetchingRef = useRef(false)
+  const fallbackTimersRef = useRef(null)
   const [playing, setPlaying] = useState(true)
   const [muted, setMuted] = useState(false)
   const [streamUrl, setStreamUrl] = useState('')
@@ -68,10 +69,11 @@ export default function VideoPlayer({
   const [showStats, setShowStats] = useState(false)
   const [audioOnly, setAudioOnly] = useState(false)
   const prevQualityRef = useRef('best')
+  const audioOnlyRef = useRef(false)
+  useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
   const [stats, setStats] = useState({ bitrate: null, resolution: null, dropped: 0, buffer: 0 })
   const [recording, setRecording] = useState(false)
   const [showTheatreToast, setShowTheatreToast] = useState(false)
-  const [compact, setCompact] = useState(() => localStorage.getItem('blinkstream_compact') === 'true')
   const containerRef = useRef(null)
   const controlsTimerRef = useRef(null)
   const [streamStartTime] = useState(Date.now)
@@ -79,89 +81,159 @@ export default function VideoPlayer({
 
   useEffect(() => { volumeRef.current = volume }, [volume])
 
-  const fetchStream = useCallback(async (ch) => {
+  // ── Sistema ORIGINAL: get_stream_url con calidad específica ──
+  const fetchStream = useCallback(async (ch, q) => {
     if (!ch) return
     if (isFetchingRef.current) return
     isFetchingRef.current = true
     setLoading(true); setError(''); setStreamUrl('')
 
+    const targetQuality = q || quality || 'best'
+
+    // Audio-only: streamlink directo
+    if (targetQuality === 'audio_only') {
+      try {
+        const url = await invoke('get_stream_url', { channel: ch, quality: 'audio_only' })
+        setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
+      } catch (e) { console.warn('Audio-only failed:', e) }
+      setError('No se pudo obtener stream de solo audio')
+      setLoading(false); isFetchingRef.current = false; return
+    }
+
     try {
-      const url = await invoke('get_stream_url', { channel: ch, quality: 'best' })
+      const url = await invoke('get_stream_url', { channel: ch, quality: targetQuality })
       setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
     } catch (e) { console.warn('Streamlink fallback — get_stream_url failed:', e) }
 
-    // Fallback directo desde Rust (evita CORS del WebView macOS)
+    // Fallback: best
     try {
-      const url = await invoke('get_direct_stream_url', { channel: ch })
+      const url = await invoke('get_stream_url', { channel: ch, quality: 'best' })
       setStreamUrl(url); setUsingFallback(true); setLoading(false); isFetchingRef.current = false; return
-    } catch (e) { console.warn('Rust direct fallback failed:', e) }
-
-    setError(`No se pudo cargar ${ch}. ¿Está online?`)
+    } catch (e) {
+      const msg = typeof e === 'string' ? e : e?.message || e?.toString() || 'Error desconocido'
+      setError(`No se pudo cargar ${ch}: ${msg}`)
+    }
     setLoading(false); isFetchingRef.current = false
-  }, [])
+  }, [quality])
 
   const fetchStreamInfo = useCallback(async (ch) => {
     const info = await getStreamInfo(ch); setStreamInfo(info)
   }, [])
 
+  const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '1080p60']
+
+  // ── fetchQualities: versión infalible (sin cambios) ──
   const fetchQualities = useCallback(async (ch) => {
     if (!ch) return
     try {
       const quals = await invoke('get_available_qualities', { channel: ch })
-      if (Array.isArray(quals) && quals.length > 0) { setAvailableQualities(quals.filter(q => q.toLowerCase() !== 'best')); return }
-    } catch {}
-    setAvailableQualities([])
+      if (Array.isArray(quals) && quals.length > 0) {
+        setAvailableQualities(quals.filter(q => q.toLowerCase() !== 'best'))
+        return
+      }
+    } catch (e) { console.warn('Error fetching qualities:', e) }
+    // Siempre mostrar calidades aunque el backend falle
+    setAvailableQualities(FALLBACK_QUALITIES)
   }, [])
 
+  // ── handleQualityChange: recarga con nueva calidad (SIN hls level API) ──
+  const handleQualityChange = useCallback((newQuality) => {
+    onQualityChange(newQuality)
+    fetchStream(channel, newQuality)
+  }, [onQualityChange, fetchStream, channel])
+
+  // ── Carga inicial + reconexión cada 25min ──
   useEffect(() => {
     Promise.all([fetchStream(channel), fetchStreamInfo(channel), fetchQualities(channel)])
-    reconnTimerRef.current = setInterval(() => { fetchStream(channel) }, 25 * 60 * 1000)
+    reconnTimerRef.current = setInterval(() => {
+      if (audioOnlyRef.current) { fetchStream(channel, 'audio_only') }
+      else { fetchStream(channel, quality) }
+    }, 25 * 60 * 1000)
     return () => { if (reconnTimerRef.current) clearInterval(reconnTimerRef.current) }
   }, [channel, fetchStream, fetchStreamInfo, fetchQualities])
 
   useEffect(() => { const i = setInterval(() => fetchStreamInfo(channel), 120000); return () => clearInterval(i) }, [channel, fetchStreamInfo])
-  useEffect(() => { if (channel) fetchStream(channel) }, [quality])
 
+  // ── hls.js effect: SIMPLE con auto-fallback ──
   useEffect(() => {
     const video = videoRef.current
     if (!video || !streamUrl) return
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
-    if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = streamUrl }
-    else if (Hls.isSupported()) {
-      const hls = new Hls(); hlsRef.current = hls
-      hls.loadSource(streamUrl); hls.attachMedia(video)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => setPlaying(false)) })
-      hls.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) { setError('Error de reproducción'); fetchStream(channel) } })
-      const statsInterval = setInterval(() => {
-        if (!hlsRef.current) return
-        const level = hls.levels[hls.currentLevel]
-        setStats({
-          bitrate: level ? `${Math.round(level.bitrate / 1000)} kbps` : 'N/A',
-          resolution: level ? `${level.width}x${level.height}@${level.attrs?.FRAME_RATE || '?'}` : 'N/A',
-          dropped: hls.stats?.droppedFrames || 0,
-          buffer: video.buffered.length ? `${video.buffered.end(video.buffered.length - 1).toFixed(1)}s` : '0s',
-        })
-      }, 2000)
-      return () => {
-        clearInterval(statsInterval)
-        if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
+
+    // Safari nativo
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = streamUrl
+      return
+    }
+
+    if (!Hls.isSupported()) {
+      setError('HLS no soportado')
+      return
+    }
+
+    const hls = new Hls()
+    hlsRef.current = hls
+    hls.loadSource(streamUrl)
+    hls.attachMedia(video)
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play().catch(() => setPlaying(false))
+
+      // Auto-fallback: si esta calidad no funciona, cambiar a best
+      const fallbackTimer = setTimeout(() => {
+        if (video.readyState < 2 && quality !== 'best') {
+          console.warn(`Quality ${quality} not working, falling back to best`)
+          onQualityChange('best')
+          fetchStream(channel, 'best')
+        }
+      }, 8000)
+      fallbackTimersRef.current = fallbackTimer
+    })
+
+    hls.on(Hls.Events.ERROR, (_e, data) => {
+      if (data.fatal) {
+        setError('Error de reproducción')
+        fetchStream(channel)
       }
-    } else { setError('HLS no soportado') }
-    return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null } }
-  }, [streamUrl, channel, fetchStream])
+    })
+
+    const statsInterval = setInterval(() => {
+      if (!hlsRef.current) return
+      const level = hls.levels?.[0]
+      setStats({
+        bitrate: level ? `${Math.round(level.bitrate / 1000)} kbps` : 'N/A',
+        resolution: level ? `${level.width}x${level.height}@${level.attrs?.FRAME_RATE || '?'}` : 'N/A',
+        dropped: hls.stats?.droppedFrames || 0,
+        buffer: video.buffered.length ? `${video.buffered.end(video.buffered.length - 1).toFixed(1)}s` : '0s',
+      })
+    }, 2000)
+
+    return () => {
+      clearInterval(statsInterval)
+      if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
+      if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
+    }
+  }, [streamUrl, channel, fetchStream, onQualityChange, quality])
 
   useEffect(() => { const v = videoRef.current; if (v) v.volume = muted ? 0 : volume / 100 }, [volume, muted, streamUrl])
 
   const togglePlay = () => { const v = videoRef.current; if (!v) return; if (v.paused) { v.play().catch(() => {}); setPlaying(true) } else { v.pause(); setPlaying(false) } }
   const toggleMute = () => { const v = videoRef.current; if (!v) return; v.muted = !muted; setMuted(!muted) }
+
+  // ── toggleAudioOnly con fetchStream explícito ──
   const toggleAudioOnly = () => {
-    setAudioOnly(p => {
-      if (p) { onQualityChange(prevQualityRef.current); return false }
+    if (audioOnly) {
+      onQualityChange(prevQualityRef.current)
+      fetchStream(channel, prevQualityRef.current)
+      setAudioOnly(false)
+    } else {
       prevQualityRef.current = quality
       onQualityChange('audio_only')
-      return true
-    })
+      fetchStream(channel, 'audio_only')
+      setAudioOnly(true)
+    }
   }
+
   const handleVolume = (e) => { const val = Number(e.target.value); onVolumeChange(val); if (videoRef.current) videoRef.current.volume = val / 100; setMuted(false) }
   const toggleFullscreen = () => { if (document.fullscreenElement) document.exitFullscreen(); else containerRef.current?.requestFullscreen() }
   const togglePiP = async () => {
@@ -221,6 +293,7 @@ export default function VideoPlayer({
     return () => window.removeEventListener('keydown', handleKey)
   }, [volume, muted, streamUrl, playing])
 
+  // ──────────────────────── RENDER ────────────────────────
   return (
     <div ref={containerRef} className={`relative bg-black overflow-hidden group/player ${theatreMode ? 'w-full h-full' : 'w-full'}`} style={theatreMode ? {} : { aspectRatio: '16/9', maxHeight: '100%' }}
       onMouseMove={showControlsTemporarily} onMouseEnter={() => setShowControls(true)} onMouseLeave={() => setShowControls(false)}>
@@ -308,7 +381,11 @@ export default function VideoPlayer({
 
         <div className="flex items-center gap-3 text-white/60">
           <div className="flex items-center gap-3">
-            {availableQualities === null ? <span className="text-[11px] px-2">...</span> : availableQualities.length > 0 && <QualitySelector current={quality} onChange={onQualityChange} qualities={availableQualities} />}
+            {availableQualities === null ? (
+              <span className="text-[11px] px-2">...</span>
+            ) : availableQualities.length > 0 ? (
+              <QualitySelector current={quality} onChange={handleQualityChange} qualities={availableQualities} />
+            ) : null}
             <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title="Clips" aria-label="Abrir clips"><ClipIcon/></button>
             <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title="VODs" aria-label="Ver VODs"><VodIcon/></button>
             <button onClick={async () => {
@@ -353,7 +430,7 @@ export default function VideoPlayer({
         </div>
       </div>
 
-      {showSettingsPanel && <PlayerSettingsPanel onClose={() => setShowSettingsPanel(false)} compact={compact} onToggleCompact={() => { setCompact(p => { const next = !p; localStorage.setItem('blinkstream_compact', String(next)); return next; }) }} />}
+      {showSettingsPanel && <PlayerSettingsPanel onClose={() => setShowSettingsPanel(false)} compact={compact} onToggleCompact={onToggleCompact} />}
 
       {showClips && <ClipPlayer channel={channel} onClose={() => setShowClips(false)} />}
       {showVods && <VodPlayer channel={channel} onClose={() => setShowVods(false)} />}

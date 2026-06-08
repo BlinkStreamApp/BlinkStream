@@ -10,13 +10,22 @@ function safeTimeout(ms) {
   return ctrl.signal
 }
 
-export function getStoredToken() {
+export async function getStoredToken() {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const token = await invoke('get_secret', { key: 'twitch_token' })
+    if (token) return token
+  } catch { /* fallback */ }
   try {
     return localStorage.getItem('blinkstream_twitch_token') || null
   } catch { return null }
 }
 
-export function clearStoredToken() {
+export async function clearStoredToken() {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('delete_secret', { key: 'twitch_token' })
+  } catch { /* ignore */ }
   try {
     localStorage.removeItem('blinkstream_twitch_token')
     localStorage.removeItem('blinkstream_twitch_username')
@@ -37,8 +46,8 @@ export async function validateToken(token) {
   } catch { return false }
 }
 
-export function getHeaders() {
-  const token = getStoredToken()
+export async function getHeaders() {
+  const token = await getStoredToken()
   const headers = {
     'Client-ID': token ? APP_CLIENT_ID : PUBLIC_CLIENT_ID,
   }
@@ -125,9 +134,10 @@ export async function getDirectStreamUrl(channel, quality = '1080p60') {
 }
 
 export async function getStreamInfo(channel) {
+  const headers = await getHeaders()
   const res = await fetch(
     `https://api.twitch.tv/helix/streams?user_login=${encodeURIComponent(channel)}`,
-    { headers: getHeaders(), signal: safeTimeout(5000) }
+    { headers, signal: safeTimeout(5000) }
   )
   if (!res.ok) return null
   const data = await res.json()
@@ -135,13 +145,14 @@ export async function getStreamInfo(channel) {
 }
 
 export async function searchChannels(query) {
+  const headers = await getHeaders()
   const res = await fetch(
     `https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(query)}&first=8`,
-    { headers: getHeaders(), signal: safeTimeout(5000) }
+    { headers, signal: safeTimeout(5000) }
   )
   if (!res.ok) return []
   const data = await res.json()
-  return (data.data || []).map(ch => ({
+  let results = (data.data || []).map(ch => ({
     login: ch.broadcaster_login,
     displayName: ch.display_name,
     avatar: ch.thumbnail_url,
@@ -149,4 +160,6 @@ export async function searchChannels(query) {
     game: ch.game_name,
     viewers: ch.viewer_count,
   }))
+  results.sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0))
+  return results
 }

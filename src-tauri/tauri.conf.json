@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "BlinkStream",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "identifier": "com.blinkstream.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -18,7 +18,7 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": false,
-        "devtools": true
+        "devtools": false
       }
     ],
     "security": {
@@ -41,5 +41,15 @@
     },
     "externalBin": []
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://raw.githubusercontent.com/BlinkStreamApp/BlinkStream/main/updater.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJBMzg2RUY1NjY1QTI1OQpSV1Jab21WVzc0YWpBZ1pVQm42bU5mdmdKaktGV1BpYUY3dElpeGJQelcrU2dlazZmOXI4a2liYwo=",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
 }

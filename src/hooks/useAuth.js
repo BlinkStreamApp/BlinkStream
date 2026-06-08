@@ -53,20 +53,56 @@ export function useAuth() {
   const [authing, setAuthing] = useState(false)
   const [error, setError] = useState(null)
   const [avatar, setAvatar] = useState(() => localStorage.getItem(LS_AVATAR) || null)
+  const [keychainReady, setKeychainReady] = useState(false)
+  const [cachedToken, setCachedToken] = useState(() => {
+    try { return localStorage.getItem(LS_TOKEN) || null } catch { return null }
+  })
   const abortRef = useRef(null)
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem(LS_TOKEN)
-      const username = localStorage.getItem(LS_USERNAME)
-      if (token) {
-        setUser({
-          username: username || 'twitch_user',
-          identities: username ? [{ provider: 'twitch', identity_data: { login: username } }] : [],
-        })
+    const init = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+
+        // 1º: Intentar cargar del keychain
+        let token = await invoke('get_secret', { key: 'twitch_token' })
+
+        // 2º: Fallback a localStorage (migración silenciosa)
+        if (!token) {
+          token = localStorage.getItem(LS_TOKEN) || ''
+          if (token) {
+            try {
+              await invoke('store_secret', { key: 'twitch_token', value: token })
+              localStorage.removeItem(LS_TOKEN)
+            } catch { /* si falla keychain, mantener en localStorage */ }
+          }
+        }
+
+        if (token) {
+          setCachedToken(token)
+          const username = localStorage.getItem(LS_USERNAME) || 'twitch_user'
+          setUser({
+            username,
+            identities: username ? [{ provider: 'twitch', identity_data: { login: username } }] : [],
+          })
+        }
+      } catch { /* fallback a localStorage */
+        try {
+          const token = localStorage.getItem(LS_TOKEN)
+          if (token) {
+            setCachedToken(token)
+            const username = localStorage.getItem(LS_USERNAME) || 'twitch_user'
+            setUser({
+              username,
+              identities: username ? [{ provider: 'twitch', identity_data: { login: username } }] : [],
+            })
+          }
+        } catch { /* ignore */ }
       }
-    } catch { /* ignore */ }
-    setLoading(false)
+      setLoading(false)
+      setKeychainReady(true)
+    }
+    init()
 
     return () => {
       abortRef.current?.abort()
@@ -90,7 +126,14 @@ export function useAuth() {
       const result = await pollAuthToken(requestId, { signal: abortController.signal, interval: 1500 })
 
       if (result?.access_token) {
-        localStorage.setItem(LS_TOKEN, result.access_token)
+        // Guardar token en keychain
+        try {
+          const { invoke } = await import('@tauri-apps/api/core')
+          await invoke('store_secret', { key: 'twitch_token', value: result.access_token })
+        } catch {
+          localStorage.setItem(LS_TOKEN, result.access_token)
+        }
+        setCachedToken(result.access_token)
 
         const tempUsername = result.username || 'twitch_user'
         localStorage.setItem(LS_USERNAME, tempUsername)
@@ -136,7 +179,13 @@ export function useAuth() {
 
       const username = userInfo.username
 
-      localStorage.setItem(LS_TOKEN, cleanToken)
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        await invoke('store_secret', { key: 'twitch_token', value: cleanToken })
+      } catch {
+        localStorage.setItem(LS_TOKEN, cleanToken)
+      }
+      setCachedToken(cleanToken)
       localStorage.setItem(LS_USERNAME, username)
       if (userInfo.avatar) setAvatar(userInfo.avatar)
 
@@ -153,18 +202,21 @@ export function useAuth() {
   }, [])
 
   const logout = useCallback(async () => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('delete_secret', { key: 'twitch_token' })
+    } catch { /* ignore */ }
     localStorage.removeItem(LS_TOKEN)
     localStorage.removeItem(LS_USERNAME)
+    setCachedToken(null)
     setUser(null)
     setError(null)
     setAuthing(false)
   }, [])
 
   const getTwitchToken = useCallback(() => {
-    try {
-      return localStorage.getItem(LS_TOKEN) || null
-    } catch { return null }
-  }, [])
+    return cachedToken
+  }, [cachedToken])
 
   const isLoggedIn = !!user && !!getTwitchToken()
 
@@ -175,6 +227,7 @@ export function useAuth() {
     error,
     user,
     avatar,
+    keychainReady,
     isLoggedIn,
     login,
     loginWithToken,

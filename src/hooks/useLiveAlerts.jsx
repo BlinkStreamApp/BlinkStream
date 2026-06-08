@@ -1,4 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { PUBLIC_CLIENT_ID } from '../utils/twitch'
 
 export function Toast({ message, channel, logo, onClick, onDismiss }) {
@@ -61,6 +63,8 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
           current[f] = !!user?.stream
         })
 
+        const newlyLive = []
+
         setAlerts(prev => {
           const newAlerts = [...prev]
           favorites.forEach(f => {
@@ -78,10 +82,37 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
                   logo,
                 })
               }
+              newlyLive.push({ channel: f, game, logo })
             }
           })
           return newAlerts
         })
+
+        // Notificación nativa SOLO si la ventana no está enfocada
+        if (newlyLive.length > 0) {
+          try {
+            const win = getCurrentWindow()
+            const focused = await win.isFocused()
+            if (!focused) {
+              let granted = await isPermissionGranted()
+              if (!granted) {
+                const permission = await requestPermission()
+                granted = permission === 'granted'
+              }
+              if (granted) {
+                for (const { channel, game, logo } of newlyLive) {
+                  sendNotification({
+                    title: `${channel} está en vivo!`,
+                    body: game || 'Empezó a transmitir',
+                    icon: logo,
+                  })
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Notificación nativa no disponible:', e)
+          }
+        }
 
         prevLiveRef.current = current
       } catch { /* ignore */ }

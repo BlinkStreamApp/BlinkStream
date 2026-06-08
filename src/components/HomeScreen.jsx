@@ -350,7 +350,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
       batches.push(allNames.slice(i, i + BATCH))
     }
 
-    const headers = getHeaders()
+    const headers = await getHeaders()
 
     const [streamResults, userResults] = await Promise.all([
       Promise.all(batches.map(async (batch) => {
@@ -458,13 +458,16 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
 
   useEffect(() => {
     let c = false
-    fetch(`https://api.twitch.tv/helix/games/top?first=12`, {
-      headers: getHeaders(), signal: AbortSignal.timeout(8000),
-    }).then(r => r.ok ? r.json() : null).then(d => {
-      if (!c && d?.data) setTopGames(d.data.map(g => ({
-        id: g.id, name: g.name, boxArt: g.box_art_url?.replace('{width}','285').replace('{height}','380') || '',
-      })))
-    }).catch(() => {})
+    ;(async () => {
+      const headers = await getHeaders()
+      const r = await fetch(`https://api.twitch.tv/helix/games/top?first=12`, { headers, signal: AbortSignal.timeout(8000) })
+      if (!c) {
+        const d = r.ok ? await r.json() : null
+        if (d?.data) setTopGames(d.data.map(g => ({
+          id: g.id, name: g.name, boxArt: g.box_art_url?.replace('{width}','285').replace('{height}','380') || '',
+        })))
+      }
+    })()
     return () => { c = true }
   }, [])
 
@@ -654,7 +657,8 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                     if (activeGameId === game.id) { setActiveGameId(null); setGameStreams([]); return }
                     setActiveGameId(game.id); setGameLoading(true)
                     try {
-                      const res = await fetch(`https://api.twitch.tv/helix/streams?game_id=${game.id}&first=8`, { headers: getHeaders(), signal: AbortSignal.timeout(8000) })
+                      const h = await getHeaders()
+                      const res = await fetch(`https://api.twitch.tv/helix/streams?game_id=${game.id}&first=8`, { headers: h, signal: AbortSignal.timeout(8000) })
                       if (res.ok) { const d = await res.json(); setGameStreams(d.data || []) }
                     } catch {}
                     setGameLoading(false)

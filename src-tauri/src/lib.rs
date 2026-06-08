@@ -13,6 +13,7 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
+use keyring::Entry;
 
 pub fn try_lock_single_instance(name: &str) -> bool {
     let lock_dir = single_instance_lock_dir();
@@ -254,11 +255,33 @@ fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<(String, String), St
             }
         })?;
 
-    // Tomar pipes ANTES de wait_timeout para evitar ECHILD en Unix
+    // Leer pipes en hilos paralelos MIENTRAS el hijo se ejecuta
+    // Esto evita el deadlock cuando streamlink produce mucha salida
+    // y el buffer del pipe (típicamente 64KB) se llena.
     let stdout_handle = child.stdout.take();
     let stderr_handle = child.stderr.take();
 
-    let timeout = Duration::from_secs(10);
+    let stdout_thread = std::thread::spawn(move || -> String {
+        if let Some(mut handle) = stdout_handle {
+            let mut buf = String::new();
+            let _ = handle.read_to_string(&mut buf);
+            buf
+        } else {
+            String::new()
+        }
+    });
+
+    let stderr_thread = std::thread::spawn(move || -> String {
+        if let Some(mut handle) = stderr_handle {
+            let mut buf = String::new();
+            let _ = handle.read_to_string(&mut buf);
+            buf
+        } else {
+            String::new()
+        }
+    });
+
+    let timeout = Duration::from_secs(60);
     let _status = match child
         .wait_timeout(timeout)
         .map_err(|e| format!("Error esperando a streamlink: {}", e))?
@@ -267,30 +290,20 @@ fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<(String, String), St
         None => {
             let _ = child.kill();
             let _ = child.wait();
+            // Unir hilos pendientes para evitar thread leak
+            let _ = stdout_thread.join();
+            let _ = stderr_thread.join();
             return Err(
-                "Streamlink tardó más de 10 segundos.".into(),
+                "Streamlink tardó más de 60 segundos.".into(),
             );
         }
     };
 
-    // Leer stdout/stderr manualmente desde los pipes tomados
-    let stdout = match stdout_handle {
-        Some(mut handle) => {
-            let mut buf = String::new();
-            handle.read_to_string(&mut buf).map_err(|e| format!("Error leyendo stdout: {}", e))?;
-            buf
-        }
-        None => String::new(),
-    };
-
-    let stderr = match stderr_handle {
-        Some(mut handle) => {
-            let mut buf = String::new();
-            handle.read_to_string(&mut buf).map_err(|e| format!("Error leyendo stderr: {}", e))?;
-            buf
-        }
-        None => String::new(),
-    };
+    // Recoger resultados de los hilos
+    let stdout = stdout_thread.join()
+        .map_err(|_| "Error interno leyendo stdout de streamlink".to_string())?;
+    let stderr = stderr_thread.join()
+        .map_err(|_| "Error interno leyendo stderr de streamlink".to_string())?;
 
     Ok((stdout, stderr))
 }
@@ -299,6 +312,16 @@ static RECORDING: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mut
 
 #[tauri::command]
 fn start_recording(app: AppHandle, channel: String, output_path: String) -> Result<String, String> {
+    let path = std::path::Path::new(&output_path);
+    if !path.is_absolute() {
+        return Err("La ruta de salida debe ser absoluta".into());
+    }
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            return Err("El directorio de salida no existe".into());
+        }
+    }
+
     let binary = find_streamlink(&app)?;
     let url = format!("twitch.tv/{}", channel);
 
@@ -342,52 +365,114 @@ fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Result<St
     }
 }
 
+/// Devuelve la URL del MASTER PLAYLIST (contiene todas las calidades).
+/// hls.js puede cargar esta URL y el usuario cambia calidad via level API,
+/// sin recargar el stream. Así evitamos pantallas negras con variantes raras.
 #[tauri::command]
-fn get_available_qualities(app: AppHandle, channel: String) -> Result<Vec<String>, String> {
+fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String> {
     validate_channel(&channel)?;
-    let (_stdout, stderr) = run_streamlink(&app, &[&format!("twitch.tv/{}", channel)])?;
+    // Primero obtenemos cualquier variante con best
+    let (stdout, stderr) = run_streamlink(
+        &app,
+        &[&format!("twitch.tv/{}", channel), "best", "--stream-url"],
+    )?;
+    let variant_url = stdout.trim();
 
-    let qualities: Vec<String> = stderr
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            if !line.contains("Available streams:") {
-                return None;
+    if variant_url.is_empty() {
+        return Err(format!(
+            "Streamlink no devolvió URL. stderr: {}",
+            stderr.trim()
+        ));
+    }
+
+    // La URL de Twitch tiene formato:
+    //   .../playlist/{TOKEN}/{resolucion}.m3u8   (variante)
+    //   .../playlist/{TOKEN}.m3u8                (master)
+    //
+    // Eliminamos el último segmento (/{resolucion}.m3u8) para obtener el master.
+    // Solo aplicamos la transformación si la URL contiene el segmento /playlist/.
+    if variant_url.contains("/playlist/") {
+        if let Some(last_slash) = variant_url.rfind('/') {
+            let prefix = &variant_url[..last_slash];
+            let suffix = &variant_url[last_slash + 1..];
+            if suffix.ends_with(".m3u8") {
+                let master = format!("{}.m3u8", prefix);
+                return Ok(master);
             }
-            let parts = line.split("Available streams:").nth(1)?;
-            Some(
-                parts
-                    .split(',')
-                    .filter_map(|s| {
-                        let s = s.trim();
-                        let name = s.split_whitespace().next()?;
-                        if name.is_empty() || name.contains('[') {
-                            return None;
-                        }
-                        Some(name.to_string())
-                    })
-                    .collect::<Vec<String>>(),
-            )
-        })
-        .flatten()
-        .collect();
+        }
+    }
 
-    if qualities.is_empty() {
-        Ok(vec![
-            "audio_only".into(),
-            "160p".into(),
-            "360p".into(),
-            "720p60".into(),
-            "1080p60".into(),
-        ])
-    } else {
-        Ok(qualities)
+    // Si no podemos extraer el master, devolvemos la URL de la variante
+    log::warn!(
+        "get_master_playlist: formato inesperado, devolviendo variante: {}",
+        variant_url
+    );
+    Ok(variant_url.to_string())
+}
+
+const DEFAULT_QUALITIES: &[&str] = &[
+    "audio_only", "160p", "360p", "480p", "720p", "720p60", "1080p60",
+];
+
+#[tauri::command]
+fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String> {
+    // Esta función NUNCA debe fallar. Si algo sale mal, devuelve defaults.
+    // El frontend necesita poder mostrar el selector de calidad siempre.
+
+    if let Err(e) = validate_channel(&channel) {
+        log::error!("get_available_qualities: validate_channel error: {}", e);
+        return DEFAULT_QUALITIES.iter().map(|&s| s.to_string()).collect();
+    }
+
+    // --stream-url para que streamlink NO intente reproducir el stream
+    match run_streamlink(&app, &[&format!("twitch.tv/{}", channel), "--stream-url"]) {
+        Ok((_stdout, stderr)) => {
+            let qualities: Vec<String> = stderr
+                .lines()
+                .filter_map(|line| {
+                    let line = line.trim();
+                    if !line.contains("Available streams:") {
+                        return None;
+                    }
+                    let parts = line.split("Available streams:").nth(1)?;
+                    Some(
+                        parts
+                            .split(',')
+                            .filter_map(|s| {
+                                let s = s.trim();
+                                let name = s.split_whitespace().next()?;
+                                if name.is_empty() || name.contains('[') {
+                                    return None;
+                                }
+                                Some(name.to_string())
+                            })
+                            .collect::<Vec<String>>(),
+                    )
+                })
+                .flatten()
+                .collect();
+
+            if qualities.is_empty() {
+                log::info!("get_available_qualities: parsing empty, usando defaults");
+                DEFAULT_QUALITIES.iter().map(|&s| s.to_string()).collect()
+            } else {
+                qualities
+            }
+        }
+        Err(e) => {
+            log::error!("get_available_qualities: streamlink error: {}", e);
+            DEFAULT_QUALITIES.iter().map(|&s| s.to_string()).collect()
+        }
     }
 }
 
 #[tauri::command]
 async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
     
     let query = format!(
         "query {{ clip(slug: \"{}\") {{ videoQualities {{ sourceURL quality }} playbackAccessToken(params: {{ platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }}) {{ value signature }} }} }}",
@@ -451,7 +536,11 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
 
     let query = format!(
         "query {{ video(id: \"{}\") {{ playbackAccessToken(params: {{ platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }}) {{ value signature }} }} }}",
@@ -499,6 +588,8 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
 
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(10))
         .build()
         .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
 
@@ -566,6 +657,37 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
     Ok(usher_res.url().to_string())
 }
 
+/// Almacena un secreto en el keychain del SO.
+/// Servicio: "blinkstream", cuenta: el key proporcionado.
+#[tauri::command]
+async fn store_secret(key: String, value: String) -> Result<(), String> {
+    let entry = Entry::new("blinkstream", &key).map_err(|e| format!("Error creando entrada keychain: {}", e))?;
+    entry.set_password(&value).map_err(|e| format!("Error guardando en keychain: {}", e))
+}
+
+/// Recupera un secreto del keychain del SO.
+/// Devuelve vacío si no existe.
+#[tauri::command]
+async fn get_secret(key: String) -> Result<String, String> {
+    let entry = Entry::new("blinkstream", &key).map_err(|e| format!("Error creando entrada keychain: {}", e))?;
+    match entry.get_password() {
+        Ok(password) => Ok(password),
+        Err(keyring::Error::NoEntry) => Ok(String::new()),
+        Err(e) => Err(format!("Error leyendo keychain: {}", e)),
+    }
+}
+
+/// Elimina un secreto del keychain del SO.
+#[tauri::command]
+async fn delete_secret(key: String) -> Result<(), String> {
+    let entry = Entry::new("blinkstream", &key).map_err(|e| format!("Error creando entrada keychain: {}", e))?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(format!("Error eliminando del keychain: {}", e)),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -574,10 +696,16 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
+            store_secret,
+            get_secret,
+            delete_secret,
             get_stream_url,
             get_available_qualities,
             get_direct_stream_url,
+            get_master_playlist,
             get_twitch_clip_url,
             get_vod_manifest_url,
             start_recording,
@@ -596,13 +724,11 @@ pub fn run() {
                 }
             }
 
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(if cfg!(debug_assertions) { log::LevelFilter::Info } else { log::LevelFilter::Warn })
+                    .build(),
+            )?;
             Ok(())
         })
         .run(tauri::generate_context!())

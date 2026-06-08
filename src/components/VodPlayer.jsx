@@ -29,7 +29,7 @@ async function fetchVods(channel) {
 
   if (!userId) return []
   try {
-    const headers = getHeaders()
+    const headers = await getHeaders()
     const res = await fetch(`https://api.twitch.tv/helix/videos?user_id=${userId}&type=archive&first=20`, { headers, signal: AbortSignal.timeout(8000) })
     if (!res.ok) return []
     const data = await res.json()
