@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "BlinkStream",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "identifier": "com.blinkstream.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -15,6 +15,8 @@
         "title": "BlinkStream",
         "width": 1280,
         "height": 720,
+        "minWidth": 800,
+        "minHeight": 480,
         "resizable": true,
         "fullscreen": false,
         "decorations": false,

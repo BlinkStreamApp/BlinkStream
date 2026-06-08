@@ -120,8 +120,17 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
       setUptime(h > 0 ? `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}` : `${m}:${s.toString().padStart(2,'0')}`)
     }
     update()
-    const interval = setInterval(update, 1000)
-    return () => clearInterval(interval)
+    let cancelled = false
+    let timer
+    const tick = () => {
+      timer = setTimeout(() => {
+        if (cancelled) return
+        update()
+        if (!cancelled) tick()
+      }, 1000)
+    }
+    tick()
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [info?.started_at])
 
   return (

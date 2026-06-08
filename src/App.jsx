@@ -141,6 +141,7 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
+    let timer
     const check = async () => {
       const token = getTwitchToken()
       if (!token) return
@@ -149,15 +150,15 @@ function App() {
         await clearStoredToken()
         logout()
       }
+      if (!cancelled) timer = setTimeout(check, 10 * 60 * 1000)
     }
     check()
-    const interval = setInterval(check, 10 * 60 * 1000)
-    return () => { cancelled = true; clearInterval(interval) }
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [isLoggedIn, getTwitchToken, logout])
 
   useEffect(() => {
     let cancelled = false
-    const check = async () => {
+    const checkUpdate = async () => {
       try {
         const update = await check()
         if (!cancelled && update) {
@@ -173,7 +174,7 @@ function App() {
         console.warn('Error checking for updates:', e)
       }
     }
-    const timer = setTimeout(check, 3000)
+    const timer = setTimeout(checkUpdate, 3000)
     return () => { cancelled = true; clearTimeout(timer) }
   }, [])
 

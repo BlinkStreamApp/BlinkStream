@@ -452,8 +452,17 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
     }
 
     fetchLiveStatus()
-    const interval = setInterval(fetchLiveStatus, 60000)
-    return () => clearInterval(interval)
+    let cancelled = false
+    let timer
+    const pollStatus = () => {
+      timer = setTimeout(() => {
+        if (cancelled) return
+        fetchLiveStatus()
+        if (!cancelled) pollStatus()
+      }, 60000)
+    }
+    pollStatus()
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [fetchLiveStatus])
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { PUBLIC_CLIENT_ID } from '../utils/twitch'
 import logo7tv from '../assets/7tv.png'
 import logoBttv from '../assets/bttv.png'
@@ -182,6 +182,41 @@ function UserCardPopup({ username, position, onClose }) {
 }
 
 let msgIdCounter = 0
+
+const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage }) => {
+  return (
+    <div
+      className={`flex gap-1 text-sm leading-snug hover:bg-bg-tertiary/20 px-1.5 py-1 rounded transition-colors group/msg animate-fade-in ${msg.isNotice ? 'bg-twitch/5 border-l-2 border-twitch/30 pl-2' : ''}`}
+    >
+      {msg.badges.length > 0 && (
+        <span className="flex gap-0.5 shrink-0 items-center pt-0.5">
+          {msg.badges.map((b, i) => {
+            const url = badgeUrls[`${msg.id}-${b.set}`]
+            return url ? <img key={i} src={url} alt={b.set} className="w-3.5 h-3.5" loading="lazy" /> : null
+          })}
+        </span>
+      )}
+      <span
+        className="font-semibold shrink-0 hover:underline cursor-pointer"
+        style={{ fontSize: `${chatFontSize}px`, color: msg.color || '#adadb8' }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!msg.isNotice) setUserCard(prev => prev?.username === msg.user ? null : { x: e.clientX, y: e.clientY, username: msg.user })
+        }}
+      >
+        {msg.user}
+      </span>
+      <span className="text-text-primary break-words min-w-0" style={{ fontSize: `${chatFontSize}px` }}>
+        {renderMessage(msg.message, msg.emotes)}
+      </span>
+      {msg.timestamp && (
+        <span className="text-[9px] text-text-muted/25 shrink-0 self-start ml-auto tabular-nums font-mono pt-0.5">
+          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      )}
+    </div>
+  )
+})
 
 export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername }) {
   const [messages, setMessages] = useState([])
@@ -1075,7 +1110,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
         </div>
       )}
 
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-1 py-0.5" onScroll={handleScroll}>
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-1 py-0.5" onScroll={handleScroll} role="log" aria-live="polite" aria-label="Mensajes del chat">
         {connError && !connected && (
           <p className="text-orange-400/80 text-xs text-center mt-4">{connError}</p>
         )}
@@ -1089,37 +1124,14 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
           {messages
             .filter(msg => !hideBots || !msg.user.toLowerCase().includes('bot'))
             .map(msg => (
-            <div
-              key={msg.id}
-              className={`flex gap-1 text-sm leading-snug hover:bg-bg-tertiary/20 px-1.5 py-1 rounded transition-colors group/msg animate-fade-in ${msg.isNotice ? 'bg-twitch/5 border-l-2 border-twitch/30 pl-2' : ''}`}
-            >
-              {msg.badges.length > 0 && (
-                <span className="flex gap-0.5 shrink-0 items-center pt-0.5">
-                  {msg.badges.map((b, i) => {
-                    const url = badgeUrls[`${msg.id}-${b.set}`]
-                    return url ? <img key={i} src={url} alt={b.set} className="w-3.5 h-3.5" loading="lazy" /> : null
-                  })}
-                </span>
-              )}
-              <span
-                className="font-semibold shrink-0 hover:underline cursor-pointer"
-                style={{ fontSize: `${chatFontSize}px`, color: msg.color || '#adadb8' }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (!msg.isNotice) setUserCard(prev => prev?.username === msg.user ? null : { x: e.clientX, y: e.clientY, username: msg.user })
-                }}
-              >
-                {msg.user}
-              </span>
-              <span className="text-text-primary break-words min-w-0" style={{ fontSize: `${chatFontSize}px` }}>
-                {renderMessage(msg.message, msg.emotes)}
-              </span>
-              {msg.timestamp && (
-                <span className="text-[9px] text-text-muted/25 shrink-0 self-start ml-auto tabular-nums font-mono pt-0.5">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-            </div>
+              <ChatMessage
+                key={msg.id}
+                msg={msg}
+                badgeUrls={badgeUrls}
+                chatFontSize={chatFontSize}
+                setUserCard={setUserCard}
+                renderMessage={renderMessage}
+              />
           ))}
         </div>
 

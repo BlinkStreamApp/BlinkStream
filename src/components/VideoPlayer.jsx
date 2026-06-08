@@ -60,7 +60,6 @@ export default function VideoPlayer({
   const [showControls, setShowControls] = useState(true)
   const [streamInfo, setStreamInfo] = useState(null)
   const [usingFallback, setUsingFallback] = useState(false)
-  const [progress, setProgress] = useState(0)
   const [availableQualities, setAvailableQualities] = useState(null)
   const [showClips, setShowClips] = useState(false)
   const [showVods, setShowVods] = useState(false)
@@ -145,14 +144,33 @@ export default function VideoPlayer({
   // ── Carga inicial + reconexión cada 25min ──
   useEffect(() => {
     Promise.all([fetchStream(channel), fetchStreamInfo(channel), fetchQualities(channel)])
-    reconnTimerRef.current = setInterval(() => {
-      if (audioOnlyRef.current) { fetchStream(channel, 'audio_only') }
-      else { fetchStream(channel, quality) }
-    }, 25 * 60 * 1000)
-    return () => { if (reconnTimerRef.current) clearInterval(reconnTimerRef.current) }
+    let cancelled = false
+    let timer
+    const reconnect = () => {
+      timer = setTimeout(() => {
+        if (cancelled) return
+        if (audioOnlyRef.current) { fetchStream(channel, 'audio_only') }
+        else { fetchStream(channel, quality) }
+        if (!cancelled) reconnect()
+      }, 25 * 60 * 1000)
+    }
+    reconnect()
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [channel, fetchStream, fetchStreamInfo, fetchQualities])
 
-  useEffect(() => { const i = setInterval(() => fetchStreamInfo(channel), 120000); return () => clearInterval(i) }, [channel, fetchStreamInfo])
+  useEffect(() => {
+    let cancelled = false
+    let timer
+    const fetchInfo = () => {
+      timer = setTimeout(() => {
+        if (cancelled) return
+        fetchStreamInfo(channel)
+        if (!cancelled) fetchInfo()
+      }, 120000)
+    }
+    fetchInfo()
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [channel, fetchStreamInfo])
 
   // ── hls.js effect: SIMPLE con auto-fallback ──
   useEffect(() => {
@@ -197,19 +215,26 @@ export default function VideoPlayer({
       }
     })
 
-    const statsInterval = setInterval(() => {
-      if (!hlsRef.current) return
-      const level = hls.levels?.[0]
-      setStats({
-        bitrate: level ? `${Math.round(level.bitrate / 1000)} kbps` : 'N/A',
-        resolution: level ? `${level.width}x${level.height}@${level.attrs?.FRAME_RATE || '?'}` : 'N/A',
-        dropped: hls.stats?.droppedFrames || 0,
-        buffer: video.buffered.length ? `${video.buffered.end(video.buffered.length - 1).toFixed(1)}s` : '0s',
-      })
-    }, 2000)
+    let cancelled = false
+    let statsTimer
+    const updateStats = () => {
+      statsTimer = setTimeout(() => {
+        if (cancelled || !hlsRef.current) return
+        const level = hls.levels?.[0]
+        setStats({
+          bitrate: level ? `${Math.round(level.bitrate / 1000)} kbps` : 'N/A',
+          resolution: level ? `${level.width}x${level.height}@${level.attrs?.FRAME_RATE || '?'}` : 'N/A',
+          dropped: hls.stats?.droppedFrames || 0,
+          buffer: video.buffered.length ? `${video.buffered.end(video.buffered.length - 1).toFixed(1)}s` : '0s',
+        })
+        if (!cancelled) updateStats()
+      }, 2000)
+    }
+    updateStats()
 
     return () => {
-      clearInterval(statsInterval)
+      cancelled = true
+      clearTimeout(statsTimer)
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }
@@ -255,14 +280,12 @@ export default function VideoPlayer({
 
   useEffect(() => {
     const v = videoRef.current; if (!v) return
-    const up = () => setProgress(v.currentTime)
-    v.addEventListener('timeupdate', up)
     const onPlay = () => setPlaying(true); const onPause = () => setPlaying(false)
     v.addEventListener('play', onPlay); v.addEventListener('pause', onPause)
     const onPiPEnter = () => setIsPiP(true); const onPiPLeave = () => setIsPiP(false)
     v.addEventListener('enterpictureinpicture', onPiPEnter)
     v.addEventListener('leavepictureinpicture', onPiPLeave)
-    return () => { v.removeEventListener('timeupdate', up); v.removeEventListener('play', onPlay); v.removeEventListener('pause', onPause); v.removeEventListener('enterpictureinpicture', onPiPEnter); v.removeEventListener('leavepictureinpicture', onPiPLeave) }
+    return () => { v.removeEventListener('play', onPlay); v.removeEventListener('pause', onPause); v.removeEventListener('enterpictureinpicture', onPiPEnter); v.removeEventListener('leavepictureinpicture', onPiPLeave) }
   }, [streamUrl])
 
   useEffect(() => { if (theatreMode) { setShowTheatreToast(true); const t = setTimeout(() => setShowTheatreToast(false), 2500); return () => clearTimeout(t) } }, [theatreMode])
@@ -304,7 +327,7 @@ export default function VideoPlayer({
         </div>
       )}
 
-      <video ref={videoRef} className={`w-full h-full object-contain ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline />
+      <video ref={videoRef} className={`w-full h-full object-contain ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
       {audioOnly && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 select-none">
           <div className="w-16 h-16 rounded-2xl bg-twitch/20 flex items-center justify-center mb-3 animate-pulse-glow">

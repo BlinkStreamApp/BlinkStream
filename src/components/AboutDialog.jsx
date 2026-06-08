@@ -1,9 +1,24 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BlinkStreamLogo } from './BlinkStreamLogo'
+import { getVersion } from '@tauri-apps/api/app'
 
 function CloseIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg> }
 
+function PayPalIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106z"/>
+    </svg>
+  )
+}
+
 export default function AboutDialog({ onClose }) {
+  const [appVersion, setAppVersion] = useState('...')
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion('1.0.3'))
+  }, [])
+
   useEffect(() => {
     const handleKey = (e) => { if (e.code === 'Escape') onClose() }
     window.addEventListener('keydown', handleKey)
@@ -29,16 +44,32 @@ export default function AboutDialog({ onClose }) {
             </span>
           </div>
 
+          <div className="flex items-center gap-1.5 mb-3">
+            <span className="px-2.5 py-0.5 rounded-full bg-twitch/15 text-twitch text-[11px] font-semibold tracking-wide">
+              v{appVersion}
+            </span>
+          </div>
+
           <p className="text-sm text-text-secondary leading-relaxed max-w-xs">
             Cliente ligero de Twitch sin anuncios.
             Transmisiones limpias, rápidas y sin interrupciones.
           </p>
 
+          <a
+            href="https://paypal.me/AlbertPlayX"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0070ba]/10 text-[#0070ba] hover:bg-[#0070ba]/20 text-[13px] font-medium transition-all cursor-pointer"
+          >
+            <PayPalIcon />
+            Invitar a un café
+          </a>
+
           <div className="mt-6 w-full border-t border-bg-tertiary/50 pt-4 text-[12px] text-text-muted/60">
             <p>&copy; 2026 BlinkStream Team</p>
           </div>
 
-          <div className="mt-4 flex gap-3 text-[12px]">
+          <div className="mt-3 flex gap-3 text-[12px]">
             <span className="text-twitch/70">Hecho con ♥ para la comunidad</span>
           </div>
         </div>

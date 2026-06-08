@@ -124,11 +124,20 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
       checkLive()
     }, 2000)
 
-    timerRef.current = setInterval(checkLive, intervalMs)
+    let cancelled = false
+    const schedulePoll = () => {
+      timerRef.current = setTimeout(() => {
+        if (cancelled) return
+        checkLive()
+        if (!cancelled) schedulePoll()
+      }, intervalMs)
+    }
+    schedulePoll()
 
     return () => {
+      cancelled = true
       clearTimeout(initTimer)
-      clearInterval(timerRef.current)
+      clearTimeout(timerRef.current)
     }
   }, [favorites, intervalMs])
 
