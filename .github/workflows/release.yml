@@ -166,11 +166,7 @@ jobs:
           # Escribir clave a archivo temporal desde env var (evita errores de keychain en macOS CI)
           printf '%s\n' "$TAURI_PRIVATE_KEY" > /tmp/tauri-key.pem
           # Validar que la clave sea base64 válido (falla temprano si está corrupta)
-          if ! python3 -c "
-import base64, sys
-with open('/tmp/tauri-key.pem') as f:
-    base64.b64decode(f.read())
-" 2>/dev/null; then
+          if ! python3 -c "import base64; base64.b64decode(open('/tmp/tauri-key.pem').read())" 2>/dev/null; then
             echo "ERROR: la clave privada no es base64 válido. Verificar GitHub Secret TAURI_PRIVATE_KEY"
             exit 1
           fi
