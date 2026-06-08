@@ -163,14 +163,15 @@ jobs:
           fi
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/$DMG_NAME"
           echo "🔏 Generando signature para auto-updater..."
-          # Escribir clave a archivo temporal desde env var (evita errores de keychain en macOS CI)
-          printf '%s\n' "$TAURI_PRIVATE_KEY" > /tmp/tauri-key.pem
-          # Validar que la clave sea base64 válido (falla temprano si está corrupta)
-          if ! python3 -c "import base64; base64.b64decode(open('/tmp/tauri-key.pem').read())" 2>/dev/null; then
-            echo "ERROR: la clave privada no es base64 válido. Verificar GitHub Secret TAURI_PRIVATE_KEY"
+          # Escribir clave desde env var usando Python (evita problemas de shell con base64)
+          python3 -c "import os; open('/tmp/tauri-key.pem','w').write(os.environ['TAURI_PRIVATE_KEY'])"
+          KEY_LEN=$(wc -c < /tmp/tauri-key.pem)
+          echo "Key file length: ${KEY_LEN} bytes"
+          # Validar que la clave sea base64 válido
+          python3 -c "import base64; base64.b64decode(open('/tmp/tauri-key.pem','rb').read())" || {
+            echo "ERROR: clave privada no es base64 válido (${KEY_LEN} bytes). Verificar TAURI_PRIVATE_KEY"
             exit 1
-          fi
-          if [ ! -s /tmp/tauri-key.pem ]; then echo "ERROR: clave privada vacía"; exit 1; fi
+          }
           if [ -n "$TAURI_KEY_PASSWORD" ]; then
             pnpm tauri signer sign \
               --private-key /tmp/tauri-key.pem \
