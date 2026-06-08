@@ -152,7 +152,6 @@ jobs:
       - name: Generate macOS .sig for DMG
         if: runner.os == 'macOS'
         env:
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
         run: |
           VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
@@ -162,20 +161,12 @@ jobs:
             DMG_NAME="BlinkStream_${VERSION}_macOS_x64.dmg"
           fi
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/$DMG_NAME"
-          echo "🔏 Generando signature para auto-updater..."
-          # Pasar clave inline (no como ruta). El CLI de Tauri en macOS
-          # trata la ruta del archivo como contenido inline, causando
-          # "Invalid symbol 45" porque decodifica el string de la ruta.
-          if [ -n "$TAURI_KEY_PASSWORD" ]; then
-            pnpm tauri signer sign \
-              --private-key "$TAURI_PRIVATE_KEY" \
-              --password "$TAURI_KEY_PASSWORD" \
-              "$DMG_PATH"
-          else
-            pnpm tauri signer sign \
-              --private-key "$TAURI_PRIVATE_KEY" \
-              "$DMG_PATH"
-          fi
+          echo "🔏 Instalando minisign y generando signature..."
+          brew install minisign
+          echo "$TAURI_PRIVATE_KEY" > /tmp/tauri-key.minisign
+          minisign -Sm "$DMG_PATH" -s /tmp/tauri-key.minisign
+          mv "${DMG_PATH}.minisig" "${DMG_PATH}.sig"
+          rm -f /tmp/tauri-key.minisign
           echo "✅ Signature: ${DMG_NAME}.sig"
 
       - name: Build Rust (Windows)
