@@ -162,16 +162,19 @@ jobs:
           fi
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/$DMG_NAME"
           echo "🔏 Generando signature para auto-updater..."
+          # Escribir clave a archivo temporal (evita errores de keychain en macOS CI)
+          echo "${{ secrets.TAURI_PRIVATE_KEY }}" > /tmp/tauri-key.pem
           if [ -n "$TAURI_KEY_PASSWORD" ]; then
             pnpm tauri signer sign \
-              --private-key "${{ secrets.TAURI_PRIVATE_KEY }}" \
+              --private-key /tmp/tauri-key.pem \
               --password "$TAURI_KEY_PASSWORD" \
               "$DMG_PATH"
           else
             pnpm tauri signer sign \
-              --private-key "${{ secrets.TAURI_PRIVATE_KEY }}" \
+              --private-key /tmp/tauri-key.pem \
               "$DMG_PATH"
           fi
+          rm -f /tmp/tauri-key.pem
           echo "✅ Signature: ${DMG_NAME}.sig"
 
       - name: Build Rust (Windows)
