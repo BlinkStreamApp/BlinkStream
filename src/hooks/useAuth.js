@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { SUPABASE_URL, pollAuthToken } from '../utils/supabase'
+import { SUPABASE_URL, pollAuthToken, clearBlinkstreamToken } from '../utils/supabase'
 import { APP_CLIENT_ID, PUBLIC_CLIENT_ID } from '../utils/twitch'
 
 const EDGE_FN_URL = `${SUPABASE_URL}/functions/v1/twitch-auth`
@@ -208,6 +208,10 @@ export function useAuth() {
     } catch { /* ignore */ }
     localStorage.removeItem(LS_TOKEN)
     localStorage.removeItem(LS_USERNAME)
+    // F-1 fix: limpiar tambien los tokens de Supabase emitidos por twitch-auth.
+    // Si quedan cacheados, la proxima sesion podria usarlos con un username
+    // distinto (si reusamos el mismo storage de la edge function).
+    clearBlinkstreamToken()
     setCachedToken(null)
     setUser(null)
     setError(null)
