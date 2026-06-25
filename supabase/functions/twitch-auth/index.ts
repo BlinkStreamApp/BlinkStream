@@ -574,12 +574,30 @@ function handleAuthRedirect(
   authUrl.searchParams.set("client_id", TWITCH_CLIENT_ID);
   authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
   authUrl.searchParams.set("response_type", "code");
-  // F-2 fix: scopes actualizados (chat + moderation + channel points).
-  // Aplicado por F-2 en tarea separada; este es el scope legacy.
-  // Una vez que F-2 se aplique, este set se sustituira.
+  // F-2 fix: scopes actualizados (chat + moderación + channel points).
+  // === TWITCH OAUTH SCOPES (11 total) ===
+  // Chat (IRC):
+  //   chat:read                       - leer mensajes via IRC (USERSTATE, PRIVMSG, etc.)
+  //   chat:edit                       - enviar mensajes via IRC
+  // Follows:
+  //   user:edit:follows               - follow/unfollow programático
+  //   user:read:follows               - listar follows del usuario
+  // Moderación (requiere ser mod en el canal objetivo):
+  //   moderator:manage:chat_messages  - /delete, /clear, pin/unpin
+  //   moderator:manage:banned_users   - /ban, /unban, /timeout, /untimeout
+  //   moderator:manage:chat_settings  - /slow, /followers, /emoteonly, /subscribers
+  //   moderation:read                 - listar mods, bans, timeouts (Helix)
+  // Channel Points (requiere ser broadcaster del canal):
+  //   channel:read:redemptions        - listar rewards y redenciones
+  //   channel:manage:redemptions      - crear/editar rewards, fulfill/cancel redenciones
+  //   channel:read:subscriptions      - subs (gating de features por sub)
+  //
+  // RE-AUTH REQUERIDA: usuarios existentes deben re-autorizar para obtener
+  // los nuevos scopes. Twitch omite silenciosamente scopes que el usuario
+  // no puede tener (no es mod / no es broadcaster); NO genera error.
   authUrl.searchParams.set(
     "scope",
-    "chat:read chat:edit user:edit:follows user:read:follows",
+    "chat:read chat:edit user:edit:follows user:read:follows moderator:manage:chat_messages moderator:manage:banned_users moderator:manage:chat_settings moderation:read channel:read:redemptions channel:manage:redemptions channel:read:subscriptions",
   );
   authUrl.searchParams.set("state", requestId);
   authUrl.searchParams.set("force_verify", "true");
