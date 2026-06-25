@@ -267,7 +267,25 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
   }, [showChatSettings])
 
   const [recentEmotes, setRecentEmotes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('blinkstream_recent_emotes') || '[]') } catch { return [] }
+    try {
+      const raw = JSON.parse(localStorage.getItem('blinkstream_recent_emotes') || '[]')
+      if (!Array.isArray(raw)) return []
+      // ── Migración: filtrar entradas legacy inválidas ──
+      // El formato anterior guardaba `url` que era un objeto
+      // (`e.url || e.urls?.[0]?.[1]`), no un string. Eso rompía la
+      // comparación y cualquier render que esperara un string.
+      // Nuevo formato: { name: string, provider: string }
+      // La URL se reconstruye al renderizar desde el dict `emotes` cargado.
+      const migrated = raw
+        .filter(r => r && typeof r.name === 'string' && r.name.length > 0)
+        .map(r => ({ name: r.name, provider: typeof r.provider === 'string' ? r.provider : '' }))
+        .slice(0, 20)
+      // Si hubo migración, re-persistir el localStorage en formato limpio.
+      if (migrated.length !== raw.length) {
+        try { localStorage.setItem('blinkstream_recent_emotes', JSON.stringify(migrated)) } catch { /* ignore */ }
+      }
+      return migrated
+    } catch { return [] }
   })
   const [favoriteEmotes, setFavoriteEmotes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('blinkstream_fav_emotes') || '[]') } catch { return [] }
@@ -905,7 +923,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
           setEmoteSearch('')
           setRecentEmotes(prev => {
             const filtered = prev.filter(r => r.name !== e.name)
-            const next = [{ name: e.name, url: e.url || e.urls?.[0]?.[1], provider: e.provider }, ...filtered].slice(0, 20)
+            // Solo guardamos name + provider. La URL se reconstruye al
+            // renderizar desde el dict `emotes` cargado, que es la
+            // fuente de verdad y se rehidrata al cambiar de canal.
+            const next = [{ name: e.name, provider: e.provider }, ...filtered].slice(0, 20)
             try { localStorage.setItem('blinkstream_recent_emotes', JSON.stringify(next)) } catch {}
             return next
           })
@@ -1221,7 +1242,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
                                     setShowEmoteMenu(false); setEmoteSearch('')
                                     setRecentEmotes(prev => {
                                       const filtered = prev.filter(r => r.name !== e.name)
-                                      const next = [{ name: e.name, url: e.url || e.urls?.[0]?.[1], provider: e.provider }, ...filtered].slice(0, 20)
+                                      // Mismo criterio que el botón del picker:
+                                      // solo name + provider. URL se reconstruye
+                                      // al renderizar desde `emotes`.
+                                      const next = [{ name: e.name, provider: e.provider }, ...filtered].slice(0, 20)
                                       try { localStorage.setItem('blinkstream_recent_emotes', JSON.stringify(next)) } catch {}
                                       return next
                                     })

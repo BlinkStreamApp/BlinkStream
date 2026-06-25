@@ -312,6 +312,11 @@ static RECORDING: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mut
 
 #[tauri::command]
 fn start_recording(app: AppHandle, channel: String, output_path: String) -> Result<String, String> {
+    // ── Validar nombre de canal (mismo criterio que el resto de commands) ──
+    // Antes este command omitía la validación, permitiendo que un channel
+    // malicioso se inyectara directo en la URL de streamlink.
+    validate_channel(&channel)?;
+
     let path = std::path::Path::new(&output_path);
     if !path.is_absolute() {
         return Err("La ruta de salida debe ser absoluta".into());

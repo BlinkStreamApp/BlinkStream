@@ -72,6 +72,13 @@ export default function VideoPlayer({
   useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
   const [stats, setStats] = useState({ bitrate: null, resolution: null, dropped: 0, buffer: 0 })
   const [recording, setRecording] = useState(false)
+  // Ref espejo del state de grabación para que los useEffect de cleanup
+  // (cambio de canal / unmount) lean el valor actual sin re-suscribirse.
+  const recordingRef = useRef(false)
+  useEffect(() => { recordingRef.current = recording }, [recording])
+  // Error específico de grabación, separado de `error` (carga del stream)
+  // para poder mostrarlo cerca del badge REC sin confundir al usuario.
+  const [recordingError, setRecordingError] = useState('')
   const [showTheatreToast, setShowTheatreToast] = useState(false)
   const containerRef = useRef(null)
   const controlsTimerRef = useRef(null)
@@ -171,6 +178,57 @@ export default function VideoPlayer({
     fetchInfo()
     return () => { cancelled = true; clearTimeout(timer) }
   }, [channel, fetchStreamInfo])
+
+  // ── Helper reutilizable: detiene grabación en el backend de forma segura ──
+  // Fire-and-forget (no await) para no bloquear el flujo del caller.
+  // Try/catch interno para que un fallo del backend NO propague y rompa
+  // el cleanup de React o el cambio de canal.
+  const stopRecordingSafely = useCallback((reason) => {
+    if (!recordingRef.current) return
+    // Bajamos el ref ANTES del await para que un re-entrant (poco probable
+    // pero posible si React dispara cleanup dos veces en dev) no intente
+    // detener dos veces el mismo proceso backend.
+    recordingRef.current = false
+    setRecording(false)
+    setRecordingError('')
+    if (reason) console.info(`[Recording] Detenida por: ${reason}`)
+    invoke('stop_recording').catch(err => {
+      // Si el backend dice "No hay grabación activa" lo tratamos como OK
+      // (puede pasar si ya estaba cerrada por otra vía).
+      const msg = typeof err === 'string' ? err : err?.message || String(err)
+      if (!/no hay grabaci[oó]n activa/i.test(msg)) {
+        console.warn('[Recording] stop_recording falló:', msg)
+        // No spameamos UI aquí: es un cleanup, el usuario ya cambió de canal
+        // o está cerrando el componente. El log es suficiente.
+      }
+    })
+  }, [])
+
+  // ── B-1: Reset grabación al cambiar de canal ──
+  // Si el usuario cambia de canal mientras graba, el backend Rust seguiría
+  // grabando el canal original (start_recording lanza un nuevo proceso
+  // streamlink con el channel que recibió). Sin este effect, la UI diría
+  // "REC" sobre el video del nuevo canal mientras el .ts escribe el viejo.
+  useEffect(() => {
+    return () => {
+      if (recordingRef.current) {
+        stopRecordingSafely(`cambio de canal → ${channel}`)
+      }
+    }
+  }, [channel, stopRecordingSafely])
+
+  // ── B-4: Cleanup al desmontar el componente ──
+  // Si el usuario cierra la app o navega fuera del reproductor mientras
+  // graba, llamamos stop_recording en el backend. Sin esto, el proceso
+  // streamlink queda huérfano hasta que el sistema lo mate (o nunca, en
+  // algunos casos) y el .ts queda abierto/roto.
+  useEffect(() => {
+    return () => {
+      if (recordingRef.current) {
+        stopRecordingSafely('unmount del componente')
+      }
+    }
+  }, [stopRecordingSafely])
 
   // ── hls.js effect: SIMPLE con auto-fallback ──
   useEffect(() => {
@@ -352,6 +410,20 @@ export default function VideoPlayer({
         </div>
       )}
 
+      {recordingError && (
+        <div className="absolute top-3 right-3 z-30 max-w-xs bg-red-900/90 backdrop-blur-sm border border-red-500/40 rounded-lg px-3 py-2 text-[11px] text-white shadow-2xl animate-fade-in">
+          <p className="font-semibold mb-0.5">Error de grabación</p>
+          <p className="text-white/90 break-words">{recordingError}</p>
+          <button
+            onClick={() => setRecordingError('')}
+            className="mt-1 text-[10px] text-white/60 hover:text-white underline cursor-pointer"
+            aria-label="Cerrar error de grabación"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
           <div className="flex flex-col items-center gap-3">
@@ -412,15 +484,32 @@ export default function VideoPlayer({
             <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title="Clips" aria-label="Abrir clips"><ClipIcon/></button>
             <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title="VODs" aria-label="Ver VODs"><VodIcon/></button>
             <button onClick={async () => {
+              setRecordingError('')
               if (recording) {
-                try { await invoke('stop_recording'); setRecording(false) } catch {}
+                try {
+                  await invoke('stop_recording')
+                  setRecording(false)
+                  recordingRef.current = false
+                } catch (err) {
+                  const msg = typeof err === 'string' ? err : err?.message || String(err)
+                  console.error('[Recording] stop_recording falló:', msg)
+                  setRecordingError(`No se pudo detener: ${msg}`)
+                }
                 return
               }
               try {
                 const { save } = await import('@tauri-apps/plugin-dialog')
                 const path = await save({ defaultPath: `${channel}_${Date.now()}.ts`, filters: [{ name: 'Video', extensions: ['ts','mp4'] }] })
-                if (path) { await invoke('start_recording', { channel, outputPath: path }); setRecording(true) }
-              } catch {}
+                if (path) {
+                  await invoke('start_recording', { channel, outputPath: path })
+                  setRecording(true)
+                  recordingRef.current = true
+                }
+              } catch (err) {
+                const msg = typeof err === 'string' ? err : err?.message || String(err)
+                console.error('[Recording] start_recording falló:', msg)
+                setRecordingError(`No se pudo iniciar: ${msg}`)
+              }
             }} className={`hover:text-white transition-colors cursor-pointer ${recording ? 'text-red-500' : ''}`} title={recording ? 'Detener grabación' : 'Grabar stream'} aria-label="Grabar stream">
               <svg width="16" height="16" viewBox="0 0 24 24" fill={recording ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r={recording ? '4' : '8'}/><circle cx="12" cy="12" r="2.5" fill={recording ? 'white' : 'currentColor'}/></svg>
             </button>
