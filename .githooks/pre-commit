@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# =============================================================================
+# BlinkStream - Pre-commit secret scanner (bash portable)
+# Bloquea commits con keys/secretos. Override:
+#   BLINKSTREAM_SKIP_SCAN=1  (emergencia)
+#   BLINKSTREAM_SCAN_ALLOW=id1,id2  (falsos positivos documentados)
+# =============================================================================
+set -e
+# bash 5+ hace brace expansion con {n,m} -- desactivar:
+set +B
+set +o braceexpand 2>/dev/null || true
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+if [ "${BLINKSTREAM_SKIP_SCAN:-0}" = "1" ]; then
+  echo "[pre-commit] SKIP forzado por BLINKSTREAM_SKIP_SCAN=1 (emergencia)"
+  exit 0
+fi
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+if [ -z "$STAGED" ]; then exit 0; fi
+
+# Patrones (separador TAB). Formato: <id>\t<regex>\t<desc>
+PATTERNS_TSV=$(cat <<'EOF'
+supabase-jwt	eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+	JWT de Supabase (anon o service role)
+supabase-url	https://[a-z0-9]{20,}\.supabase\.co	URL de proyecto Supabase real
+twitch-clientid	(^|[^A-Za-z0-9])[a-z0-9]{30}([^A-Za-z0-9]|$)	Twitch Client ID (30 chars)
+aws-key	AKIA[0-9A-Z]+	AWS Access Key ID
+privatekey	-----BEGIN (RSA |EC |OPENSSH |PGP |)PRIVATE KEY-----	Clave privada
+github-token	gh[pousr]_[A-Za-z0-9]+	GitHub personal access token
+EOF
+)
+
+ALLOW="${BLINKSTREAM_SCAN_ALLOW:-}"
+is_allowed() {
+  local id="$1"
+  [ -z "$ALLOW" ] && return 1
+  case ",$ALLOW," in *",$id,"*) return 0;; *) return 1;; esac
+}
+
+# Filtro de placeholders: solo si el snippet es predominantemente un placeholder
+is_placeholder() {
+  local s="$1"
+  local val="${s#*=}"
+  if echo "$val" | grep -qiE '^(your[_-]|example_|_example$|placeholder|^TODO)'; then return 0; fi
+  if echo "$val" | grep -qE '<[A-Za-z_][A-Za-z0-9_]*>'; then return 0; fi
+  if echo "$val" | grep -qF '[REDACTED]'; then return 0; fi
+  return 1
+}
+
+# Determina si un archivo debe ser excluido del escaneo.
+# Docs/INSTRUCCIONES_* y archivos de documentacion generalmente son excepciones
+# a menos que el usuario configure lo contrario.
+is_excluded_file() {
+  local f="$1"
+  case "$f" in
+    # Documentacion canonica de seguridad/procedimiento
+    docs/SECURITY.md) return 0 ;;
+    INSTRUCCIONES_*.md) return 0 ;;
+    # El propio hook y sus patrones (auto-referencia)
+    .githooks/pre-commit) return 0 ;;
+    .env.example) return 0 ;;
+  esac
+  return 1
+}
+
+FINDINGS=0
+TMP_DIR=$(mktemp -d)
+trap "rm -rf $TMP_DIR" EXIT
+
+i=0
+while IFS=$'\t' read -r id regex desc; do
+  [ -z "$id" ] && continue
+  [ "${id:0:1}" = "#" ] && continue
+  PATTERN_IDS[$i]="$id"
+  PATTERN_REGEX[$i]="$regex"
+  PATTERN_DESC[$i]="$desc"
+  i=$((i + 1))
+done <<< "$PATTERNS_TSV"
+NUM_PATTERNS=$i
+
+for file in $STAGED; do
+  if is_excluded_file "$file"; then continue; fi
+  [ ! -f "$file" ] && continue
+  if head -c1 "$file" 2>/dev/null | LC_ALL=C grep -q $"\x00"; then continue; fi
+
+  pidx=0
+  while [ $pidx -lt $NUM_PATTERNS ]; do
+    id="${PATTERN_IDS[$pidx]}"
+    regex="${PATTERN_REGEX[$pidx]}"
+    desc="${PATTERN_DESC[$pidx]}"
+    pidx=$((pidx + 1))
+
+    if is_allowed "$id"; then continue; fi
+
+    matches=$(grep -nE -e "$regex" "$file" 2>/dev/null | head -5 || true)
+    [ -z "$matches" ] && continue
+
+    while IFS= read -r line; do
+      snippet=$(echo "$line" | sed -E 's/^[0-9]+://' | tr -d '\r\n' | head -c 100)
+      if is_placeholder "$snippet"; then continue; fi
+      printf "%s\n" "$file"   > "$TMP_DIR/$FINDINGS.file"
+      printf "%s\n" "$id"     > "$TMP_DIR/$FINDINGS.id"
+      printf "%s\n" "$desc"   > "$TMP_DIR/$FINDINGS.desc"
+      printf "%s\n" "$snippet"> "$TMP_DIR/$FINDINGS.snip"
+      FINDINGS=$((FINDINGS + 1))
+    done <<< "$matches"
+  done
+done
+
+if [ "$FINDINGS" -gt 0 ]; then
+  echo ""
+  echo "============================================================"
+  echo "  [pre-commit] SECRETOS DETECTADOS - COMMIT BLOQUEADO"
+  echo "============================================================"
+  j=0
+  while [ $j -lt $FINDINGS ]; do
+    f=$(cat "$TMP_DIR/$j.file")
+    d=$(cat "$TMP_DIR/$j.desc")
+    s=$(cat "$TMP_DIR/$j.snip")
+    printf "  - %s :: %s\n     match: %.60s...\n" "$f" "$d" "$s"
+    j=$((j + 1))
+  done
+  echo ""
+  echo "Acciones posibles:"
+  echo "  1) Mueve el secreto a .env (esta en .gitignore)"
+  echo "  2) Reemplaza por placeholder (your_<x>_here)"
+  echo "  3) Falso positivo documentado: BLINKSTREAM_SCAN_ALLOW=<id> git commit ..."
+  echo "  4) Emergencia: BLINKSTREAM_SKIP_SCAN=1 git commit ..."
+  echo ""
+  exit 1
+fi
+
+echo "[pre-commit] scan OK (0 secretos)"
+exit 0

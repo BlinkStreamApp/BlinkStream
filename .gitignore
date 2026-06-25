@@ -1,4 +1,4 @@
-# Logs
+﻿# Logs
 logs
 *.log
 npm-debug.log*
@@ -25,3 +25,22 @@ dist-ssr
 
 # Rust / Tauri build artifacts
 src-tauri/target/
+
+# Build artifacts (root level)
+target/
+
+# Supabase local cache
+supabase/.temp/
+
+# Lint output
+lint_output.txt
+lint.json
+
+# Environment variables
+# Bloquea .env, .env.local, .env.production, .env.development, etc.
+.env*
+# Pero permite commitear .env.example (placeholders sin secretos)
+!.env.example
+
+# Debug files
+debug_*.txt
