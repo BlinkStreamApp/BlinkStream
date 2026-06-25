@@ -406,3 +406,14 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# ─── Edge Functions ────────────────────────────────────────────────────────
+# `verify_jwt = true` es el default pero lo declaramos explicitamente para
+# auditoria. La funcion validate ademas con supabase.auth.getUser(jwt) para
+# verificar firma contra JWKS (defensa en profundidad).
+[functions.blinkstream-data]
+verify_jwt = true
+import_map = "./supabase/functions/blinkstream-data/deno.json"
+
+[functions.twitch-auth]
+verify_jwt = false  # callback OAuth de Twitch: no envia JWT
