@@ -66,9 +66,38 @@ export async function mergeFavorites(localFavorites, username) {
   if (!username) return localFavorites
   const cloud = await fetchCloudFavorites(username)
   const merged = [...new Set([...localFavorites, ...cloud])]
-  for (const ch of localFavorites) {
-    if (!cloud.includes(ch)) addCloudFavorite(username, ch)
+
+  // S-5 fix: throttling. Antes se lanzaban N requests simultaneas a la edge
+  // function (una por favorito local no presente en la nube), lo que podia
+  // tumbar el rate-limit del gateway y agotar el JWT por paralelismo.
+  // Ahora: chunks de 10 en serie, cada chunk se lanza en paralelo pero
+  // esperamos al siguiente chunk antes de empezar. Si un batch falla entero,
+  // lo loggeamos y seguimos con el resto — no perdemos la merge, solo un lote.
+  const toAdd = localFavorites.filter(ch => !cloud.includes(ch))
+  if (toAdd.length === 0) return merged
+
+  const CHUNK_SIZE = 10
+  for (let i = 0; i < toAdd.length; i += CHUNK_SIZE) {
+    const chunk = toAdd.slice(i, i + CHUNK_SIZE)
+    try {
+      const results = await Promise.allSettled(
+        chunk.map(ch => addCloudFavorite(username, ch))
+      )
+      // addCloudFavorite ya hace swallow internamente, pero si todos
+      // rechazan (p.ej. 401 global) lo dejamos constancia.
+      const failed = results.filter(r => r.status === 'rejected').length
+      if (failed > 0) {
+        // Mantener un log discreto — la UI ya degrada bien porque los
+        // favoritos quedan locales y se reintentaran en el proximo login.
+        console.warn(`[mergeFavorites] chunk ${i / CHUNK_SIZE + 1}: ${failed}/${chunk.length} failed`)
+      }
+    } catch (err) {
+      // Promise.allSettled nunca lanza, pero por si acaso no abortamos
+      // toda la merge: continuamos con el siguiente chunk.
+      console.warn(`[mergeFavorites] chunk ${i / CHUNK_SIZE + 1} failed:`, err?.message || err)
+    }
   }
+
   return merged
 }
 
