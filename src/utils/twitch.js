@@ -1,5 +1,48 @@
-export const PUBLIC_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko'
-export const APP_CLIENT_ID = 'z8bat49d2evj5nkmg5kmkge24sa7z9'
+﻿// ============================================================
+// Twitch API Client IDs
+// ============================================================
+// S-1 fix: Los Client IDs hardcodeados (`kimne78...`, `z8bat49...`)
+// eran IDs de TERCEROS (apps de chat no oficiales de Twitch), lo
+// cual viola los ToS de Twitch. Twitch puede revocarlos sin aviso.
+//
+// AHORA: leemos de variables de entorno (configurables en .env).
+// docs/TWITCH_APP_SETUP.md explica cómo registrar tu propia app.
+//
+// ⚠️  TODO: eliminar los fallbacks legacy cuando el usuario haya
+// migrado a su propia app Twitch registrada. Mientras coexistan
+// builds migrados y no migrados, los fallbacks son necesarios.
+// ============================================================
+
+// Client ID PÚBLICO (sin token de usuario). Va al frontend por diseño.
+const _PUBLIC_FROM_ENV = import.meta.env.VITE_TWITCH_CLIENT_ID?.trim()
+const _LEGACY_PUBLIC = 'kimne78kx3ncx6brgo4mv6wki5h1ko' // TODO: eliminar fallback legacy
+export const PUBLIC_CLIENT_ID = _PUBLIC_FROM_ENV || _LEGACY_PUBLIC
+
+// Client ID para llamadas AUTENTICADAS (con token de usuario).
+// Por defecto usa el mismo ID que el público (es una sola app Twitch).
+const _APP_FROM_ENV = import.meta.env.VITE_TWITCH_APP_CLIENT_ID?.trim()
+const _LEGACY_APP = 'z8bat49d2evj5nkmg5kmkge24sa7z9' // TODO: eliminar fallback legacy
+export const APP_CLIENT_ID = _APP_FROM_ENV || _LEGACY_APP
+
+// ============================================================
+// Warning de migración (solo se imprime UNA VEZ por sesión)
+// ============================================================
+if (!_PUBLIC_FROM_ENV) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    '%c[BlinkStream] ⚠️ Twitch Client ID legacy de terceros en uso.',
+    'color:#f59e0b;font-weight:bold',
+    '\n  Registra tu propia app: https://dev.twitch.tv/console/apps',
+    '\n  Docs: docs/TWITCH_APP_SETUP.md',
+  )
+} else if (_PUBLIC_FROM_ENV === _LEGACY_PUBLIC) {
+  // Caso borde: el usuario puso el legacy literal en su .env.
+  // Lo aceptamos pero avisamos.
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[BlinkStream] ⚠️ VITE_TWITCH_CLIENT_ID coincide con un Client ID legacy de terceros. Reemplázalo por el de tu propia app.',
+  )
+}
 
 function safeTimeout(ms) {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
@@ -110,7 +153,7 @@ export async function getDirectStreamUrl(channel, quality = '1080p60') {
 
   const m3u8 = await res.text()
   const lines = m3u8.split('\n')
-  
+
   const variants = [quality]
   const match = quality.match(/^(\d+)p\d+$/)
   if (match) {

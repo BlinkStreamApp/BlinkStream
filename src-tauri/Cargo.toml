@@ -19,6 +19,11 @@ tauri-build = { version = "2.6.2", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
+# `tokio` se usa para `task::spawn_blocking` dentro de comandos async de Tauri
+# (mover llamadas síncronas largas como `run_streamlink_with_timeout` fuera
+# del event loop). Tauri 2 ya depende transitivamente de tokio, pero
+# necesitamos declararlo para usar `spawn_blocking` desde este crate.
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 tauri = { version = "2.11.2", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-process = "2"
@@ -38,3 +43,13 @@ keyring = { version = "3", features = ["windows-native", "apple-native", "linux-
 # -------------------------------------------------
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2"
+
+# -------------------------------------------------
+# Dev dependencies — solo `cargo test`
+# -------------------------------------------------
+# `tokio` ya viene como dep transitiva (reqwest/tauri), pero en modo test
+# de la lib la resolución de crates no expone transitivas. Lo declaramos
+# como dev-dependency con el subset mínimo necesario para que el código
+# preexistente que usa `tokio::task::spawn_blocking` compile en tests.
+[dev-dependencies]
+tokio = { version = "1", default-features = false, features = ["rt"] }
