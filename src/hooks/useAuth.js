@@ -208,6 +208,10 @@ export function useAuth() {
     } catch { /* ignore */ }
     localStorage.removeItem(LS_TOKEN)
     localStorage.removeItem(LS_USERNAME)
+    // S-2 fix: limpiar tambien el avatar cacheado para que no se filtre
+    // PII (URL firmada de Twitch) al siguiente usuario de la misma sesion
+    // del sistema operativo si el dispositivo es compartido.
+    localStorage.removeItem(LS_AVATAR)
     // F-1 fix: limpiar tambien los tokens de Supabase emitidos por twitch-auth.
     // Si quedan cacheados, la proxima sesion podria usarlos con un username
     // distinto (si reusamos el mismo storage de la edge function).
@@ -216,6 +220,7 @@ export function useAuth() {
     setUser(null)
     setError(null)
     setAuthing(false)
+    setAvatar(null)
   }, [])
 
   const getTwitchToken = useCallback(() => {

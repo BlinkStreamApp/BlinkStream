@@ -21,8 +21,18 @@ export const LS_BLINKSTREAM_REFRESH = 'blinkstream_supabase_refresh'
 export const LS_BLINKSTREAM_EXPIRES = 'blinkstream_supabase_expires'
 export const LS_BLINKSTREAM_USER_ID = 'blinkstream_supabase_user_id'
 
+// Keychain key para el refresh token. El JWT y los expires quedan en
+// localStorage (cambian a menudo y leerlos sync es critico para los
+// fetch helpers), pero el refresh token es credencial de larga vida y
+// debe vivir en el keychain del sistema (S-4 fix).
+const KEYCHAIN_REFRESH_KEY = 'blinkstream_refresh_token'
+
 export async function pollAuthToken(requestId, { signal, interval = 1500 } = {}) {
   const pollUrl = `${EDGE_FN}?fetch=${encodeURIComponent(requestId)}`
+
+  // S-4 fix: si hay un refresh token legacy en localStorage, moverlo a
+  // keychain. Fire-and-forget — no bloqueamos el polling en esto.
+  migrateLegacyRefreshToken().catch(() => { /* ignore */ })
 
   while (!signal?.aborted) {
     try {
@@ -83,17 +93,91 @@ export function getBlinkstreamToken() {
 }
 
 export function getBlinkstreamRefreshToken() {
+  // S-4 fix: el refresh token debe leerse del keychain. Mantenemos fallback
+  // a localStorage para usuarios con tokens pre-existentes (migrados en el
+  // primer login) o entornos sin Tauri.
+  // Como leer del keychain es async pero esta funcion es sync, primero
+  // intentamos localStorage (rapido y cubre el caso comun post-migracion).
+  // La migracion a keychain se dispara en storeBlinkstreamRefreshToken.
+  try {
+    const ls = localStorage.getItem(LS_BLINKSTREAM_REFRESH)
+    if (ls) return ls
+  } catch { /* ignore */ }
+  return null
+}
+
+// S-4 fix: persiste el refresh token en el keychain del sistema operativo
+// (Tauri secret plugin). Si Tauri no esta disponible (dev web puro, build
+// sin plugin), cae a localStorage. Tras un store exitoso en keychain,
+// borra la copia en localStorage para evitar doble persistencia.
+export async function storeBlinkstreamRefreshToken(token) {
+  if (!token) return false
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('store_secret', { key: KEYCHAIN_REFRESH_KEY, value: token })
+    // Migracion silenciosa: si habia copia en localStorage, limpiarla.
+    try { localStorage.removeItem(LS_BLINKSTREAM_REFRESH) } catch { /* ignore */ }
+    return true
+  } catch {
+    // Fallback: localStorage (modo dev / sin Tauri)
+    try { localStorage.setItem(LS_BLINKSTREAM_REFRESH, token) } catch { /* ignore */ }
+    return false
+  }
+}
+
+// Lee el refresh token del keychain (async). Usado por el flow de
+// migracion: si en localStorage queda un refresh token pre-S-4, lo
+// movemos a keychain. Devuelve el token (de keychain o localStorage) o null.
+export async function readBlinkstreamRefreshToken() {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const fromKeychain = await invoke('get_secret', { key: KEYCHAIN_REFRESH_KEY })
+    if (fromKeychain) return fromKeychain
+  } catch { /* Tauri no disponible → fallback */ }
   try { return localStorage.getItem(LS_BLINKSTREAM_REFRESH) || null } catch { return null }
 }
 
-function saveBlinkstreamToken({ jwt, refreshToken, expiresIn, userId }) {
+// Borra el refresh token del keychain. Usado en logout / clear.
+export async function clearBlinkstreamRefreshToken() {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('delete_secret', { key: KEYCHAIN_REFRESH_KEY })
+  } catch { /* ignore */ }
+  try { localStorage.removeItem(LS_BLINKSTREAM_REFRESH) } catch { /* ignore */ }
+}
+
+// S-4 fix: migracion silenciosa. Si encontramos un refresh token en
+// localStorage (formato pre-fix), lo movemos a keychain y limpiamos
+// la copia vieja. Solo actua si Tauri esta disponible y la copia
+// en keychain esta vacia.
+async function migrateLegacyRefreshToken() {
+  try {
+    const lsToken = localStorage.getItem(LS_BLINKSTREAM_REFRESH)
+    if (!lsToken) return
+    const { invoke } = await import('@tauri-apps/api/core')
+    const existing = await invoke('get_secret', { key: KEYCHAIN_REFRESH_KEY })
+    if (existing) {
+      // Ya hay uno en keychain, solo limpiamos la copia legacy.
+      localStorage.removeItem(LS_BLINKSTREAM_REFRESH)
+      return
+    }
+    await invoke('store_secret', { key: KEYCHAIN_REFRESH_KEY, value: lsToken })
+    localStorage.removeItem(LS_BLINKSTREAM_REFRESH)
+  } catch { /* Tauri no disponible, mantener en localStorage */ }
+}
+
+async function saveBlinkstreamToken({ jwt, refreshToken, expiresIn, userId }) {
   try {
     localStorage.setItem(LS_BLINKSTREAM_JWT, jwt)
-    if (refreshToken) localStorage.setItem(LS_BLINKSTREAM_REFRESH, refreshToken)
     // expiresIn viene en segundos. Guardamos timestamp absoluto en ms.
     const expiresAtMs = Date.now() + (Number(expiresIn) || 3600) * 1000
     localStorage.setItem(LS_BLINKSTREAM_EXPIRES, String(expiresAtMs))
     if (userId) localStorage.setItem(LS_BLINKSTREAM_USER_ID, userId)
+
+    // S-4 fix: el refresh token va al keychain, no a localStorage.
+    if (refreshToken) {
+      await storeBlinkstreamRefreshToken(refreshToken)
+    }
   } catch { /* localStorage lleno o deshabilitado */ }
 }
 
@@ -104,6 +188,10 @@ export function clearBlinkstreamToken() {
     localStorage.removeItem(LS_BLINKSTREAM_EXPIRES)
     localStorage.removeItem(LS_BLINKSTREAM_USER_ID)
   } catch { /* ignore */ }
+  // S-4 fix: tambien limpiar del keychain. Es fire-and-forget porque
+  // clearBlinkstreamToken se invoca en paths sincronos (logout) y no
+  // esperamos al keychain.
+  clearBlinkstreamRefreshToken().catch(() => { /* ignore */ })
 }
 
 // Renovacion lazy: si el token esta vencido, intenta refrescarlo contra
