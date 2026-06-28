@@ -20,9 +20,13 @@ function VodIcon() { return <svg width="19" height="19" viewBox="0 0 512 512" fi
 function SettingsIcon() { return <svg width="20" height="20" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M26.7,12.3c-2.1,0.4-4,0-4.7-1.3c-0.7-1.3-0.2-3.1,1.3-4.7c-1.3-1.3-3-2.2-4.8-2.8C17.8,5.6,16.5,7,15,7s-2.8-1.4-3.5-3.5C9.7,4.1,8.1,5,6.8,6.3c1.5,1.6,2,3.5,1.3,4.7c-0.7,1.3-2.6,1.7-4.7,1.3C3.1,13.1,3,14.1,3,15s0.1,1.9,0.3,2.7c2.1-0.4,4,0,4.7,1.3c0.7,1.3,0.2,3.1-1.3,4.7c1.3,1.3,3,2.2,4.8,2.8c0.7-2.1,2-3.5,3.5-3.5s2.8,1.4,3.5,3.5c1.8-0.5,3.4-1.5,4.8-2.8c-1.5-1.6-2-3.5-1.3-4.7c0.7-1.3,2.6-1.7,4.7-1.3c0.2-0.9,0.3-1.8,0.3-2.7S26.9,13.1,26.7,12.3z"/><circle cx="15" cy="15" r="4"/></svg> }
 
 function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
-  const [opts, setOpts] = useState({
-    compact: compact || false,
-  })
+  // El state local era una fuente duplicada de verdad que se desincronizaba
+  // cuando el padre cambiaba `compact` mientras el panel estaba abierto.
+  // Ahora derivamos directo de la prop (source-of-truth = App.jsx).
+  // El toggle dispatcha al padre vía `onToggleCompact`, que actualiza
+  // `compact` y vuelve a llegar por prop en el siguiente render.
+  // (Auditoría WT-20260628-01 / B-5)
+  const compactValue = compact || false
 
   return (
     <div className="absolute bottom-20 right-4 z-40 w-64 bg-bg-secondary/80 backdrop-blur-xl border border-bg-tertiary/60 rounded-xl p-4 text-text-primary shadow-2xl animate-fade-in">
@@ -35,7 +39,7 @@ function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
       <div className="mt-3 space-y-3 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-text-secondary">Modo compacto</span>
-          <ToggleSwitch active={opts.compact} onClick={() => { setOpts(p => ({ ...p, compact: !p.compact })); onToggleCompact?.() }} />
+          <ToggleSwitch active={compactValue} onClick={onToggleCompact} />
         </div>
       </div>
     </div>
