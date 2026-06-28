@@ -1,5 +1,17 @@
+/**
+ * @file StreamInfo (M-7 / Auditoria WT-20260628-01).
+ * Header de informacion del canal en reproduccion: avatar, titulo,
+ * juego, viewers, tags, uptime.
+ *
+ * @typedef {object} StreamInfoProps
+ * @property {string}  channel
+ * @property {boolean} isFavorite
+ * @property {() => void} onToggleFavorite
+ */
+
 import { useState, useEffect } from 'react'
-import { PUBLIC_CLIENT_ID, getHeaders } from '../utils/twitch'
+import { PUBLIC_CLIENT_ID, getHeaders, sanitizeChannelForGraphQL } from '../utils/twitch'
+import { validateProps, isString, isBoolean } from '../utils/validateProps'
 import timerIcon from '../assets/timer.png'
 import LiveBadge from './LiveBadge'
 
@@ -19,36 +31,51 @@ function PingDot() {
 }
 
 function buildGqlQuery(channel) {
-  const login = channel.toLowerCase()
-  return `{
-    user(login: "${login}") {
-      profileImageURL(width: 70)
-      stream {
-        id
-        title
-        viewersCount
-        createdAt
-        game { displayName }
-        tags { id localizedName }
-        type
-      }
-    }
-  }`
+  // FIX-5 (Hank / P0): variables GraphQL (no interpolacion) + validacion
+  // previa con regex (^[a-z0-9_]{3,25}$). CWE-94: Code Injection.
+  // Si el canal no pasa la validacion, devolvemos { ok: false } para que
+  // el caller aborte sin hacer fetch.
+  const login = sanitizeChannelForGraphQL(channel)
+  if (!login) return { ok: false }
+  return {
+    ok: true,
+    query: 'query($login: String!) { user(login: $login) { profileImageURL(width: 70) stream { id title viewersCount createdAt game { displayName } tags { id localizedName } type } } }',
+    variables: { login },
+  }
 }
 
+/**
+ * Header de informacion del stream en reproduccion.
+ *
+ * @param {StreamInfoProps} props
+ */
 export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
+  // M-7: validacion runtime
+  validateProps(
+    { channel, isFavorite, onToggleFavorite },
+    {
+      channel: isString,
+      isFavorite: isBoolean,
+      onToggleFavorite: { name: 'function', check: (v) => typeof v === 'function' },
+    },
+    'StreamInfo props',
+  )
+
   const [info, setInfo] = useState(null)
   const [avatar, setAvatar] = useState(null)
   const [tags, setTags] = useState([])
   const [streamType, setStreamType] = useState(null)
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!channel) return
     let cancelled = false
-    setLoading(true)
+    // Reset al cambiar de canal: estado UI que se sustituye en el
+    // siguiente fetch. setState en effect es el patron canonico.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAvatar(null)
+     
     setTags([])
+     
     setStreamType(null)
 
     ;(async () => {
@@ -61,7 +88,7 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
         fetch('https://gql.twitch.tv/gql', {
           method: 'POST',
           headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: buildGqlQuery(channel) }),
+          body: (() => { const q = buildGqlQuery(channel); return q.ok ? JSON.stringify({ query: q.query, variables: q.variables }) : JSON.stringify({ query: '{ __typename }' }) })(),
           signal: AbortSignal.timeout(6000),
         }).then(res => res.ok ? res.json() : null).catch(() => null),
       ])
@@ -98,9 +125,7 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
       if (gqlStream?.tags?.length) {
         setTags(gqlStream.tags.map(t => t.localizedName).filter(Boolean))
       }
-
-      setLoading(false)
-    })().catch(() => { if (!cancelled) setLoading(false) })
+    })().catch(() => { /* ignore: si falla el fetch dejamos el estado anterior */ })
 
     return () => { cancelled = true }
   }, [channel])
@@ -110,7 +135,11 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
 
   const [uptime, setUptime] = useState('')
   useEffect(() => {
-    if (!info?.started_at) { setUptime(''); return }
+    // Reset de uptime al cambiar de stream: estado derivado de info.
+    if (!info?.started_at) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setUptime(''); return
+    }
     const update = () => {
       const elapsed = Math.floor((Date.now() - new Date(info.started_at).getTime()) / 1000)
       if (elapsed < 0) { setUptime(''); return }

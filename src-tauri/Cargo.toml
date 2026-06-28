@@ -50,6 +50,13 @@ libc = "0.2"
 # `tokio` ya viene como dep transitiva (reqwest/tauri), pero en modo test
 # de la lib la resolución de crates no expone transitivas. Lo declaramos
 # como dev-dependency con el subset mínimo necesario para que el código
-# preexistente que usa `tokio::task::spawn_blocking` compile en tests.
+# preexistente que usa `tokio::task::spawn_blocking` y `#[tokio::test]`
+# compile en tests.
+#
+# WT-20260628-16: anadimos `macros` para que el test
+# `get_app_token_missing_secret_returns_error` (que usa `#[tokio::test]`)
+# compile. Antes dependia de una resolucion de features en cache, que
+# se rompe con cualquier recompilacion. (`rt` ya estaba para el runtime
+# basico; `macros` provee el macro `#[tokio::test]`.)
 [dev-dependencies]
-tokio = { version = "1", default-features = false, features = ["rt"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BlinkStreamLogo } from './BlinkStreamLogo'
+import PhosphorIcon from './icons/PhosphorIcon'
 
 const SLIDES = [
   {
@@ -29,9 +30,7 @@ const SLIDES = [
   {
     icon: (
       <div className="w-20 h-20 rounded-2xl bg-green-400/10 flex items-center justify-center">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="text-green-400">
-          <path d="M20 14.5A2.5 2.5 0 0 1 17.5 17H7l-4 4V5.5A2.5 2.5 0 0 1 5.5 3h12A2.5 2.5 0 0 1 20 5.5z"/>
-        </svg>
+        <PhosphorIcon name="ChatCircle" size={36} weight="regular" className="text-green-400" />
       </div>
     ),
     title: 'Chat con superpoderes',

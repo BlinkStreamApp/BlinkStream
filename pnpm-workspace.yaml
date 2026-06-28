@@ -5,3 +5,6 @@ virtualStoreDir: node_modules/.pnpm
 
 overrides:
   svgo: 3.3.3
+
+allowBuilds:
+  esbuild: true

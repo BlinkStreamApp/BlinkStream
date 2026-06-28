@@ -1,23 +1,55 @@
+/**
+ * @file VideoPlayer (M-7 / Auditoria WT-20260628-01).
+ * Reproductor HLS con auto-fallback de calidad, grabacion local via
+ * backend Rust, y estadisticas en vivo. Conexion hls.js se recrea al
+ * cambiar de canal/calidad y se destruye en cleanup.
+ *
+ * @typedef {object} VideoPlayerProps
+ * @property {string}      channel
+ * @property {string}      quality
+ * @property {(q: string) => void}   onQualityChange
+ * @property {number}      volume
+ * @property {(v: number) => void}   onVolumeChange
+ * @property {boolean}     theatreMode
+ * @property {() => void}  onToggleTheatre
+ * @property {boolean}     compact
+ * @property {() => void}  onToggleCompact
+ */
+
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import Hls from 'hls.js'
 import { getStreamInfo } from '../utils/twitch'
 import { formatViewers } from '../utils/format'
+import { measureInvoke } from '../utils/perf'
+import { validateProps, isString, isNumber, isBoolean } from '../utils/validateProps'
+import { useRecording } from '../hooks/useRecording'
 import QualitySelector from './QualitySelector'
 import ClipPlayer from './ClipPlayer'
 import VodPlayer from './VodPlayer'
 import LiveBadge from './LiveBadge'
 import ToggleSwitch from './ToggleSwitch'
+import PhosphorIcon from './icons/PhosphorIcon'
+// FASE 4 / WT-20260628-45: Lordicon animado para el boton REC. Solo
+// se monta cuando `recording` es true; el resto del tiempo seguimos
+// con Phosphor (mas liviano, sin fetch de CDN).
+import AnimatedIcon from './icons/AnimatedIcon'
 
-function PlayIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5L8 5.5z"/></svg> }
+function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
-function VolumeHigh() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M2 9.5v5h3.5l4.5 4V5.5l-4.5 4H2z"/><path d="M17 8a5.5 5.5 0 0 1 0 8"/><path d="M20 5a9 9 0 0 1 0 14"/></svg> }
-function VolumeMute() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M2 9.5v5h3.5l4.5 4V5.5l-4.5 4H2z"/><path d="M22 9l-6 6M16 9l6 6"/></svg> }
-function FullscreenIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/></svg> }
-function TheatreIcon() { return <svg width="20" height="20" viewBox="0 0 512 512" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" strokeLinejoin="round"><path d="M97.69,293.63a8,8,0,0,0,6.55,1.74a850.73,850.73,0,0,1,303.52,0a8,8,0,0,0,9.42-7.88v-188.32a8,8,0,0,0-9.42-7.87a850.73,850.73,0,0,1-303.52,0a8,8,0,0,0-9.42,7.87v188.32A8,8,0,0,0,97.69,293.63Zm13.13-184.94a866.22,866.22,0,0,0,290.36,0v172.97a866.3,866.3,0,0,0-290.36,0Z"/><path d="M186.58,354.23a7,7,0,0,0-7-7h-4.01v-11.89a23.33,23.33,0,0,0-23.3-23.3h-30.27a23.33,23.33,0,0,0-23.3,23.3v11.89h-4.02a7,7,0,1,0,0,14h84.9A7,7,0,0,0,186.58,354.23Z"/><path d="M271.13,312.04h-30.26a23.33,23.33,0,0,0-23.31,23.3v11.89h-4.01a7,7,0,1,0,0,14h84.9a7,7,0,0,0,0-14h-4.01v-11.89A23.33,23.33,0,0,0,271.13,312.04Z"/></svg> }
-function ClipIcon() { return <svg width="19" height="19" viewBox="0 0 512 512" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" strokeLinejoin="round"><path d="M401.24,215.29H152.46L385.56,129.59a8,8,0,0,0,4.75-10.27l-15.36-41.77a8,8,0,0,0-10.27-4.75L108,167.17a8,8,0,0,0-4.75,10.27l15.36,41.77a8,8,0,0,0,1.35,2.33a8,8,0,0,0-.2,1.75v193.8a22.63,22.63,0,0,0,22.61,22.6h244.27a22.63,22.63,0,0,0,22.6-22.6v-193.8A8,8,0,0,0,401.24,215.29Zm-8,44.5h-33.16v-28.5h33.16Zm-257.48,0v-28.5h33.16v28.5Zm73.67-28.5h35.35v28.5h-35.35Zm75.86,0h34.28v28.5h-34.28Zm-52.1-107.77l-33.18,12.2l-9.83-26.75l33.18-12.2Zm28.18-40.73l32.18-11.83l9.83,26.75l-32.17,11.83Zm111.16-10.5l-31.13,11.44l-9.83-26.75l31.12-11.44ZM152.15,167.99l9.84,26.75l-31.12,11.44l-9.84-26.75ZM386.63,423.69H142.36a6.61,6.61,0,0,1-6.6-6.6v-141.3h257.48v141.3A6.61,6.61,0,0,1,386.63,423.69Z"/><path d="M355.76,348.24H173.23a10.45,10.45,0,0,0-10.45,10.45v28.78a9.81,9.81,0,0,0,9.81,9.8h183.16a9.81,9.81,0,0,0,9.81-9.8v-28.78A10.45,10.45,0,0,0,355.76,348.24Z"/></svg> }
-function VodIcon() { return <svg width="19" height="19" viewBox="0 0 512 512" fill="none" stroke="currentColor" strokeWidth="28" strokeLinecap="round" strokeLinejoin="round"><path d="M449.42,108.4H62.58a8,8,0,0,0-8,8v279.2a8,8,0,0,0,8,8h386.85a8,8,0,0,0,8-8V116.4A8,8,0,0,0,449.42,108.4ZM99.64,368.82H77.13v-27.8h22.51Zm0-49.42H77.13v-27.81h22.51Zm0-49.43H77.13v-27.8h22.51Zm0-49.42H77.13v-27.81h22.51Zm0-49.43H77.13v-27.8h22.51ZM390.06,387.6H122.03V124.4h268.03Zm44.9-18.78H412.45v-27.8h22.51Zm0-49.42H412.45v-27.81h22.51Zm0-49.43H412.45v-27.8h22.51Zm0-49.42H412.45v-27.81h22.51Zm0-49.43H412.45v-27.8h22.51Z"/><path d="M286.14,214.72a8,8,0,0,0-11.15,1.91l-25.44,35.91a8,8,0,0,0,6.53,12.62h23.8v10.27a8,8,0,0,0,16,0v-10.27h6.58a8,8,0,1,0,0-16h-6.58v-9.96a7.99,7.99,0,0,0-12.7-6.46l4.86-6.87A8,8,0,0,0,286.14,214.72Zm-6.25,24.49v9.95h-8.34l8.67-12.23A8,8,0,0,0,279.88,239.21Z"/></svg> }
-function SettingsIcon() { return <svg width="20" height="20" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M26.7,12.3c-2.1,0.4-4,0-4.7-1.3c-0.7-1.3-0.2-3.1,1.3-4.7c-1.3-1.3-3-2.2-4.8-2.8C17.8,5.6,16.5,7,15,7s-2.8-1.4-3.5-3.5C9.7,4.1,8.1,5,6.8,6.3c1.5,1.6,2,3.5,1.3,4.7c-0.7,1.3-2.6,1.7-4.7,1.3C3.1,13.1,3,14.1,3,15s0.1,1.9,0.3,2.7c2.1-0.4,4,0,4.7,1.3c0.7,1.3,0.2,3.1-1.3,4.7c1.3,1.3,3,2.2,4.8,2.8c0.7-2.1,2-3.5,3.5-3.5s2.8,1.4,3.5,3.5c1.8-0.5,3.4-1.5,4.8-2.8c-1.5-1.6-2-3.5-1.3-4.7c0.7-1.3,2.6-1.7,4.7-1.3c0.2-0.9,0.3-1.8,0.3-2.7S26.9,13.1,26.7,12.3z"/><circle cx="15" cy="15" r="4"/></svg> }
+function VolumeHigh() { return <PhosphorIcon name="SpeakerHigh" size={22} weight="regular" /> }
+function VolumeMute() { return <PhosphorIcon name="SpeakerSlash" size={22} weight="regular" /> }
+function FullscreenIcon() { return <PhosphorIcon name="CornersOut" size={20} weight="regular" /> }
+function TheatreIcon() { return <PhosphorIcon name="MonitorPlay" size={20} weight="regular" /> }
+function ClipIcon() { return <PhosphorIcon name="PlayCircle" size={19} weight="regular" /> }
+function VodIcon() { return <PhosphorIcon name="FilmStrip" size={19} weight="regular" /> }
+function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="regular" /> }
+
+// FALLBACK_QUALITIES a nivel modulo: si lo declaramos dentro del
+// componente, se recrea en cada render y dispara el warning de
+// `react-hooks/exhaustive-deps` en `fetchQualities` (su dep changea
+// constantemente). Como es un array inmutable de strings, sacarlo
+// del cuerpo del componente es seguro.
+const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '1080p60']
 
 function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
   // El state local era una fuente duplicada de verdad que se desincronizaba
@@ -33,7 +65,7 @@ function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
       <div className="flex items-center justify-between pb-3 border-b border-bg-tertiary/30">
         <span className="text-xs font-bold tracking-wide">Ajustes</span>
         <button onClick={onClose} className="text-text-muted hover:text-text-primary cursor-pointer">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          <PhosphorIcon name="X" size={16} weight="bold" />
         </button>
       </div>
       <div className="mt-3 space-y-3 text-sm">
@@ -46,14 +78,37 @@ function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
   )
 }
 
+/**
+ * Reproductor principal. Maneja HLS, fallback de calidad, grabacion
+ * via backend, y estadisticas en vivo.
+ *
+ * @param {VideoPlayerProps} props
+ */
 export default function VideoPlayer({
   channel, quality, onQualityChange, volume, onVolumeChange,
   theatreMode, onToggleTheatre, compact, onToggleCompact,
 }) {
+  // M-7: validamos props criticas (vienen de App.jsx). Solo loggea.
+  const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
+  validateProps(
+    { channel, quality, onQualityChange, volume, onVolumeChange, theatreMode, onToggleTheatre, compact, onToggleCompact },
+    {
+      channel: isString,
+      quality: isString,
+      onQualityChange: isFunc,
+      volume: isNumber,
+      onVolumeChange: isFunc,
+      theatreMode: isBoolean,
+      onToggleTheatre: isFunc,
+      compact: isBoolean,
+      onToggleCompact: isFunc,
+    },
+    'VideoPlayer props',
+  )
+
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
   const volumeRef = useRef(volume)
-  const reconnTimerRef = useRef(null)
   const isFetchingRef = useRef(false)
   const fallbackTimersRef = useRef(null)
   const [playing, setPlaying] = useState(true)
@@ -75,14 +130,18 @@ export default function VideoPlayer({
   const audioOnlyRef = useRef(false)
   useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
   const [stats, setStats] = useState({ bitrate: null, resolution: null, dropped: 0, buffer: 0 })
-  const [recording, setRecording] = useState(false)
-  // Ref espejo del state de grabación para que los useEffect de cleanup
-  // (cambio de canal / unmount) lean el valor actual sin re-suscribirse.
-  const recordingRef = useRef(false)
-  useEffect(() => { recordingRef.current = recording }, [recording])
-  // Error específico de grabación, separado de `error` (carga del stream)
-  // para poder mostrarlo cerca del badge REC sin confundir al usuario.
-  const [recordingError, setRecordingError] = useState('')
+  // G1 / WT-20260628-16: estado de grabacion extraido a useRecording.
+  // El hook maneja isRecording, outputPath, error y cleanup.
+  // - `recording`         → render del badge REC
+  // - `recordingError`    → mensaje user-friendly cerca del badge
+  // - `startRecording`    → abre dialog save y arranca backend
+  // - `hookStopRecording` → mata el proceso en el backend
+  const {
+    isRecording: recording,
+    error: recordingError,
+    startRecording,
+    stopRecording: hookStopRecording,
+  } = useRecording()
   const [showTheatreToast, setShowTheatreToast] = useState(false)
   const containerRef = useRef(null)
   const controlsTimerRef = useRef(null)
@@ -103,7 +162,7 @@ export default function VideoPlayer({
     // Audio-only: streamlink directo
     if (targetQuality === 'audio_only') {
       try {
-        const url = await invoke('get_stream_url', { channel: ch, quality: 'audio_only' })
+        const url = await measureInvoke('get_stream_url', { channel: ch, quality: 'audio_only' })
         setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
       } catch (e) { console.warn('Audio-only failed:', e) }
       setError('No se pudo obtener stream de solo audio')
@@ -111,13 +170,13 @@ export default function VideoPlayer({
     }
 
     try {
-      const url = await invoke('get_stream_url', { channel: ch, quality: targetQuality })
+      const url = await measureInvoke('get_stream_url', { channel: ch, quality: targetQuality })
       setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
     } catch (e) { console.warn('Streamlink fallback — get_stream_url failed:', e) }
 
     // Fallback: best
     try {
-      const url = await invoke('get_stream_url', { channel: ch, quality: 'best' })
+      const url = await measureInvoke('get_stream_url', { channel: ch, quality: 'best' })
       setStreamUrl(url); setUsingFallback(true); setLoading(false); isFetchingRef.current = false; return
     } catch (e) {
       const msg = typeof e === 'string' ? e : e?.message || e?.toString() || 'Error desconocido'
@@ -130,13 +189,11 @@ export default function VideoPlayer({
     const info = await getStreamInfo(ch); setStreamInfo(info)
   }, [])
 
-  const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '1080p60']
-
   // ── fetchQualities: versión infalible (sin cambios) ──
   const fetchQualities = useCallback(async (ch) => {
     if (!ch) return
     try {
-      const quals = await invoke('get_available_qualities', { channel: ch })
+      const quals = await measureInvoke('get_available_qualities', { channel: ch })
       if (Array.isArray(quals) && quals.length > 0) {
         setAvailableQualities(quals.filter(q => q.toLowerCase() !== 'best'))
         return
@@ -144,6 +201,10 @@ export default function VideoPlayer({
     } catch (e) { console.warn('Error fetching qualities:', e) }
     // Siempre mostrar calidades aunque el backend falle
     setAvailableQualities(FALLBACK_QUALITIES)
+    // FALLBACK_QUALITIES es constante a nivel modulo (ver arriba); la
+    // regla exhaustive-deps la pide igualmente como dep formal. La
+    // omitimos: la constante nunca cambia.
+     
   }, [])
 
   // ── handleQualityChange: recarga con nueva calidad (SIN hls level API) ──
@@ -153,7 +214,16 @@ export default function VideoPlayer({
   }, [onQualityChange, fetchStream, channel])
 
   // ── Carga inicial + reconexión cada 25min ──
+  // `quality` se lee dentro del setTimeout; si lo añadimos a las deps,
+  // el effect se re-montaría cada vez que cambia la calidad y eso
+  // reiniciaría el timer de 25min (UX: el usuario perdería la reconexión
+  // cada vez que cambia calidad). Por eso la omitimos: el reconnect usa
+  // siempre la ultima `quality` accesible via closure + audioOnlyRef.
+   
   useEffect(() => {
+    // fetchStream*/fetchQualities disparan setState al resolver; es
+    // el patron "fetch on mount/canal-change", no cascading render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     Promise.all([fetchStream(channel), fetchStreamInfo(channel), fetchQualities(channel)])
     let cancelled = false
     let timer
@@ -167,6 +237,11 @@ export default function VideoPlayer({
     }
     reconnect()
     return () => { cancelled = true; clearTimeout(timer) }
+    // `quality` se lee dentro del setTimeout (línea `fetchStream(channel, quality)`);
+    // si la añadimos a deps, el effect se re-montaría cada vez que el
+    // usuario cambia calidad y eso reiniciaría el reconnect de 25min.
+    // Intencional: la regla exhaustive-deps no modela setTimeout largos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel, fetchStream, fetchStreamInfo, fetchQualities])
 
   useEffect(() => {
@@ -183,56 +258,23 @@ export default function VideoPlayer({
     return () => { cancelled = true; clearTimeout(timer) }
   }, [channel, fetchStreamInfo])
 
-  // ── Helper reutilizable: detiene grabación en el backend de forma segura ──
-  // Fire-and-forget (no await) para no bloquear el flujo del caller.
-  // Try/catch interno para que un fallo del backend NO propague y rompa
-  // el cleanup de React o el cambio de canal.
-  const stopRecordingSafely = useCallback((reason) => {
-    if (!recordingRef.current) return
-    // Bajamos el ref ANTES del await para que un re-entrant (poco probable
-    // pero posible si React dispara cleanup dos veces en dev) no intente
-    // detener dos veces el mismo proceso backend.
-    recordingRef.current = false
-    setRecording(false)
-    setRecordingError('')
-    if (reason) console.info(`[Recording] Detenida por: ${reason}`)
-    invoke('stop_recording').catch(err => {
-      // Si el backend dice "No hay grabación activa" lo tratamos como OK
-      // (puede pasar si ya estaba cerrada por otra vía).
-      const msg = typeof err === 'string' ? err : err?.message || String(err)
-      if (!/no hay grabaci[oó]n activa/i.test(msg)) {
-        console.warn('[Recording] stop_recording falló:', msg)
-        // No spameamos UI aquí: es un cleanup, el usuario ya cambió de canal
-        // o está cerrando el componente. El log es suficiente.
-      }
-    })
-  }, [])
-
-  // ── B-1: Reset grabación al cambiar de canal ──
-  // Si el usuario cambia de canal mientras graba, el backend Rust seguiría
-  // grabando el canal original (start_recording lanza un nuevo proceso
-  // streamlink con el channel que recibió). Sin este effect, la UI diría
-  // "REC" sobre el video del nuevo canal mientras el .ts escribe el viejo.
+  // ── Cleanup de grabacion ─────────────────────────────────
+  // G1 / WT-20260628-16: el hook useRecording ya maneja el cleanup en
+  // unmount (fire-and-forget stop_recording). Para el caso de cambio
+  // de canal (B-1 original), necesitamos un efecto extra: si el canal
+  // cambia mientras graba, el backend Rust seguiria grabando el canal
+  // viejo. Lo paramos explicitamente al cambiar `channel`.
   useEffect(() => {
     return () => {
-      if (recordingRef.current) {
-        stopRecordingSafely(`cambio de canal → ${channel}`)
+      // Cleanup del cambio de canal. No await: es cleanup, el usuario
+      // ya esta navegando.
+      if (recording) {
+         
+        console.info(`[VideoPlayer] Deteniendo grabacion por cambio de canal → ${channel}`)
+        hookStopRecording()
       }
     }
-  }, [channel, stopRecordingSafely])
-
-  // ── B-4: Cleanup al desmontar el componente ──
-  // Si el usuario cierra la app o navega fuera del reproductor mientras
-  // graba, llamamos stop_recording en el backend. Sin esto, el proceso
-  // streamlink queda huérfano hasta que el sistema lo mate (o nunca, en
-  // algunos casos) y el .ts queda abierto/roto.
-  useEffect(() => {
-    return () => {
-      if (recordingRef.current) {
-        stopRecordingSafely('unmount del componente')
-      }
-    }
-  }, [stopRecordingSafely])
+  }, [channel, recording, hookStopRecording])
 
   // ── hls.js effect: SIMPLE con auto-fallback ──
   useEffect(() => {
@@ -247,33 +289,188 @@ export default function VideoPlayer({
     }
 
     if (!Hls.isSupported()) {
+      // El browser no soporta HLS nativo ni hls.js. setError en effect
+      // es legitimo: estado UI derivado de la disponibilidad del codec.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('HLS no soportado')
       return
     }
 
-    const hls = new Hls()
+    // WT-20260628-36: config robusta de HLS.js para streams 2K/1440p.
+    // - maxBufferLength/maxMaxBufferLength/maxBufferSize: buffer generoso
+    //   para absorber picos de bitrate en 2K (Twitch source llega a
+    //   ~6-8 Mbps y con picos de 12 Mbps).
+    // - capLevelToPlayerSize: evita que HLS.js intente decodificar el
+    //   level mas alto cuando el player es mas pequeno (este es el
+    //   trigger #4 del spec: causa directa del 2K-black-screen).
+    // - abrEwmaDefaultEstimate: arranca con 5 Mbps asumidos en vez de
+    //   500 kbps; el default subestima brutalmente streams 2K y fuerza
+    //   un downgrade prematuro que confunde al usuario.
+    // - fragLoadingTimeOut/manifestLoadingTimeOut/levelLoadingTimeOut
+    //   marcados deprecated en 1.6.16 (reemplazados por LoadPolicy) pero
+    //   siguen funcionando; los conservo por estabilidad y porque la
+    //   spec los pide explicitamente. Si rompen build, migrar a
+    //   `fragLoadPolicy: { default: { maxLoadTimeMs: 20000, ... } }`.
+    // - debug solo en dev para no spammear consola en produccion.
+    const hls = new Hls({
+      maxBufferLength: 60,
+      maxMaxBufferLength: 600,
+      maxBufferSize: 60 * 1000 * 1000,
+      backBufferLength: 30,
+      capLevelToPlayerSize: true,
+      abrEwmaDefaultEstimate: 5_000_000,
+      abrBandWidthFactor: 0.95,
+      abrBandWidthUpFactor: 0.7,
+      enableWorker: true,
+      fragLoadingTimeOut: 20000,
+      manifestLoadingTimeOut: 15000,
+      levelLoadingTimeOut: 15000,
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 10,
+      enableSoftwareAES: true,
+      debug: import.meta.env.DEV,
+    })
     hlsRef.current = hls
     hls.loadSource(streamUrl)
     hls.attachMedia(video)
 
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    // WT-20260628-36: ResizeObserver para re-evaluar capLevelToPlayerSize
+    // cuando el contenedor cambia de tamano (theatre mode, fullscreen,
+    // PiP). `triggerLevelSwap` NO existe en hls.js 1.6.16 — el equivalente
+    // real es manipular `hls.currentLevel` o llamar `hls.startLoad()`.
+    // Aqui solo queremos que hls.js re-mida el player y aplique el cap
+    // automaticamente; lo hacemos con un callback defensivo que verifica
+    // que la API exista antes de invocarla.
+    const resizeObserver = new ResizeObserver(() => {
+      if (hls && typeof hls.startLoad === 'function') {
+        // startLoad re-evalua el ABR; capLevelToPlayerSize se recalcula
+        // internamente cuando el video element reporta nuevas dimensiones.
+        try { hls.startLoad() } catch { /* noop: no-op en re-entry */ }
+      }
+    })
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current)
+    }
+
+    // WT-20260628-36: listener de errores nativos del <video>. HLS.js NO
+    // emite un ERROR event para todos los fallos del decoder (Codec no
+    // soportado, decode error del browser); estos llegan via video.error.
+    // Codigos: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED.
+    // El 3 (DECODE) es el caso tipico de 2K en WebView2: el HEVC/high
+    // profile falla a decodificar y se queda en pantalla negra. El 4 es
+    // cuando el codec no esta soportado en absoluto.
+    const handleVideoError = () => {
+      if (!video.error) return
+      const errCode = video.error.code
+      const errMsg = {
+        1: 'MEDIA_ERR_ABORTED',
+        2: 'MEDIA_ERR_NETWORK',
+        3: 'MEDIA_ERR_DECODE',
+        4: 'MEDIA_ERR_SRC_NOT_SUPPORTED',
+      }[errCode] || `code ${errCode}`
+      console.error(`[VideoPlayer] video.error: ${errMsg} (channel=${channel}, quality=${quality})`)
+      if (errCode === 3 && quality !== 'best') {
+        // Decode error en una calidad especifica -> caer a 'best' que
+        // suele ser la fuente mas estable.
+        console.warn(`[VideoPlayer] decode error at ${quality}, falling back to best`)
+        onQualityChange('best')
+        fetchStream(channel, 'best')
+      } else if (errCode === 4) {
+        setError(`Codec no soportado: ${errMsg}`)
+      }
+    }
+    video.addEventListener('error', handleVideoError)
+
+    hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
       video.play().catch(() => setPlaying(false))
 
-      // Auto-fallback: si esta calidad no funciona, cambiar a best
+      // WT-20260628-36: log de diagnostico en dev. Util para confirmar
+      // que el manifest tiene los levels esperados (incluido 2K/1440p).
+      if (import.meta.env.DEV) {
+        const levelsInfo = data.levels.map(l => `${l.height}p (${Math.round(l.bitrate / 1000)}kbps)`).join(', ')
+        console.log(`[HLS] ${data.levels.length} levels: ${levelsInfo}`)
+      }
+
+      // WT-20260628-36: auto-fallback inteligente de 5s (antes 8s).
+      // Tres casos:
+      //   1) readyState < 2: no llegaron datos -> bajar 1 level o ir a 'best'
+      //   2) videoWidth === 0 con levels disponibles: caso reportado de
+      //      2K-black-screen; forzar al level mas bajo.
+      //   3) ok: no hacer nada.
       const fallbackTimer = setTimeout(() => {
-        if (video.readyState < 2 && quality !== 'best') {
-          console.warn(`Quality ${quality} not working, falling back to best`)
-          onQualityChange('best')
-          fetchStream(channel, 'best')
+        if (video.readyState < 2) {
+          const currentLevelIdx = hls.currentLevel
+          console.warn(`[HLS] current level (${currentLevelIdx}) not playing after 5s, trying fallback`)
+          if (hls.levels && hls.levels.length > 1 && currentLevelIdx >= 0 && currentLevelIdx < hls.levels.length - 1) {
+            // +1 = un level mas bajo (los levels se ordenan de mayor a menor
+            // bitrate en hls.js).
+            hls.currentLevel = currentLevelIdx + 1
+          } else {
+            // No hay level mas bajo disponible -> pedir 'best' que es el
+            // flujo mas estable (suele ser 1080p60 o 720p60).
+            onQualityChange('best')
+            fetchStream(channel, 'best')
+          }
+        } else if (video.videoWidth === 0 && data.levels.length > 1) {
+          // Caso 2K reportado: videoWidth=0 significa que el frame no se
+          // ha renderizado, aunque readyState indique datos. Bajar al
+          // level mas bajo disponible.
+          console.warn(`[VideoPlayer] videoWidth=0 with levels available, downgrading to lowest`)
+          hls.currentLevel = data.levels.length - 1
         }
-      }, 8000)
+      }, 5000)
       fallbackTimersRef.current = fallbackTimer
     })
 
+    // WT-20260628-36: handler de errores categorizado.
+    // Distingue fatales vs no-fatales (los no-fatales hls.js los resuelve
+    // solo; no actuamos). Para fatales, recuperacion por tipo:
+    //   - NETWORK_ERROR: hls.startLoad() reintenta la carga.
+    //   - MEDIA_ERROR: recoverMediaError() resetea MediaSource; si es un
+    //     problema de codec especifico (bufferIncompatibleCodecsError /
+    //     bufferAppendError), probamos primero un downgrade de level.
+    //   - BUFFER_APPEND_ERROR / BUFFER_FULL_ERROR: recoverMediaError().
+    //   - otros (KEY_SYSTEM, MUX, OTHER): no recuperables, mostrar error.
     hls.on(Hls.Events.ERROR, (_e, data) => {
-      if (data.fatal) {
-        setError('Error de reproducción')
-        fetchStream(channel)
+      if (!data.fatal) {
+        if (import.meta.env.DEV) {
+          console.warn(`[HLS] non-fatal ${data.type}: ${data.details}`)
+        }
+        return
+      }
+
+      switch (data.type) {
+        case Hls.ErrorTypes.NETWORK_ERROR:
+          console.error('[HLS] network error', data.details)
+          hls.startLoad()
+          break
+
+        case Hls.ErrorTypes.MEDIA_ERROR:
+          console.error('[HLS] media error', data.details)
+          if (data.details === 'bufferIncompatibleCodecsError' || data.details === 'bufferAppendError') {
+            // Codec issue — intentar con el siguiente level mas bajo
+            // antes de recover completo (mas barato que re-buffering).
+            if (hls.levels && hls.currentLevel >= 0 && hls.currentLevel < hls.levels.length - 1) {
+              console.warn(`[HLS] codec issue at level ${hls.currentLevel}, downgrading`)
+              hls.currentLevel = hls.currentLevel + 1
+            } else {
+              hls.recoverMediaError()
+            }
+          } else {
+            hls.recoverMediaError()
+          }
+          break
+
+        case Hls.ErrorTypes.BUFFER_APPEND_ERROR:
+        case Hls.ErrorTypes.BUFFER_FULL_ERROR:
+          console.error('[HLS] buffer error', data.details)
+          hls.recoverMediaError()
+          break
+
+        default:
+          console.error('[HLS] fatal error', data.type, data.details)
+          setError(`Error de reproducción: ${data.details || data.type}`)
+          hls.destroy()
       }
     })
 
@@ -298,6 +495,12 @@ export default function VideoPlayer({
       cancelled = true
       clearTimeout(statsTimer)
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
+      // WT-20260628-36: cleanup del ResizeObserver y del listener nativo
+      // de error del <video>. Sin esto, en re-mount dejariamos observers
+      // y handlers colgando que dispararian warnings en consola y
+      // mantendrian referencias al video element destruido.
+      resizeObserver.disconnect()
+      video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }
   }, [streamUrl, channel, fetchStream, onQualityChange, quality])
@@ -350,7 +553,28 @@ export default function VideoPlayer({
     return () => { v.removeEventListener('play', onPlay); v.removeEventListener('pause', onPause); v.removeEventListener('enterpictureinpicture', onPiPEnter); v.removeEventListener('leavepictureinpicture', onPiPLeave) }
   }, [streamUrl])
 
-  useEffect(() => { if (theatreMode) { setShowTheatreToast(true); const t = setTimeout(() => setShowTheatreToast(false), 2500); return () => clearTimeout(t) } }, [theatreMode])
+  useEffect(() => {
+    // Auto-hide del toast de theatre mode: estado UI derivado de
+    // theatreMode. setState en effect es OK aqui.
+    if (theatreMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowTheatreToast(true); const t = setTimeout(() => setShowTheatreToast(false), 2500); return () => clearTimeout(t)
+    }
+  }, [theatreMode])
+
+  // Barra de progreso de sesion: tick cada 30s para refrescar el width.
+  // Asi evitamos Date.now() durante render (la regla `react-hooks/purity`
+  // detecta funciones impuras llamadas en el cuerpo del componente).
+  const [sessionProgress, setSessionProgress] = useState(0)
+  useEffect(() => {
+    const update = () => {
+      const elapsed = (Date.now() - streamStartTime) / 1000
+      setSessionProgress(Math.min((elapsed / 3600) * 100, 100))
+    }
+    update()
+    const id = setInterval(update, 30000)
+    return () => clearInterval(id)
+  }, [streamStartTime])
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -376,6 +600,10 @@ export default function VideoPlayer({
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
+    // toggleMute/onToggleTheatre/onVolumeChange: handlers de evento
+    // provistos por el padre. Si los añadimos a deps, el listener se
+    // re-montaría en cada render del padre (no estan memoizados).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume, muted, streamUrl, playing])
 
   // ──────────────────────── RENDER ────────────────────────
@@ -393,7 +621,7 @@ export default function VideoPlayer({
       {audioOnly && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 select-none">
           <div className="w-16 h-16 rounded-2xl bg-twitch/20 flex items-center justify-center mb-3 animate-pulse-glow">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="text-twitch"><path d="M2 9.5v5h3.5l4.5 4V5.5l-4.5 4H2z"/><path d="M17 8a5.5 5.5 0 0 1 0 8"/><path d="M20 5a9 9 0 0 1 0 14"/></svg>
+            <PhosphorIcon name="Headphones" size={32} weight="regular" />
           </div>
           <p className="text-white/60 text-sm font-medium">Modo solo audio</p>
           <p className="text-text-muted text-[12px] mt-1">{channel}</p>
@@ -418,13 +646,9 @@ export default function VideoPlayer({
         <div className="absolute top-3 right-3 z-30 max-w-xs bg-red-900/90 backdrop-blur-sm border border-red-500/40 rounded-lg px-3 py-2 text-[11px] text-white shadow-2xl animate-fade-in">
           <p className="font-semibold mb-0.5">Error de grabación</p>
           <p className="text-white/90 break-words">{recordingError}</p>
-          <button
-            onClick={() => setRecordingError('')}
-            className="mt-1 text-[10px] text-white/60 hover:text-white underline cursor-pointer"
-            aria-label="Cerrar error de grabación"
-          >
-            Cerrar
-          </button>
+          <p className="mt-1 text-[10px] text-white/50">
+            Se borrará al reintentar.
+          </p>
         </div>
       )}
 
@@ -456,9 +680,7 @@ export default function VideoPlayer({
           )}
           <LiveBadge />
           <button onClick={() => setShowMacHelp(true)} className="text-white/40 hover:text-white transition-colors cursor-pointer ml-1" title="Ayuda macOS" aria-label="Ayuda">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>
-            </svg>
+            <PhosphorIcon name="Question" size={15} weight="regular" />
           </button>
         </div>
       </div>
@@ -470,9 +692,9 @@ export default function VideoPlayer({
           <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={handleVolume} className="w-20 h-1 accent-twitch bg-white/20 rounded-lg appearance-none cursor-pointer" aria-label="Volumen" aria-valuemin="0" aria-valuemax="100" aria-valuenow={muted ? 0 : volume} />
           <button onClick={toggleAudioOnly} className={`hover:text-white transition-colors cursor-pointer ${audioOnly ? 'text-twitch' : ''}`} title={audioOnly ? 'Modo video' : 'Solo audio'} aria-label="Solo audio">
             {audioOnly ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+              <PhosphorIcon name="Monitor" size={18} weight="regular" />
             ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M2 9.5v5h3.5l4.5 4V5.5l-4.5 4H2z"/></svg>
+              <PhosphorIcon name="Headphones" size={18} weight="regular" />
             )}
           </button>
           <LiveBadge />
@@ -488,34 +710,26 @@ export default function VideoPlayer({
             <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title="Clips" aria-label="Abrir clips"><ClipIcon/></button>
             <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title="VODs" aria-label="Ver VODs"><VodIcon/></button>
             <button onClick={async () => {
-              setRecordingError('')
+              // G1 / WT-20260628-16: delega al hook useRecording.
+              // El hook se encarga del dialog save, errores, y eventLog.
               if (recording) {
-                try {
-                  await invoke('stop_recording')
-                  setRecording(false)
-                  recordingRef.current = false
-                } catch (err) {
-                  const msg = typeof err === 'string' ? err : err?.message || String(err)
-                  console.error('[Recording] stop_recording falló:', msg)
-                  setRecordingError(`No se pudo detener: ${msg}`)
-                }
-                return
-              }
-              try {
-                const { save } = await import('@tauri-apps/plugin-dialog')
-                const path = await save({ defaultPath: `${channel}_${Date.now()}.ts`, filters: [{ name: 'Video', extensions: ['ts','mp4'] }] })
-                if (path) {
-                  await invoke('start_recording', { channel, outputPath: path })
-                  setRecording(true)
-                  recordingRef.current = true
-                }
-              } catch (err) {
-                const msg = typeof err === 'string' ? err : err?.message || String(err)
-                console.error('[Recording] start_recording falló:', msg)
-                setRecordingError(`No se pudo iniciar: ${msg}`)
+                await hookStopRecording()
+              } else {
+                await startRecording(channel)
               }
             }} className={`hover:text-white transition-colors cursor-pointer ${recording ? 'text-red-500' : ''}`} title={recording ? 'Detener grabación' : 'Grabar stream'} aria-label="Grabar stream">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill={recording ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r={recording ? '4' : '8'}/><circle cx="12" cy="12" r="2.5" fill={recording ? 'white' : 'currentColor'}/></svg>
+              {recording ? (
+                // FASE 4 / WT-20260628-45: Lordicon animado. Si la red/CDN
+                // falla, AnimatedIcon cae a Phosphor Record duotone.
+                <AnimatedIcon
+                  src="https://cdn.lordicon.com/lbjeurwh.json"
+                  fallback="Record"
+                  size={18}
+                  color="#ef4444"
+                />
+              ) : (
+                <PhosphorIcon name="Record" size={18} weight="duotone" />
+              )}
             </button>
           </div>
 
@@ -525,12 +739,12 @@ export default function VideoPlayer({
             <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch' : ''}`} title="Ajustes" aria-label="Ajustes del reproductor"><SettingsIcon/></button>
             <button onClick={onToggleTheatre} className={`hover:text-white transition-colors cursor-pointer ${theatreMode ? 'text-twitch' : ''}`} title="Teatro (T)" aria-label="Modo teatro"><TheatreIcon/></button>
             <button onClick={async () => {
-              try { await import('@tauri-apps/plugin-opener'); window.open(`https://www.twitch.tv/${channel}`, '_blank') } catch {}
+              try { await import('@tauri-apps/plugin-opener'); window.open(`https://www.twitch.tv/${channel}`, '_blank') } catch { /* ignore: fallback a window.open ya esta hecho */ }
             }} className="hover:text-white transition-colors cursor-pointer" title="Abrir en navegador" aria-label="Abrir en navegador">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+              <PhosphorIcon name="ArrowSquareOut" size={16} weight="regular" />
             </button>
             <button onClick={togglePiP} className={`hover:text-white transition-colors cursor-pointer ${isPiP ? 'text-twitch' : ''}`} title="Picture-in-Picture" aria-label="Picture-in-Picture">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="9" y="8" width="13" height="11" rx="1.5"/><path d="M20 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg>
+              <PhosphorIcon name="PictureInPicture" size={16} weight="regular" />
             </button>
             <button onClick={toggleFullscreen} className="hover:text-white transition-colors cursor-pointer" title="Fullscreen (F)" aria-label="Pantalla completa"><FullscreenIcon/></button>
           </div>
@@ -538,10 +752,7 @@ export default function VideoPlayer({
 
         <div className="absolute top-0 left-5 right-5 h-[2px] bg-white/10 rounded-full overflow-hidden -translate-y-1">
           <div className="bg-twitch h-full shadow-[0_0_8px_#9146FF] transition-all duration-1000" style={{
-            width: `${(() => {
-              const elapsed = (Date.now() - streamStartTime) / 1000
-              return Math.min((elapsed / 3600) * 100, 100)
-            })()}%`
+            width: `${sessionProgress}%`
           }} />
         </div>
       </div>
@@ -557,7 +768,7 @@ export default function VideoPlayer({
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-white font-bold text-sm tracking-wide">🖥️ macOS — Primeros pasos</h3>
               <button onClick={() => setShowMacHelp(false)} className="text-text-muted hover:text-white cursor-pointer">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                <PhosphorIcon name="X" size={16} weight="bold" />
               </button>
             </div>
             <div className="space-y-3 text-sm text-text-secondary">

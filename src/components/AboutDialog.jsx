@@ -1,8 +1,19 @@
+/**
+ * @file AboutDialog (M-7 / Auditoria WT-20260628-01).
+ * Modal "acerca de": logo, version (via Tauri), link de donacion.
+ *
+ * @typedef {object} AboutDialogProps
+ * @property {() => void} onClose
+ */
+
 import { useEffect, useState } from 'react'
 import { BlinkStreamLogo } from './BlinkStreamLogo'
 import { getVersion } from '@tauri-apps/api/app'
+import { validateProps } from '../utils/validateProps'
+import { logError } from '../utils/errors'
+import PhosphorIcon from './icons/PhosphorIcon'
 
-function CloseIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg> }
+function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> }
 
 function PayPalIcon() {
   return (
@@ -12,11 +23,28 @@ function PayPalIcon() {
   )
 }
 
+/**
+ * Modal de informacion de la app.
+ *
+ * @param {AboutDialogProps} props
+ */
 export default function AboutDialog({ onClose }) {
+  // M-7: prop validation
+  validateProps(
+    { onClose },
+    { onClose: { name: 'function', check: (v) => typeof v === 'function' } },
+    'AboutDialog props',
+  )
+
   const [appVersion, setAppVersion] = useState('...')
 
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => setAppVersion('1.0.3'))
+    getVersion()
+      .then(setAppVersion)
+      .catch((err) => {
+        logError(err, { component: 'AboutDialog', action: 'getVersion' })
+        setAppVersion('1.0.3')
+      })
   }, [])
 
   useEffect(() => {
@@ -72,6 +100,20 @@ export default function AboutDialog({ onClose }) {
           <div className="mt-3 flex gap-3 text-[12px]">
             <span className="text-twitch/70">Hecho con ♥ para la comunidad</span>
           </div>
+
+          {/* FASE 4 / WT-20260628-45: Lordicon requiere atribucion visible. */}
+          <p className="text-text-muted/60 text-[10px] mt-4">
+            Animated icons by{' '}
+            <a
+              href="https://lordicon.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-twitch"
+            >
+              Lordicon
+            </a>
+            {' '}(Free for commercial use)
+          </p>
         </div>
       </div>
     </div>

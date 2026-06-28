@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { searchChannels } from '../utils/twitch'
+import PhosphorIcon from './icons/PhosphorIcon'
 
 const CHANNEL_RE = /^[a-zA-Z][a-zA-Z0-9_]{2,24}$/
 
@@ -25,13 +26,21 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
   }, [])
 
   useEffect(() => {
+    // Reset al cambiar de canal: estado UI que depende de currentChannel.
+    // No es cascading render: el effect se re-monta solo al cambiar.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (currentChannel) { setInput(''); setSuggestions([]) }
   }, [currentChannel])
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     const val = input.trim()
-    if (val.length < 2) { setSuggestions([]); return }
+    if (val.length < 2) {
+      // Input demasiado corto: limpiamos suggestions. setState en effect
+      // es OK porque es reset dependiente de la prop `input`.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSuggestions([]); return
+    }
 
     debounceRef.current = setTimeout(async () => {
       setSearching(true)
@@ -87,9 +96,7 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
   return (
     <div className="flex-1 max-w-sm relative z-[9998]" ref={containerRef}>
       <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted/50 pointer-events-none" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-          <circle cx="11" cy="11" r="7.5"/><path d="m20 20-3.5-3.5"/>
-        </svg>
+        <PhosphorIcon name="MagnifyingGlass" size={16} weight="regular" className="absolute left-3 top-0 bottom-0 my-auto text-text-muted/60 pointer-events-none" />
         <input
           ref={inputRef}
           type="text"

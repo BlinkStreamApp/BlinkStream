@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { PUBLIC_CLIENT_ID, getHeaders } from '../utils/twitch'
 import { invoke } from '@tauri-apps/api/core'
+import { isTauri } from '../utils/tauriEnv'
 import Hls from 'hls.js'
+import PhosphorIcon from './icons/PhosphorIcon'
 
 function parseDuration(dur) {
   if (!dur) return 0
@@ -10,6 +12,9 @@ function parseDuration(dur) {
 }
 
 async function getVodM3u8(vodId) {
+  // FIX WT-20260628-34: fuera de Tauri el invoke no tiene backend;
+  // devolvemos null y el componente muestra "No se pudo obtener el VOD".
+  if (!isTauri()) return null
   try {
     return await invoke('get_vod_manifest_url', { vodId: String(vodId) })
   } catch { return null }
@@ -25,7 +30,7 @@ async function fetchVods(channel) {
       signal: AbortSignal.timeout(5000),
     })
     if (gqlRes.ok) { const d = await gqlRes.json(); userId = d?.data?.user?.id }
-  } catch {}
+  } catch { /* ignore: si falla la query GQL seguimos sin userId */ }
 
   if (!userId) return []
   try {
@@ -56,7 +61,12 @@ function VodVideo({ video }) {
     else if (Hls.isSupported()) {
       const hls = new Hls(); hlsRef.current = hls
       hls.loadSource(url); hls.attachMedia(v)
-    } else { setError('HLS no soportado') }
+    } else {
+      // HLS no soportado: setError en effect es el patron "estado UI
+      // derivado de la disponibilidad del codec en el browser".
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setError('HLS no soportado')
+    }
     return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null } }
   }, [url])
 
@@ -79,6 +89,9 @@ export default function VodPlayer({ channel, onClose }) {
   const [activeVod, setActiveVod] = useState(null)
 
   useEffect(() => {
+    // Reset de loading + fetch. setState en effect es el patron
+    // canonico "fetch on mount/channel-change".
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     let c = false; setLoading(true)
     fetchVods(channel).then(v => { if (!c) { setVods(v); setLoading(false) } }).catch(() => { if (!c) setLoading(false) })
     return () => { c = true }
@@ -95,7 +108,7 @@ export default function VodPlayer({ channel, onClose }) {
         <div className="flex items-center justify-between px-5 py-3 border-b border-bg-tertiary/30 shrink-0">
           <h2 className="text-white text-sm font-bold">VODs de {channel}</h2>
           <button onClick={onClose} className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <PhosphorIcon name="X" size={18} weight="bold" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">

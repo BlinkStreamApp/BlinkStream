@@ -13,6 +13,223 @@
 // builds migrados y no migrados, los fallbacks son necesarios.
 // ============================================================
 
+import { measureFetch } from './perf'
+import { AppError, ErrorCode, logError, formatUserMessage } from './errors'
+import { logEvent } from './eventLog'
+import { isTauri } from './tauriEnv'
+
+// ============================================================
+// isTauri(): detecta runtime Tauri (sirve para feature-detect).
+// Reutilizado por getAppToken y cualquier helper que tenga fallback
+// desktop-only. Marcado con CWE-200/CWE-522 en mente: cuando hay un
+// fallback con secretos, hay que cortar el path en PROD web.
+// ============================================================
+// FIX WT-20260628-34: re-export desde tauriEnv para tener una sola
+// fuente de verdad. Se mantiene el export para no romper consumidores
+// externos que importan `isTauri` desde `./utils/twitch`.
+export { isTauri }
+
+// ============================================================
+// FIX-5 (Hank / P0): sanitizacion defensiva de canales para GraphQL.
+// ============================================================
+// Twitch exige que el `login` del canal cumpla `^[a-z0-9_]{3,25}$`
+// (case-insensitive, pero en queries lo pasamos lowercase). Sin
+// embargo, si un input externo (URL, deep-link, IPC) llega sin
+// validar y se INTERPOLA dentro de un string de query, un canal
+// como `foo"} maliciousFragment { ... } { x(login: "bar` rompe la
+// query y permite exfiltrar data del viewer (CWE-94: Code Injection,
+// CWE-20: Improper Input Validation).
+//
+// Esta funcion es defense-in-depth: SIEMPRE usarla antes de pasar
+// el canal a cualquier GQL, ademas de preferir variables (que es la
+// unica defensa real contra inyeccion en query languages).
+// ============================================================
+
+/**
+ * Regex Twitch login: solo letras (case-insensitive), digitos y
+ * underscore, longitud 3-25. Exportada para tests.
+ * @type {RegExp}
+ */
+export const TWITCH_LOGIN_REGEX = /^[a-z0-9_]{3,25}$/
+
+/**
+ * Valida que un canal Twitch cumple el formato esperado.
+ * @param {string} channel
+ * @returns {boolean}
+ */
+export function isValidTwitchLogin(channel) {
+  if (typeof channel !== 'string') return false
+  return TWITCH_LOGIN_REGEX.test(channel.toLowerCase())
+}
+
+/**
+ * Genera un entero aleatorio criptograficamente seguro en [0, max).
+ * FIX 1 (Hank / P1): sustituye a Math.random() para cache-busting
+ * y cualquier otro uso donde la predictibilidad del PRNG del engine
+ * JS pueda ser explotada. CWE-330: Use of Insufficiently Random Values.
+ *
+ * - Usa crypto.getRandomValues (WebCrypto) cuando esta disponible.
+ * - Cae a Math.random() solo como ultimo recurso (sin CSPRNG),
+ *   porque aunque el parametro no es criptografico (cache-buster),
+ *   la consistencia con el resto del modulo exige que el fallback
+ *   se mantenga explicito.
+ *
+ * Exportada para tests de regresion.
+ *
+ * @param {number} max - Limite superior exclusivo (debe ser > 0)
+ * @returns {number} entero en [0, max)
+ */
+export function secureRandomInt(max) {
+  if (typeof max !== 'number' || max <= 0 || !Number.isFinite(max)) {
+    throw new RangeError('secureRandomInt: max must be a positive finite number')
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    // Uint32Array -> 32 bits -> % max reduce al rango deseado
+    const buf = new Uint32Array(1)
+    crypto.getRandomValues(buf)
+    return buf[0] % Math.floor(max)
+  }
+  return Math.floor(Math.random() * max)
+}
+
+/**
+ * Sanitiza un canal para uso seguro en queries GQL:
+ *   - Si es valido, lo devuelve en lowercase.
+ *   - Si NO es valido, devuelve `null` (NO lanza; el caller decide).
+ *
+ * Pensado para combinarse con el patron de variables GraphQL:
+ *   const ch = sanitizeChannelForGraphQL(rawChannel)
+ *   if (!ch) return null
+ *   body = JSON.stringify({
+ *     query: 'query($login: String!) { user(login: $login) { id } }',
+ *     variables: { login: ch },
+ *   })
+ *
+ * @param {string} channel
+ * @returns {string|null}
+ */
+export function sanitizeChannelForGraphQL(channel) {
+  if (typeof channel !== 'string') return null
+  const lower = channel.toLowerCase().trim()
+  if (!isValidTwitchLogin(lower)) return null
+  return lower
+}
+
+
+// ============================================================
+// Result type para mod helpers (M-1 / WT-20260628-13)
+// ============================================================
+// Patron explicito Result<T, AppError> para que los hooks (useChannelRole,
+// useModeration) puedan branchear sin try/catch anidados. Mantenemos
+// un wrapper interno en vez de exponer una libreria externa: ligero,
+// zero-deps, y tipable mentalmente (success: true => T, success: false => AppError).
+// ============================================================
+
+/**
+ * @template T
+ * @typedef {{ success: true, value: T } | { success: false, error: AppError }} Result
+ */
+
+/**
+ * Envoltorio OK. Anota contexto extra al AppError via `meta`.
+ * @template T
+ * @param {T} value
+ * @returns {Result<T>}
+ */
+function ok(value) {
+  return { success: true, value }
+}
+
+/**
+ * Envoltorio ERROR. Construye un AppError tipado con codigo MOD_ACTION_FAILED
+ * (o el que llegue) y contexto para que logError pueda correlacionar.
+ * Loggea automaticamente via logError (M-6) salvo que silent=true.
+ *
+ * @param {string} code      - ErrorCode.MOD_ACTION_FAILED por defecto
+ * @param {string} message
+ * @param {object} [meta]    - { component, action, ... }
+ * @param {boolean} [silent] - si true, no llama a logError
+ * @returns {Result<never>}
+ */
+function err(code, message, meta = {}, silent = false) {
+  const codeStr = code || ErrorCode.MOD_ACTION_FAILED
+  const ae = new AppError(codeStr, message, meta)
+  if (!silent) {
+    logError(ae, meta)
+  }
+  return { success: false, error: ae }
+}
+
+/**
+ * Helper interno: ejecuta un fetch Helix con timeout 5s, headers autenticados
+ * y manejo de error uniforme. Devuelve Result<T> parseando JSON si response ok.
+ *
+ * Acepta un `signal` externo (del caller) que se combina con el timeout
+ * interno via `AbortSignal.any(...)` para que el caller pueda abortar
+ * (p. ej. cambio rapido de canal en un hook) sin necesidad de re-implementar
+ * la logica de timeout.
+ *
+ * @template T
+ * @param {string} url
+ * @param {RequestInit} [opts]
+ * @param {object} [meta] - contexto para AppError/log
+ * @param {AbortSignal} [signal] - signal externo del caller (opcional)
+ * @returns {Promise<Result<T>>}
+ */
+async function helixFetch(url, opts = {}, meta = {}, signal) {
+  try {
+    const headers = await getHeaders()
+    // Combinamos el signal externo con el timeout interno. Si el caller
+    // aborta O si pasan 5s, fetch se cancela. `AbortSignal.any` es el
+    // patron oficial para combinar signals (soportado en browsers 2024+
+    // y Node 20+). Fallback a un Merge manual si no esta disponible.
+    const timeoutSignal = safeTimeout(5000)
+    let combinedSignal = timeoutSignal
+    if (signal) {
+      if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
+        combinedSignal = AbortSignal.any([timeoutSignal, signal])
+      } else if (!timeoutSignal.aborted && !signal.aborted) {
+        // Fallback: combinamos manualmente. Si uno aborta, abortamos el otro.
+        const ctrl = new AbortController()
+        const onAbort = () => ctrl.abort()
+        timeoutSignal.addEventListener('abort', onAbort, { once: true })
+        signal.addEventListener('abort', onAbort, { once: true })
+        combinedSignal = ctrl.signal
+      }
+    }
+    const finalOpts = {
+      ...opts,
+      headers: { ...headers, ...(opts.headers || {}) },
+      signal: combinedSignal,
+    }
+    const res = await measureFetch(url, finalOpts)
+    const status = res.status
+    if (!res.ok) {
+      // Mensaje informativo segun status
+      const msg =
+        status === 403 ? 'Sin permisos para esta accion' :
+        status === 404 ? 'Recurso no encontrado' :
+        status === 429 ? 'Rate limit de Twitch alcanzado' :
+        status >= 500 ? 'Error del servidor de Twitch' :
+        `Helix fallo (HTTP ${status})`
+      return err(ErrorCode.MOD_ACTION_FAILED, msg, { ...meta, url, status })
+    }
+    // DELETE no devuelve body
+    if (status === 204 || (opts.method || 'GET').toUpperCase() === 'DELETE') {
+      return ok(/** @type {any} */ (null))
+    }
+    const data = await res.json().catch(() => null)
+    return ok(/** @type {any} */ (data))
+  } catch (e) {
+    // AbortError u otros fallos de red
+    return err(
+      ErrorCode.MOD_ACTION_FAILED,
+      e?.name === 'AbortError' ? 'Timeout (5s) llamando a Twitch' : (e?.message || 'Fallo de red'),
+      { ...meta, url, errName: e?.name },
+    )
+  }
+}
+
 // Client ID PÚBLICO (sin token de usuario). Va al frontend por diseño.
 const _PUBLIC_FROM_ENV = import.meta.env.VITE_TWITCH_CLIENT_ID?.trim()
 const _LEGACY_PUBLIC = 'kimne78kx3ncx6brgo4mv6wki5h1ko' // TODO: eliminar fallback legacy
@@ -28,7 +245,7 @@ export const APP_CLIENT_ID = _APP_FROM_ENV || _LEGACY_APP
 // Warning de migración (solo se imprime UNA VEZ por sesión)
 // ============================================================
 if (!_PUBLIC_FROM_ENV) {
-  // eslint-disable-next-line no-console
+   
   console.warn(
     '%c[BlinkStream] ⚠️ Twitch Client ID legacy de terceros en uso.',
     'color:#f59e0b;font-weight:bold',
@@ -38,7 +255,7 @@ if (!_PUBLIC_FROM_ENV) {
 } else if (_PUBLIC_FROM_ENV === _LEGACY_PUBLIC) {
   // Caso borde: el usuario puso el legacy literal en su .env.
   // Lo aceptamos pero avisamos.
-  // eslint-disable-next-line no-console
+   
   console.warn(
     '[BlinkStream] ⚠️ VITE_TWITCH_CLIENT_ID coincide con un Client ID legacy de terceros. Reemplázalo por el de tu propia app.',
   )
@@ -53,32 +270,52 @@ function safeTimeout(ms) {
   return ctrl.signal
 }
 
+/**
+ * Recupera el token de Twitch persistido. Prioriza keychain (Tauri),
+ * cae a localStorage. Devuelve null si no hay token o si el acceso
+ * a almacenamiento falla.
+ *
+ * @returns {Promise<string|null>}
+ */
 export async function getStoredToken() {
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const token = await invoke('get_secret', { key: 'twitch_token' })
-    if (token) return token
-  } catch { /* fallback */ }
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const token = await invoke('get_secret', { key: 'twitch_token' })
+      if (token) return token
+    } catch { /* invoke fallo -> fallback */ }
+  }
   try {
     return localStorage.getItem('blinkstream_twitch_token') || null
   } catch { return null }
 }
 
+/**
+ * Borra el token de Twitch de keychain y localStorage. No lanza.
+ * @returns {Promise<void>}
+ */
 export async function clearStoredToken() {
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('delete_secret', { key: 'twitch_token' })
-  } catch { /* ignore */ }
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('delete_secret', { key: 'twitch_token' })
+    } catch { /* ignore */ }
+  }
   try {
     localStorage.removeItem('blinkstream_twitch_token')
     localStorage.removeItem('blinkstream_twitch_username')
   } catch { /* ignore */ }
 }
 
+/**
+ * Verifica contra Helix que un token sigue siendo valido. Timeout 5s.
+ * @param {string|null|undefined} token
+ * @returns {Promise<boolean>}
+ */
 export async function validateToken(token) {
   if (!token) return false
   try {
-    const res = await fetch('https://api.twitch.tv/helix/users', {
+    const res = await measureFetch('https://api.twitch.tv/helix/users', {
       headers: {
         'Client-ID': APP_CLIENT_ID,
         'Authorization': `Bearer ${token}`,
@@ -89,6 +326,13 @@ export async function validateToken(token) {
   } catch { return false }
 }
 
+/**
+ * Construye las cabeceras para llamadas Helix. Si hay token persistido
+ * lo anade como Authorization Bearer; usa APP_CLIENT_ID en ese caso, si
+ * no, cae al PUBLIC_CLIENT_ID.
+ *
+ * @returns {Promise<Record<string, string>>}
+ */
 export async function getHeaders() {
   const token = await getStoredToken()
   const headers = {
@@ -100,6 +344,10 @@ export async function getHeaders() {
   return headers
 }
 
+/**
+ * Cabeceras para llamadas GQL publicas (no requieren token de usuario).
+ * @returns {{'Client-ID': string, 'Content-Type': string}}
+ */
 export function getGqlHeaders() {
   return {
     'Client-ID': PUBLIC_CLIENT_ID,
@@ -107,13 +355,22 @@ export function getGqlHeaders() {
   }
 }
 
+/**
+ * Pide a Twitch GQL el playback access token para un canal o VOD.
+ * Usado por el reproductor para obtener la URL firmada del HLS.
+ *
+ * @param {string} channel - login del canal o id del VOD
+ * @param {'stream'|'video'} [type='stream']
+ * @returns {Promise<{value: string, signature: string}>}
+ * @throws {Error} si la peticion falla o la respuesta no trae token
+ */
 export async function getAccessToken(channel, type = 'stream') {
   const isVod = type === 'video'
   const query = isVod
     ? `{ video(id: "${channel}") { playbackAccessToken(params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } } }`
     : `{ streamPlaybackAccessToken(channelName: "${channel}", params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } }`
   const fieldName = isVod ? 'playbackAccessToken' : 'streamPlaybackAccessToken'
-  const gqlRes = await fetch('https://gql.twitch.tv/gql', {
+  const gqlRes = await measureFetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query }),
@@ -126,6 +383,17 @@ export async function getAccessToken(channel, type = 'stream') {
   return { value: at.value, signature: at.signature }
 }
 
+/**
+ * Resuelve la URL HLS directa del stream. Primero pide el access token
+ * via GQL, luego hace la peticion a usher y parsea el m3u8 para
+ * encontrar la variante de calidad pedida. Si pide audio_only/best/
+ * chunked devuelve la URL base del m3u8.
+ *
+ * @param {string} channel
+ * @param {string} [quality='1080p60']
+ * @returns {Promise<string>}
+ * @throws {Error} si la peticion a usher falla
+ */
 export async function getDirectStreamUrl(channel, quality = '1080p60') {
   const at = await getAccessToken(channel)
   const token = at.value; const sig = at.signature
@@ -137,11 +405,14 @@ export async function getDirectStreamUrl(channel, quality = '1080p60') {
     allow_audio_only: 'true',
     allow_source: 'true',
     type: 'any',
-    p: String(Math.floor(Math.random() * 1e7)),
+    // FIX 1 (Hank / P1): CSPRNG para cache-buster. Math.random() es
+    // predecible (PRNG del engine JS) y constituye CWE-330. Se usa
+    // crypto.getRandomValues cuando esta disponible. Rango: [0, 1e7).
+    p: String(secureRandomInt(1e7)),
   })
 
   const usherUrl = `https://usher.ttvnw.net/api/channel/hls/${encodeURIComponent(channel)}.m3u8?${params}`
-  const res = await fetch(usherUrl, {
+  const res = await measureFetch(usherUrl, {
     headers: { 'Client-ID': PUBLIC_CLIENT_ID },
     signal: safeTimeout(10000),
   })
@@ -176,9 +447,16 @@ export async function getDirectStreamUrl(channel, quality = '1080p60') {
   return res.url
 }
 
+/**
+ * Devuelve info de stream en vivo de un canal. Null si no esta en vivo
+ * o si la peticion falla.
+ *
+ * @param {string} channel
+ * @returns {Promise<object|null>}
+ */
 export async function getStreamInfo(channel) {
   const headers = await getHeaders()
-  const res = await fetch(
+  const res = await measureFetch(
     `https://api.twitch.tv/helix/streams?user_login=${encodeURIComponent(channel)}`,
     { headers, signal: safeTimeout(5000) }
   )
@@ -187,9 +465,16 @@ export async function getStreamInfo(channel) {
   return data.data?.[0] || null
 }
 
+/**
+ * Busca canales en Twitch. Ordena los que estan en vivo primero.
+ * Devuelve array vacio si la query falla o no hay resultados.
+ *
+ * @param {string} query
+ * @returns {Promise<Array<{login: string, displayName: string, avatar: string, isLive: boolean, game: string, viewers: number}>>}
+ */
 export async function searchChannels(query) {
   const headers = await getHeaders()
-  const res = await fetch(
+  const res = await measureFetch(
     `https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(query)}&first=8`,
     { headers, signal: safeTimeout(5000) }
   )
@@ -205,4 +490,841 @@ export async function searchChannels(query) {
   }))
   results.sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0))
   return results
+}
+
+/**
+ * Resuelve un login de Twitch (e.g. "ninja") a su user_id numerico
+ * (e.g. "19571641"). Necesario para Channel Points y mod endpoints
+ * que solo aceptan broadcaster_id, no login. Cache de 1h en localStorage.
+ *
+ * Devuelve null si el canal no existe o si la peticion falla.
+ *
+ * @param {string} login
+ * @returns {Promise<string|null>}
+ */
+export async function getUserIdByLogin(login) {
+  if (!login || typeof login !== 'string') return null
+  const cacheKey = `bs.twitch.userid.${login.toLowerCase()}`
+  try {
+    const cached = localStorage.getItem(cacheKey)
+    if (cached) return cached
+  } catch { /* ignore */ }
+
+  const headers = await getHeaders()
+  try {
+    const res = await measureFetch(
+      `https://api.twitch.tv/helix/users?login=${encodeURIComponent(login.toLowerCase())}`,
+      { headers, signal: safeTimeout(5000) },
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const id = data?.data?.[0]?.id
+    if (id) {
+      try { localStorage.setItem(cacheKey, id) } catch { /* ignore */ }
+    }
+    return id || null
+  } catch { return null }
+}
+
+// ============================================================
+// Channel Points (Helix /channel_points/*) — WT-20260628-14
+// ============================================================
+// Twitch exige un APP ACCESS TOKEN (client_credentials) para los
+// endpoints de manage, pero los endpoints de viewer (redeem) usan
+// el token del usuario. Por eso separamos dos "canales" de auth.
+//
+// Todas las funciones devuelven { ok, data, error } para que el
+// caller pueda manejar el caso de fallo sin try/catch redundantes.
+// Internamente miden con measureFetch, loggean con logError
+// (contexto: 'channel-points') y se protegen con AbortSignal.timeout(5s).
+//
+// Los actions que cada logError lleva son strings estables para que
+// el eventLog y DebugPanel puedan correlacionar / filtrar.
+// ============================================================
+
+const CP_TIMEOUT_MS = 5000
+// FIX 4 (Hank / P1): eliminada la persistencia en localStorage del
+// App Access Token. CWE-922: Insecure Storage of Sensitive Information.
+// El App Token de Twitch NO es del usuario, pero:
+//   1) tiene poder de actuar como la app registrada (scopes de
+//      manage channel_points, moderation, etc),
+//   2) cualquier XSS que robe este token puede pivotar hacia la
+//      infraestructura de BlinkStream sin pasar por el keychain.
+// Ahora vive solo en memoria del modulo (variable privada). Si el
+// proceso se reinicia, expiramos y pedimos uno nuevo al backend.
+const APP_TOKEN_RENEW_BEFORE_MS = 5 * 60 * 1000
+// App tokens de Twitch duran ~1h (expires_in suele ser 3600-4900s).
+// Pedimos uno nuevo cuando faltan < 5 min, para evitar edge cases de
+// expiracion durante una operacion larga.
+
+/**
+ * @typedef {object} ChannelPointsResult
+ * @property {boolean} ok
+ * @property {*=}    data   - payload si ok=true
+ * @property {string=} error - mensaje user-friendly si ok=false
+ * @property {string=} code  - ErrorCode.* para filtrar
+ */
+
+/**
+ * Helper interno: shape de retorno uniforme. Lo usan TODOS los
+ * helpers de Channel Points para que el caller siempre reciba la
+ * misma estructura (un solo patrón de manejo en el hook).
+ *
+ * @param {boolean} ok
+ * @param {*=}      data
+ * @param {string=} error
+ * @param {string=} code
+ * @returns {ChannelPointsResult}
+ */
+function _cpResult(ok, data = undefined, error = undefined, code = undefined) {
+  return { ok, data, error, code }
+}
+
+/**
+ * Cache en memoria + localStorage del App Access Token. La cache
+ * vive en el módulo (singleton) y se sincroniza con localStorage
+ * para sobrevivir recargas sin pedir un token nuevo cada vez.
+ *
+ * Estructura interna: { token: string, expiresAt: number (ms) }
+ */
+let _appTokenCache = null
+
+function _readAppTokenCache() {
+  return _appTokenCache
+}
+
+function _writeAppTokenCache(token, expiresAt) {
+  _appTokenCache = { token, expiresAt }
+}
+
+/**
+ * Devuelve un App Access Token de Twitch (client_credentials flow).
+ * Usa cache en localStorage con TTL de `expires_in - 5min` para no
+ * pedir uno nuevo en cada llamada. Si estamos en Tauri, llama al
+ * command Rust `get_app_token` (que tiene el client_secret).
+ * En web/dev puro, intenta con `VITE_TWITCH_APP_CLIENT_ID` +
+ * `VITE_TWITCH_APP_CLIENT_SECRET` del .env y avisa con warning
+ * (DEV ONLY: el secret NUNCA debe estar en build de produccion web).
+ *
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function getAppToken() {
+  // 1) Cache: si tenemos uno válido, lo devolvemos sin tocar la red.
+  const cached = _readAppTokenCache()
+  if (cached && cached.expiresAt > Date.now() + APP_TOKEN_RENEW_BEFORE_MS) {
+    return _cpResult(true, cached.token)
+  }
+
+  // 2) Tauri: command backend con el secret seguro.
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    if (isTauri()) {
+      const data = await invoke('get_app_token')
+      if (data?.token && typeof data.expiresAt === 'number') {
+        _writeAppTokenCache(data.token, data.expiresAt)
+        return _cpResult(true, data.token)
+      }
+      const err = new AppError(ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED, 'Tauri get_app_token no devolvio un token valido', { action: 'get_app_token' })
+      logError(err, { context: 'channel-points', action: 'get_app_token' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
+    }
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'get_app_token' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
+  }
+
+  // FIX-2 (Hank / P0): bloquear el path web de getAppToken en PRODUCCION.
+  // Si llegamos aqui es porque NO estamos en Tauri (o el command fallo).
+  // El path web usa VITE_TWITCH_APP_CLIENT_SECRET, que quedaria embebido
+  // en el bundle de produccion (Vite sustituye import.meta.env en build).
+  // CWE-522: Insufficiently Protected Credentials.
+  // Solo permitimos el fallback en DEV (vite dev server) o cuando el
+  // command de Tauri fallo (best-effort) — NUNCA en PROD web.
+  if (import.meta.env.PROD && !isTauri()) {
+    const err = new AppError(
+      ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED,
+      'getAppToken via web no esta disponible en produccion; usa el desktop app',
+      { action: 'get_app_token_web_blocked' },
+    )
+    logError(err, { context: 'channel-points', action: 'get_app_token' })
+    return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
+  }
+
+  // 3) Web/dev puro: client_credentials con credenciales del .env.
+  //    ADVERTENCIA: esto expone el client_secret al bundle web. Solo
+  //    aceptable en dev puro (vite dev server). En produccion SIEMPRE
+  //    debe ir por Tauri command.
+  const clientId = import.meta.env.VITE_TWITCH_APP_CLIENT_ID?.trim()
+  const clientSecret = import.meta.env.VITE_TWITCH_APP_CLIENT_SECRET?.trim()
+  if (!clientId || !clientSecret) {
+    const err = new AppError(
+      ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED,
+      'Faltan VITE_TWITCH_APP_CLIENT_ID / VITE_TWITCH_APP_CLIENT_SECRET en el entorno web',
+      { action: 'get_app_token_web' },
+    )
+    logError(err, { context: 'channel-points', action: 'get_app_token' })
+    return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
+  }
+
+   
+  // FIX-2 (Hank / P0): redactar el secret del warning para que no quede
+  // en logs persistentes. Mostramos solo longitud como fingerprint.
+  const _secretLen = clientSecret ? clientSecret.length : 0
+  console.warn(
+    `%c[BlinkStream] ⚠️ getAppToken via .env (web/dev). client_secret en bundle (len=${_secretLen}). En produccion usa Tauri.`,
+    'color:#f59e0b;font-weight:bold',
+  )
+
+  try {
+    const params = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'client_credentials',
+    })
+    const res = await measureFetch(`https://id.twitch.tv/oauth2/token?${params}`, {
+      method: 'POST',
+      signal: safeTimeout(CP_TIMEOUT_MS),
+    })
+    if (!res.ok) {
+      const err = new AppError(
+        ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED,
+        `Twitch token endpoint HTTP ${res.status}`,
+        { action: 'get_app_token_web' },
+      )
+      logError(err, { context: 'channel-points', action: 'get_app_token' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
+    }
+    const data = await res.json()
+    if (!data?.access_token || !data?.expires_in) {
+      const err = new AppError(
+        ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED,
+        'Twitch token endpoint sin access_token/expires_in',
+        { action: 'get_app_token_web' },
+      )
+      logError(err, { context: 'channel-points', action: 'get_app_token' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
+    }
+    // expires_in viene en segundos; lo guardamos como ms absolutos.
+    const expiresAt = Date.now() + (Number(data.expires_in) * 1000)
+    _writeAppTokenCache(data.access_token, expiresAt)
+    return _cpResult(true, data.access_token)
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'get_app_token' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
+  }
+}
+
+/**
+ * Lista las recompensas personalizadas de un canal. Requiere
+ * app access token (scope: channel:manage:redemptions). Si solo
+ * lees para mostrarlas, el scope `channel:read:redemptions` es
+ * suficiente — Twitch acepta el app token con cualquiera de los dos.
+ *
+ * @param {string} broadcasterId
+ * @param {string} [manageToken] - app access token (opcional, se obtiene via getAppToken si falta)
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function getCustomRewards(broadcasterId, manageToken) {
+  if (!broadcasterId) return _cpResult(false, undefined, 'broadcasterId requerido', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
+  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+
+  try {
+    const res = await measureFetch(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${encodeURIComponent(broadcasterId)}`,
+      {
+        headers: {
+          'Client-ID': APP_CLIENT_ID,
+          'Authorization': `Bearer ${tokenRes.data}`,
+        },
+        signal: safeTimeout(CP_TIMEOUT_MS),
+      },
+    )
+    if (!res.ok) {
+      const err = new AppError(ErrorCode.CHANNEL_POINTS_LIST_FAILED, `Twitch HTTP ${res.status}`, { action: 'list_rewards' })
+      logError(err, { context: 'channel-points', action: 'list_rewards' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+    }
+    const data = await res.json()
+    return _cpResult(true, data?.data || [])
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'list_rewards' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+  }
+}
+
+/**
+ * Devuelve una sola recompensa por ID.
+ *
+ * @param {string} broadcasterId
+ * @param {string} rewardId
+ * @param {string} [manageToken]
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function getCustomReward(broadcasterId, rewardId, manageToken) {
+  if (!broadcasterId || !rewardId) return _cpResult(false, undefined, 'broadcasterId y rewardId requeridos', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
+  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+
+  try {
+    const res = await measureFetch(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${encodeURIComponent(broadcasterId)}&id=${encodeURIComponent(rewardId)}`,
+      {
+        headers: {
+          'Client-ID': APP_CLIENT_ID,
+          'Authorization': `Bearer ${tokenRes.data}`,
+        },
+        signal: safeTimeout(CP_TIMEOUT_MS),
+      },
+    )
+    if (!res.ok) {
+      const err = new AppError(ErrorCode.CHANNEL_POINTS_LIST_FAILED, `Twitch HTTP ${res.status}`, { action: 'get_reward' })
+      logError(err, { context: 'channel-points', action: 'get_reward' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+    }
+    const data = await res.json()
+    const reward = data?.data?.[0]
+    if (!reward) return _cpResult(false, undefined, 'Recompensa no encontrada', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+    return _cpResult(true, reward)
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'get_reward' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+  }
+}
+
+/**
+ * Crea una recompensa personalizada. El body va como query params
+ * (Twitch Helix para este endpoint no acepta JSON body, solo form).
+ *
+ * @param {string} broadcasterId
+ * @param {object} rewardData  - { title, cost, prompt?, background_color?, is_enabled?, ... }
+ * @param {string} [manageToken]
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function createCustomReward(broadcasterId, rewardData, manageToken) {
+  if (!broadcasterId || !rewardData?.title || typeof rewardData?.cost !== 'number') {
+    return _cpResult(false, undefined, 'Faltan campos requeridos (title, cost)', ErrorCode.CHANNEL_POINTS_CREATE_FAILED)
+  }
+  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
+  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+
+  const params = new URLSearchParams()
+  params.set('broadcaster_id', broadcasterId)
+  params.set('title', rewardData.title)
+  params.set('cost', String(rewardData.cost))
+  if (rewardData.prompt != null) params.set('prompt', String(rewardData.prompt))
+  if (rewardData.background_color) params.set('background_color', rewardData.background_color)
+  if (rewardData.is_enabled != null) params.set('is_enabled', String(rewardData.is_enabled))
+  if (rewardData.is_user_input_required != null) params.set('is_user_input_required', String(rewardData.is_user_input_required))
+  if (rewardData.max_per_stream != null) params.set('max_per_stream', String(rewardData.max_per_stream))
+  if (rewardData.max_per_user_per_stream != null) params.set('max_per_user_per_stream', String(rewardData.max_per_user_per_stream))
+  if (rewardData.global_cooldown_seconds != null) params.set('global_cooldown_seconds', String(rewardData.global_cooldown_seconds))
+  if (rewardData.is_max_per_stream_enabled != null) params.set('is_max_per_stream_enabled', String(rewardData.is_max_per_stream_enabled))
+  if (rewardData.is_global_cooldown_enabled != null) params.set('is_global_cooldown_enabled', String(rewardData.is_global_cooldown_enabled))
+
+  try {
+    const res = await measureFetch(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: {
+          'Client-ID': APP_CLIENT_ID,
+          'Authorization': `Bearer ${tokenRes.data}`,
+        },
+        signal: safeTimeout(CP_TIMEOUT_MS),
+      },
+    )
+    if (!res.ok) {
+      const err = new AppError(ErrorCode.CHANNEL_POINTS_CREATE_FAILED, `Twitch HTTP ${res.status}`, { action: 'create_reward' })
+      logError(err, { context: 'channel-points', action: 'create_reward' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_CREATE_FAILED)
+    }
+    const data = await res.json()
+    const created = data?.data?.[0]
+    if (!created) return _cpResult(false, undefined, 'Twitch no devolvio la recompensa creada', ErrorCode.CHANNEL_POINTS_CREATE_FAILED)
+    logEvent('channel_points', 'reward.created', { broadcasterId, rewardId: created.id })
+    return _cpResult(true, created)
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'create_reward' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_CREATE_FAILED)
+  }
+}
+
+/**
+ * Actualiza una recompensa existente. Mismas reglas que create.
+ *
+ * @param {string} broadcasterId
+ * @param {string} rewardId
+ * @param {object} rewardData  - campos a modificar
+ * @param {string} [manageToken]
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function updateCustomReward(broadcasterId, rewardId, rewardData, manageToken) {
+  if (!broadcasterId || !rewardId) return _cpResult(false, undefined, 'broadcasterId y rewardId requeridos', ErrorCode.CHANNEL_POINTS_UPDATE_FAILED)
+  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
+  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+
+  const params = new URLSearchParams()
+  params.set('broadcaster_id', broadcasterId)
+  params.set('id', rewardId)
+  // Twitch permite mandar cualquier subconjunto de campos en PATCH.
+  for (const [k, v] of Object.entries(rewardData || {})) {
+    if (v == null) continue
+    params.set(k, String(v))
+  }
+
+  try {
+    const res = await measureFetch(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?${params.toString()}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Client-ID': APP_CLIENT_ID,
+          'Authorization': `Bearer ${tokenRes.data}`,
+        },
+        signal: safeTimeout(CP_TIMEOUT_MS),
+      },
+    )
+    if (!res.ok) {
+      const err = new AppError(ErrorCode.CHANNEL_POINTS_UPDATE_FAILED, `Twitch HTTP ${res.status}`, { action: 'update_reward' })
+      logError(err, { context: 'channel-points', action: 'update_reward' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_UPDATE_FAILED)
+    }
+    const data = await res.json()
+    const updated = data?.data?.[0]
+    if (!updated) return _cpResult(false, undefined, 'Twitch no devolvio la recompensa actualizada', ErrorCode.CHANNEL_POINTS_UPDATE_FAILED)
+    logEvent('channel_points', 'reward.updated', { broadcasterId, rewardId })
+    return _cpResult(true, updated)
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'update_reward' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_UPDATE_FAILED)
+  }
+}
+
+/**
+ * Elimina una recompensa. Twitch mueve la reward a "archivada" en la
+ * UI del broadcaster (no se borra definitivamente), pero a nivel
+ * de API devuelve 204 y desaparece de /custom_rewards.
+ *
+ * @param {string} broadcasterId
+ * @param {string} rewardId
+ * @param {string} [manageToken]
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function deleteCustomReward(broadcasterId, rewardId, manageToken) {
+  if (!broadcasterId || !rewardId) return _cpResult(false, undefined, 'broadcasterId y rewardId requeridos', ErrorCode.CHANNEL_POINTS_DELETE_FAILED)
+  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
+  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+
+  const params = new URLSearchParams()
+  params.set('broadcaster_id', broadcasterId)
+  params.set('id', rewardId)
+
+  try {
+    const res = await measureFetch(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?${params.toString()}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Client-ID': APP_CLIENT_ID,
+          'Authorization': `Bearer ${tokenRes.data}`,
+        },
+        signal: safeTimeout(CP_TIMEOUT_MS),
+      },
+    )
+    if (!res.ok) {
+      const err = new AppError(ErrorCode.CHANNEL_POINTS_DELETE_FAILED, `Twitch HTTP ${res.status}`, { action: 'delete_reward' })
+      logError(err, { context: 'channel-points', action: 'delete_reward' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_DELETE_FAILED)
+    }
+    logEvent('channel_points', 'reward.deleted', { broadcasterId, rewardId })
+    return _cpResult(true, { id: rewardId })
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'delete_reward' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_DELETE_FAILED)
+  }
+}
+
+/**
+ * Lista redenciones de una reward. status por defecto 'UNFULFILLED'
+ * que es lo que usa la UI de Manage.
+ *
+ * @param {string} broadcasterId
+ * @param {string} rewardId
+ * @param {string} [status='UNFULFILLED']   - UNFULFILLED | FULFILLED | CANCELED
+ * @param {string} [manageToken]
+ * @param {string} [userId]                 - filtra por user_id (opcional)
+ * @param {number} [first=50]               - limite de paginacion
+ * @param {string} [after]                  - cursor de paginacion
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function getRedemptions(broadcasterId, rewardId, status = 'UNFULFILLED', manageToken, userId, first = 50, after) {
+  if (!broadcasterId || !rewardId) return _cpResult(false, undefined, 'broadcasterId y rewardId requeridos', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
+  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+
+  const params = new URLSearchParams()
+  params.set('broadcaster_id', broadcasterId)
+  params.set('reward_id', rewardId)
+  params.set('status', status)
+  params.set('first', String(Math.min(Math.max(first, 1), 50)))
+  if (userId) params.set('user_id', userId)
+  if (after) params.set('after', after)
+
+  try {
+    const res = await measureFetch(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?${params.toString()}`,
+      {
+        headers: {
+          'Client-ID': APP_CLIENT_ID,
+          'Authorization': `Bearer ${tokenRes.data}`,
+        },
+        signal: safeTimeout(CP_TIMEOUT_MS),
+      },
+    )
+    if (!res.ok) {
+      const err = new AppError(ErrorCode.CHANNEL_POINTS_LIST_FAILED, `Twitch HTTP ${res.status}`, { action: 'list_redemptions' })
+      logError(err, { context: 'channel-points', action: 'list_redemptions' })
+      return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+    }
+    const data = await res.json()
+    return _cpResult(true, { data: data?.data || [], cursor: data?.pagination?.cursor || null })
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'list_redemptions' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+  }
+}
+
+/**
+ * Aprueba o rechaza redenciones en bulk. status debe ser FULFILLED
+ * o CANCELED. Twitch exige que el broadcaster cumpla los requisitos
+ * de la reward (puntos, cooldown, stock) o devuelve 400.
+ *
+ * @param {string} broadcasterId
+ * @param {string} rewardId
+ * @param {string[]} redemptionIds
+ * @param {'FULFILLED'|'CANCELED'} status
+ * @param {string} [manageToken]
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function updateRedemptionStatus(broadcasterId, rewardId, redemptionIds, status, manageToken) {
+  if (!broadcasterId || !rewardId || !Array.isArray(redemptionIds) || redemptionIds.length === 0) {
+    return _cpResult(false, undefined, 'Faltan campos requeridos (redemptionIds no vacio)', ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+  }
+  if (status !== 'FULFILLED' && status !== 'CANCELED') {
+    return _cpResult(false, undefined, 'status debe ser FULFILLED o CANCELED', ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+  }
+  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
+  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+
+  // Twitch limita el bulk a 50 IDs por llamada. Si el caller pasa
+  // mas, los troceamos en paralelo para no bloquear la UI.
+  const chunks = []
+  for (let i = 0; i < redemptionIds.length; i += 50) {
+    chunks.push(redemptionIds.slice(i, i + 50))
+  }
+  const results = await Promise.all(chunks.map(async (ids) => {
+    const params = new URLSearchParams()
+    params.set('broadcaster_id', broadcasterId)
+    params.set('reward_id', rewardId)
+    params.set('status', status)
+    ids.forEach(id => params.append('id', id))
+    try {
+      const res = await measureFetch(
+        `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?${params.toString()}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Client-ID': APP_CLIENT_ID,
+            'Authorization': `Bearer ${tokenRes.data}`,
+          },
+          signal: safeTimeout(CP_TIMEOUT_MS),
+        },
+      )
+      if (!res.ok) {
+        const err = new AppError(ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED, `Twitch HTTP ${res.status}`, { action: 'update_redemption', chunkSize: ids.length })
+        logError(err, { context: 'channel-points', action: 'update_redemption' })
+        return _cpResult(false, ids, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+      }
+      logEvent('channel_points', `redemption.${status.toLowerCase()}`, { broadcasterId, rewardId, count: ids.length })
+      return _cpResult(true, ids)
+    } catch (e) {
+      logError(e, { context: 'channel-points', action: 'update_redemption' })
+      return _cpResult(false, ids, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+    }
+  }))
+  const failed = results.filter(r => !r.ok)
+  if (failed.length > 0) {
+    return _cpResult(false, results, failed[0].error, failed[0].code)
+  }
+  return _cpResult(true, results)
+}
+
+/**
+ * Canjea una recompensa del lado del VIEWER. Usa el token del
+ * usuario, no un app token. El broadcasterId es el del canal donde
+ * se hace el canje. Si la reward requiere input de usuario, pasarlo
+ * en `userInput`; si no, dejar undefined.
+ *
+ * Twitch exige un channel points balance > cost o devuelve 400.
+ *
+ * @param {string} broadcasterId
+ * @param {string} rewardId
+ * @param {string|undefined} userInput
+ * @param {string} userToken  - OAuth token del viewer
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function redeemCustomReward(broadcasterId, rewardId, userInput, userToken) {
+  if (!broadcasterId || !rewardId || !userToken) {
+    return _cpResult(false, undefined, 'Faltan campos requeridos (broadcasterId, rewardId, userToken)', ErrorCode.CHANNEL_POINTS_REDEEM_FAILED)
+  }
+  const params = new URLSearchParams()
+  params.set('broadcaster_id', broadcasterId)
+  params.set('reward_id', rewardId)
+  if (userInput) params.set('user_input', userInput)
+
+  try {
+    const res = await measureFetch(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: {
+          'Client-ID': APP_CLIENT_ID,
+          'Authorization': `Bearer ${userToken}`,
+        },
+        signal: safeTimeout(CP_TIMEOUT_MS),
+      },
+    )
+    if (!res.ok) {
+      // Twitch devuelve 400 con mensaje cuando no hay saldo suficiente.
+      const code = res.status === 400 ? ErrorCode.CHANNEL_POINTS_INSUFFICIENT_BALANCE : ErrorCode.CHANNEL_POINTS_REDEEM_FAILED
+      const err = new AppError(code, `Twitch HTTP ${res.status}`, { action: 'redeem' })
+      logError(err, { context: 'channel-points', action: 'redeem' })
+      return _cpResult(false, undefined, formatUserMessage(err), code)
+    }
+    const data = await res.json()
+    return _cpResult(true, data?.data?.[0] || null)
+  } catch (e) {
+    logError(e, { context: 'channel-points', action: 'redeem' })
+    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_REDEEM_FAILED)
+  }
+}
+
+// ============================================================
+// Moderation Helix helpers (M1 / WT-20260628-13)
+// ============================================================
+// Todos los helpers siguen el mismo contrato:
+//   - Auth via getHeaders() (con token persistido o client-id publico).
+//   - Timeout 5s.
+//   - Miden latencia via measureFetch (M-8).
+//   - Errores se loggean con ErrorCode.MOD_ACTION_FAILED y contexto (M-6).
+//   - Devuelven Result<T, AppError> en vez de throw (callers branchan
+//     con `if (result.success)` y obtienen AppError tipado si falla).
+//
+// Scopes necesarios (ya aplicadas en el flujo OAuth, commit 02b8c26):
+//   - moderator:manage:chat_messages
+//   - moderator:manage:banned_users
+//   - moderator:manage:chat_settings
+//   - moderation:read
+//   - channel:read:vips
+//   - channel:manage:vips
+// ============================================================
+
+/**
+ * @typedef {object} HelixUser
+ * @property {string} user_id
+ * @property {string} user_login
+ * @property {string} user_name
+ */
+
+/**
+ * Resuelve el rol de un usuario en un canal. Estrategia:
+ *   1) Si `userId === broadcasterId` → 'broadcaster'
+ *   2) GET /helix/moderation/moderators?broadcaster_id=X&user_id=Y → 'mod'
+ *   3) GET /helix/channels/vips?broadcaster_id=X&user_id=Y → 'vip'
+ *   4) Si todo lo anterior falla o no encuentra → 'viewer' | 'unknown'
+ *
+ * NOTA: Twitch NO expone un endpoint directo "isSub". Por scope y paridad
+ * con el cliente, solo distinguimos broad/mod/vip/viewer/unknown. La
+ * pertenencia a sub se infiere por badges IRC, fuera del scope de Helix.
+ *
+ * Acepta un `signal` externo (del caller, tipicamente un AbortController
+ * del hook) para cancelar la peticion si el componente se desmonta o
+ * cambian los IDs. Esto cierra el race condition donde fetches viejos
+ * sobrescriben el state nuevo cuando el usuario cambia de canal rapido.
+ *
+ * @param {string} broadcasterId
+ * @param {string} userId
+ * @param {AbortSignal} [signal] - signal externo del caller (opcional)
+ * @returns {Promise<import('./twitch').Result<'broadcaster'|'mod'|'vip'|'viewer'|'unknown'>>}
+ */
+export async function getChannelRole(broadcasterId, userId, signal) {
+  if (!broadcasterId || !userId) {
+    return ok('unknown')
+  }
+  if (broadcasterId === userId) {
+    return ok('broadcaster')
+  }
+  // Comprobamos mod primero
+  const modRes = await helixFetch(
+    `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getChannelRole.checkMod' },
+    signal,
+  )
+  if (modRes.success && modRes.value?.data?.length > 0) {
+    return ok('mod')
+  }
+  // Despues VIP
+  const vipRes = await helixFetch(
+    `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getChannelRole.checkVip', silent: true },
+    signal,
+  )
+  if (vipRes.success && vipRes.value?.data?.length > 0) {
+    return ok('vip')
+  }
+  // Si la API fallo de forma no silenciosa (token caducado etc) devolvemos
+  // 'viewer' como fallback conservador: la UI asumira que el user no es mod
+  // y no expondra acciones peligrosas.
+  if (!modRes.success && modRes.error?.context?.status === 401) {
+    return ok('unknown')
+  }
+  return ok('viewer')
+}
+
+/**
+ * Lista los moderadores de un canal.
+ * @param {string} broadcasterId
+ * @returns {Promise<import('./twitch').Result<HelixUser[]>>}
+ */
+export async function getModerators(broadcasterId) {
+  if (!broadcasterId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getModerators' }, true)
+  }
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${encodeURIComponent(broadcasterId)}&first=100`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getModerators' },
+  )
+  if (!result.success) return result
+  return ok(result.value?.data || [])
+}
+
+/**
+ * Lista los VIPs de un canal. Requiere scope `channel:read:vips`.
+ * @param {string} broadcasterId
+ * @returns {Promise<import('./twitch').Result<HelixUser[]>>}
+ */
+export async function getVips(broadcasterId) {
+  if (!broadcasterId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getVips' }, true)
+  }
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${encodeURIComponent(broadcasterId)}&first=100`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getVips' },
+  )
+  if (!result.success) return result
+  return ok(result.value?.data || [])
+}
+
+/**
+ * Lista usuarios baneados de un canal (permanentes o temporales).
+ * Para timeouts, usa `getTimeouts` (wrapper con `ban_type=timeout`).
+ *
+ * @param {string} broadcasterId
+ * @param {'permanent'|'temporary'} [banType='permanent']
+ * @returns {Promise<import('./twitch').Result<HelixUser[]>>}
+ */
+export async function getBannedUsers(broadcasterId, banType = 'permanent') {
+  if (!broadcasterId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getBannedUsers' }, true)
+  }
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/moderation/banned?broadcaster_id=${encodeURIComponent(broadcasterId)}&ban_type=${banType}&first=100`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getBannedUsers' },
+  )
+  if (!result.success) return result
+  return ok(result.value?.data || [])
+}
+
+/**
+ * Lista timeouts activos de un canal. Equivalente a `getBannedUsers`
+ * con `ban_type=timeout`. La API de Twitch distingue por este param.
+ *
+ * @param {string} broadcasterId
+ * @returns {Promise<import('./twitch').Result<HelixUser[]>>}
+ */
+export async function getTimeouts(broadcasterId) {
+  return getBannedUsers(broadcasterId, 'temporary')
+}
+
+/**
+ * Banea (o timeoutea) a un usuario del canal.
+ * - Si `duration` es null/undefined → ban permanente.
+ * - Si `duration` es numero positivo en segundos → timeout.
+ *
+ * @param {string}  broadcasterId
+ * @param {string}  userId
+ * @param {string}  [reason]   - hasta 500 chars
+ * @param {number}  [duration] - segundos de timeout; undefined = permanente
+ * @returns {Promise<import('./twitch').Result<null>>}
+ */
+export async function banUser(broadcasterId, userId, reason, duration) {
+  if (!broadcasterId || !userId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y userId requeridos', { action: 'banUser' })
+  }
+  const body = { data: { user_id: userId } }
+  if (reason) body.data.reason = String(reason).slice(0, 500)
+  if (typeof duration === 'number' && duration > 0) body.data.duration = duration
+  return helixFetch(
+    'https://api.twitch.tv/helix/moderation/bans',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    { component: 'twitch', action: 'banUser', broadcasterId, userId, duration },
+  )
+}
+
+/**
+ * Desbanea / quita un timeout de un usuario.
+ * Twitch usa el mismo endpoint con DELETE para ambos casos.
+ *
+ * @param {string} broadcasterId
+ * @param {string} userId
+ * @returns {Promise<import('./twitch').Result<null>>}
+ */
+export async function unbanUser(broadcasterId, userId) {
+  if (!broadcasterId || !userId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y userId requeridos', { action: 'unbanUser' })
+  }
+  return helixFetch(
+    `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
+    { method: 'DELETE' },
+    { component: 'twitch', action: 'unbanUser', broadcasterId, userId },
+  )
+}
+
+/**
+ * Borra un mensaje especifico del chat (mod action). El messageId viene
+ * del tag `id` de IRC PRIVMSG.
+ *
+ * @param {string} broadcasterId
+ * @param {string} messageId
+ * @returns {Promise<import('./twitch').Result<null>>}
+ */
+export async function deleteChatMessage(broadcasterId, messageId) {
+  if (!broadcasterId || !messageId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y messageId requeridos', { action: 'deleteChatMessage' })
+  }
+  return helixFetch(
+    `https://api.twitch.tv/helix/moderation/chat_messages?broadcaster_id=${encodeURIComponent(broadcasterId)}&message_id=${encodeURIComponent(messageId)}`,
+    { method: 'DELETE' },
+    { component: 'twitch', action: 'deleteChatMessage', broadcasterId, messageId },
+  )
 }

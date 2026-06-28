@@ -9,6 +9,8 @@
 // como JSON del polling. Aqui solo los guardamos en localStorage y los
 // servimos a quien los pida.
 
+import { isTauri } from './tauriEnv'
+
 export const SUPABASE_URL = 'https://oncbojnqxpxctwnhehau.supabase.co'
 
 const EDGE_FN = `${SUPABASE_URL}/functions/v1/twitch-auth`
@@ -27,6 +29,17 @@ export const LS_BLINKSTREAM_USER_ID = 'blinkstream_supabase_user_id'
 // debe vivir en el keychain del sistema (S-4 fix).
 const KEYCHAIN_REFRESH_KEY = 'blinkstream_refresh_token'
 
+/**
+ * Polling del OAuth de Twitch contra la edge function. Cada `interval`
+ * ms pregunta si el flujo termino y trae el access_token. Si abortan
+ * la signal, sale del bucle y devuelve null.
+ *
+ * @param {string} requestId
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal]
+ * @param {number}      [options.interval=1500]
+ * @returns {Promise<{access_token: string, username: string} | null>}
+ */
 export async function pollAuthToken(requestId, { signal, interval = 1500 } = {}) {
   const pollUrl = `${EDGE_FN}?fetch=${encodeURIComponent(requestId)}`
 
@@ -57,7 +70,14 @@ export async function pollAuthToken(requestId, { signal, interval = 1500 } = {})
         }
         return { access_token: data.access_token, username: data.username || 'twitch_user' }
       }
-    } catch {
+    } catch (pollErr) {
+      // FIX P1-5: bind explicito del error para que reglas eslint de
+      // "no-empty" / "no-unused-vars" no marquen el bloque. La
+      // semantica no cambia: pollAuthToken reintenta tras `sleep`
+      // y un fallo transitorio de red NO debe matar el bucle. Si en
+      // el futuro queremos logear el fallo (telemetria, debug), el
+      // pollErr ya esta disponible sin tocar la firma del catch.
+      void pollErr
     }
 
     await sleep(interval, signal)
@@ -79,6 +99,12 @@ function sleep(ms, signal) {
 // si no hay token guardado o si ya expiro. La renovacion es lazy y se
 // hace la primera vez que alguien pide un token vencido.
 
+/**
+ * Lectura sincrona del JWT de Supabase guardado. Devuelve null si no
+ * hay, si ya expiro (margen 60s) o si localStorage falla.
+ *
+ * @returns {string|null}
+ */
 export function getBlinkstreamToken() {
   try {
     const jwt = localStorage.getItem(LS_BLINKSTREAM_JWT)
@@ -92,13 +118,24 @@ export function getBlinkstreamToken() {
   }
 }
 
-export function getBlinkstreamRefreshToken() {
-  // S-4 fix: el refresh token debe leerse del keychain. Mantenemos fallback
-  // a localStorage para usuarios con tokens pre-existentes (migrados en el
-  // primer login) o entornos sin Tauri.
-  // Como leer del keychain es async pero esta funcion es sync, primero
-  // intentamos localStorage (rapido y cubre el caso comun post-migracion).
-  // La migracion a keychain se dispara en storeBlinkstreamRefreshToken.
+/**
+ * FIX-3 (Hank / P0): getBlinkstreamRefreshToken se ha renombrado a la
+ * variante Sync para clarificar que solo lee localStorage (rapido, sin
+ * latencia de keychain). La lectura con keychain-first vive en
+ * `getBlinkstreamRefreshTokenAsync` y es la que DEBE usarse en cualquier
+ * codigo que pueda permitirse un await (caso normal: refresh del JWT).
+ *
+ * Razon: el S-4 fix original decia "keychain first, LS fallback" pero
+ * como keychain es async y la funcion era sync, el implementador original
+ * (regresion) lo simplifico a "LS only", perdiendo la lectura del keychain.
+ * Esto es una regresion: en usuarios con token ya migrado, el refresh
+ * leeria del LS vacio y devolveria null, forzando un re-login.
+ *
+ * La migracion a keychain la dispara `storeBlinkstreamRefreshToken`.
+ *
+ * @returns {string|null}
+ */
+export function getBlinkstreamRefreshTokenSync() {
   try {
     const ls = localStorage.getItem(LS_BLINKSTREAM_REFRESH)
     if (ls) return ls
@@ -106,43 +143,87 @@ export function getBlinkstreamRefreshToken() {
   return null
 }
 
-// S-4 fix: persiste el refresh token en el keychain del sistema operativo
-// (Tauri secret plugin). Si Tauri no esta disponible (dev web puro, build
-// sin plugin), cae a localStorage. Tras un store exitoso en keychain,
-// borra la copia en localStorage para evitar doble persistencia.
-export async function storeBlinkstreamRefreshToken(token) {
-  if (!token) return false
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('store_secret', { key: KEYCHAIN_REFRESH_KEY, value: token })
-    // Migracion silenciosa: si habia copia en localStorage, limpiarla.
-    try { localStorage.removeItem(LS_BLINKSTREAM_REFRESH) } catch { /* ignore */ }
-    return true
-  } catch {
-    // Fallback: localStorage (modo dev / sin Tauri)
-    try { localStorage.setItem(LS_BLINKSTREAM_REFRESH, token) } catch { /* ignore */ }
-    return false
+/**
+ * FIX-3 (Hank / P0): lee el refresh token siguiendo la politica del S-4
+ * fix: keychain primero, localStorage como fallback para tokens legacy.
+ * Es async porque leer del keychain requiere invoke() de Tauri.
+ *
+ * Usar preferentemente esta variante en cualquier codigo async (refresh
+ * de JWT, helpers de Supabase). Solo usar `getBlinkstreamRefreshTokenSync`
+ * si estas en codigo que no puede esperar (legacy paths).
+ *
+ * @returns {Promise<string|null>}
+ */
+export async function getBlinkstreamRefreshTokenAsync() {
+  // 1) Keychain (Tauri secret plugin). Si Tauri no esta disponible,
+  //    el invoke falla silenciosamente y caemos al fallback.
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const fromKeychain = await invoke('get_secret', { key: KEYCHAIN_REFRESH_KEY })
+      if (fromKeychain) return fromKeychain
+    } catch { /* invoke fallo -> fallback */ }
   }
+  // 2) Fallback legacy (localStorage).
+  return getBlinkstreamRefreshTokenSync()
 }
 
-// Lee el refresh token del keychain (async). Usado por el flow de
-// migracion: si en localStorage queda un refresh token pre-S-4, lo
-// movemos a keychain. Devuelve el token (de keychain o localStorage) o null.
+/**
+ * S-4 fix: persiste el refresh token en el keychain del sistema operativo
+ * (Tauri secret plugin). Si Tauri no esta disponible (dev web puro, build
+ * sin plugin), cae a localStorage. Tras un store exitoso en keychain,
+ * borra la copia en localStorage para evitar doble persistencia.
+ *
+ * @param {string} token
+ * @returns {Promise<boolean>} true si quedo en keychain, false si quedo en localStorage
+ */
+export async function storeBlinkstreamRefreshToken(token) {
+  if (!token) return false
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('store_secret', { key: KEYCHAIN_REFRESH_KEY, value: token })
+      // Migracion silenciosa: si habia copia en localStorage, limpiarla.
+      try { localStorage.removeItem(LS_BLINKSTREAM_REFRESH) } catch { /* ignore */ }
+      return true
+    } catch {
+      // Si el invoke falla caemos a localStorage (modo dev / sin Tauri backend).
+    }
+  }
+  // Fallback: localStorage (modo dev / sin Tauri)
+  try { localStorage.setItem(LS_BLINKSTREAM_REFRESH, token) } catch { /* ignore */ }
+  return false
+}
+
+/**
+ * Lee el refresh token del keychain (async). Usado por el flow de
+ * migracion: si en localStorage queda un refresh token pre-S-4, lo
+ * movemos a keychain. Devuelve el token (de keychain o localStorage) o null.
+ *
+ * @returns {Promise<string|null>}
+ */
 export async function readBlinkstreamRefreshToken() {
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const fromKeychain = await invoke('get_secret', { key: KEYCHAIN_REFRESH_KEY })
-    if (fromKeychain) return fromKeychain
-  } catch { /* Tauri no disponible → fallback */ }
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const fromKeychain = await invoke('get_secret', { key: KEYCHAIN_REFRESH_KEY })
+      if (fromKeychain) return fromKeychain
+    } catch { /* invoke fallo → fallback */ }
+  }
   try { return localStorage.getItem(LS_BLINKSTREAM_REFRESH) || null } catch { return null }
 }
 
-// Borra el refresh token del keychain. Usado en logout / clear.
+/**
+ * Borra el refresh token del keychain y de localStorage. No lanza.
+ * @returns {Promise<void>}
+ */
 export async function clearBlinkstreamRefreshToken() {
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('delete_secret', { key: KEYCHAIN_REFRESH_KEY })
-  } catch { /* ignore */ }
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('delete_secret', { key: KEYCHAIN_REFRESH_KEY })
+    } catch { /* ignore */ }
+  }
   try { localStorage.removeItem(LS_BLINKSTREAM_REFRESH) } catch { /* ignore */ }
 }
 
@@ -151,6 +232,7 @@ export async function clearBlinkstreamRefreshToken() {
 // la copia vieja. Solo actua si Tauri esta disponible y la copia
 // en keychain esta vacia.
 async function migrateLegacyRefreshToken() {
+  if (!isTauri()) return
   try {
     const lsToken = localStorage.getItem(LS_BLINKSTREAM_REFRESH)
     if (!lsToken) return
@@ -163,7 +245,7 @@ async function migrateLegacyRefreshToken() {
     }
     await invoke('store_secret', { key: KEYCHAIN_REFRESH_KEY, value: lsToken })
     localStorage.removeItem(LS_BLINKSTREAM_REFRESH)
-  } catch { /* Tauri no disponible, mantener en localStorage */ }
+  } catch { /* invoke fallo, mantener en localStorage */ }
 }
 
 async function saveBlinkstreamToken({ jwt, refreshToken, expiresIn, userId }) {
@@ -181,6 +263,11 @@ async function saveBlinkstreamToken({ jwt, refreshToken, expiresIn, userId }) {
   } catch { /* localStorage lleno o deshabilitado */ }
 }
 
+/**
+ * Borra todos los artefactos de sesion Supabase: JWT, refresh token,
+ * expires, userId. Tambien dispara clear del keychain (fire-and-forget).
+ * @returns {void}
+ */
 export function clearBlinkstreamToken() {
   try {
     localStorage.removeItem(LS_BLINKSTREAM_JWT)
@@ -194,11 +281,17 @@ export function clearBlinkstreamToken() {
   clearBlinkstreamRefreshToken().catch(() => { /* ignore */ })
 }
 
-// Renovacion lazy: si el token esta vencido, intenta refrescarlo contra
-// twitch-auth. Devuelve un JWT valido o null. Se usa dentro de fetch
-// helpers de favoritos (vease favoritesSync.js) para reintentos en 401.
+/**
+ * Renovacion lazy: si el token esta vencido, intenta refrescarlo contra
+ * twitch-auth. Devuelve un JWT valido o null. Se usa dentro de fetch
+ * helpers de favoritos (vease favoritesSync.js) para reintentos en 401.
+ *
+ * @returns {Promise<string|null>}
+ */
 export async function refreshBlinkstreamToken() {
-  const refresh = getBlinkstreamRefreshToken()
+  // FIX-3 (Hank / P0): usar la variante async que lee keychain primero.
+  // La sync solo leia localStorage (regresion del S-4 fix).
+  const refresh = await getBlinkstreamRefreshTokenAsync()
   if (!refresh) return null
   try {
     const res = await fetch(`${EDGE_FN}?refresh=${encodeURIComponent(refresh)}`)

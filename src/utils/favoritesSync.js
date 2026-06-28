@@ -32,6 +32,13 @@ async function authedFetch(url, options = {}) {
   return res
 }
 
+/**
+ * Lista los favoritos de un usuario desde la nube. Devuelve array vacio
+ * si falla (la UI ya tiene fallback local).
+ *
+ * @param {string} username
+ * @returns {Promise<string[]>}
+ */
 export async function fetchCloudFavorites(username) {
   if (!username) return []
   try {
@@ -42,6 +49,15 @@ export async function fetchCloudFavorites(username) {
   } catch { return [] }
 }
 
+/**
+ * Persiste un favorito en la nube. Fire-and-forget: no lanza y no
+ * devuelve nada. Si falla, el favorito sigue en localStorage y se
+ * reintentara en el proximo login.
+ *
+ * @param {string} username
+ * @param {string} channel
+ * @returns {Promise<void>}
+ */
 export async function addCloudFavorite(username, channel) {
   if (!username) return
   try {
@@ -52,6 +68,12 @@ export async function addCloudFavorite(username, channel) {
   } catch { /* fire-and-forget */ }
 }
 
+/**
+ * Elimina un favorito de la nube. Fire-and-forget.
+ * @param {string} username
+ * @param {string} channel
+ * @returns {Promise<void>}
+ */
 export async function removeCloudFavorite(username, channel) {
   if (!username) return
   try {
@@ -62,6 +84,15 @@ export async function removeCloudFavorite(username, channel) {
   } catch { /* fire-and-forget */ }
 }
 
+/**
+ * Mezcla favoritos locales y nube, y sube los locales que no esten
+ * en la nube en chunks de 10 en serie. Si la nube no responde,
+ * devuelve solo los locales (merge idempotente).
+ *
+ * @param {string[]} localFavorites
+ * @param {string} username
+ * @returns {Promise<string[]>}
+ */
 export async function mergeFavorites(localFavorites, username) {
   if (!username) return localFavorites
   const cloud = await fetchCloudFavorites(username)
@@ -101,6 +132,13 @@ export async function mergeFavorites(localFavorites, username) {
   return merged
 }
 
+/**
+ * Lista los canales que el usuario de un token sigue en Twitch.
+ * Pagina hasta 5 paginas (500 canales max). Devuelve array de logins.
+ *
+ * @param {string} token - Bearer token de Twitch
+ * @returns {Promise<string[]>}
+ */
 export async function fetchFollowedChannels(token) {
   if (!token) return []
   try {

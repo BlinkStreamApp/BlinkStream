@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { isTauri } from '../utils/tauriEnv'
 import { PUBLIC_CLIENT_ID } from '../utils/twitch'
+import PhosphorIcon from './icons/PhosphorIcon'
 
 function ClipVideo({ clip }) {
   const [videoUrl, setVideoUrl] = useState(null)
@@ -8,8 +10,15 @@ function ClipVideo({ clip }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Reset de loading/error + fetch async. setState en effect
+    // es el patron "fetch on prop change", no cascading render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
+     
     setError(null)
+    // FIX WT-20260628-34: fuera de Tauri el invoke no tiene backend;
+    // mostramos "No disponible" sin tirar el catch.
+    if (!isTauri()) { setError('No disponible en este entorno'); setLoading(false); return }
     invoke('get_twitch_clip_url', { slug: clip.slug })
       .then(setVideoUrl)
       .catch(e => setError(String(e)))
@@ -23,7 +32,7 @@ function ClipVideo({ clip }) {
         <svg width="120" height="120" viewBox="0 0 100 80" fill="currentColor" className="text-white"><path d="M10 10H55C68 10 75 18 75 27C75 36 68 42 55 42H28L10 10Z"/><path d="M18 46H58C71 46 78 54 78 63C78 72 71 80 58 80H10L18 46Z"/></svg>
       </div>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-twitch/10 blur-3xl rounded-full" />
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="text-text-muted/40"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      <PhosphorIcon name="Info" size={32} weight="regular" className="text-text-muted/40" />
       <p className="text-text-secondary text-sm">{error ? 'Error al cargar' : 'No disponible'}</p>
       {error && <p className="text-text-muted text-[12px] text-center px-6 max-w-xs truncate">{error}</p>}
     </div>
@@ -42,6 +51,8 @@ export default function ClipPlayer({ channel, onClose }) {
   const [activeClip, setActiveClip] = useState(null)
 
   useEffect(() => {
+    // Reset de loading al cambiar de canal + fetch. Patron canonico.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     let c = false; setLoading(true)
     fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
@@ -62,7 +73,7 @@ export default function ClipPlayer({ channel, onClose }) {
       <div className="bg-bg-secondary border border-bg-tertiary/50 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-bg-tertiary/30 shrink-0">
           <h2 className="text-white text-sm font-bold">Clips de {channel}</h2>
-          <button onClick={onClose} className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+          <button onClick={onClose} className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors"><PhosphorIcon name="X" size={18} weight="bold" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-twitch border-t-transparent rounded-full animate-spin" /></div>

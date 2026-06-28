@@ -1,6 +1,23 @@
+/**
+ * @file HomeScreen (M-7 / Auditoria WT-20260628-01).
+ * Pantalla principal sin canal seleccionado: sidebar de favoritos,
+ * carrusel hero, top juegos, recientes. Toda la data llega del padre
+ * (App.jsx) y se valida via runtime en los puntos sensibles.
+ *
+ * @typedef {object} HomeScreenProps
+ * @property {(name: string) => void}    onSelect
+ * @property {(name: string) => void}    onToggleFavorite
+ * @property {() => void}                onShowAbout
+ * @property {string[]}                  favorites
+ * @property {string[]}                  [recentChannels]
+ * @property {(name: string) => void}    [onRemoveRecent]
+ */
+
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
-import { PUBLIC_CLIENT_ID, getHeaders } from '../utils/twitch'
+import { PUBLIC_CLIENT_ID, getHeaders, sanitizeChannelForGraphQL } from '../utils/twitch'
+import { validateProps, isArray, optional } from '../utils/validateProps'
 import LiveBadge from './LiveBadge'
+import PhosphorIcon from './icons/PhosphorIcon'
 
 function exactViewers(n) {
   if (n == null) return null
@@ -33,22 +50,39 @@ function cacheSet(key, data) {
 
 async function fetchAvatarsViaGQL(logins) {
   if (!logins.length) return null
+  // FIX-5 (Hank / P0): defense-in-depth GQL injection.
+  // 1) Validamos cada canal con regex (^[a-z0-9_]{3,25}$).
+  // 2) Usamos GraphQL variables (NO interpolacion) para que el input
+  //    sea SIEMPRE tratado como dato, no como sintaxis.
+  // CWE-94: Code Injection. CWE-20: Improper Input Validation.
+  const validLogins = logins
+    .map(l => sanitizeChannelForGraphQL(l))
+    .filter(Boolean)
+  if (!validLogins.length) return null
   try {
-    const aliases = logins.map((l, i) =>
-      `a${i}: user(login: "${l.toLowerCase()}") { profileImageURL(width: 300) }`
-    ).join('\n')
+    // Construimos el alias de cada login y la query usando concatenacion
+    // (no template literal anidado) para evitar problemas de escape.
+    const varDecls = validLogins.map((_, i) => '$login' + i + ': String!').join(', ')
+    const aliases = validLogins
+      .map((_, i) => 'a' + i + ': user(login: $login' + i + ') { profileImageURL(width: 300) }')
+      .join('\n')
+    const variablesObj = {}
+    validLogins.forEach((l, i) => { variablesObj['login' + i] = l })
     const res = await fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
       headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: `{ ${aliases} }` }),
+      body: JSON.stringify({
+        query: 'query(' + varDecls + ') { ' + aliases + ' }',
+        variables: variablesObj,
+      }),
     })
     if (!res.ok) return null
     const json = await res.json()
     if (json?.errors) return null
     const result = {}
-    logins.forEach((l, i) => {
-      const url = json?.data?.[`a${i}`]?.profileImageURL
-      if (url) result[l.toLowerCase()] = url
+    validLogins.forEach((l, i) => {
+      const url = json?.data?.['a' + i]?.profileImageURL
+      if (url) result[l] = url
     })
     return Object.keys(result).length ? result : null
   } catch { return null }
@@ -56,24 +90,35 @@ async function fetchAvatarsViaGQL(logins) {
 
 async function fetchStreamsViaGQL(logins) {
   if (!logins.length) return null
+  // FIX-5 (Hank / P0): defense-in-depth GQL injection (mismo patron
+  // que fetchAvatarsViaGQL). Validamos canales y usamos variables.
+  const validLogins = logins
+    .map(l => sanitizeChannelForGraphQL(l))
+    .filter(Boolean)
+  if (!validLogins.length) return null
   try {
-    const aliases = logins.map((l, i) =>
-      `a${i}: user(login: "${l.toLowerCase()}") { stream { id title game { displayName } viewersCount createdAt } }`
-    ).join('\n')
+    const varDecls = validLogins.map((_, i) => '$login' + i + ': String!').join(', ')
+    const aliases = validLogins
+      .map((_, i) => 'a' + i + ': user(login: $login' + i + ') { stream { id title game { displayName } viewersCount createdAt } }')
+      .join('\n')
+    const variablesObj = {}
+    validLogins.forEach((l, i) => { variablesObj['login' + i] = l })
     const res = await fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
       headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: `{ ${aliases} }` }),
+      body: JSON.stringify({
+        query: 'query(' + varDecls + ') { ' + aliases + ' }',
+        variables: variablesObj,
+      }),
     })
     if (!res.ok) return null
     const json = await res.json()
     if (json?.errors) return null
     const result = {}
-    logins.forEach((l, i) => {
-      const stream = json?.data?.[`a${i}`]?.stream
+    validLogins.forEach((l, i) => {
+      const stream = json?.data?.['a' + i]?.stream
       if (stream) {
-        const key = l.toLowerCase()
-        result[key] = {
+        result[l] = {
           user_login: l,
           title: stream.title,
           game_name: stream.game?.displayName || '',
@@ -147,9 +192,7 @@ const SidebarChannel = memo(function SidebarChannel({ name, status, onSelect, on
           className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted/30 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-pointer btn-press"
           title="Eliminar de favoritos"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <path d="M18 6L6 18M6 6l12 12"/>
-          </svg>
+          <PhosphorIcon name="X" size={14} weight="bold" />
         </button>
       )}
     </div>
@@ -249,41 +292,44 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
 
   return (
     <div
-      className="relative w-full rounded-xl overflow-hidden cursor-pointer group mb-6"
-      style={{ aspectRatio: '16/5', maxWidth: '1400px', margin: '0 auto 1.5rem' }}
+      className="relative w-full rounded-xl overflow-hidden cursor-pointer group mb-6 shadow-2xl shadow-black/30 ring-1 ring-white/5"
+      style={{ aspectRatio: '16/5', maxWidth: '1400px', margin: '0 auto 1.5rem', minHeight: '320px' }}
       onClick={() => onSelect(stream.user_login)}
     >
       <img key={stream.id} src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover transition-all duration-500 animate-fade-in" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
 
-      <div className="absolute inset-0 flex flex-col justify-end p-6 pb-5" onClick={() => onSelect(stream.user_login)}>
-        <div className="flex items-center gap-2 mb-2">
+      <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-6 lg:p-8 pb-5" onClick={() => onSelect(stream.user_login)}>
+        <div className="flex items-center gap-2 mb-2.5">
           <LiveBadge />
-          <span className="text-white/80 text-[12px] font-medium">
-            {exactViewers(stream.viewer_count)} Viewers
+          <span className="flex items-center gap-1.5 text-white/90 text-[13px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            {exactViewers(stream.viewer_count)} viewers
           </span>
         </div>
-        <h1 className="text-white font-extrabold text-2xl sm:text-3xl leading-tight mb-2 drop-shadow-2xl max-w-lg">
+        <h1 className="text-white font-extrabold text-xl sm:text-2xl md:text-3xl lg:text-4xl leading-tight mb-2.5 drop-shadow-2xl line-clamp-2 max-w-full">
           {stream.title}
         </h1>
         {stream.game_name && (
-          <p className="text-white/70 text-[13px] mb-4 max-w-md line-clamp-2">
+          <p className="text-white/80 text-[14px] mb-4 max-w-2xl line-clamp-1 font-medium">
             {stream.game_name}
           </p>
         )}
         <button
           onClick={e => { e.stopPropagation(); onSelect(stream.user_login) }}
-          className="flex items-center gap-2 bg-gradient-to-r from-twitch to-purple-600 hover:from-twitch-dark hover:to-purple-700 text-white font-semibold text-sm px-5 py-2.5 rounded-lg cursor-pointer transition-all shadow-lg shadow-twitch/20 hover:shadow-twitch/40 w-fit"
+          className="flex items-center gap-2 bg-gradient-to-r from-twitch to-purple-600 hover:from-twitch-dark hover:to-purple-700 text-white font-bold text-sm px-6 py-3 rounded-lg cursor-pointer transition-all shadow-lg shadow-twitch/30 hover:shadow-twitch/50 hover:scale-105 active:scale-95 w-fit"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
           Ver ahora
         </button>
 
-        <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2">
-          <Avatar name={stream.user_login} size={6} src={logos?.[stream.user_login?.toLowerCase()]} />
-          <div>
-            <p className="text-white text-[12px] font-semibold leading-tight">{stream.user_name || stream.user_login}</p>
-            <p className="text-white/50 text-[11px] leading-tight">
+        <div className="absolute bottom-5 right-5 flex items-center gap-2.5 bg-black/70 backdrop-blur-md rounded-xl px-3 py-2 ring-1 ring-white/10">
+          <Avatar name={stream.user_login} size={7} src={logos?.[stream.user_login?.toLowerCase()]} />
+          <div className="min-w-0">
+            <p className="text-white text-[13px] font-bold leading-tight truncate max-w-[180px]">
+              {stream.user_name || stream.user_login}
+            </p>
+            <p className="text-white/60 text-[11px] leading-tight truncate max-w-[180px]">
               {stream.game_name ? `Jugando a ${stream.game_name}` : 'En vivo'}
             </p>
           </div>
@@ -292,27 +338,30 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
 
       {streams.length > 1 && (
         <>
-          <button onClick={goPrev} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center cursor-pointer opacity-60 hover:opacity-100 transition-opacity z-20">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+          <button onClick={goPrev} aria-label="Anterior" className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-twitch/80 text-white flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm z-20">
+            <PhosphorIcon name="CaretLeft" size={20} weight="regular" />
           </button>
-          <button onClick={goNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center cursor-pointer opacity-60 hover:opacity-100 transition-opacity z-20">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+          <button onClick={goNext} aria-label="Siguiente" className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-twitch/80 text-white flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm z-20">
+            <PhosphorIcon name="CaretRight" size={20} weight="regular" />
           </button>
         </>
       )}
 
       {streams.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-          <div className="flex gap-1.5 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-full">
-          {streams.slice(0, 5).map((_, i) => (
-            <button
-              key={i}
-              onClick={e => { e.stopPropagation(); onIndexChange(i) }}
-              className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                i === (currentIndex % streams.length) ? 'bg-white w-4' : 'bg-white/40 hover:bg-white/70'
-              }`}
-            />
-          ))}
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10">
+          <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full">
+            {streams.map((_, i) => (
+              <button
+                key={i}
+                onClick={e => { e.stopPropagation(); onIndexChange(i) }}
+                className={`transition-all duration-300 cursor-pointer rounded-full ${
+                  i === (currentIndex % streams.length)
+                    ? 'bg-white w-6 h-2'
+                    : 'bg-white/40 hover:bg-white/70 w-2 h-2'
+                }`}
+                aria-label={`Ir a slide ${i + 1}`}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -320,7 +369,28 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
   )
 })
 
+/**
+ * Pantalla principal del app (vista sin reproduccion activa).
+ *
+ * @param {HomeScreenProps} props
+ */
 export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, favorites, recentChannels = [], onRemoveRecent }) {
+  // M-7: validamos las props criticas que vienen del padre. No bloqueamos
+  // la UI; solo loggeamos fallos para detectar drift de contrato temprano.
+  const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
+  validateProps(
+    { onSelect, onToggleFavorite, onShowAbout, favorites, recentChannels, onRemoveRecent },
+    {
+      onSelect: isFunc,
+      onToggleFavorite: isFunc,
+      onShowAbout: isFunc,
+      favorites: isArray,
+      recentChannels: optional(isArray),
+      onRemoveRecent: optional(isFunc),
+    },
+    'HomeScreen props',
+  )
+
   const [liveStatus, setLiveStatus] = useState({})
   const [channelLogos, setChannelLogos] = useState({})
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
@@ -443,10 +513,14 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
     const cachedStatus = cacheGet(CACHE_KEY_STATUS, STATUS_TTL_MS)
     const cachedLogos = cacheGet(CACHE_KEY_LOGOS, LOGOS_TTL_MS)
     if (cachedStatus && Object.keys(cachedStatus).length) {
+      // Hidratar cache en el primer mount: setState en effect es
+      // el patron "estado desde fuente externa".
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLiveStatus(cachedStatus)
       cachedStatusRef.current = cachedStatus
     }
     if (cachedLogos && Object.keys(cachedLogos).length) {
+       
       setChannelLogos(cachedLogos)
       cachedLogosRef.current = cachedLogos
     }
@@ -551,9 +625,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                   className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all"
                   title="Colapsar"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M7 10l5 5 5-5z" />
-                  </svg>
+                  <PhosphorIcon name="CaretDown" size={16} weight="regular" />
                 </button>
               </div>
             </div>
@@ -620,10 +692,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
               onClick={onShowAbout}
               className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[13px] text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 16v-4M12 8h.01"/>
-              </svg>
+              <PhosphorIcon name="Info" size={18} weight="regular" />
               <span>Acerca de BlinkStream</span>
             </button>
           </footer>
@@ -669,14 +738,14 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                       const h = await getHeaders()
                       const res = await fetch(`https://api.twitch.tv/helix/streams?game_id=${game.id}&first=8`, { headers: h, signal: AbortSignal.timeout(8000) })
                       if (res.ok) { const d = await res.json(); setGameStreams(d.data || []) }
-                    } catch {}
+                    } catch { /* ignore: error de red o timeout, dejamos el estado anterior */ }
                     setGameLoading(false)
                   }} className="flex flex-col items-center gap-1.5 shrink-0 w-[110px] group cursor-pointer card-hover rounded-lg p-2 hover:bg-hover transition-colors">
                     {game.boxArt ? (
                       <img src={game.boxArt} alt="" className="w-full aspect-[3/4] object-cover rounded-md transition-transform group-hover:scale-105" loading="lazy" />
                     ) : (
                       <div className="w-full aspect-[3/4] bg-bg-tertiary rounded-md flex items-center justify-center text-text-muted/30">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 6H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1z"/></svg>
+                        <PhosphorIcon name="GameController" size={24} weight="regular" />
                       </div>
                     )}
                     <span className="text-[12px] font-medium text-text-primary truncate w-full text-center">{game.name}</span>
@@ -764,9 +833,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                           className="absolute top-1 right-1 p-0.5 rounded-full text-text-muted/30 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all cursor-pointer z-10"
                           title="Eliminar de recientes"
                         >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                            <path d="M18 6L6 18M6 6l12 12"/>
-                          </svg>
+                          <PhosphorIcon name="X" size={12} weight="bold" />
                         </button>
                       )}
                       <div className="relative">

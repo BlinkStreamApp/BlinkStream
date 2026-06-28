@@ -1,9 +1,18 @@
 ﻿use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tauri::AppHandle;
 use tauri::Manager;
 use wait_timeout::ChildExt;
+
+// G1 / WT-20260628-16: modulo dedicado de grabacion.
+// Re-exporta start_recording / stop_recording para que la API publica
+// no cambie. Las funciones nuevas (recorder_set_global_enabled, etc.)
+// se referencian directamente desde recorder::*.
+mod recorder;
+pub use recorder::{start_recording, stop_recording};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -128,20 +137,20 @@ fn single_instance_lock_dir() -> std::path::PathBuf {
 }
 
 const CHANNEL_RE: &str = r"^[a-zA-Z0-9][a-zA-Z0-9_]{2,24}$";
-// Los slugs de clips de Twitch son tokens opacos: alfanumÃ©ricos, guiones y
-// guiones bajos, tÃ­picamente 10-50 chars pero aceptamos 1-100 por margen.
-// NO permitimos comillas, barras, espacios ni caracteres de control â€” eso
-// cierra la inyecciÃ³n GraphQL en el cuerpo de la query.
+// Los slugs de clips de Twitch son tokens opacos: alfanuméricos, guiones y
+// guiones bajos, típicamente 10-50 chars pero aceptamos 1-100 por margen.
+// NO permitimos comillas, barras, espacios ni caracteres de control — eso
+// cierra la inyección GraphQL en el cuerpo de la query.
 const SLUG_RE: &str = r"^[a-zA-Z0-9_-]{1,100}$";
 // Los VOD IDs de Twitch son enteros sin signo (generalmente < 2^31).
-// Solo dÃ­gitos, 1-20 caracteres de margen.
+// Solo dígitos, 1-20 caracteres de margen.
 const VOD_ID_RE: &str = r"^[0-9]{1,20}$";
 
 fn validate_channel(name: &str) -> Result<(), String> {
-    let re = regex_lite::Regex::new(CHANNEL_RE).expect("CHANNEL_RE estÃ¡tico - no deberÃ­a fallar");
+    let re = regex_lite::Regex::new(CHANNEL_RE).expect("CHANNEL_RE estático - no debería fallar");
     if !re.is_match(name) {
         return Err(
-            "Nombre de canal invÃ¡lido. Solo letras, nÃºmeros y guiÃ³n bajo (3-25 caracteres)."
+            "Nombre de canal inválido. Solo letras, números y guión bajo (3-25 caracteres)."
                 .into(),
         );
     }
@@ -149,23 +158,23 @@ fn validate_channel(name: &str) -> Result<(), String> {
 }
 
 /// Valida un slug de clip de Twitch. Devuelve Ok solo si cumple
-/// `^[a-zA-Z0-9_-]{1,100}$`. Esto blinda contra inyecciÃ³n GraphQL.
+/// `^[a-zA-Z0-9_-]{1,100}$`. Esto blinda contra inyección GraphQL.
 fn validate_slug(slug: &str) -> Result<(), String> {
-    let re = regex_lite::Regex::new(SLUG_RE).expect("SLUG_RE estÃ¡tico - no deberÃ­a fallar");
+    let re = regex_lite::Regex::new(SLUG_RE).expect("SLUG_RE estático - no debería fallar");
     if !re.is_match(slug) {
         return Err(
-            "Slug de clip invÃ¡lido. Solo letras, nÃºmeros, guion y guion bajo (1-100 caracteres)."
+            "Slug de clip inválido. Solo letras, números, guion y guion bajo (1-100 caracteres)."
                 .into(),
         );
     }
     Ok(())
 }
 
-/// Valida un VOD ID de Twitch. Debe ser numÃ©rico (1-20 dÃ­gitos).
+/// Valida un VOD ID de Twitch. Debe ser numérico (1-20 dígitos).
 fn validate_vod_id(vod_id: &str) -> Result<(), String> {
-    let re = regex_lite::Regex::new(VOD_ID_RE).expect("VOD_ID_RE estÃ¡tico - no deberÃ­a fallar");
+    let re = regex_lite::Regex::new(VOD_ID_RE).expect("VOD_ID_RE estático - no debería fallar");
     if !re.is_match(vod_id) {
-        return Err("VOD ID invÃ¡lido. Debe ser numÃ©rico (1-20 dÃ­gitos).".into());
+        return Err("VOD ID inválido. Debe ser numérico (1-20 dígitos).".into());
     }
     Ok(())
 }
@@ -306,11 +315,11 @@ fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
         }
     }
 
-    Err(format!("Streamlink no estÃ¡ instalado.\n\nInstÃ¡lalo con: {}", INSTALL_CMD))
+    Err(format!("Streamlink no está instalado.\n\nInstálalo con: {}", INSTALL_CMD))
 }
 
 /// Ejecuta streamlink con un timeout configurable (en segundos).
-/// Es sÃ­ncrona: usa `Command::spawn` + `wait_timeout`. Para no bloquear
+/// Es síncrona: usa `Command::spawn` + `wait_timeout`. Para no bloquear
 /// el event loop de Tauri, los llamadores async deben envolverla en
 /// `tokio::task::spawn_blocking`.
 fn run_streamlink_with_timeout(
@@ -330,7 +339,7 @@ fn run_streamlink_with_timeout(
 
     let mut child = cmd.spawn().map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                format!("Streamlink no estÃ¡ instalado.\n\nInstÃ¡lalo con: {}", INSTALL_CMD)
+                format!("Streamlink no está instalado.\n\nInstálalo con: {}", INSTALL_CMD)
             } else {
                 format!("Error al ejecutar streamlink: {}", e)
             }
@@ -338,7 +347,7 @@ fn run_streamlink_with_timeout(
 
     // Leer pipes en hilos paralelos MIENTRAS el hijo se ejecuta
     // Esto evita el deadlock cuando streamlink produce mucha salida
-    // y el buffer del pipe (tÃ­picamente 64KB) se llena.
+    // y el buffer del pipe (típicamente 64KB) se llena.
     let stdout_handle = child.stdout.take();
     let stderr_handle = child.stderr.take();
 
@@ -375,7 +384,7 @@ fn run_streamlink_with_timeout(
             let _ = stdout_thread.join();
             let _ = stderr_thread.join();
             return Err(
-                format!("Streamlink tardÃ³ mÃ¡s de {} segundos.", timeout_secs),
+                format!("Streamlink tardó más de {} segundos.", timeout_secs),
             );
         }
     };
@@ -389,61 +398,15 @@ fn run_streamlink_with_timeout(
     Ok((stdout, stderr))
 }
 
-/// Wrapper con el timeout histÃ³rico (60s). Mantiene la firma que ya usan
-/// `get_stream_url` y `get_master_playlist` sin cambiar su semÃ¡ntica.
+/// Wrapper con el timeout histórico (60s). Mantiene la firma que ya usan
+/// `get_stream_url` y `get_master_playlist` sin cambiar su semántica.
 fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<(String, String), String> {
     run_streamlink_with_timeout(app, args, 60)
 }
 
-static RECORDING: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
-
-#[tauri::command]
-fn start_recording(app: AppHandle, channel: String, output_path: String) -> Result<String, String> {
-    // â”€â”€ Validar nombre de canal (mismo criterio que el resto de commands) â”€â”€
-    // Antes este command omitÃ­a la validaciÃ³n, permitiendo que un channel
-    // malicioso se inyectara directo en la URL de streamlink.
-    validate_channel(&channel)?;
-
-    let path = std::path::Path::new(&output_path);
-    if !path.is_absolute() {
-        return Err("La ruta de salida debe ser absoluta".into());
-    }
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            return Err("El directorio de salida no existe".into());
-        }
-    }
-
-    let binary = find_streamlink(&app)?;
-    let url = format!("twitch.tv/{}", channel);
-
-    let mut cmd = Command::new(&binary);
-    cmd.args(&[&url, "best", "-o", &output_path])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    #[cfg(windows)]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-
-    let child = cmd.spawn().map_err(|e| format!("No se pudo iniciar grabaciÃ³n: {}", e))?;
-    let pid = child.id();
-    let mut rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
-    *rec = Some(child);
-
-    Ok(format!("Grabando (PID: {})", pid))
-}
-
-#[tauri::command]
-fn stop_recording() -> Result<String, String> {
-    let mut rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(mut child) = rec.take() {
-        let _ = child.kill();
-        let _ = child.wait();
-        Ok("GrabaciÃ³n detenida".into())
-    } else {
-        Err("No hay grabaciÃ³n activa".into())
-    }
-}
+// ── start_recording / stop_recording movidos a recorder.rs (G1 / WT-20260628-16)
+// Se re-exportan arriba via `pub use recorder::{start_recording, stop_recording}`.
+// El Mutex RECORDING tambien vive ahora en recorder.rs (single source of truth).
 
 #[tauri::command]
 fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Result<String, String> {
@@ -451,7 +414,7 @@ fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Result<St
     let (stdout, stderr) = run_streamlink(&app, &[&format!("twitch.tv/{}", channel), &quality, "--stream-url"])?;
     let url = stdout.trim().to_string();
     if url.is_empty() {
-        Err(format!("Streamlink no devolviÃ³ URL. stderr: {}", stderr.trim()))
+        Err(format!("Streamlink no devolvió URL. stderr: {}", stderr.trim()))
     } else {
         Ok(url)
     }
@@ -459,7 +422,7 @@ fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Result<St
 
 /// Devuelve la URL del MASTER PLAYLIST (contiene todas las calidades).
 /// hls.js puede cargar esta URL y el usuario cambia calidad via level API,
-/// sin recargar el stream. AsÃ­ evitamos pantallas negras con variantes raras.
+/// sin recargar el stream. Así evitamos pantallas negras con variantes raras.
 #[tauri::command]
 fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String> {
     validate_channel(&channel)?;
@@ -472,7 +435,7 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
 
     if variant_url.is_empty() {
         return Err(format!(
-            "Streamlink no devolviÃ³ URL. stderr: {}",
+            "Streamlink no devolvió URL. stderr: {}",
             stderr.trim()
         ));
     }
@@ -481,8 +444,8 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
     //   .../playlist/{TOKEN}/{resolucion}.m3u8   (variante)
     //   .../playlist/{TOKEN}.m3u8                (master)
     //
-    // Eliminamos el Ãºltimo segmento (/{resolucion}.m3u8) para obtener el master.
-    // Solo aplicamos la transformaciÃ³n si la URL contiene el segmento /playlist/.
+    // Eliminamos el último segmento (/{resolucion}.m3u8) para obtener el master.
+    // Solo aplicamos la transformación si la URL contiene el segmento /playlist/.
     if variant_url.contains("/playlist/") {
         if let Some(last_slash) = variant_url.rfind('/') {
             let prefix = &variant_url[..last_slash];
@@ -508,14 +471,14 @@ const DEFAULT_QUALITIES: &[&str] = &[
 
 /// Devuelve las calidades disponibles para un canal.
 ///
-/// Esta funciÃ³n NUNCA debe fallar. Si algo sale mal, devuelve defaults
+/// Esta función NUNCA debe fallar. Si algo sale mal, devuelve defaults
 /// para que el frontend pueda mostrar el selector de calidad siempre.
 ///
-/// Notas de rendimiento (M-3 de la auditorÃ­a WT-20260628-01):
+/// Notas de rendimiento (M-3 de la auditoría WT-20260628-01):
 /// - Usa `run_streamlink_with_timeout` con 15s (no 60s) para que el
 ///   selector de calidad no quede colgado si Twitch/streamlink no responden.
-/// - Envuelve la llamada sÃ­ncrona en `tokio::task::spawn_blocking` para
-///   no bloquear el event loop de Tauri (la funciÃ³n es `async`).
+/// - Envuelve la llamada síncrona en `tokio::task::spawn_blocking` para
+///   no bloquear el event loop de Tauri (la función es `async`).
 #[tauri::command]
 async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String> {
     let defaults: Vec<String> = DEFAULT_QUALITIES.iter().map(|&s| s.to_string()).collect();
@@ -525,14 +488,14 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
         return defaults;
     }
 
-    // `run_streamlink_with_timeout` es sÃ­ncrona (usa `Command::spawn` +
+    // `run_streamlink_with_timeout` es síncrona (usa `Command::spawn` +
     // `wait_timeout`). La movemos a un thread bloqueante para no
     // congelar el runtime de tokio que Tauri usa para los comandos.
     let channel_for_blocking = channel.clone();
     let join_result = tokio::task::spawn_blocking(move || {
         // 15s es suficiente: streamlink responde en <2s en condiciones
         // normales, y 15s cubre redes lentas sin hacer esperar al usuario
-        // un minuto entero si algo estÃ¡ mal.
+        // un minuto entero si algo está mal.
         run_streamlink_with_timeout(
             &app,
             &[&format!("twitch.tv/{}", channel_for_blocking), "--stream-url"],
@@ -592,7 +555,7 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
 
 #[tauri::command]
 async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
-    // â”€â”€ Validar slug antes de tocar la red. Cierra inyecciÃ³n GraphQL. â”€â”€
+    // ── Validar slug antes de tocar la red. Cierra inyección GraphQL. ──
     validate_slug(&slug)?;
 
     let client = reqwest::Client::builder()
@@ -602,9 +565,9 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
         .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
     
     // El slug viaja como variable GraphQL ($slug), nunca como string
-    // interpolado. AsÃ­ un slug con `"` o `\` no puede romper la query.
+    // interpolado. Así un slug con `"` o `\` no puede romper la query.
     let body = serde_json::json!({
-        "query": "query($slug: String!) { clip(slug: $slug) { videoQualities { sourceURL quality } playbackAccessToken(params: { platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }) { value signature } } }",
+        "query": "query($slug: ID!) { clip(slug: $slug) { videoQualities { sourceURL quality } playbackAccessToken(params: { platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }) { value signature } } }",
         "variables": { "slug": slug }
     });
 
@@ -621,7 +584,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
 
     if !status.is_success() {
         // S-6: NO exponer el cuerpo HTTP al frontend. Log internamente
-        // para debugging y devolver mensaje genÃ©rico con el cÃ³digo de estado.
+        // para debugging y devolver mensaje genérico con el código de estado.
         log::error!(
             "Twitch clip GQL failed: status={} body_len={} preview={}",
             status.as_u16(),
@@ -632,14 +595,14 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
     }
 
     let data: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
-        // S-6: log interno con detalle, mensaje genÃ©rico al frontend.
+        // S-6: log interno con detalle, mensaje genérico al frontend.
         log::error!(
             "Twitch clip JSON parse error: err={} body_len={} preview={}",
             e,
             text.len(),
             &text[..200.min(text.len())]
         );
-        "Twitch API: respuesta invÃ¡lida".to_string()
+        "Twitch API: respuesta inválida".to_string()
     })?;
 
     let clip = data.get("data").and_then(|d| d.get("clip"));
@@ -687,7 +650,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
-    // â”€â”€ Validar vod_id antes de tocar la red. Cierra inyecciÃ³n GraphQL. â”€â”€
+    // ── Validar vod_id antes de tocar la red. Cierra inyección GraphQL. ──
     validate_vod_id(&vod_id)?;
 
     let client = reqwest::Client::builder()
@@ -697,7 +660,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
 
     // El VOD ID viaja como variable GraphQL ($id), nunca como string
-    // interpolado. Validamos formato numÃ©rico en validate_vod_id().
+    // interpolado. Validamos formato numérico en validate_vod_id().
     let body = serde_json::json!({
         "query": "query($id: ID!) { video(id: $id) { playbackAccessToken(params: { platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }) { value signature } } }",
         "variables": { "id": vod_id }
@@ -712,7 +675,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         .map_err(|e| format!("HTTP: {}", e))?;
 
     let text = response.text().await.map_err(|e| format!("Read: {}", e))?;
-    // S-6: log interno con detalle, mensaje genÃ©rico al frontend.
+    // S-6: log interno con detalle, mensaje genérico al frontend.
     let json_res: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
         log::error!(
             "Twitch VOD JSON parse error: err={} body_len={} preview={}",
@@ -720,7 +683,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
             text.len(),
             &text[..200.min(text.len())]
         );
-        "Twitch API: respuesta invÃ¡lida".to_string()
+        "Twitch API: respuesta inválida".to_string()
     })?;
 
     let video = json_res.get("data").and_then(|d| d.get("video"))
@@ -765,9 +728,9 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .build()
         .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
 
-    // â”€â”€ Step 1: Obtener access token vÃ­a GraphQL de Twitch â”€â”€
-    // El channel viaja como variable GraphQL ($channelName) â€” ya validado
-    // arriba con validate_channel(&channel)? â€” asÃ­ cerramos la inyecciÃ³n.
+    // ── Step 1: Obtener access token vía GraphQL de Twitch ──
+    // El channel viaja como variable GraphQL ($channelName) — ya validado
+    // arriba con validate_channel(&channel)? — así cerramos la inyección.
     let gql_body = serde_json::json!({
         "query": "query($channelName: String!) { streamPlaybackAccessToken(channelName: $channelName, params: { platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }) { value signature } }",
         "variables": { "channelName": channel }
@@ -783,7 +746,7 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .map_err(|e| format!("Error conectando con Twitch GQL: {}", e))?;
 
     if !gql_res.status().is_success() {
-        return Err(format!("Twitch GQL respondiÃ³ con HTTP {}", gql_res.status()));
+        return Err(format!("Twitch GQL respondió con HTTP {}", gql_res.status()));
     }
 
     let gql_data: serde_json::Value = gql_res
@@ -800,7 +763,7 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .ok_or_else(|| "No se pudo obtener signature de Twitch".to_string())?
         .to_string();
 
-    // â”€â”€ Step 2: Obtener playlist HLS de Usher â”€â”€
+    // ── Step 2: Obtener playlist HLS de Usher ──
     let p = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -822,10 +785,10 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .map_err(|e| format!("Error conectando con Twitch Usher: {}", e))?;
 
     if !usher_res.status().is_success() {
-        return Err(format!("Twitch Usher respondiÃ³ con HTTP {}", usher_res.status()));
+        return Err(format!("Twitch Usher respondió con HTTP {}", usher_res.status()));
     }
 
-    // Devolver la URL final (despuÃ©s de redirecciones)
+    // Devolver la URL final (después de redirecciones)
     Ok(usher_res.url().to_string())
 }
 
@@ -838,7 +801,7 @@ async fn store_secret(key: String, value: String) -> Result<(), String> {
 }
 
 /// Recupera un secreto del keychain del SO.
-/// Devuelve vacÃ­o si no existe.
+/// Devuelve vacío si no existe.
 #[tauri::command]
 async fn get_secret(key: String) -> Result<String, String> {
     let entry = Entry::new("blinkstream", &key).map_err(|e| format!("Error creando entrada keychain: {}", e))?;
@@ -858,6 +821,164 @@ async fn delete_secret(key: String) -> Result<(), String> {
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(format!("Error eliminando del keychain: {}", e)),
     }
+}
+
+// ============================================================
+// App Access Token (client_credentials) — Channel Points
+// ============================================================
+// WT-20260628-14: el endpoint /helix/channel_points/custom_rewards
+// requiere un App Access Token (client_credentials flow), NO un
+// token de usuario. Twitch rota el client_secret por app, asi que
+// aqui lo leemos de env (build-time, igual que TWITCH_CLIENT_ID).
+//
+// El token se cachea en memoria con TTL = expires_in - 60s para
+// evitar edge cases de expiracion. NUNCA loggeamos el secret ni
+// el access_token (sensitive material).
+//
+// Fallback legacy: si no se define TWITCH_APP_CLIENT_SECRET en
+// build-time, no podemos obtener tokens de app. Devolvemos error
+// explicito en vez de fallar silenciosamente. Asi el operador
+// sabe que tiene que provisionar el secret. Esto es diferente
+// del comportamiento de TWITCH_CLIENT_ID (que tiene fallback
+// legacy de un Client ID publico de terceros): el SECRET no
+// tiene fallback posible por seguridad.
+// ============================================================
+
+const TWITCH_APP_CLIENT_SECRET: &str = match option_env!("TWITCH_APP_CLIENT_SECRET") {
+    Some(s) if !s.is_empty() => s,
+    _ => "",
+};
+
+// Aviso de una sola vez por sesion del proceso: si no hay secret
+// configurado, lo loggeamos para que el operador sepa por que
+// /helix/channel_points/* falla.
+static APP_TOKEN_MISCONFIG_WARN: std::sync::Once = std::sync::Once::new();
+
+fn warn_missing_app_secret_once() {
+    if !TWITCH_APP_CLIENT_SECRET.is_empty() {
+        return;
+    }
+    APP_TOKEN_MISCONFIG_WARN.call_once(|| {
+        log::error!(
+            "[BlinkStream] TWITCH_APP_CLIENT_SECRET no definido. Los endpoints de Channel Points NO funcionaran. Configuralo en build-time (.env o variable de entorno del build)."
+        );
+    });
+}
+
+// Cache en proceso: (token, expiresAtInstant). El Mutex protege
+// el acceso concurrente desde multiples comandos async.
+// `static` lo expone a nivel de crate. `Arc<Mutex<...>>` es la
+// forma idiomática de compartir estado mutable entre tasks.
+type AppTokenCache = Arc<Mutex<Option<(String, Instant)>>>;
+static APP_TOKEN_CACHE: std::sync::OnceLock<AppTokenCache> = std::sync::OnceLock::new();
+
+fn app_token_cache() -> &'static AppTokenCache {
+    APP_TOKEN_CACHE.get_or_init(|| Arc::new(Mutex::new(None)))
+}
+
+/// Devuelve un App Access Token de Twitch para los endpoints de
+/// Channel Points. Cache en memoria con TTL = expires_in - 60s.
+/// NUNCA loggea el secret ni el access_token.
+#[tauri::command]
+async fn get_app_token() -> Result<serde_json::Value, String> {
+    warn_missing_app_secret_once();
+
+    if TWITCH_APP_CLIENT_SECRET.is_empty() {
+        return Err(
+            "TWITCH_APP_CLIENT_SECRET no configurado. Define la variable de entorno en build-time."
+                .into(),
+        );
+    }
+
+    // 1) Cache: si tenemos uno valido, lo devolvemos sin red.
+    {
+        let cache = app_token_cache().lock().map_err(|e| format!("Lock poisoned: {}", e))?;
+        if let Some((token, expires_at)) = cache.as_ref() {
+            if *expires_at > Instant::now() {
+                // Devolvemos el token + expiresAt en ms epoch para
+                // que el frontend pueda cachearlo en localStorage.
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                let ttl_ms = expires_at.saturating_duration_since(Instant::now()).as_millis() as u64;
+                return Ok(serde_json::json!({
+                    "token": token,
+                    "expiresAt": now + ttl_ms,
+                }));
+            }
+        }
+    }
+
+    // 2) Llamada a Twitch id.twitch.tv.
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
+
+    let res = client
+        .post("https://id.twitch.tv/oauth2/token")
+        .query(&[
+            ("client_id", TWITCH_APP_CLIENT_ID),
+            ("client_secret", TWITCH_APP_CLIENT_SECRET),
+            ("grant_type", "client_credentials"),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("Error conectando con Twitch OAuth: {}", e))?;
+
+    let status = res.status();
+    let text = res.text().await.map_err(|e| format!("Error leyendo respuesta: {}", e))?;
+
+    if !status.is_success() {
+        // S-6: log interno con codigo de estado, mensaje generico al
+        // frontend. NO loggeamos el body porque Twitch a veces lo
+        // devuelve con info del grant.
+        log::error!(
+            "Twitch OAuth client_credentials fallo: status={} body_len={}",
+            status.as_u16(),
+            text.len()
+        );
+        return Err(format!("Twitch OAuth: HTTP {}", status.as_u16()));
+    }
+
+    let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
+        log::error!("Twitch OAuth JSON parse error: err={} body_len={}", e, text.len());
+        "Twitch OAuth: respuesta invalida".to_string()
+    })?;
+
+    let token = json
+        .get("access_token")
+        .and_then(|v| v.as_str())
+        .ok_or("Twitch OAuth: sin access_token")?
+        .to_string();
+    let expires_in_secs = json
+        .get("expires_in")
+        .and_then(|v| v.as_u64())
+        .ok_or("Twitch OAuth: sin expires_in")?;
+
+    // Cache: TTL = expires_in - 60s para evitar edge cases. Si
+    // expires_in es 0 o absurdo, no cacheamos (pedimos de nuevo).
+    let safe_ttl = if expires_in_secs > 60 { expires_in_secs - 60 } else { 0 };
+    if safe_ttl > 0 {
+        let mut cache = app_token_cache().lock().map_err(|e| format!("Lock poisoned: {}", e))?;
+        *cache = Some((token.clone(), Instant::now() + Duration::from_secs(safe_ttl)));
+    }
+
+    // Devolvemos expiresAt como ms epoch (mismo formato que el
+    // frontend cachea en localStorage). Asi JS puede reusar la
+    // cache entre reloads sin un segundo round-trip a Tauri.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let expires_at_ms = now + (safe_ttl * 1000);
+
+    Ok(serde_json::json!({
+        "token": token,
+        "expiresAt": expires_at_ms,
+    }))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -882,10 +1003,21 @@ pub fn run() {
             get_vod_manifest_url,
             start_recording,
             stop_recording,
+            get_app_token,
+            // G1 / WT-20260628-16: comandos nuevos de grabacion global
+            recorder::recorder_set_global_enabled,
+            recorder::recorder_get_global_state,
+            recorder::recorder_list_active,
+            recorder::recorder_get_full_state,
         ])
         .setup(|app| {
             let mut labels_to_close = Vec::new();
             warn_legacy_client_id_once();
+
+            // G1 / WT-20260628-16: carga el estado global de grabacion
+            // desde disco al Mutex en memoria. Si el archivo no existe
+            // (primera ejecucion), queda en OFF.
+            recorder::init_global_state(app.handle());
 
             for (label, _) in app.webview_windows().iter() {
                 if label != "main" {
@@ -911,18 +1043,18 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    // B-2: tests de validaciÃ³n contra inyecciÃ³n GraphQL.
+    // B-2: tests de validación contra inyección GraphQL.
     // Las queries GQL de twitch viajan como variables, no como strings
     // interpolados, pero igualmente validamos el input con regex
-    // ANTES de cualquier I/O como segunda lÃ­nea de defensa.
+    // ANTES de cualquier I/O como segunda línea de defensa.
 
     use super::*;
 
-    // â”€â”€ validate_slug â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validate_slug ──────────────────────────────────────────────
 
     #[test]
     fn validate_slug_rejects_injection_payload() {
-        // Intento clÃ¡sico de inyecciÃ³n SQL/GQL: cierra string, mete payload.
+        // Intento clásico de inyección SQL/GQL: cierra string, mete payload.
         assert!(validate_slug(r#""; DROP TABLE--"#).is_err());
     }
 
@@ -945,7 +1077,7 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_too_long() {
-        // 101 chars excede el lÃ­mite.
+        // 101 chars excede el límite.
         let s = "a".repeat(101);
         assert!(validate_slug(&s).is_err());
     }
@@ -973,11 +1105,11 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_slash() {
-        // Slash = path traversal smell, tambiÃ©n cierra query.
+        // Slash = path traversal smell, también cierra query.
         assert!(validate_slug("../etc/passwd").is_err());
     }
 
-    // â”€â”€ validate_vod_id â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validate_vod_id ────────────────────────────────────────────
 
     #[test]
     fn validate_vod_id_rejects_non_numeric() {
@@ -991,13 +1123,13 @@ mod tests {
 
     #[test]
     fn validate_vod_id_rejects_negative() {
-        // El regex no permite signo, asÃ­ que "-123" cae fuera.
+        // El regex no permite signo, así que "-123" cae fuera.
         assert!(validate_vod_id("-123").is_err());
     }
 
     #[test]
     fn validate_vod_id_rejects_too_long() {
-        // 21 dÃ­gitos excede el lÃ­mite.
+        // 21 dígitos excede el límite.
         let s = "1".repeat(21);
         assert!(validate_vod_id(&s).is_err());
     }
@@ -1012,7 +1144,7 @@ mod tests {
         assert!(validate_vod_id("0").is_ok());
     }
 
-    // â”€â”€ validate_channel (cobertura adicional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── validate_channel (cobertura adicional) ─────────────────────
 
     #[test]
     fn validate_channel_rejects_path_traversal() {
@@ -1021,8 +1153,8 @@ mod tests {
 
     #[test]
     fn validate_channel_rejects_injection_payload() {
-        // Mismo payload que el caso de slug â€” debe caer por la regex
-        // de canal (solo letras, nÃºmeros y `_`).
+        // Mismo payload que el caso de slug — debe caer por la regex
+        // de canal (solo letras, números y `_`).
         assert!(validate_channel(r#""; DROP TABLE--"#).is_err());
     }
 
@@ -1033,7 +1165,30 @@ mod tests {
 
     #[test]
     fn validate_channel_rejects_too_short() {
-        // MÃ­nimo 3 chars.
+        // Mínimo 3 chars.
         assert!(validate_channel("ab").is_err());
+    }
+
+    // ─── get_app_token: sin secret configurado -> error explicito ───
+
+    #[tokio::test]
+    async fn get_app_token_missing_secret_returns_error() {
+        // Si TWITCH_APP_CLIENT_SECRET no se definio en build-time,
+        // el command debe devolver un error claro (no panic, no
+        // token invalido). Solo testeable cuando el secret esta
+        // vacio en la build de test (que es lo normal en CI).
+        if TWITCH_APP_CLIENT_SECRET.is_empty() {
+            let res = get_app_token().await;
+            assert!(res.is_err(), "get_app_token sin secret debe devolver Err");
+            let err = res.unwrap_err();
+            assert!(
+                err.contains("TWITCH_APP_CLIENT_SECRET"),
+                "el error debe mencionar la variable faltante, got: {}",
+                err
+            );
+        }
+        // Si el secret SI esta configurado (build local con .env),
+        // no podemos testear nada sin pegarle a Twitch real, asi
+        // que este test se convierte en no-op. Aun asi, no panic.
     }
 }

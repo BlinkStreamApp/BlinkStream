@@ -1,35 +1,37 @@
+/**
+ * @file Hook que vigila una lista de favoritos y emite un toast + notificacion
+ * nativa cuando uno se pone en vivo (M-2 / Auditoria WT-20260628-01).
+ *
+ * El componente Toast se movio a useLiveAlerts.Toast.jsx para evitar el
+ * warning de fast-refresh (un archivo no debe mezclar componentes con
+ * hooks/constantes).
+ *
+ * @typedef {object} LiveAlert
+ * @property {number} id        - timestamp + random, para key de React
+ * @property {string} channel   - login del canal
+ * @property {string} message   - categoria/juego o fallback
+ * @property {string} logo      - URL del logo del canal
+ *
+ * @typedef {object} UseLiveAlertsReturn
+ * @property {LiveAlert[]} alerts
+ * @property {(channel: string) => void} dismissAlert
+ */
+
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { PUBLIC_CLIENT_ID } from '../utils/twitch'
+import { logError } from '../utils/errors'
+import { isTauri } from '../utils/tauriEnv'
 
-export function Toast({ message, channel, logo, onClick, onDismiss }) {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 8000)
-    return () => clearTimeout(timer)
-  }, [onDismiss])
-
-  return (
-    <button
-      onClick={() => { onClick?.(); onDismiss() }}
-      className="flex items-center gap-3 bg-bg-secondary/90 backdrop-blur-sm border border-bg-tertiary/60 rounded-xl px-4 py-3 shadow-lg cursor-pointer hover:bg-hover transition-colors animate-slide-right max-w-[360px]"
-    >
-      {logo ? (
-        <img src={logo} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-      ) : (
-        <div className="w-9 h-9 rounded-full bg-twitch flex items-center justify-center shrink-0">
-          <span className="text-white text-sm font-bold">{channel?.charAt(0).toUpperCase()}</span>
-        </div>
-      )}
-      <div className="min-w-0 flex-1 text-left">
-        <p className="text-[13px] font-semibold text-text-primary truncate">{channel} está en vivo</p>
-        <p className="text-[11px] text-text-secondary truncate">{message}</p>
-      </div>
-      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse-dot shrink-0" />
-    </button>
-  )
-}
-
+/**
+ * Polling de estado en vivo de los canales favoritos. Solo notifica
+ * cuando un canal PASA de offline a live (no spam al iniciar la app).
+ *
+ * @param {string[]} favorites  - logins de Twitch
+ * @param {number}   [intervalMs=30000]  - periodo entre checks
+ * @returns {UseLiveAlertsReturn}
+ */
 export function useLiveAlerts(favorites, intervalMs = 30000) {
   const [alerts, setAlerts] = useState([])
   const prevLiveRef = useRef({})
@@ -91,6 +93,10 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
         // Notificación nativa SOLO si la ventana no está enfocada
         if (newlyLive.length > 0) {
           try {
+            // FIX WT-20260628-34: getCurrentWindow() falla fuera de Tauri
+            // porque accede a `window.__TAURI_INTERNALS__.metadata`. Saltamos
+            // el bloque nativo completo si no hay runtime Tauri.
+            if (!isTauri()) return
             const win = getCurrentWindow()
             const focused = await win.isFocused()
             if (!focused) {
@@ -110,7 +116,7 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
               }
             }
           } catch (e) {
-            console.warn('Notificación nativa no disponible:', e)
+            logError(e, { component: 'useLiveAlerts', action: 'nativeNotification' })
           }
         }
 

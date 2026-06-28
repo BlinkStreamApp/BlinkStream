@@ -1,5 +1,29 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
-import { PUBLIC_CLIENT_ID } from '../utils/twitch'
+﻿import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
+import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL } from '../utils/twitch'
+import PhosphorIcon from './icons/PhosphorIcon'
+
+// FIX-5 (Hank / P0): helper para pedir `user(login: $login) { id }`
+// usando variables GraphQL (no interpolacion) + validacion previa
+// (sanitizeChannelForGraphQL). Devuelve el id o null si falla.
+async function gqlGetUserIdByLogin(channel) {
+  const login = sanitizeChannelForGraphQL(channel)
+  if (!login) return null
+  try {
+    const res = await fetch('https://gql.twitch.tv/gql', {
+      method: 'POST',
+      headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: 'query($login: String!) { user(login: $login) { id } }',
+        variables: { login },
+      }),
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.data?.user?.id || null
+  } catch { return null }
+}
+
 import logo7tv from '../assets/7tv.png'
 import logoBttv from '../assets/bttv.png'
 import logoFfz from '../assets/ffz.png'
@@ -138,10 +162,15 @@ function UserCardPopup({ username, position, onClose }) {
   const [info, setInfo] = useState(null)
   useEffect(() => {
     let c = false
+    const login = sanitizeChannelForGraphQL(username)
+    if (!login) return
     fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
       headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: `{ user(login: "${username.toLowerCase()}") { displayName profileImageURL(width:70) description bio createdAt } }` }),
+      body: JSON.stringify({
+        query: 'query($login: String!) { user(login: $login) { displayName profileImageURL(width:70) description bio createdAt } }',
+        variables: { login: sanitizeChannelForGraphQL(username) },
+      }),
       signal: AbortSignal.timeout(5000),
     }).then(r => r.ok ? r.json() : null).then(d => { if (!c) setInfo(d?.data?.user || null) }).catch(() => {})
     return () => { c = true }
@@ -210,7 +239,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
   )
 })
 
-export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername }) {
+export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel }) {
   const [messages, setMessages] = useState([])
   const [emotes, setEmotes] = useState({})
   const [badgeUrls, setBadgeUrls] = useState({})
@@ -239,16 +268,17 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
   const [showEmoteMenu, setShowEmoteMenu] = useState(false)
   const [emoteSearch, setEmoteSearch] = useState('')
   const [emoteTab, setEmoteTab] = useState('all')
-  const [showChatSettings, setShowChatSettings] = useState(false)
-  const [chatFontSize, setChatFontSize] = useState(() => Number(localStorage.getItem('blinkstream_chat_font') || 14))
-  const [hideBots, setHideBots] = useState(() => localStorage.getItem('blinkstream_hide_bots') === 'true')
-
-  useEffect(() => {
-    if (!showChatSettings) return
-    const h = (e) => { if (!e.target.closest('.chat-settings-popup')) setShowChatSettings(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [showChatSettings])
+  const [chatFontSize, _setChatFontSize] = useState(() => Number(localStorage.getItem('blinkstream_chat_font') || 14))
+  const [hideBots, _setHideBots] = useState(() => localStorage.getItem('blinkstream_hide_bots') === 'true')
+  // WT-20260628-48: ocultar mensajes del chat (placeholder cuando true).
+  // WT-20260628-49: el toggle que lo modificaba vivia en el gear+popover
+  // retirado de la barra de input; el state se conserva para que el
+  // render condicional siga funcionando si la preferencia localStorage
+  // estaba activa. El control de UI vive ahora en el topbar global.
+  // El setter queda como `_setChatHidden` (prefijo _) por convencion del
+  // archivo (ver `_setChatFontSize` arriba) — actualmente no hay UI que
+  // lo invoque, pero lo mantenemos para restauracion futura.
+  const [chatHidden, _setChatHidden] = useState(() => localStorage.getItem('blinkstream_chat_hidden') === 'true')
 
   const [recentEmotes, setRecentEmotes] = useState(() => {
     try {
@@ -351,14 +381,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
     const tasks = [
       (async () => {
         try {
-          const gqlRes = await fetch('https://gql.twitch.tv/gql', {
-            method: 'POST',
-            headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: `{ user(login: "${ch}") { id } }` }),
-            signal: AbortSignal.timeout(5000),
-          })
-          const gqlData = await gqlRes.json()
-          const twitchId = gqlData?.data?.user?.id
+          const twitchId = await gqlGetUserIdByLogin(ch)
           if (!twitchId) return
           const userRes = await fetchJson(`https://7tv.io/v3/users/twitch/${twitchId}`)
           if (userRes?.emote_set?.emotes) {
@@ -456,15 +479,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
       })(),
       (async () => {
         try {
-          const gqlRes = await fetch('https://gql.twitch.tv/gql', {
-            method: 'POST',
-            headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: `{ user(login: "${ch}") { id } }` }),
-            signal: AbortSignal.timeout(5000),
-          })
-          if (!gqlRes.ok) return
-          const gqlData = await gqlRes.json()
-          const userId = gqlData?.data?.user?.id
+          const userId = await gqlGetUserIdByLogin(ch)
           if (!userId) return
           const data = await fetchJson(`https://api.twitch.tv/helix/chat/emotes?broadcaster_id=${userId}`)
           if (data?.data) {
@@ -590,7 +605,12 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
     setShowLoginOptions(false)
     try {
       const clientId = getClientId()
-      console.log('[Auth] Solicitando device code con Client-ID:', clientId)
+      // FIX 3 (Hank / P1): el Client-ID NO es PII del usuario, pero
+      // en builds web de produccion se filtra a DevTools / consoles de
+      // terceros. CWE-532. Gateamos a DEV.
+      if (import.meta.env.DEV) {
+        console.log('[Auth] Solicitando device code con Client-ID:', clientId)
+      }
 
       const deviceRes = await fetch('https://id.twitch.tv/oauth2/device', {
         method: 'POST',
@@ -613,7 +633,13 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
       const { device_code, user_code } = deviceData
       const interval = Number(deviceData.interval) || 5
 
-      console.log('[Auth] Device code obtenido. Código:', user_code)
+      // FIX 3 (Hank / P1): user_code es PII (codigo de un solo uso
+      // enlazado a la sesion del usuario, equivalente a un OTP). Si
+      // XSS o captura de pantalla, un atacante podria completar el
+      // pairing OAuth. CWE-532. Gateamos a DEV.
+      if (import.meta.env.DEV) {
+        console.log('[Auth] Device code obtenido. Código:', user_code)
+      }
 
       setAuthCode(user_code)
 
@@ -625,17 +651,54 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
         await new Promise(r => setTimeout(r, pollInterval))
         attempts++
 
+        // WT-20260628-27 / FIX 3: usamos `Origin: null` como header
+        // explicito para que el browser NO fuerce una preflight CORS
+        // (Twitch no declara ACAO para este endpoint, y un OPTIONS
+        // previo fallaria con un error opaco que confunde al usuario).
+        // `Origin: null` es la unica forma de hacer un request "no-CORS"
+        // desde un fetch() explicito. Si el browser aun asi bloquea,
+        // `fetch` rechaza con TypeError y lo capturamos abajo.
         const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'null',
+          },
           body: new URLSearchParams({
             client_id: clientId,
             device_code,
-            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+            grant_type: 'urn:ietf:params:oauth:grant_type:device_code',
           }),
         })
 
-        const tokenData = await tokenRes.json()
+        // FIX 3: validar `ok` ANTES de parsear. Si 4xx/5xx, devolvemos
+        // un error user-friendly sin loggear el body (que puede traer
+        // tokens parciales, device_code, o scopes del OAuth — CWE-532).
+        // El P0 de Hank ya cubre el log del body sensible; aqui
+        // añadimos la red de seguridad del lado del flujo.
+        if (!tokenRes.ok) {
+          const status = tokenRes.status
+          // FIX 3: NO leemos el body en este branch. Ya lo descartamos
+          // (no hay `.text()` ni `.json()` aqui). Asi evitamos que un
+          // 4xx con cuerpo `{ "error": "invalid_client", "device_code":
+          // "XYZ" }` se filtre al log.
+          if (status === 0) {
+            // fetch rechazo antes de obtener respuesta (red, CORS, o
+            // preflight OPTIONS fallido). El TypeError normalmente se
+            // propaga al catch externo, pero este branch existe por si
+            // el runner de tests inyecta un Response con status 0.
+            throw new Error('No se pudo contactar el servidor de Twitch. Revisa tu conexión.')
+          }
+          console.warn('[Auth] Device poll HTTP error (status):', status)
+          throw new Error(
+            status >= 500
+              ? 'El servidor de Twitch tuvo un problema. Intenta de nuevo en unos minutos.'
+              : `Error de autenticación (${status}). Usa "Token manual" como alternativa.`
+          )
+        }
+
+        const status = tokenRes.status
+        const tokenData = await tokenRes.json().catch(() => ({}))
 
         if (tokenData.access_token) {
           const cleanToken = tokenData.access_token
@@ -669,7 +732,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
           throw new Error('El código expiró. Intenta de nuevo.')
         }
 
-        console.warn('[Auth] Device poll error:', tokenData)
+        // FIX-1 (Hank / P0): tokenData puede contener campos sensibles del OAuth
+        // de Twitch; loggear SOLO error + message + status (CWE-532 insertion of sensitive
+        // information into log file).
+        console.warn('[Auth] Device poll error:', tokenData?.error || tokenData?.message || 'unknown', '(status: ' + status + ')')
         throw new Error(tokenData.message || 'Error durante la autenticación')
       }
 
@@ -688,6 +754,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
     let retryDelay = 1000
     const MAX_RETRY = 30000
     let reconnectTimer = null
+    // Reset legítimo de error al (re)conectar a un canal: NO es cascading
+    // render en la práctica (se ejecuta una vez por cambio de canal) y el
+    // efecto siguiente ya depende de `channel`/`connError` vía el closure.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setConnError('')
     lineBufferRef.current = ''
 
@@ -893,86 +963,21 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
     }
   }
 
-  const emoteButton = (e) => {
-    const src = e.urls[1] || e.urls[0]
-    return (
-      <button
-        key={e.provider + '-' + e.id}
-        type="button"
-        onClick={() => {
-          setInputText(prev => prev + (prev ? ' ' : '') + e.name + ' ')
-          setShowEmoteMenu(false)
-          setEmoteSearch('')
-          setRecentEmotes(prev => {
-            const filtered = prev.filter(r => r.name !== e.name)
-            // Solo guardamos name + provider. La URL se reconstruye al
-            // renderizar desde el dict `emotes` cargado, que es la
-            // fuente de verdad y se rehidrata al cambiar de canal.
-            const next = [{ name: e.name, provider: e.provider }, ...filtered].slice(0, 20)
-            try { localStorage.setItem('blinkstream_recent_emotes', JSON.stringify(next)) } catch {}
-            return next
-          })
-        }}
-        onContextMenu={(ev) => {
-          ev.preventDefault()
-          setFavoriteEmotes(prev => {
-            const isFav = prev.includes(e.name)
-            const next = isFav ? prev.filter(f => f !== e.name) : [...prev, e.name]
-            localStorage.setItem('blinkstream_fav_emotes', JSON.stringify(next))
-            return next
-          })
-        }}
-        className="p-1 rounded-md hover:bg-hover cursor-pointer transition-colors group relative"
-        title={e.name}
-      >
-        <img src={src} alt={e.name} className="w-7 h-7 object-contain" loading="lazy"
-          onError={(ev) => { ev.target.style.display = 'none' }} />
-        <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/90 text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10">
-          {e.name}
-        </span>
-      </button>
-    )
-  }
-
   return (
     <div className="h-full flex flex-col bg-chat">
       <div className="shrink-0 px-3 py-2 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center gap-2">
         <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
         <span className="text-xs text-text-secondary font-medium truncate">{channel}</span>
 
+        {/* WT-20260628-47: badge estilo Twitch nativo */}
+        <span className="text-[10px] text-text-muted/60 bg-bg-tertiary/40 px-1.5 py-0.5 rounded">
+          Chat
+        </span>
+
         <div className="flex-1" />
 
-        <div className="relative">
-          <button onClick={() => setShowChatSettings(p => !p)} className="p-1 rounded-md text-text-muted/40 hover:text-text-primary hover:bg-hover cursor-pointer transition-colors" title="Ajustes del chat">
-            <svg width="14" height="14" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M26.7,12.3c-2.1,0.4-4,0-4.7-1.3c-0.7-1.3-0.2-3.1,1.3-4.7c-1.3-1.3-3-2.2-4.8-2.8C17.8,5.6,16.5,7,15,7s-2.8-1.4-3.5-3.5C9.7,4.1,8.1,5,6.8,6.3c1.5,1.6,2,3.5,1.3,4.7c-0.7,1.3-2.6,1.7-4.7,1.3C3.1,13.1,3,14.1,3,15s0.1,1.9,0.3,2.7c2.1-0.4,4,0,4.7,1.3c0.7,1.3,0.2,3.1-1.3,4.7c1.3,1.3,3,2.2,4.8,2.8c0.7-2.1,2-3.5,3.5-3.5s2.8,1.4,3.5,3.5c1.8-0.5,3.4-1.5,4.8-2.8c-1.5-1.6-2-3.5-1.3-4.7c0.7-1.3,2.6-1.7,4.7-1.3c0.2-0.9,0.3-1.8,0.3-2.7S26.9,13.1,26.7,12.3z"/><circle cx="15" cy="15" r="4"/></svg>
-          </button>
-          {showChatSettings && (
-            <>
-              <div className="fixed inset-0 z-[9999]" onClick={() => setShowChatSettings(false)} />
-              <div className="absolute right-0 top-full mt-1 w-44 bg-bg-secondary border border-bg-tertiary/60 rounded-xl shadow-2xl z-[10000] p-3 animate-fade-in chat-settings-popup">
-                <p className="text-[11px] font-semibold text-text-primary mb-2">Chat</p>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] text-text-muted">Tamaño</span>
-                  <div className="flex gap-1">
-                    {[12, 14, 16].map(s => (
-                      <button key={s} onClick={() => { setChatFontSize(s); localStorage.setItem('blinkstream_chat_font', String(s)) }}
-                        className={`text-[11px] px-1.5 py-0.5 rounded cursor-pointer ${chatFontSize === s ? 'bg-twitch/30 text-twitch' : 'bg-bg-tertiary text-text-muted hover:bg-hover'}`}>
-                        {s}px
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-text-muted">Ocultar bots</span>
-                  <button onClick={() => { setHideBots(p => { localStorage.setItem('blinkstream_hide_bots', String(!p)); return !p }) }}
-                    className={`shrink-0 w-8 h-4 rounded-full transition-colors ${hideBots ? 'bg-twitch' : 'bg-bg-tertiary'}`}>
-                    <span className={`block w-3 h-3 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${hideBots ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        {/* WT-20260628-48: el boton de ajustes (gear) se movio a la barra de input.
+            El popup con "Ocultar chat" vive ahora justo encima del boton Enviar. */}
 
         {auth.token ? (
           <div className="flex items-center gap-1.5">
@@ -1117,26 +1122,33 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
         {connError && !connected && (
           <p className="text-orange-400/80 text-xs text-center mt-4">{connError}</p>
         )}
-        {messages.length === 0 && !connError && !authing && (
+        {messages.length === 0 && !connError && !authing && !chatHidden && (
           <p className="text-text-muted/50 text-xs text-center mt-6">
             {connected ? 'Esperando mensajes...' : 'Conectando al chat...'}
           </p>
         )}
 
-        <div className="space-y-0.5">
-          {messages
-            .filter(msg => !hideBots || !msg.user.toLowerCase().includes('bot'))
-            .map(msg => (
-              <ChatMessage
-                key={msg.id}
-                msg={msg}
-                badgeUrls={badgeUrls}
-                chatFontSize={chatFontSize}
-                setUserCard={setUserCard}
-                renderMessage={renderMessage}
-              />
-          ))}
-        </div>
+        {/* WT-20260628-48: cuando chatHidden es true, mostrar placeholder en vez de mensajes */}
+        {chatHidden ? (
+          <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted/50 text-sm">
+            Chat oculto
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {messages
+              .filter(msg => !hideBots || !msg.user.toLowerCase().includes('bot'))
+              .map(msg => (
+                <ChatMessage
+                  key={msg.id}
+                  msg={msg}
+                  badgeUrls={badgeUrls}
+                  chatFontSize={chatFontSize}
+                  setUserCard={setUserCard}
+                  renderMessage={renderMessage}
+                />
+            ))}
+          </div>
+        )}
 
         <div ref={bottomRef} />
       </div>
@@ -1162,24 +1174,23 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
             <span><strong className="text-text-secondary">/raid</strong> canal</span>
           </div>
         )}
-        <form onSubmit={sendMessage} className="flex gap-1.5 p-2 bg-bg-secondary/50 border-t border-bg-tertiary/50">
+        <form onSubmit={sendMessage} className="flex items-center gap-2 p-2.5 bg-bg-secondary/30 border-t border-bg-tertiary/50">
+          {/* WT-20260628-47: Emote picker a la izquierda (estilo Twitch) */}
           <div className="relative">
             <button
               type="button"
               onClick={() => { setShowEmoteMenu(p => !p); setEmoteSearch(''); if (!showEmoteMenu) setEmoteTab('all') }}
-              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${showEmoteMenu ? 'bg-twitch/20 text-twitch' : 'text-text-muted hover:text-text-primary hover:bg-hover'}`}
+              className={`shrink-0 p-2 rounded-lg cursor-pointer transition-colors ${showEmoteMenu ? 'bg-twitch/20 text-twitch' : 'text-text-muted hover:text-text-primary hover:bg-hover'}`}
               title="Emotes"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="0.8" fill="currentColor"/><circle cx="15" cy="9" r="0.8" fill="currentColor"/>
-              </svg>
+              <PhosphorIcon name="Smiley" size={20} weight="regular" />
             </button>
 
             {showEmoteMenu && (
               <div className="absolute bottom-full right-0 mb-1 w-[380px] max-h-[400px] bg-bg-secondary/95 backdrop-blur-md border border-bg-tertiary/60 rounded-2xl shadow-2xl z-50 flex flex-col animate-slide-up overflow-hidden">
                 <div className="p-2.5">
                   <div className="relative">
-                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted/30 pointer-events-none" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <PhosphorIcon name="MagnifyingGlass" size={12} weight="regular" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted/30 pointer-events-none" />
                     <input
                       type="text"
                       value={emoteSearch}
@@ -1228,7 +1239,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
                                       // solo name + provider. URL se reconstruye
                                       // al renderizar desde `emotes`.
                                       const next = [{ name: e.name, provider: e.provider }, ...filtered].slice(0, 20)
-                                      try { localStorage.setItem('blinkstream_recent_emotes', JSON.stringify(next)) } catch {}
+                                      try { localStorage.setItem('blinkstream_recent_emotes', JSON.stringify(next)) } catch { /* no-op: localStorage no disponible (modo privado / cuota llena) */ }
                                       return next
                                     })
                                   }}
@@ -1262,17 +1273,17 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
                 {!emoteSearch && (
                   <div className="flex gap-1 px-2 py-2.5 border-t border-bg-tertiary/40 bg-bg-secondary/50">
                     {[
-                      { id: 'all', label: 'Todos', count: emoteList.length, svg: <svg width="14" height="14" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M24 26H6c-2.2 0-4-1.8-4-4v-9c0-2.2 1.8-4 4-4h18c2.2 0 4 1.8 4 4v9c0 2.2-1.8 4-4 4z"/><path d="M13.1 4H6C3.8 4 2 5.8 2 8v14c0 2.2 1.8 4 4 4h18c0.5 0 0.9-0.1 1.3-0.2L13.1 4z"/></svg> },
-                      { id: 'favs', label: 'Fav', count: favoriteEmotes.filter(f => emoteList.some(e => e.name === f)).length, svg: <svg width="14" height="14" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 8.7l-1.6-1.7c-2.3-2.5-6.2-2.6-8.7-0.2l0 0c-2.2 2.2-2.3 5.7-0.2 8L7 17.3l8 8.7 8-8.7 1-1.1-8.3-8.3L15 8.7z"/><path d="M25.3 6.7l0 0c-2.4-2.4-6.4-2.2-8.7 0.2l-0.9 1 8.3 8.3 1.4-1.5c2.4-2.4 2.3-5.9-0.1-8z"/></svg> },
-                      { id: 'recent', label: 'Rec', count: recentEmotes.filter(r => emoteList.some(e => e.name === r.name)).length, svg: <svg width="14" height="14" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="15" cy="15" r="12"/><polyline points="15 7 15 15 21 15"/></svg> },
-                      { id: 'channel', label: 'Canal', count: emoteList.filter(e => e.section === 'channel').length, svg: <svg width="14" height="14" viewBox="0 0 30 30" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.2 19h-4.4c-0.2 3.8-1.7 7-3.8 9h12c-1.1-2-2.6-5.2-3.8-9z"/><path d="M27 22H3c-1.1 0-2-0.9-2-2V4c0-1.1 0.9-2 2-2h24c1.1 0 2 0.9 2 2v16c0 1.1-0.9 2-2 2z"/><line x1="13" y1="21" x2="17" y2="21"/></svg> },
-                      { id: '7tv', label: '7TV', count: emoteList.filter(e => e.provider === '7tv').length, svg: <img src={logo7tv} alt="7TV" className="w-4 h-4 object-contain" /> },
-                      { id: 'bttv', label: 'BTTV', count: emoteList.filter(e => e.provider === 'bttv').length, svg: <img src={logoBttv} alt="BTTV" className="w-4 h-4 object-contain" /> },
-                      { id: 'ffz', label: 'FFZ', count: emoteList.filter(e => e.provider === 'ffz').length, svg: <img src={logoFfz} alt="FFZ" className="w-4 h-4 object-contain" /> },
+                      { id: 'all', label: 'Todos', count: emoteList.length, icon: <PhosphorIcon name="Cat" size={14} weight="regular" /> },
+                      { id: 'favs', label: 'Fav', count: favoriteEmotes.filter(f => emoteList.some(e => e.name === f)).length, icon: <PhosphorIcon name="Heart" size={14} weight="regular" /> },
+                      { id: 'recent', label: 'Rec', count: recentEmotes.filter(r => emoteList.some(e => e.name === r.name)).length, icon: <PhosphorIcon name="ClockCounterClockwise" size={14} weight="regular" /> },
+                      { id: 'channel', label: 'Canal', count: emoteList.filter(e => e.section === 'channel').length, icon: <PhosphorIcon name="Television" size={14} weight="regular" /> },
+                      { id: '7tv', label: '7TV', count: emoteList.filter(e => e.provider === '7tv').length, icon: <img src={logo7tv} alt="7TV" className="w-4 h-4 object-contain" /> },
+                      { id: 'bttv', label: 'BTTV', count: emoteList.filter(e => e.provider === 'bttv').length, icon: <img src={logoBttv} alt="BTTV" className="w-4 h-4 object-contain" /> },
+                      { id: 'ffz', label: 'FFZ', count: emoteList.filter(e => e.provider === 'ffz').length, icon: <img src={logoFfz} alt="FFZ" className="w-4 h-4 object-contain" /> },
                     ].filter(t => t.count > 0 || t.id === 'all' || t.id === 'favs' || t.id === 'recent').map(tab => (
                       <button key={tab.id} onClick={() => setEmoteTab(tab.id)}
                         className={`shrink-0 flex flex-col items-center gap-1 w-11 px-1 py-1.5 rounded-xl cursor-pointer transition-colors ${emoteTab === tab.id ? 'bg-twitch/15 text-white' : 'text-text-muted/40 hover:text-text-primary hover:bg-hover/30'}`}>
-                        <span className="flex items-center justify-center w-5 h-5">{tab.svg}</span>
+                        <span className="flex items-center justify-center w-5 h-5">{tab.icon}</span>
                         <span className="text-[9px] leading-none font-medium">{tab.label}</span>
                       </button>
                     ))}
@@ -1281,28 +1292,50 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
               </div>
             )}
           </div>
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder={
-              !connected ? 'Sin conexión' :
-              !auth.token ? 'Inicia sesión para chatear' :
-              'Escribe un mensaje...'
-            }
-            disabled={!connected || !auth.token}
-            maxLength={500}
-            className="flex-1 px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary placeholder-text-muted/40 text-sm border border-transparent focus:border-twitch focus:ring-2 focus:ring-twitch/20 focus:outline-none transition-all disabled:opacity-40"
-          />
-          {inputText.length > 400 && (
-            <span className={`absolute right-16 top-1/2 -translate-y-1/2 text-[11px] ${inputText.length >= 500 ? 'text-red-400' : 'text-text-muted/50'}`}>
-              {inputText.length}/500
-            </span>
+
+          {/* WT-20260628-47: Input grande al centro con pill shape (estilo Twitch) */}
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder={
+                !connected ? 'Sin conexión' :
+                !auth.token ? 'Inicia sesión para chatear' :
+                'Escribe un mensaje...'
+              }
+              disabled={!connected || !auth.token}
+              maxLength={500}
+              className="w-full pl-4 pr-12 py-2.5 rounded-full bg-bg-tertiary text-text-primary placeholder-text-muted/40 text-sm border border-transparent focus:border-twitch focus:ring-2 focus:ring-twitch/20 focus:outline-none transition-all disabled:opacity-40"
+            />
+            {inputText.length > 400 && (
+              <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-[11px] pointer-events-none ${inputText.length >= 500 ? 'text-red-400' : 'text-text-muted/50'}`}>
+                {inputText.length}/500
+              </span>
+            )}
+          </div>
+
+          {/* WT-20260628-47: Channel Points a la izquierda del Enviar (estilo Twitch) */}
+          {broadcasterId && onOpenCPPanel && (
+            <button
+              type="button"
+              onClick={onOpenCPPanel}
+              className="shrink-0 p-2 rounded-lg text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10 cursor-pointer transition-colors"
+              title="Puntos del canal"
+              aria-label="Puntos del canal"
+            >
+              <PhosphorIcon name="Coins" size={20} weight="duotone" />
+            </button>
           )}
+
+          {/* WT-20260628-49: Botón Enviar (primary action, gradient).
+              WT-20260628-49: el gear+popover de ajustes de chat fue retirado
+              de esta barra — el toggle "Ocultar chat" se movio al topbar
+              global. La barra de input queda limpia: emote, input, CP, send. */}
           <button
             type="submit"
             disabled={!connected || !inputText.trim() || !auth.token}
-            className="px-4 py-2 rounded-lg bg-twitch text-white text-sm font-semibold cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed hover:bg-twitch-dark transition-all shadow-lg shadow-twitch/20 hover:shadow-twitch/30 active:scale-95"
+            className="shrink-0 px-5 py-2.5 rounded-lg bg-gradient-to-r from-twitch to-purple-600 hover:from-twitch-dark hover:to-purple-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-twitch/20 hover:shadow-twitch/30 active:scale-95"
           >
             Enviar
           </button>
