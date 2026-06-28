@@ -49,13 +49,6 @@ function buildSecurityHeaders(): Record<string, string> {
   };
 }
 
-// CORS legacy (mantenido para no romper referencias internas en html()/json()).
-// El router principal usa buildCorsHeaders(origin) que valida whitelist.
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 // Pool global (reutilizado entre requests)
 const sql = DB_URL ? postgres(DB_URL, { max: 3, idle_timeout: 10 }) : null;
 
@@ -125,8 +118,29 @@ async function issueSupabaseSession(twitchLogin: string): Promise<SupabaseSessio
 
     if (createErr) {
       // "User already registered" o similar: rotar password.
-      const { data: list } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
-      const existing = list?.users?.find((u) => u.email === email);
+      // B-4 fix: paginar TODOS los usuarios server-side. listUsers con perPage fijo
+      // falla en cuanto hay >N usuarios. getUserByEmail no existe en @supabase/auth-js
+      // 2.65.0 (usado por @supabase/supabase-js 2.45.4); la unica API admin estable
+      // es listUsers con paginacion, que recorremos completa hasta encontrar el email.
+      let existing: { id: string; email?: string } | null = null;
+      try {
+        for (let page = 1; ; page++) {
+          const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+          if (listErr) {
+            console.error("issueSupabaseSession listUsers error:", listErr.message);
+            break;
+          }
+          const users = list?.users ?? [];
+          const found = users.find((u) => u.email === email);
+          if (found) { existing = found as unknown as { id: string; email?: string }; break; }
+          const lastPage = (list as unknown as { lastPage?: number } | null)?.lastPage;
+          if (!users.length || lastPage === undefined || lastPage === 0 || page >= lastPage) break;
+          // salvaguarda: max 100 paginas (100k usuarios) para no loops infinitos
+          if (page >= 100) break;
+        }
+      } catch (e) {
+        console.error("issueSupabaseSession listUsers pagination error:", (e as Error).message);
+      }
       if (existing) {
         const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
           existing.id,
