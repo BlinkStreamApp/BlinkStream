@@ -118,11 +118,12 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
       } catch { /* ignore */ }
     }
 
+    // Primera verificación: establece prevLiveRef con el estado actual.
+    // NO se hace un segundo check a los 2s con el ref vacío: eso provocaba
+    // que CADA canal en vivo disparase una alerta al iniciar la app, porque
+    // `wasLive` era undefined para todos y la condición `!wasLive && isLive`
+    // se cumplía siempre. (Auditoría WT-20260628-01 / B-1)
     checkLive()
-    const initTimer = setTimeout(() => {
-      prevLiveRef.current = {}
-      checkLive()
-    }, 2000)
 
     let cancelled = false
     const schedulePoll = () => {
@@ -136,7 +137,6 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
 
     return () => {
       cancelled = true
-      clearTimeout(initTimer)
       clearTimeout(timerRef.current)
     }
   }, [favorites, intervalMs])
