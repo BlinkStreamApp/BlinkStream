@@ -127,14 +127,6 @@ async function getBadgeUrl(setName, version) {
   }
 }
 
-function loadAuth() {
-  try {
-    const token = localStorage.getItem('blinkstream_twitch_token')
-    const username = localStorage.getItem('blinkstream_twitch_username')
-    return { token, username }
-  } catch { return { token: null, username: null } }
-}
-
 function saveLocalAuth(token, username) {
   try {
     localStorage.setItem('blinkstream_twitch_token', token || '')
@@ -227,22 +219,14 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
   const [inputText, setInputText] = useState('')
   const [newMsgCount, setNewMsgCount] = useState(0)
 
-  const [localAuth, setLocalAuth] = useState(loadAuth)
-
+  // Auth deriva directamente de las props que llegan del padre (App.jsx → keychain).
+  // Antes leíamos localStorage aquí, pero eso estaba ROTO: cuando keychain funciona
+  // el token NO está en localStorage, loadAuth() retornaba null y la sesión se perdía.
   const auth = useMemo(() => {
     if (isLoggedIn && twitchToken && twitchUsername) {
       return { token: twitchToken, username: twitchUsername }
     }
-    if (localAuth.token && localAuth.username) {
-      return localAuth
-    }
     return { token: null, username: null }
-  }, [isLoggedIn, twitchToken, twitchUsername, localAuth])
-
-  useEffect(() => {
-    if (isLoggedIn && twitchToken && twitchUsername) {
-      setLocalAuth({ token: twitchToken, username: twitchUsername })
-    }
   }, [isLoggedIn, twitchToken, twitchUsername])
 
   const [authing, setAuthing] = useState(false)
@@ -585,7 +569,6 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
       }
 
       saveLocalAuth(cleanToken, username)
-      setLocalAuth({ token: cleanToken, username })
       setManualToken('')
       setShowLoginOptions(false)
     } catch (err) {
@@ -675,7 +658,6 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername 
             }
           } catch { /* ignore */ }
 
-          setLocalAuth({ token: cleanToken, username: resolvedUsername })
           setAuthing(false)
           setAuthCode('')
           return
