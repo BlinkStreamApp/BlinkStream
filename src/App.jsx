@@ -216,7 +216,11 @@ function App() {
         if (merged.length > favorites.length) setFavorites(merged)
       })
     })
-  }, [username])
+    // Deps: re-sincronizar cuando cambien `favorites` locales (ej: el
+    // usuario añade/quita un favorito y queremos re-mergear con la nube
+    // en el próximo ciclo) o cuando `getTwitchToken` quede disponible
+    // tras el login.
+  }, [username, favorites, getTwitchToken])
 
   const selectChannel = useCallback((name) => {
     setChannel(name)
