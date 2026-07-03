@@ -106,8 +106,8 @@ importers:
         specifier: ^8.0.12
         version: 8.0.16(jiti@2.7.0)
       vite-plugin-svgo:
-        specifier: ^2.0.0
-        version: 2.0.0(typescript@6.0.3)(vite@8.0.16(jiti@2.7.0))
+        specifier: ^3.0.0
+        version: 3.0.0(typescript@6.0.3)(vite@8.0.16(jiti@2.7.0))
       vitest:
         specifier: ^2.1.9
         version: 2.1.9(@vitest/ui@2.1.9)(jsdom@25.0.1)(lightningcss@1.32.0)
@@ -1975,8 +1975,8 @@ packages:
     engines: {node: ^18.0.0 || >=20.0.0}
     hasBin: true
 
-  vite-plugin-svgo@2.0.0:
-    resolution: {integrity: sha512-WaiOUlmt1fKw1w/WWJnx9gVk42D1BASKZmGCPpy6iTLE5iIemN2lim3MwI7Rffyt3aQnPrLfLSLnI8ZUJ9s49g==}
+  vite-plugin-svgo@3.0.0:
+    resolution: {integrity: sha512-TZBgm4eq0YCsPvrKpBqQA7/Cn+mTF5WXU9J11e66DSc4DQWIvJd+8polUTKDGYlUnXe28LnJsiHTpNAkyCKmBg==}
     peerDependencies:
       typescript: '>=4.9.4'
       vite: '>=4.0.2'
@@ -3842,7 +3842,7 @@ snapshots:
       - supports-color
       - terser
 
-  vite-plugin-svgo@2.0.0(typescript@6.0.3)(vite@8.0.16(jiti@2.7.0)):
+  vite-plugin-svgo@3.0.0(typescript@6.0.3)(vite@8.0.16(jiti@2.7.0)):
     dependencies:
       svgo: 3.3.3
       typescript: 6.0.3
