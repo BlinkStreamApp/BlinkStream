@@ -521,7 +521,7 @@ async function handleCallback(
       return html(getErrorHtml("Error guardando sesion: " + msg), securityHeaders, corsHeaders);
     }
 
-    // âœ… Mostrar pagina de exito. El frontend hara polling para obtener el token.
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Mostrar pagina de exito. El frontend hara polling para obtener el token.
     return html(getSuccessHtml(username), securityHeaders, corsHeaders);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -553,15 +553,15 @@ function handleAuthRedirect(
   authUrl.searchParams.set("client_id", TWITCH_CLIENT_ID);
   authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
   authUrl.searchParams.set("response_type", "code");
-  // F-2 fix: scopes actualizados (chat + moderaciÃ³n + channel points).
+  // F-2 fix: scopes actualizados (chat + moderaciÃƒÆ’Ã‚Â³n + channel points).
   // === TWITCH OAUTH SCOPES (11 total) ===
   // Chat (IRC):
   //   chat:read                       - leer mensajes via IRC (USERSTATE, PRIVMSG, etc.)
   //   chat:edit                       - enviar mensajes via IRC
   // Follows:
-  //   user:edit:follows               - follow/unfollow programÃ¡tico
+  //   user:edit:follows               - follow/unfollow programÃƒÆ’Ã‚Â¡tico
   //   user:read:follows               - listar follows del usuario
-  // ModeraciÃ³n (requiere ser mod en el canal objetivo):
+  // ModeraciÃƒÆ’Ã‚Â³n (requiere ser mod en el canal objetivo):
   //   moderator:manage:chat_messages  - /delete, /clear, pin/unpin
   //   moderator:manage:banned_users   - /ban, /unban, /timeout, /untimeout
   //   moderator:manage:chat_settings  - /slow, /followers, /emoteonly, /subscribers
@@ -599,7 +599,7 @@ function html(
   const headers = new Headers({
     ...securityHeaders,
     ...corsHeaders,
-    "content-type": "text/html; charset=utf-8",
+    "content-type": "text/plain; charset=utf-8",
   });
   return new Response(body, { status: 200, headers });
 }
@@ -618,62 +618,38 @@ function json(
 }
 
 function getSuccessHtml(username: string): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BlinkStream - Conectado</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f1a;color:#efeff1;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:1rem}
-.card{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:2rem;max-width:420px;width:100%;text-align:center}
-.icon{font-size:3rem;margin-bottom:1rem;color:#4ade80}
-h2{color:#4ade80;font-size:1.3rem;margin-bottom:0.5rem}
-p{color:#9a9abf;font-size:0.9rem;line-height:1.5;margin-bottom:0.5rem}
-.username{color:#9147ff;font-weight:700;font-size:1.1rem}
-.close-hint{color:#5a5a7a;font-size:0.75rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #2a2a4a}
-</style>
-</head>
-<body>
-<div class="card">
-<div class="icon">&#10004;</div>
-<h2>Conectado!</h2>
-<p>Has iniciado sesion como <span class="username">${escapeHtml(username)}</span></p>
-<p>Ya puedes cerrar esta ventana y volver a BlinkStream.</p>
-<div class="close-hint">La app detectara la sesion automaticamente en unos segundos.</div>
-</div>
-</body>
-</html>`;
+  return `
+================================================================================
+                           [ âœ“ ]  B L I N K S T R E A M
+================================================================================
+
+  Â¡ConexiÃ³n con Twitch completada con Ã©xito!
+
+  Has iniciado sesiÃ³n correctamente como:
+  ðŸ‘‰ ${username}
+
+--------------------------------------------------------------------------------
+  âœ“ Ya puedes cerrar de forma segura esta ventana del navegador.
+  âœ“ Vuelve a la aplicaciÃ³n de BlinkStream; tu sesiÃ³n iniciarÃ¡ en unos segundos.
+================================================================================
+`.trim();
 }
 function getErrorHtml(msg: string): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BlinkStream - Error</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f0f1a;color:#efeff1;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:1rem}
-.card{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:2rem;max-width:420px;width:100%;text-align:center}
-.icon{font-size:3rem;margin-bottom:1rem}
-h2{color:#ff6b6b;font-size:1.1rem;margin-bottom:0.75rem}
-.msg{color:#9a9abf;font-size:0.85rem;line-height:1.5;margin-bottom:1.5rem}
-.btn{display:inline-block;padding:0.6rem 1.25rem;border-radius:8px;background:#9147ff;color:#fff;font-size:0.85rem;font-weight:600;text-decoration:none;transition:background .2s}
-.btn:hover{background:#772ce8}
-</style>
-</head>
-<body>
-<div class="card">
-<div class="icon">&#9888;</div>
-<h2>Algo salio mal</h2>
-<div class="msg">${escapeHtml(msg).replace(/\n/g, '<br>')}</div>
-<a class="btn" href="/">Intentar de nuevo</a>
-</div>
-</body>
-</html>`;
+  return `
+================================================================================
+                           [ ! ]  B L I N K S T R E A M
+================================================================================
+
+  Â¡Vaya! No se pudo completar el inicio de sesiÃ³n con Twitch.
+
+  Motivo del error:
+  ðŸ‘‰ ${msg}
+
+--------------------------------------------------------------------------------
+  âœ— Por favor, cierra esta pestaÃ±a y vuelve a intentarlo desde la aplicaciÃ³n.
+================================================================================
+`.trim();
 }
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s;
 }
