@@ -42,10 +42,17 @@ lint.json
 # Pero permite commitear .env.example (placeholders sin secretos)
 !.env.example
 
+# Test coverage and output reports
+coverage/
+*_output*.txt
+*.hardening-ref.*
+*_security-node.*
+
 # Debug files
 debug_*.txt
 build_output_*.txt
-
+test_output_*.txt
+lint_output_*.txt
 # AI agents, backups and external tool vaults
 .claude/
 .mojibake_backup/
