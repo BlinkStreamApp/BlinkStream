@@ -236,14 +236,17 @@ pub async fn uninstall_blinkstream_custom(app: AppHandle, remove_data: bool) -> 
         );
 
         if remove_data {
-            if let Ok(app_data) = env::var("APPDATA") {
-                let data_path = Path::new(&app_data).join("com.blinkstream.desktop");
-                let data_str = data_path.to_string_lossy().replace("'", "''");
-                ps_script.push_str(&format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue;\n", data_str));
+            let targets = ["com.blinkstream.desktop", "com.blinkstream.app", "BlinkStream"];
+            for target in &targets {
+                if let Ok(app_data) = env::var("APPDATA") {
+                    let data_path = Path::new(&app_data).join(target);
+                    let data_str = data_path.to_string_lossy().replace("'", "''");
+                    ps_script.push_str(&format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue;\n", data_str));
+                }
+                let local_data_path = Path::new(&local_app_data).join(target);
+                let local_data_str = local_data_path.to_string_lossy().replace("'", "''");
+                ps_script.push_str(&format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue;\n", local_data_str));
             }
-            let local_data_path = Path::new(&local_app_data).join("com.blinkstream.desktop");
-            let local_data_str = local_data_path.to_string_lossy().replace("'", "''");
-            ps_script.push_str(&format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue;\n", local_data_str));
         }
 
         run_powershell_script(&ps_script)?;

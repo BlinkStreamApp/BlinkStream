@@ -14,7 +14,7 @@ export default function UninstallerScreen() {
     bugs: false,
     reinstall: false
   })
-  const [cleanData, setCleanData] = useState(false)
+  const [cleanData, setCleanData] = useState(true)
   const [status, setStatus] = useState('idle') // 'idle' | 'uninstalling' | 'success'
   const [progress, setProgress] = useState(0)
 
