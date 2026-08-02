@@ -338,8 +338,8 @@ Deno.serve(async (req: Request) => {
       method: req.method,
       extra: { twitch_error: errParam },
     });
-    return html(
-      getErrorHtml("Twitch rechazo la autorizacion: " + errParam),
+    return redirectError(
+      "Twitch rechazó la autorización: " + errParam,
       securityHeaders,
       corsHeaders,
     );
@@ -441,8 +441,8 @@ async function handleCallback(
 ) {
   // Issue #7: validar UUID v4 en state
   if (!isValidUuidV4(requestId)) {
-    return html(
-      getErrorHtml("State invalido (must be UUID v4)"),
+    return redirectError(
+      "State inválido (debe ser UUID v4)",
       securityHeaders,
       corsHeaders,
     );
@@ -473,7 +473,7 @@ async function handleCallback(
     if (!tokenData.access_token) {
       const errMsg = "Error de Twitch (" + tokenRes.status + "): " +
         (String(tokenData.message ?? "") || rawText || "sin respuesta");
-      return html(getErrorHtml(errMsg), securityHeaders, corsHeaders);
+      return redirectError(errMsg, securityHeaders, corsHeaders);
     }
 
     const accessToken = String(tokenData.access_token);
@@ -498,7 +498,7 @@ async function handleCallback(
 
     // Guardar en DB con ON CONFLICT para idempotencia
     if (!supabaseAdmin) {
-      return html(getErrorHtml("Base de datos no disponible"), securityHeaders, corsHeaders);
+      return redirectError("Base de datos no disponible", securityHeaders, corsHeaders);
     }
     try {
       const { error: dbErr } = await supabaseAdmin
@@ -513,19 +513,19 @@ async function handleCallback(
         }, { onConflict: 'request_id', ignoreDuplicates: false })
       if (dbErr) {
         console.error("[twitch-auth] DB upsert error:", dbErr.message);
-        return html(getErrorHtml("Error guardando sesion: " + dbErr.message), securityHeaders, corsHeaders);
+        return redirectError("Error guardando sesión: " + dbErr.message, securityHeaders, corsHeaders);
       }
     } catch (dbErr) {
       const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
       console.error("[twitch-auth] DB upsert exception:", msg);
-      return html(getErrorHtml("Error guardando sesion: " + msg), securityHeaders, corsHeaders);
+      return redirectError("Error guardando sesión: " + msg, securityHeaders, corsHeaders);
     }
 
-    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Mostrar pagina de exito. El frontend hara polling para obtener el token.
-    return html(getSuccessHtml(username), securityHeaders, corsHeaders);
+    // Redirigir a página de éxito en GitHub Pages
+    return redirectSuccess(username, securityHeaders, corsHeaders);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return html(getErrorHtml("Error interno: " + msg), securityHeaders, corsHeaders);
+    return redirectError("Error interno: " + msg, securityHeaders, corsHeaders);
   }
 }
 
@@ -591,18 +591,6 @@ function handleAuthRedirect(
   });
 }
 
-function html(
-  body: string,
-  securityHeaders: Record<string, string>,
-  corsHeaders: Record<string, string>,
-): Response {
-  const headers = new Headers({
-    ...securityHeaders,
-    ...corsHeaders,
-    "content-type": "text/plain; charset=utf-8",
-  });
-  return new Response(body, { status: 200, headers });
-}
 function json(
   data: Record<string, unknown>,
   status: number,
@@ -617,39 +605,38 @@ function json(
   return new Response(JSON.stringify(data), { status, headers });
 }
 
-function getSuccessHtml(username: string): string {
-  return `
-================================================================================
-                          [ OK ]  B L I N K S T R E A M
-================================================================================
-
-  Conexion con Twitch completada con exito.
-
-  Has iniciado sesion correctamente como:
-  -> ${username}
-
---------------------------------------------------------------------------------
-  * Ya puedes cerrar de forma segura esta ventana del navegador.
-  * Vuelve a la aplicacion de BlinkStream; tu sesion iniciara en unos segundos.
-================================================================================
-`.trim();
+function redirectSuccess(
+  username: string,
+  securityHeaders: Record<string, string>,
+  corsHeaders: Record<string, string>,
+): Response {
+  const target = new URL("https://blinkstreamapp.github.io/auth/");
+  target.searchParams.set("status", "success");
+  target.searchParams.set("username", username);
+  return new Response(null, {
+    status: 303,
+    headers: {
+      ...securityHeaders,
+      ...corsHeaders,
+      Location: target.toString(),
+    },
+  });
 }
-function getErrorHtml(msg: string): string {
-  return `
-================================================================================
-                       [ ERROR ]  B L I N K S T R E A M
-================================================================================
 
-  No se pudo completar el inicio de sesion con Twitch.
-
-  Motivo del error:
-  -> ${msg}
-
---------------------------------------------------------------------------------
-  * Por favor, cierra esta pestana y vuelve a intentarlo desde la aplicacion.
-================================================================================
-`.trim();
-}
-function escapeHtml(s: string): string {
-  return s;
+function redirectError(
+  msg: string,
+  securityHeaders: Record<string, string>,
+  corsHeaders: Record<string, string>,
+): Response {
+  const target = new URL("https://blinkstreamapp.github.io/auth/");
+  target.searchParams.set("status", "error");
+  target.searchParams.set("msg", msg);
+  return new Response(null, {
+    status: 303,
+    headers: {
+      ...securityHeaders,
+      ...corsHeaders,
+      Location: target.toString(),
+    },
+  });
 }
