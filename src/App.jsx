@@ -16,11 +16,13 @@ import DiskSpaceIndicator from './components/recording/DiskSpaceIndicator'
 import { RecordingProvider } from './components/recording/RecordingContext'
 import { BlinkStreamLogo } from './components/BlinkStreamLogo'
 import { getUserIdByLogin } from './utils/twitch'
+import { applyStoredHslTheme } from './utils/hslTheme'
 
 const VideoPlayer = lazy(() => import('./components/VideoPlayer'))
 const Chat = lazy(() => import('./components/Chat'))
 const InstallerScreen = lazy(() => import('./components/installer/InstallerScreen'))
 const UninstallerScreen = lazy(() => import('./components/installer/UninstallerScreen'))
+const MultiStreamGrid = lazy(() => import('./components/multistream/MultiStreamGrid'))
 
 // M-8: DebugPanel solo en dev. Lazy + DEV guardean para que Vite
 // haga dead-code elimination en el build de produccion y el bundle
@@ -122,8 +124,7 @@ function loadTheatre() { return localStorage.getItem('blinkstream_theatre') === 
 function MainApp() {
   const t = useT()
   useEffect(() => {
-    const accent = localStorage.getItem('blinkstream_accent') || 'purple'
-    document.documentElement.setAttribute('data-accent', accent)
+    applyStoredHslTheme()
   }, [])
 
   useEffect(() => {
@@ -133,6 +134,7 @@ function MainApp() {
     }
   }, [])
 
+  const [viewMode, setViewMode] = useState('normal')
   const [channel, setChannel] = useState('')
   const [quality, setQuality] = useState('best')
   const [favorites, setFavorites] = useState(loadFavorites)
@@ -364,6 +366,7 @@ function MainApp() {
   }, [username, getTwitchToken])
 
   const selectChannel = useCallback((name) => {
+    setViewMode('normal')
     setChannel(name)
     setRecentChannels(prev => {
       const filtered = prev.filter(c => c !== name)
@@ -414,7 +417,7 @@ function MainApp() {
       <TitleBar />
 
         <header className={`flex items-center gap-3 px-4 py-2 bg-bg-secondary/50 backdrop-blur-xl border-b border-white/[0.04] shrink-0 select-none relative z-[1000] ${showOnboarding ? 'hidden pointer-events-none' : ''} ${theatreMode ? 'opacity-0 max-h-0 overflow-hidden pointer-events-none' : ''} transition-all duration-300`}>
-          <div className="flex items-center gap-3 mr-1.5 cursor-pointer" onClick={() => { if (channel) setChannel('') }} title={channel ? t('nav.home', 'Volver al inicio') : 'BlinkStream'}>
+          <div className="flex items-center gap-3 mr-1.5 cursor-pointer" onClick={() => { setViewMode('normal'); if (channel) setChannel('') }} title={channel || viewMode === 'multistream' ? t('nav.home', 'Volver al inicio') : 'BlinkStream'}>
             <BlinkStreamLogo size={30} />
             <span className="text-base font-extrabold tracking-tight hidden sm:inline">
               <span className="text-text-primary">Blink</span>
@@ -423,6 +426,19 @@ function MainApp() {
           </div>
           <div className="w-px h-6 bg-bg-tertiary mx-1.5" />
           <ChannelSearch onSelect={selectChannel} currentChannel={channel} />
+
+          <button
+            onClick={() => setViewMode(prev => prev === 'multistream' ? 'normal' : 'multistream')}
+            title={t('grid.title', 'Modo Multivistas Simultáneo')}
+            className={`flex items-center gap-2 px-3 py-1.5 ml-3 rounded-xl border transition-all cursor-pointer text-[12px] font-bold ${
+              viewMode === 'multistream'
+                ? 'bg-gradient-to-r from-twitch to-fuchsia-600 text-white border-twitch shadow-md shadow-twitch/30 scale-105'
+                : 'bg-bg-tertiary/80 text-text-secondary border-white/10 hover:text-text-primary hover:border-white/20'
+            }`}
+          >
+            <PhosphorIcon name="SquaresFour" size={17} weight={viewMode === 'multistream' ? 'fill' : 'duotone'} />
+            <span className="hidden md:inline">{t('nav.multistream', 'Grid Multi-Stream')}</span>
+          </button>
 
           {/* WT-20260628-49: espacio flexible que empuja el avatar al extremo derecho */}
           <div className="flex-1" />
@@ -523,60 +539,73 @@ function MainApp() {
           )}
         </header>
 
-      <div className={`flex flex-1 min-h-0 min-w-0 overflow-hidden ${!chatOnRight ? 'flex-row-reverse' : ''}`}>
-        <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden animate-fade-in">
-          {channel ? (
-            <>
-              {!theatreMode && <StreamInfo channel={channel} isFavorite={favorites.includes(channel)} onToggleFavorite={() => toggleFavorite(channel)} />}
-              <div className={`flex-1 min-h-0 flex items-center justify-center ${theatreMode ? '' : 'p-3'}`}>
-              <Suspense fallback={<PlayerFallback />}>
-                <VideoPlayer
+      {viewMode === 'multistream' ? (
+        <Suspense fallback={<PlayerFallback />}>
+          <MultiStreamGrid
+            initialChannel={channel}
+            isLoggedIn={isLoggedIn}
+            twitchToken={getTwitchToken()}
+            twitchUsername={username || localStorage.getItem('blinkstream_twitch_username')}
+            chatOnRight={chatOnRight}
+            onExit={() => setViewMode('normal')}
+          />
+        </Suspense>
+      ) : (
+        <div className={`flex flex-1 min-h-0 min-w-0 overflow-hidden ${!chatOnRight ? 'flex-row-reverse' : ''}`}>
+          <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden animate-fade-in">
+            {channel ? (
+              <>
+                {!theatreMode && <StreamInfo channel={channel} isFavorite={favorites.includes(channel)} onToggleFavorite={() => toggleFavorite(channel)} />}
+                <div className={`flex-1 min-h-0 flex items-center justify-center ${theatreMode ? '' : 'p-3'}`}>
+                <Suspense fallback={<PlayerFallback />}>
+                  <VideoPlayer
+                    channel={channel}
+                    quality={quality}
+                    onQualityChange={setQuality}
+                    volume={volume}
+                    onVolumeChange={setVolume}
+                    theatreMode={theatreMode}
+                    onToggleTheatre={() => setTheatreMode(p => !p)}
+                    compact={compact}
+                    onToggleCompact={() => setCompact(p => { const next = !p; localStorage.setItem('blinkstream_compact', String(next)); return next; })}
+                    showChat={showChat}
+                    onToggleChat={() => setShowChat(p => !p)}
+                  />
+                </Suspense>
+                </div>
+              </>
+            ) : (
+              <HomeScreen
+                onSelect={selectChannel}
+                onToggleFavorite={toggleFavorite}
+                favorites={favorites}
+                recentChannels={recentChannels}
+                onRemoveRecent={removeRecent}
+                onShowAbout={() => setShowAbout(true)}
+              />
+            )}
+          </div>
+
+          {showChat && channel && (
+            <div className={`w-96 min-w-[320px] max-w-[440px] ${chatOnRight ? 'border-l' : 'border-r'} border-bg-tertiary/30 transition-all duration-300`}>
+              <Suspense fallback={<ChatFallback />}>
+                <Chat
                   channel={channel}
-                  quality={quality}
-                  onQualityChange={setQuality}
-                  volume={volume}
-                  onVolumeChange={setVolume}
-                  theatreMode={theatreMode}
-                  onToggleTheatre={() => setTheatreMode(p => !p)}
-                  compact={compact}
-                  onToggleCompact={() => setCompact(p => { const next = !p; localStorage.setItem('blinkstream_compact', String(next)); return next; })}
-                  showChat={showChat}
-                  onToggleChat={() => setShowChat(p => !p)}
+                  isLoggedIn={isLoggedIn}
+                  twitchToken={getTwitchToken()}
+                  twitchUsername={username || localStorage.getItem('blinkstream_twitch_username')}
+                  broadcasterId={broadcasterId}
+                  onOpenCPPanel={() => setShowCPPanel(p => !p)}
+                  isModerator={roleState.isModerator}
+                  isBroadcaster={roleState.isBroadcaster}
+                  viewerLogin={username}
+                  onLoginWithToken={loginWithToken}
                 />
               </Suspense>
-              </div>
-            </>
-          ) : (
-            <HomeScreen
-              onSelect={selectChannel}
-              onToggleFavorite={toggleFavorite}
-              favorites={favorites}
-              recentChannels={recentChannels}
-              onRemoveRecent={removeRecent}
-              onShowAbout={() => setShowAbout(true)}
-            />
+            </div>
           )}
         </div>
-
-        {showChat && channel && (
-          <div className={`w-96 min-w-[320px] max-w-[440px] ${chatOnRight ? 'border-l' : 'border-r'} border-bg-tertiary/30 transition-all duration-300`}>
-            <Suspense fallback={<ChatFallback />}>
-              <Chat
-                channel={channel}
-                isLoggedIn={isLoggedIn}
-                twitchToken={getTwitchToken()}
-                twitchUsername={username || localStorage.getItem('blinkstream_twitch_username')}
-                broadcasterId={broadcasterId}
-                onOpenCPPanel={() => setShowCPPanel(p => !p)}
-                isModerator={roleState.isModerator}
-                isBroadcaster={roleState.isBroadcaster}
-                viewerLogin={username}
-                onLoginWithToken={loginWithToken}
-              />
-            </Suspense>
-          </div>
-        )}
-      </div>
+      )}
 
       {showSettings && <Settings onClose={handleCloseSettings} />}
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}

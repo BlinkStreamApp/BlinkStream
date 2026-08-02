@@ -15,12 +15,14 @@ import { SettingsModerationTab } from './settings/SettingsModerationTab'
 import { SettingsAccountTab } from './settings/SettingsAccountTab'
 import { SettingsRecordingTab } from './settings/SettingsRecordingTab'
 import { SettingsAdvancedTab } from './settings/SettingsAdvancedTab'
+import HslThemeStudio from './settings/HslThemeStudio'
 import PhosphorIcon from './icons/PhosphorIcon'
 
 function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> }
 
 const TABS = [
   { id: 'general', label: 'General' },
+  { id: 'hsl', label: 'Estudio HSL' },
   { id: 'account', label: 'Cuenta' },
   { id: 'moderation', label: 'Moderación' },
   { id: 'recording', label: 'Grabación' },
@@ -76,6 +78,7 @@ export default function Settings({ onClose }) {
   const t = useT()
   const currentTabs = [
     { id: 'general', label: t('tab.general', 'General') },
+    { id: 'hsl', label: '🎨 ' + t('hsl.tab', 'Estudio HSL') },
     { id: 'account', label: t('tab.account', 'Cuenta') },
     { id: 'moderation', label: t('tab.moderation', 'Moderación') },
     { id: 'recording', label: t('tab.recording', 'Grabación') },
@@ -151,11 +154,12 @@ export default function Settings({ onClose }) {
                 </select>
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-text-secondary mb-1.5 block">{t('set.defaultVolume', 'Volumen predeterminado')}: {defaultVol}%</label>
-                <input type="range" min="0" max="100" value={defaultVol} onChange={e => setDefaultVol(Number(e.target.value))}
-                  className="w-full accent-twitch" />
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-text-primary">{t('set.defaultVolume', 'Volumen por defecto')}</span>
+                <span className="text-xs text-text-secondary font-mono">{defaultVol}%</span>
               </div>
+              <input type="range" min="0" max="100" value={defaultVol} onChange={e => setDefaultVol(Number(e.target.value))}
+                className="w-full h-1.5 rounded-lg appearance-none bg-bg-tertiary cursor-pointer accent-twitch" />
 
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-text-primary">{t('set.autoTheatre', 'Modo teatro automático')}</span>
@@ -192,6 +196,13 @@ export default function Settings({ onClose }) {
                     </button>
                   ))}
                 </div>
+                <button
+                  onClick={() => setActiveTab('hsl')}
+                  className="mt-3 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-twitch/20 to-fuchsia-600/20 border border-twitch/40 hover:border-twitch text-[12px] font-bold text-twitch-light flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md hover:scale-[1.01] cursor-pointer"
+                >
+                  <span>🎨 {t('hsl.title', 'Estudio de Temas HSL (Personalización 100% en vivo)')}</span>
+                  <span className="text-[10px] bg-twitch px-1.5 py-0.5 rounded text-white uppercase font-black tracking-wide">Nuevo</span>
+                </button>
               </div>
 
               <div>
@@ -226,6 +237,8 @@ export default function Settings({ onClose }) {
               </div>
             </div>
           )}
+
+          {activeTab === 'hsl' && <HslThemeStudio />}
 
           {activeTab === 'account' && <SettingsAccountTab />}
 
