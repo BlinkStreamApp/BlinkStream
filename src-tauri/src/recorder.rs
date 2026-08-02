@@ -295,6 +295,7 @@ fn get_disk_space() -> Option<(f64, f64)> {
 
     #[cfg(unix)]
     {
+        use std::os::unix::ffi::OsStrExt;
         // statvfs(3) es POSIX estandar y nos da:
         //   - f_blocks  * f_frsize  = bytes totales del FS
         //   - f_bavail  * f_frsize  = bytes libres para el usuario (respeta quotas)
