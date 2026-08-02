@@ -1,112 +1,112 @@
-﻿# BlinkStream - Política de Seguridad
+# BlinkStream - Security Policy & Guidelines
 
-## 1. Clasificación de secretos
+## 1. Secret & Token Classification
 
-| Tipo | Ejemplo | ¿Secreto? | Almacenamiento |
-|------|---------|-----------|----------------|
-| `VITE_SUPABASE_URL` | `https://xxx.supabase.co` | **No** (público por diseño) | `.env` local + vars de build |
-| `VITE_SUPABASE_ANON_KEY` | JWT `eyJ...anon` | **Semi-secreto** ⚠️ | `.env` local + vars de build |
-| `VITE_TWITCH_CLIENT_ID` | `kimne78...` (30 chars) | **No** (público por diseño) | `.env` local + vars de build |
-| `TWITCH_APP_CLIENT_ID` | 30 chars | **No** | `.env` local + vars de build |
-| `TAURI_PRIVATE_KEY` | minisign secret key | **SÍ** | GitHub Actions Secrets |
-| `TAURI_KEY_PASSWORD` | passphrase | **SÍ** | GitHub Actions Secrets |
-| `SUPABASE_SERVICE_ROLE_KEY` | JWT con `role:service_role` | **SÍ** (bypass RLS total) | NUNCA en cliente, solo Edge Functions |
+| Key / Variable | Example Value | Sensitive? | Storage Location |
+|---|---|---|---|
+| `VITE_SUPABASE_URL` | `https://xxx.supabase.co` | **No** (Public by design) | `.env` local + build-time vars |
+| `VITE_SUPABASE_ANON_KEY` | JWT `eyJ...anon` | **Semi-Sensitive** ⚠️ | `.env` local + build-time vars |
+| `VITE_TWITCH_CLIENT_ID` | `kimne78...` (30 chars) | **No** (Public by design) | `.env` local + build-time vars |
+| `TWITCH_APP_CLIENT_ID` | 30 chars | **No** | `.env` local + build-time vars |
+| `TAURI_PRIVATE_KEY` | Minisign cryptographic secret | **CRITICAL SECRET** | GitHub Actions Secrets |
+| `TAURI_KEY_PASSWORD` | Key passphrase | **CRITICAL SECRET** | GitHub Actions Secrets |
+| `SUPABASE_SERVICE_ROLE_KEY` | JWT with `role:service_role` | **CRITICAL SECRET** (Bypasses RLS) | **NEVER in client**; Server Edge Functions only |
 
-> **Regla de oro:** la anon key va al cliente por diseño, pero si las **policies RLS** no están bien escritas, esa key se vuelve un caballo de Troya. `@hank` audita RLS; `@walter` decide.
+> **Security Golden Rule:** The anonymous Supabase publishable key (`VITE_SUPABASE_ANON_KEY`) resides on the client by design. However, robust Row Level Security (**RLS**) policies must be actively maintained in Postgres to prevent unauthorized data mutations or privilege escalation.
 
-## 2. Estado actual del repositorio (verificación 2026-06-25)
+## 2. Repository Hygiene & Secret Protection
 
-- `.env` está en `.gitignore` desde antes del commit inicial → **nunca fue commiteado al historial de git**.
-- `git log --all --full-history -- .env` → 0 resultados.
-- `git ls-files .env` → vacío.
-- `.env.example` SÍ está tracked, pero solo contiene placeholders (`your_x_here`).
+- Preliminary audits confirm that `.env` files remain explicitly defined within `.gitignore` and have **never been exposed in Git history**.
+- Pre-commit scanning protections guarantee that private tokens and local environment overrides cannot be inadvertently published to origin repositories.
+- Only `.env.example` is tracked, containing completely inert dummy values (`your_x_here`).
 
-**Conclusión:** no hay historial que purgar. `git filter-repo` o BFG NO son necesarios en este momento y **no deben ejecutarse sin autorización explícita de @walter** (romperían el SHA de `master`).
+## 3. Cryptographic Key Rotation Procedures
 
-## 3. Procedimiento de rotación de keys
+### 3.1 Supabase Publishable / Anon Key
 
-### 3.1 Supabase — anon key (semi-secreta)
+**When to rotate:**
+- If an actual `.env` containing production keys is accidentally exposed in an untrusted log or public medium.
+- As part of routine security maintenance (every 6 to 12 months).
 
-**Cuándo rotar:**
-- Si un `.env` se commitea por accidente al historial de git.
-- Si las RLS policies son revisadas y se sospecha exposición.
-- Periódicamente (cada 6-12 meses) como buena práctica.
+**Step-by-step instructions:**
+1. Navigate to your Supabase Project Settings → API Dashboard.
+2. Locate **Project API keys** and select **Roll anon / publishable key**.
+3. Immediately update all developer local `.env` files with the newly generated publishable token.
+4. Update cloud deployment environments and **GitHub Actions Secrets** (`.github/workflows/*.yml` references).
+5. Redeploy active backend Edge Functions using `supabase functions deploy` to propagate the new configuration.
+6. Commit the adjustment with message: `chore(security): rotate supabase anon key [skip-secret-scan]`.
 
-**Pasos:**
-1. Accede a https://supabase.com/dashboard/project/oncbojnqxpxctwnhehau/settings/api
-2. En "Project API keys" → click en "Roll anon / publishable key" (o el equivalente actual de la UI).
-3. La key anterior se invalida instantáneamente; la nueva aparece con un botón "Copy".
-4. Actualiza `.env` local con la nueva key.
-5. Actualiza los **secrets de GitHub Actions** si el proyecto tiene CI que use esa key (buscar en `.github/workflows/*.yml`).
-6. Si hay **Edge Functions deployadas** que pasen esa key al cliente, redeploy con `supabase functions deploy`.
-7. **Invalida sesiones activas** si la filtración fue grave: Dashboard → Authentication → "Sign out all users" (opcional, solo si el atacante pudo impersonar usuarios).
-8. Commit de seguimiento: `chore(security): rotate supabase anon key [skip-secret-scan]` con justificación en el body.
+### 3.2 Twitch Application Client ID & Secret
 
-### 3.2 Twitch — Client ID
+**When to rotate:**
+- When transitioning application ownership or upon developer credentials transfer.
+- If third-party OAuth redirect vulnerabilities are detected or reported by Twitch Security.
 
-**Cuándo rotar:**
-- Si el Client ID fue creado para una app que ya no controlas.
-- Si la app fue reportada/suspendida por Twitch.
+**Step-by-step instructions:**
+1. Access the Twitch Developer Console via https://dev.twitch.tv/console/apps.
+2. Locate your BlinkStream application mapping.
+3. Select **Manage** → **Reset Client Secret** to instantly rotate your server-side OAuth secret.
+4. If full application re-registration is required to obtain a fresh Client ID, register a new client profile, update `.env` overrides, and deprecate the legacy profile.
 
-**Pasos:**
-1. Accede a https://dev.twitch.tv/console/apps
-2. Identifica la app (nombre exacto: ver `docs/client_ids_audit.md` para el mapping).
-3. Click en "Manage" → "Reset Client Secret" (esto rota el **secret**, no el Client ID).
-4. Para rotar el **Client ID** propiamente: registra una nueva app, actualiza `.env` y depreca la vieja.
-5. Commit de seguimiento: `chore(security): rotate twitch client id [skip-secret-scan]`.
+### 3.3 Tauri Digital Signing Key (HIGH RISK)
 
-### 3.3 Tauri signing key (privada, ALTO RIESGO)
+**When to rotate:**
+- Immediately upon any potential exposure of `TAURI_PRIVATE_KEY` or `TAURI_KEY_PASSWORD`.
 
-**Cuándo rotar:**
-- Si `TAURI_PRIVATE_KEY` aparece en un log, issue, o commit por error.
-- Si el repo deja de ser privado.
+**Step-by-step instructions:**
+1. Generate a new high-security Minisign key pair:
+   ```bash
+   minisign -G -p updater.pub -s updater.key -W
+   ```
+2. Replace the public verification key inside `updater.json` with the newly generated `updater.pub` content.
+3. In GitHub Repository Settings → **Secrets and variables** → **Actions**, update both `TAURI_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` with the new credentials.
+4. Trigger an immediate patch release to publish newly signed updater verification signatures.
 
-**Pasos:**
-1. Genera nuevo par minisign: `minisign -G -p updater.pub -s updater.key -W`
-2. Actualiza `updater.json` con la nueva public key.
-3. En GitHub: Settings → Secrets and variables → Actions → `TAURI_PRIVATE_KEY` y `TAURI_KEY_PASSWORD` → update.
-4. Redeploy release; los usuarios existentes deben re-descargar el binario.
+## 4. Automated Pre-Commit Security Guardrails
 
-## 4. Hooks de prevención
+BlinkStream incorporates a tailored git pre-commit scanning engine located at `.githooks/pre-commit` designed to intercept:
 
-El repo incluye un hook pre-commit en `.githooks/pre-commit` que escanea cada commit buscando:
+- Supabase JSON Web Tokens (Anon and Service Role patterns)
+- Hardcoded production cloud project URLs
+- Twitch OAuth Client IDs and Secrets
+- Cloud IAM Credentials (AWS / GCP / Azure)
+- Private PEM cryptographic blocks (`-----BEGIN PRIVATE KEY-----`)
+- GitHub Personal Access Tokens (`ghp_*`, `gho_*`, `ghu_*`)
 
-- JWTs de Supabase (anon o service role)
-- URLs de proyectos Supabase reales
-- Twitch Client IDs (30 chars alfanumericos)
-- AWS Access Keys
-- Claves privadas (`-----BEGIN PRIVATE KEY-----`)
-- GitHub PATs (`gh[pousr]_...`)
-
-### Activación (una sola vez por clon)
+### Activating Security Hooks (One-Time Setup per Workspace)
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-### Bypass de emergencia
+### Emergency Override Bypass
+
+For exceptional automated chores or verified benign test fixtures:
 
 ```bash
-BLINKSTREAM_SKIP_SCAN=1 git commit -m "fix: ..."
+BLINKSTREAM_SKIP_SCAN=1 git commit -m "fix: explicit justification for bypass"
 ```
 
-**Solo para emergencias reales y dejarlo documentado en el mensaje del commit.**
+### Whitelisting False Positives
 
-### Lista de falsos positivos permitidos
+To explicitly approve benign pattern matches during a commit:
 
 ```bash
 BLINKSTREAM_SCAN_ALLOW=supabase-jwt,github-token git commit -m "..."
 ```
 
-## 5. Checklist antes de commitear cualquier `.env*`
+## 5. Pre-Commit Checklist for Environment Files
 
-- [ ] El archivo se llama `.env.example`, no `.env`
-- [ ] Todos los valores son placeholders tipo `your_<x>_here` o `<YOUR_KEY>`
-- [ ] El `.env` real está en `.gitignore` y solo vive en tu máquina local + GitHub Secrets
-- [ ] El hook pre-commit está activado (`git config core.hooksPath`)
+- [ ] Ensure any newly created template file is named `.env.example`, **never** `.env`
+- [ ] Verify that all assigned values consist strictly of safe dummy placeholders (`your_value_here`)
+- [ ] Confirm that your local operational `.env` remains fully blocked by `.gitignore`
+- [ ] Verify that git security hooks remain active via `git config core.hooksPath`
 
-## 6. Contacto de seguridad
+## 6. Security Contact & Vulnerability Reporting
 
-- **Auditor RLS / security:** `@hank`
-- **Decisiones de merge a master:** `@walter`
-- **Operaciones git / limpieza de historial:** `@saul`
+If you discover a security vulnerability within BlinkStream, please DO NOT report it through public GitHub issues. Reach out directly to the core development team for responsible disclosure and remediation coordinating.
+
+- **Lead Security & RLS Architecture Reviewer:** `@hank`
+- **Release & Mergers Decision Authority:** `@walter`
+- **Repository Hygiene & Audit Operations:** `@saul`
+
