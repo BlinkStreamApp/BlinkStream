@@ -538,6 +538,8 @@ function MainApp() {
                   onToggleTheatre={() => setTheatreMode(p => !p)}
                   compact={compact}
                   onToggleCompact={() => setCompact(p => { const next = !p; localStorage.setItem('blinkstream_compact', String(next)); return next; })}
+                  showChat={showChat}
+                  onToggleChat={() => setShowChat(p => !p)}
                 />
               </Suspense>
               </div>
@@ -554,7 +556,7 @@ function MainApp() {
           )}
         </div>
 
-        {showChat && channel && !theatreMode && (
+        {showChat && channel && (
           <div className={`w-96 min-w-[320px] max-w-[440px] ${chatOnRight ? 'border-l' : 'border-r'} border-bg-tertiary/30 transition-all duration-300`}>
             <Suspense fallback={<ChatFallback />}>
               <Chat

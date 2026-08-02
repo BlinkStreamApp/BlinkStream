@@ -21,7 +21,7 @@ import Hls from 'hls.js'
 import { getStreamInfo } from '../utils/twitch'
 import { formatViewers } from '../utils/format'
 import { measureInvoke } from '../utils/perf'
-import { validateProps, isString, isNumber, isBoolean } from '../utils/validateProps'
+import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
 import { safeOpenUrl } from '../utils/tauriEnv'
 import QualitySelector from './QualitySelector'
@@ -87,12 +87,12 @@ function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
  */
 export default function VideoPlayer({
   channel, quality, onQualityChange, volume, onVolumeChange,
-  theatreMode, onToggleTheatre, compact, onToggleCompact,
+  theatreMode, onToggleTheatre, compact, onToggleCompact, showChat, onToggleChat,
 }) {
   // M-7: validamos props criticas (vienen de App.jsx). Solo loggea.
   const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
   validateProps(
-    { channel, quality, onQualityChange, volume, onVolumeChange, theatreMode, onToggleTheatre, compact, onToggleCompact },
+    { channel, quality, onQualityChange, volume, onVolumeChange, theatreMode, onToggleTheatre, compact, onToggleCompact, showChat, onToggleChat },
     {
       channel: isString,
       quality: isString,
@@ -103,6 +103,8 @@ export default function VideoPlayer({
       onToggleTheatre: isFunc,
       compact: isBoolean,
       onToggleCompact: isFunc,
+      showChat: optional(isBoolean),
+      onToggleChat: optional(isFunc),
     },
     'VideoPlayer props',
   )
@@ -591,6 +593,8 @@ export default function VideoPlayer({
           toggleFullscreen(); break
         case 'KeyT':
           if (!e.ctrlKey && !e.metaKey) onToggleTheatre(); break
+        case 'KeyC':
+          if (!e.ctrlKey && !e.metaKey && onToggleChat) onToggleChat(); break
         case 'KeyD':
           if (e.ctrlKey || e.metaKey) { e.preventDefault(); setShowStats(p => !p); } break
         case 'ArrowUp':
@@ -740,6 +744,16 @@ export default function VideoPlayer({
           <div className="flex items-center gap-3">
             <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch' : ''}`} title="Ajustes" aria-label="Ajustes del reproductor"><SettingsIcon/></button>
             <button onClick={onToggleTheatre} className={`hover:text-white transition-colors cursor-pointer ${theatreMode ? 'text-twitch' : ''}`} title="Teatro (T)" aria-label="Modo teatro"><TheatreIcon/></button>
+            {onToggleChat && (
+              <button
+                onClick={onToggleChat}
+                className={`hover:text-white transition-colors cursor-pointer ${showChat ? 'text-twitch' : ''}`}
+                title={showChat ? 'Ocultar chat (C)' : 'Mostrar chat (C)'}
+                aria-label="Alternar chat"
+              >
+                <PhosphorIcon name="ChatCircleDots" size={18} weight={showChat ? "fill" : "regular"} />
+              </button>
+            )}
             <button onClick={async () => {
               try { safeOpenUrl(`https://www.twitch.tv/${channel}`, true) } catch { /* ignore: el helper ya hace fallback */ }
             }} className="hover:text-white transition-colors cursor-pointer" title="Abrir en navegador" aria-label="Abrir en navegador">

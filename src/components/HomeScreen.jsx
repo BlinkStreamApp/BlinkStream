@@ -155,9 +155,27 @@ function Avatar({ name, size = 8, src }) {
   )
 }
 
-const SidebarChannel = memo(function SidebarChannel({ name, status, onSelect, onRemove }) {
+const SidebarChannel = memo(function SidebarChannel({ name, status, onSelect, onRemove, miniDock }) {
   const isLive = status?.live
   const isOffline = status && !status.live
+
+  if (miniDock) {
+    return (
+      <div className="relative group animate-slide-up flex items-center justify-center py-1.5 px-1">
+        <button
+          onClick={() => onSelect(name)}
+          className={`relative p-1 rounded-full transition-all duration-200 cursor-pointer ${isOffline ? 'opacity-50 hover:opacity-100 hover:scale-105' : 'ring-2 ring-twitch/80 shadow-md shadow-twitch/30 hover:scale-110'}`}
+          title={`${name} • ${isOffline ? 'Offline' : (status?.game || 'En vivo')}${isLive && status?.viewers != null ? ` (${exactViewers(status.viewers)} viewers)` : ''}`}
+        >
+          <Avatar name={name} size={9} src={status?.logo} />
+          {isLive && (
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-red-500 border border-[#09090f] rounded-full animate-pulse shadow-sm shadow-red-500/50" />
+          )}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className={`relative group animate-slide-up sidebar-channel ${isOffline ? '[&_.ch-name]:text-[#6b6b80] [&_.ch-game]:text-[#48485a]' : ''}`}>
       <button
@@ -411,6 +429,9 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
   const [liveStatus, setLiveStatus] = useState({})
   const [channelLogos, setChannelLogos] = useState({})
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
+  const [miniDock, setMiniDock] = useState(() => {
+    return localStorage.getItem('blinkstream_minidock') === 'true'
+  })
   const [recentExpanded, setRecentExpanded] = useState(false)
   const [heroIndex, setHeroIndex] = useState(0)
   const [sortMode, setSortMode] = useState(() => {
@@ -614,38 +635,54 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
   return (
     <div className="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden bg-bg-primary">
 
-      <aside className="hidden md:flex flex-col w-[200px] lg:w-[240px] shrink-0 bg-bg-secondary/30 backdrop-blur-sm border-r border-white/[0.04]">
+      <aside className={`hidden md:flex flex-col shrink-0 bg-bg-secondary/30 backdrop-blur-sm border-r border-white/[0.04] transition-all duration-300 ${miniDock ? 'w-[68px]' : 'w-[200px] lg:w-[240px]'}`}>
 
         <div className="flex-1 overflow-y-auto py-4">
+        <div className={`px-3 mb-3 flex items-center ${miniDock ? 'justify-center' : 'justify-end'}`}>
+          <button
+            onClick={() => setMiniDock(p => { const n = !p; localStorage.setItem('blinkstream_minidock', String(n)); return n; })}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-all border border-white/5 hover:border-white/15"
+            title={miniDock ? 'Expandir barra lateral' : 'Modo Mini-Dock Plegable'}
+          >
+            <PhosphorIcon name={miniDock ? "CaretDoubleRight" : "CaretDoubleLeft"} size={16} weight="regular" />
+          </button>
+        </div>
+
         {favorites.length > 0 && (
           <div className="mb-4">
-            <div className="flex items-center justify-between px-3 mb-2">
-              <span className="text-[12px] font-bold text-text-primary tracking-wide">
-                Canales Favoritos
-              </span>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={() => setSortMode(m => (m + 1) % 3)}
-                  className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all"
-                  title={sortMode === 0 ? 'Online primero' : sortMode === 1 ? 'Más viewers' : 'Menos viewers'}
-                >
-                  {sortMode === 0 ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4"/></svg>
-                  ) : sortMode === 1 ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 3l7 7h-4v11h-6V10H5z"/></svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 21l-7-7h4V3h6v11h4z"/></svg>
-                  )}
-                </button>
-                <button
-                  onClick={() => setSidebarExpanded(p => !p)}
-                  className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all"
-                  title="Colapsar"
-                >
-                  <PhosphorIcon name="CaretDown" size={16} weight="regular" />
-                </button>
+            {!miniDock ? (
+              <div className="flex items-center justify-between px-3 mb-2">
+                <span className="text-[12px] font-bold text-text-primary tracking-wide">
+                  Canales Favoritos
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={() => setSortMode(m => (m + 1) % 3)}
+                    className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all"
+                    title={sortMode === 0 ? 'Online primero' : sortMode === 1 ? 'Más viewers' : 'Menos viewers'}
+                  >
+                    {sortMode === 0 ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4"/></svg>
+                    ) : sortMode === 1 ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 3l7 7h-4v11h-6V10H5z"/></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 21l-7-7h4V3h6v11h4z"/></svg>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setSidebarExpanded(p => !p)}
+                    className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all"
+                    title="Colapsar"
+                  >
+                    <PhosphorIcon name="CaretDown" size={16} weight="regular" />
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="w-full flex justify-center mb-1">
+                <div className="w-8 h-px bg-white/10 my-1" />
+              </div>
+            )}
 
             {sidebarFavChannels.map(name => {
               const base = liveStatus[name.toLowerCase()] || {}
@@ -655,12 +692,13 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                   name={name}
                   status={{ ...base, logo: base.logo || channelLogos[name.toLowerCase()] }}
                   onSelect={onSelect}
-                  onRemove={onToggleFavorite}
+                  onRemove={!miniDock ? onToggleFavorite : null}
+                  miniDock={miniDock}
                 />
               )
             })}
 
-            {favorites.length > 5 && !sidebarExpanded && (
+            {favorites.length > 5 && !sidebarExpanded && !miniDock && (
               <button
                 onClick={() => setSidebarExpanded(true)}
                 className="w-full text-left px-3 py-1.5 text-[12px] text-twitch hover:text-twitch-light cursor-pointer transition-colors"
@@ -673,11 +711,13 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
 
         {recentChannels.length > 0 && (
           <div className="mb-4">
-            <div className="px-3 mb-2">
-              <span className="text-[12px] font-bold text-text-primary tracking-wide">
-                Vistos Recientemente
-              </span>
-            </div>
+            {!miniDock && (
+              <div className="px-3 mb-2">
+                <span className="text-[12px] font-bold text-text-primary tracking-wide">
+                  Vistos Recientemente
+                </span>
+              </div>
+            )}
             {recentChannels.slice(0, recentExpanded ? recentChannels.length : 5).map(name => {
               const key = name.toLowerCase()
               const base = liveStatus[key] || {}
@@ -687,11 +727,12 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                   name={name}
                   status={{ ...base, logo: base.logo || channelLogos[key] }}
                   onSelect={onSelect}
-                  onRemove={onRemoveRecent}
+                  onRemove={!miniDock ? onRemoveRecent : null}
+                  miniDock={miniDock}
                 />
               )
             })}
-            {recentChannels.length > 5 && !recentExpanded && (
+            {recentChannels.length > 5 && !recentExpanded && !miniDock && (
               <button
                 onClick={() => setRecentExpanded(true)}
                 className="w-full text-left px-3 py-1.5 text-[12px] text-twitch hover:text-twitch-light cursor-pointer transition-colors"
