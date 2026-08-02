@@ -20,7 +20,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { PUBLIC_CLIENT_ID } from '../utils/twitch'
+import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL } from '../utils/twitch'
 import { logError } from '../utils/errors'
 import { isTauri } from '../utils/tauriEnv'
 
@@ -45,14 +45,40 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
     if (!favorites.length) return
 
     const checkLive = async () => {
+      // FIX WT-20260628-124: la query GQL anterior interpolaba los
+      // logins de favoritos directamente en el string de query, lo
+      // cual es CWE-94 (Code Injection). Migramos a variables GQL +
+      // sanitizeChannelForGraphQL (regex ^[a-z0-9_]{3,25}$). Si un
+      // favorito no pasa la validacion, lo descartamos del batch.
+      // Importante: el alias GQL usa `a${originalIndex}` (indice en
+      // `favorites`, no en el array filtrado) para que los consumers
+      // de abajo puedan resolver `json.data.aN` con N = position del
+      // favorito en el array ORIGINAL. Esto preserva la compatibilidad
+      // con la logica de prevLiveRef.current y con el setAlerts que
+      // espera `json.data.a${favorites.indexOf(f)}`.
+      const validPairs = favorites
+        .map((f, originalIndex) => {
+          const login = sanitizeChannelForGraphQL(f)
+          return login ? { f, login, originalIndex } : null
+        })
+        .filter(Boolean)
+      if (!validPairs.length) return
+      // Map de favoritos validos -> originalIndex, para resolver el
+      // alias GQL correcto al consumir la respuesta.
+      const aliasByFav = new Map(validPairs.map(p => [p.f, p.originalIndex]))
       try {
+        const varDecls = validPairs.map((_, i) => '$login' + i + ': String!').join(', ')
+        const aliases = validPairs
+          .map((p, i) => 'a' + p.originalIndex + ': user(login: $login' + i + ') { stream { id title game { displayName } } profileImageURL(width: 300) }')
+          .join('\n')
+        const variablesObj = {}
+        validPairs.forEach((p, i) => { variablesObj['login' + i] = p.login })
         const res = await fetch('https://gql.twitch.tv/gql', {
           method: 'POST',
           headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            query: `{ ${favorites.map((f, i) =>
-              `a${i}: user(login: "${f.toLowerCase()}") { stream { id title game { displayName } } profileImageURL(width: 300) }`
-            ).join('\n')} }`,
+            query: 'query(' + varDecls + ') { ' + aliases + ' }',
+            variables: variablesObj,
           }),
         })
         if (!res.ok) return
@@ -60,8 +86,10 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
         if (json?.errors) return
 
         const current = {}
-        favorites.forEach((f, i) => {
-          const user = json?.data?.[`a${i}`]
+        favorites.forEach((f) => {
+          const aliasIdx = aliasByFav.get(f)
+          if (aliasIdx == null) { current[f] = false; return }
+          const user = json?.data?.[`a${aliasIdx}`]
           current[f] = !!user?.stream
         })
 
@@ -73,7 +101,8 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
             const wasLive = prevLiveRef.current[f]
             const isLive = current[f]
             if (!wasLive && isLive) {
-              const userData = json?.data?.[`a${favorites.indexOf(f)}`]
+              const aliasIdx = aliasByFav.get(f)
+              const userData = aliasIdx != null ? json?.data?.[`a${aliasIdx}`] : null
               const game = userData?.stream?.game?.displayName || ''
               const logo = userData?.profileImageURL || ''
               if (!newAlerts.find(a => a.channel === f)) {

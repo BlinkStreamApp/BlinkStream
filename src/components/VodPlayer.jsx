@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { PUBLIC_CLIENT_ID, getHeaders } from '../utils/twitch'
+import { PUBLIC_CLIENT_ID, getHeaders, sanitizeChannelForGraphQL } from '../utils/twitch'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../utils/tauriEnv'
 import Hls from 'hls.js'
@@ -22,11 +22,21 @@ async function getVodM3u8(vodId) {
 
 async function fetchVods(channel) {
   let userId = null
+  // FIX WT-20260628-124: usar SIEMPRE variables GraphQL para el canal
+  // (defense-in-depth contra CWE-94 Code Injection). Validamos el canal
+  // con sanitizeChannelForGraphQL (regex login Twitch) antes de meterlo
+  // en el payload; ademas, el body es JSON literal sin template strings,
+  // por lo que un canal con comillas o llaves no puede romper la query.
+  const login = sanitizeChannelForGraphQL(channel)
+  if (!login) return []
   try {
     const gqlRes = await fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
       headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: `{ user(login: "${channel.toLowerCase()}") { id } }` }),
+      body: JSON.stringify({
+        query: 'query($login: String!) { user(login: $login) { id } }',
+        variables: { login },
+      }),
       signal: AbortSignal.timeout(5000),
     })
     if (gqlRes.ok) { const d = await gqlRes.json(); userId = d?.data?.user?.id }
@@ -38,7 +48,7 @@ async function fetchVods(channel) {
     const res = await fetch(`https://api.twitch.tv/helix/videos?user_id=${userId}&type=archive&first=20`, { headers, signal: AbortSignal.timeout(8000) })
     if (!res.ok) return []
     const data = await res.json()
-    return (data.data || []).map(v => ({ id: v.id, title: v.title, viewCount: v.view_count, lengthSeconds: parseDuration(v.duration), thumbnailURL: v.thumbnail_url || '' }))
+    return (data.data || []).map(v => ({ id: v.id, title: v.title, viewCount: v.view_count, lengthSeconds: parseDuration(v.duration), thumbnailUrl: v.thumbnail_url || '' }))
   } catch { return [] }
 }
 
@@ -79,7 +89,7 @@ function VodVideo({ video }) {
 
   return (
     <video ref={videoRef} controls autoPlay playsInline className="w-full rounded-xl bg-black" style={{ aspectRatio: '16/9' }}
-      poster={video.thumbnailURL?.replace('%{width}', '1280').replace('%{height}', '720')} />
+      poster={video.thumbnailUrl?.replace('%{width}', '1280').replace('%{height}', '720')} />
   )
 }
 
@@ -129,8 +139,8 @@ export default function VodPlayer({ channel, onClose }) {
               {vods.map(vod => (
                 <button key={vod.id} onClick={() => setActiveVod(vod)} className="text-left group cursor-pointer card-hover rounded-lg overflow-hidden bg-bg-tertiary">
                   <div className="relative aspect-video overflow-hidden">
-                    {vod.thumbnailURL ? (
-                      <img src={vod.thumbnailURL.replace('%{width}', '320').replace('%{height}', '180')} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                    {vod.thumbnailUrl ? (
+                      <img src={vod.thumbnailUrl.replace('%{width}', '320').replace('%{height}', '180')} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-text-muted/30">
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>

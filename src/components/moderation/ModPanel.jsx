@@ -173,7 +173,7 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
   if (!open) return null
   if (!roleState.isModerator) {
     return (
-      <div className="fixed right-0 top-0 bottom-0 z-[100] w-80 bg-bg-secondary/95 border-l border-bg-tertiary/60 shadow-2xl animate-slide-in-right p-4 flex flex-col">
+      <div className="fixed right-0 top-0 bottom-0 z-[99999] w-80 bg-bg-secondary/95 border-l border-bg-tertiary/60 shadow-2xl animate-slide-in-right p-4 flex flex-col">
         <p className="text-sm text-text-primary mb-2">Panel de moderación</p>
         <p className="text-[11px] text-text-muted/80 leading-relaxed">
           {roleState.loading
@@ -198,7 +198,7 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
 
   return (
     <>
-      <div className="fixed right-0 top-0 bottom-0 z-[100] w-80 bg-bg-secondary/95 backdrop-blur-md border-l border-bg-tertiary/60 shadow-2xl flex flex-col animate-slide-in-right" style={{ animationDuration: '240ms' }}>
+      <div className="fixed right-0 top-0 bottom-0 z-[99999] w-80 bg-bg-secondary/95 backdrop-blur-md border-l border-bg-tertiary/60 shadow-2xl flex flex-col animate-slide-in-right" style={{ animationDuration: '240ms' }}>
         {/* Header */}
         <div className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-bg-tertiary/50">
           <div className="w-8 h-8 rounded-full bg-twitch/20 flex items-center justify-center overflow-hidden shrink-0">

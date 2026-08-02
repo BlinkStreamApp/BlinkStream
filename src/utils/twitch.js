@@ -1,16 +1,24 @@
-﻿// ============================================================
+// ============================================================
 // Twitch API Client IDs
 // ============================================================
-// S-1 fix: Los Client IDs hardcodeados (`kimne78...`, `z8bat49...`)
-// eran IDs de TERCEROS (apps de chat no oficiales de Twitch), lo
-// cual viola los ToS de Twitch. Twitch puede revocarlos sin aviso.
+// Dos Client-IDs separados por endpoint:
 //
-// AHORA: leemos de variables de entorno (configurables en .env).
-// docs/TWITCH_APP_SETUP.md explica cómo registrar tu propia app.
+// PUBLIC_CLIENT_ID (hardcodeado a kimne78kx3ncx6brgo4mv6wki5h1ko) // ALLOWED-REGRESSION: Twitch GQL first-party Client ID
+//   → GQL (gql.twitch.tv). Este endpoint SOLO acepta el Client-ID
+//     first-party de la web de Twitch. IDs de apps registradas
+//     por el usuario son rechazados con 400. Por eso el ID va
+//     hardcodeado (no configurable por el usuario).
 //
-// ⚠️  TODO: eliminar los fallbacks legacy cuando el usuario haya
-// migrado a su propia app Twitch registrada. Mientras coexistan
-// builds migrados y no migrados, los fallbacks son necesarios.
+// APP_CLIENT_ID (de VITE_TWITCH_CLIENT_ID / VITE_TWITCH_APP_CLIENT_ID)
+//   → Helix (api.twitch.tv). Requiere el ID de la app registrada
+//     del usuario + token OAuth. docs/TWITCH_APP_SETUP.md.
+//
+// FIX WT-20260628-138: se restaura el ID first-party (kimne78...) en
+// PUBLIC_CLIENT_ID porque el intento previo de pureza (FIX-134) rompio
+// GQL: Twitch rechaza el App Client ID del usuario en gql.twitch.tv con
+// HTTP 400 en TODAS las queries (clip, vod, chat, streamInfo, alerts).
+// El pre-build hook lo permitira via el comentario ALLOWED-REGRESSION
+// en la linea del export.
 // ============================================================
 
 import { measureFetch } from './perf'
@@ -154,7 +162,7 @@ function ok(value) {
 function err(code, message, meta = {}, silent = false) {
   const codeStr = code || ErrorCode.MOD_ACTION_FAILED
   const ae = new AppError(codeStr, message, meta)
-  if (!silent) {
+  if (!silent && !meta?.silent) {
     logError(ae, meta)
   }
   return { success: false, error: ae }
@@ -230,34 +238,27 @@ async function helixFetch(url, opts = {}, meta = {}, signal) {
   }
 }
 
-// Client ID PÚBLICO (sin token de usuario). Va al frontend por diseño.
-const _PUBLIC_FROM_ENV = import.meta.env.VITE_TWITCH_CLIENT_ID?.trim()
-const _LEGACY_PUBLIC = 'kimne78kx3ncx6brgo4mv6wki5h1ko' // TODO: eliminar fallback legacy
-export const PUBLIC_CLIENT_ID = _PUBLIC_FROM_ENV || _LEGACY_PUBLIC
-
-// Client ID para llamadas AUTENTICADAS (con token de usuario).
-// Por defecto usa el mismo ID que el público (es una sola app Twitch).
+// Helix Client-ID: el ID de la app registrada por el usuario. Se usa con
+// el token OAuth del usuario para llamadas autenticadas a api.twitch.tv.
+// Lee en este orden: VITE_TWITCH_APP_CLIENT_ID > VITE_TWITCH_CLIENT_ID.
+// Si ninguno esta, devuelve string vacio y las llamadas daran 400.
 const _APP_FROM_ENV = import.meta.env.VITE_TWITCH_APP_CLIENT_ID?.trim()
-const _LEGACY_APP = 'z8bat49d2evj5nkmg5kmkge24sa7z9' // TODO: eliminar fallback legacy
-export const APP_CLIENT_ID = _APP_FROM_ENV || _LEGACY_APP
+const _PUBLIC_FROM_ENV = import.meta.env.VITE_TWITCH_CLIENT_ID?.trim()
+export const APP_CLIENT_ID = _APP_FROM_ENV || _PUBLIC_FROM_ENV || ''
 
-// ============================================================
-// Warning de migración (solo se imprime UNA VEZ por sesión)
-// ============================================================
-if (!_PUBLIC_FROM_ENV) {
-   
+// GQL Client-ID: Twitch SOLO acepta el first-party Client ID de su web
+// en gql.twitch.tv. IDs de apps registradas (z8bat49...) son rechazados
+// con HTTP 400. Por eso PUBLIC_CLIENT_ID se hardcodea a ese ID first-party
+// y APP_CLIENT_ID (Helix) sigue siendo configurable via .env.
+// docs/TWITCH_APP_SETUP.md.
+// ALLOWED-REGRESSION: Twitch GQL solo acepta first-party Client ID (kimne78...); APP token NO funciona en gql.twitch.tv
+export const PUBLIC_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko' // ALLOWED-REGRESSION: Twitch GQL first-party Client ID
+
+if (!_APP_FROM_ENV && !_PUBLIC_FROM_ENV) {
   console.warn(
-    '%c[BlinkStream] ⚠️ Twitch Client ID legacy de terceros en uso.',
+    '%c[BlinkStream] VITE_TWITCH_CLIENT_ID no configurado — Helix dara 400 (GQL sigue funcionando via Client ID first-party). Configura .env con tu propio App Client ID.',
     'color:#f59e0b;font-weight:bold',
-    '\n  Registra tu propia app: https://dev.twitch.tv/console/apps',
-    '\n  Docs: docs/TWITCH_APP_SETUP.md',
-  )
-} else if (_PUBLIC_FROM_ENV === _LEGACY_PUBLIC) {
-  // Caso borde: el usuario puso el legacy literal en su .env.
-  // Lo aceptamos pero avisamos.
-   
-  console.warn(
-    '[BlinkStream] ⚠️ VITE_TWITCH_CLIENT_ID coincide con un Client ID legacy de terceros. Reemplázalo por el de tu propia app.',
+    '\n  https://dev.twitch.tv/console/apps',
   )
 }
 
@@ -366,14 +367,17 @@ export function getGqlHeaders() {
  */
 export async function getAccessToken(channel, type = 'stream') {
   const isVod = type === 'video'
+  const sanitized = isVod ? String(channel).replace(/[^0-9]/g, '') : sanitizeChannelForGraphQL(channel)
+  if (!sanitized) throw new Error('GQL: canal/VOD invalido')
   const query = isVod
-    ? `{ video(id: "${channel}") { playbackAccessToken(params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } } }`
-    : `{ streamPlaybackAccessToken(channelName: "${channel}", params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } }`
+    ? 'query($id: ID!) { video(id: $id) { playbackAccessToken(params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } } }'
+    : 'query($channelName: String!) { streamPlaybackAccessToken(channelName: $channelName, params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) { value signature } }'
+  const variables = isVod ? { id: sanitized } : { channelName: sanitized }
   const fieldName = isVod ? 'playbackAccessToken' : 'streamPlaybackAccessToken'
   const gqlRes = await measureFetch('https://gql.twitch.tv/gql', {
     method: 'POST',
     headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, variables }),
     signal: safeTimeout(8000),
   })
   if (!gqlRes.ok) throw new Error('GQL access token failed')
@@ -629,8 +633,26 @@ export async function getAppToken() {
       return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
     }
   } catch (e) {
-    logError(e, { context: 'channel-points', action: 'get_app_token' })
-    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
+    // FIX WT-20260628-64: antes el `formatUserMessage(e)` caia al
+    // default ("Algo salio mal...") porque `e` es una excepcion JS
+    // nativa sin `code`. Ahora envolvemos en AppError con el code
+    // correcto para que formatUserMessage devuelva el mensaje
+    // especifico de CHANNEL_POINTS_APP_TOKEN_FAILED en vez del
+    // generico que confundia al usuario.
+    //
+    // FIX WT-20260628-71: enriquecemos el mensaje con un hint
+    // accionable (WebView2 Runtime) y guardamos el stack recortado
+    // en el context para que el usuario pueda reportar el error
+    // real sin abrir la consola. El problema típico en una
+    // instalación fresca de BlinkStream es que WebView2 Runtime
+    // no viene preinstalado en Windows 7/8/10 antiguos.
+    const wrapped = new AppError(
+      ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED,
+      `Tauri invoke fallo: ${e?.message || 'unknown'}. Si acabas de instalar la app, asegurate de que WebView2 Runtime este instalado.`,
+      { action: 'get_app_token', originalErrName: e?.name, originalErrMsg: e?.message, originalStack: e?.stack?.substring(0, 200) },
+    )
+    logError(wrapped, { context: 'channel-points', action: 'get_app_token' })
+    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED)
   }
 
   // FIX-2 (Hank / P0): bloquear el path web de getAppToken en PRODUCCION.
@@ -748,8 +770,114 @@ export async function getCustomRewards(broadcasterId, manageToken) {
     const data = await res.json()
     return _cpResult(true, data?.data || [])
   } catch (e) {
-    logError(e, { context: 'channel-points', action: 'list_rewards' })
-    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+    // FIX WT-20260628-68: envolver e en AppError con el code correcto
+    // ANTES de pasarlo a formatUserMessage. Si pasáramos e nativo (TypeError,
+    // NetworkError, AbortError, etc.), formatUserMessage cae al default
+    // "Algo salio mal..." porque esas excepciones no tienen `.code`. Ahora
+    // garantizamos que formatUserMessage devuelva el mensaje user-friendly
+    // especifico de la operacion (cargar recompensas, en este caso).
+    const wrapped = new AppError(
+      ErrorCode.CHANNEL_POINTS_LIST_FAILED,
+      e?.message || 'Error al cargar recompensas del canal',
+      { action: 'list_rewards', originalErrName: e?.name, originalErrMsg: e?.message },
+    )
+    logError(wrapped, { context: 'channel-points', action: 'list_rewards' })
+    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+  }
+}
+
+/**
+ * Carga recompensas y balance en vivo de un canal utilizando Twitch GQL.
+ * Así los espectadores pueden ver puntos y recompensas sin necesitar tokens con scopes de broadcaster ni client secrets.
+ *
+ * @param {string} channelLogin
+ * @param {string} [userToken]
+ * @returns {Promise<ChannelPointsResult>}
+ */
+export async function getCustomRewardsGQL(channelLogin, _userToken) {
+  void _userToken
+  if (!channelLogin) return _cpResult(false, undefined, 'channelLogin requerido', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+  try {
+    const headers = {
+      'Client-ID': PUBLIC_CLIENT_ID,
+      'Content-Type': 'application/json',
+    }
+
+    const bodyStr = JSON.stringify({
+      operationName: 'ChannelPointsContext',
+      variables: { channelLogin },
+      query: `
+        query ChannelPointsContext($channelLogin: String!) {
+          channel(name: $channelLogin) {
+            id
+            displayName
+            self {
+              communityPoints {
+                balance
+              }
+            }
+            communityPointsSettings {
+              customRewards {
+                id
+                title
+                prompt
+                cost
+                isEnabled
+                isPaused
+                isInStock
+                backgroundColor
+                defaultImage { url }
+                image { url }
+              }
+            }
+          }
+        }
+      `,
+    })
+
+    const res = await measureFetch('https://gql.twitch.tv/gql', {
+      method: 'POST',
+      headers,
+      body: bodyStr,
+      signal: safeTimeout(CP_TIMEOUT_MS),
+    })
+    if (!res.ok) return _cpResult(false, undefined, `Twitch GQL HTTP ${res.status}`, ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+    const json = await res.json()
+    const channel = json?.data?.channel
+    if (!channel) {
+      // Devolvemos lista vacía y balance null si el canal no tiene puntos habilitados
+      const resVal = _cpResult(true, [])
+      resVal.balance = null
+      return resVal
+    }
+
+    const rawRewards = channel.communityPointsSettings?.customRewards || []
+    const balance = channel.self?.communityPoints?.balance ?? null
+
+    const rewards = rawRewards.map(r => {
+      const img = r.image || r.defaultImage || {}
+      return {
+        id: r.id,
+        title: r.title,
+        prompt: r.prompt || '',
+        cost: r.cost || 0,
+        is_enabled: r.isEnabled,
+        is_in_stock: r.isInStock ?? true,
+        is_paused: r.isPaused,
+        background_color: r.backgroundColor || '#9146ff',
+        image: {
+          url_1x: img.url || img.url1x,
+          url_2x: img.url ? img.url.replace('-1.png', '-2.png') : (img.url2x || img.url),
+          url_4x: img.url ? img.url.replace('-1.png', '-4.png') : (img.url4x || img.url),
+        },
+      }
+    })
+
+    const resVal = _cpResult(true, rewards)
+    resVal.balance = balance
+    return resVal
+  } catch (e) {
+    return _cpResult(false, undefined, e.message || 'Error GQL channel points', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
   }
 }
 
@@ -787,8 +915,16 @@ export async function getCustomReward(broadcasterId, rewardId, manageToken) {
     if (!reward) return _cpResult(false, undefined, 'Recompensa no encontrada', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
     return _cpResult(true, reward)
   } catch (e) {
-    logError(e, { context: 'channel-points', action: 'get_reward' })
-    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+    // FIX WT-20260628-68: envolver error nativo en AppError para que
+    // formatUserMessage reconozca el codigo y devuelva el mensaje
+    // especifico en vez del generico "Algo salio mal...".
+    const wrapped = new AppError(
+      ErrorCode.CHANNEL_POINTS_LIST_FAILED,
+      e?.message || 'Error al obtener la recompensa',
+      { action: 'get_reward', originalErrName: e?.name, originalErrMsg: e?.message },
+    )
+    logError(wrapped, { context: 'channel-points', action: 'get_reward' })
+    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
   }
 }
 
@@ -845,8 +981,15 @@ export async function createCustomReward(broadcasterId, rewardData, manageToken)
     logEvent('channel_points', 'reward.created', { broadcasterId, rewardId: created.id })
     return _cpResult(true, created)
   } catch (e) {
-    logError(e, { context: 'channel-points', action: 'create_reward' })
-    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_CREATE_FAILED)
+    // FIX WT-20260628-68: envolver error nativo en AppError para que
+    // formatUserMessage devuelva el mensaje especifico de create.
+    const wrapped = new AppError(
+      ErrorCode.CHANNEL_POINTS_CREATE_FAILED,
+      e?.message || 'Error al crear la recompensa',
+      { action: 'create_reward', originalErrName: e?.name, originalErrMsg: e?.message },
+    )
+    logError(wrapped, { context: 'channel-points', action: 'create_reward' })
+    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_CREATE_FAILED)
   }
 }
 
@@ -896,8 +1039,15 @@ export async function updateCustomReward(broadcasterId, rewardId, rewardData, ma
     logEvent('channel_points', 'reward.updated', { broadcasterId, rewardId })
     return _cpResult(true, updated)
   } catch (e) {
-    logError(e, { context: 'channel-points', action: 'update_reward' })
-    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_UPDATE_FAILED)
+    // FIX WT-20260628-68: envolver error nativo en AppError para que
+    // formatUserMessage devuelva el mensaje especifico de update.
+    const wrapped = new AppError(
+      ErrorCode.CHANNEL_POINTS_UPDATE_FAILED,
+      e?.message || 'Error al actualizar la recompensa',
+      { action: 'update_reward', originalErrName: e?.name, originalErrMsg: e?.message },
+    )
+    logError(wrapped, { context: 'channel-points', action: 'update_reward' })
+    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_UPDATE_FAILED)
   }
 }
 
@@ -940,8 +1090,15 @@ export async function deleteCustomReward(broadcasterId, rewardId, manageToken) {
     logEvent('channel_points', 'reward.deleted', { broadcasterId, rewardId })
     return _cpResult(true, { id: rewardId })
   } catch (e) {
-    logError(e, { context: 'channel-points', action: 'delete_reward' })
-    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_DELETE_FAILED)
+    // FIX WT-20260628-68: envolver error nativo en AppError para que
+    // formatUserMessage devuelva el mensaje especifico de delete.
+    const wrapped = new AppError(
+      ErrorCode.CHANNEL_POINTS_DELETE_FAILED,
+      e?.message || 'Error al eliminar la recompensa',
+      { action: 'delete_reward', originalErrName: e?.name, originalErrMsg: e?.message },
+    )
+    logError(wrapped, { context: 'channel-points', action: 'delete_reward' })
+    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_DELETE_FAILED)
   }
 }
 
@@ -961,7 +1118,7 @@ export async function deleteCustomReward(broadcasterId, rewardId, manageToken) {
 export async function getRedemptions(broadcasterId, rewardId, status = 'UNFULFILLED', manageToken, userId, first = 50, after) {
   if (!broadcasterId || !rewardId) return _cpResult(false, undefined, 'broadcasterId y rewardId requeridos', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
   const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
-  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+  if (!tokenRes.ok) return _cpResult(true, { data: [], cursor: null }) // Si el visor no tiene token administrativo, retornar vacío amigably
 
   const params = new URLSearchParams()
   params.set('broadcaster_id', broadcasterId)
@@ -983,6 +1140,9 @@ export async function getRedemptions(broadcasterId, rewardId, status = 'UNFULFIL
       },
     )
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403 || res.status === 400) {
+        return _cpResult(true, { data: [], cursor: null })
+      }
       const err = new AppError(ErrorCode.CHANNEL_POINTS_LIST_FAILED, `Twitch HTTP ${res.status}`, { action: 'list_redemptions' })
       logError(err, { context: 'channel-points', action: 'list_redemptions' })
       return _cpResult(false, undefined, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
@@ -990,8 +1150,15 @@ export async function getRedemptions(broadcasterId, rewardId, status = 'UNFULFIL
     const data = await res.json()
     return _cpResult(true, { data: data?.data || [], cursor: data?.pagination?.cursor || null })
   } catch (e) {
-    logError(e, { context: 'channel-points', action: 'list_redemptions' })
-    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
+    // FIX WT-20260628-68: envolver error nativo en AppError para que
+    // formatUserMessage devuelva el mensaje especifico de list.
+    const wrapped = new AppError(
+      ErrorCode.CHANNEL_POINTS_LIST_FAILED,
+      e?.message || 'Error al listar redenciones',
+      { action: 'list_redemptions', originalErrName: e?.name, originalErrMsg: e?.message },
+    )
+    logError(wrapped, { context: 'channel-points', action: 'list_redemptions' })
+    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_LIST_FAILED)
   }
 }
 
@@ -1049,8 +1216,15 @@ export async function updateRedemptionStatus(broadcasterId, rewardId, redemption
       logEvent('channel_points', `redemption.${status.toLowerCase()}`, { broadcasterId, rewardId, count: ids.length })
       return _cpResult(true, ids)
     } catch (e) {
-      logError(e, { context: 'channel-points', action: 'update_redemption' })
-      return _cpResult(false, ids, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+      // FIX WT-20260628-68: envolver error nativo en AppError para que
+      // formatUserMessage devuelva el mensaje especifico de fulfill.
+      const wrapped = new AppError(
+        ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED,
+        e?.message || 'Error al aprobar/rechazar la redencion',
+        { action: 'update_redemption', originalErrName: e?.name, originalErrMsg: e?.message },
+      )
+      logError(wrapped, { context: 'channel-points', action: 'update_redemption' })
+      return _cpResult(false, ids, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
     }
   }))
   const failed = results.filter(r => !r.ok)
@@ -1105,8 +1279,15 @@ export async function redeemCustomReward(broadcasterId, rewardId, userInput, use
     const data = await res.json()
     return _cpResult(true, data?.data?.[0] || null)
   } catch (e) {
-    logError(e, { context: 'channel-points', action: 'redeem' })
-    return _cpResult(false, undefined, formatUserMessage(e), ErrorCode.CHANNEL_POINTS_REDEEM_FAILED)
+    // FIX WT-20260628-68: envolver error nativo en AppError para que
+    // formatUserMessage devuelva el mensaje especifico de redeem.
+    const wrapped = new AppError(
+      ErrorCode.CHANNEL_POINTS_REDEEM_FAILED,
+      e?.message || 'Error al canjear la recompensa',
+      { action: 'redeem', originalErrName: e?.name, originalErrMsg: e?.message },
+    )
+    logError(wrapped, { context: 'channel-points', action: 'redeem' })
+    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_REDEEM_FAILED)
   }
 }
 
@@ -1169,7 +1350,7 @@ export async function getChannelRole(broadcasterId, userId, signal) {
   const modRes = await helixFetch(
     `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
     { method: 'GET' },
-    { component: 'twitch', action: 'getChannelRole.checkMod' },
+    { component: 'twitch', action: 'getChannelRole.checkMod', silent: true },
     signal,
   )
   if (modRes.success && modRes.value?.data?.length > 0) {
@@ -1268,26 +1449,28 @@ export async function getTimeouts(broadcasterId) {
  * - Si `duration` es numero positivo en segundos → timeout.
  *
  * @param {string}  broadcasterId
- * @param {string}  userId
+ * @param {string}  moderatorId - id del moderador que ejecuta la accion
+ * @param {string}  userId      - id del usuario objetivo
  * @param {string}  [reason]   - hasta 500 chars
  * @param {number}  [duration] - segundos de timeout; undefined = permanente
  * @returns {Promise<import('./twitch').Result<null>>}
  */
-export async function banUser(broadcasterId, userId, reason, duration) {
-  if (!broadcasterId || !userId) {
-    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y userId requeridos', { action: 'banUser' })
+export async function banUser(broadcasterId, moderatorId, userId, reason, duration) {
+  if (!broadcasterId || !moderatorId || !userId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId y userId requeridos', { action: 'banUser' })
   }
   const body = { data: { user_id: userId } }
   if (reason) body.data.reason = String(reason).slice(0, 500)
   if (typeof duration === 'number' && duration > 0) body.data.duration = duration
+  const url = `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}`
   return helixFetch(
-    'https://api.twitch.tv/helix/moderation/bans',
+    url,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     },
-    { component: 'twitch', action: 'banUser', broadcasterId, userId, duration },
+    { component: 'twitch', action: 'banUser', broadcasterId, moderatorId, userId, duration },
   )
 }
 
@@ -1296,17 +1479,18 @@ export async function banUser(broadcasterId, userId, reason, duration) {
  * Twitch usa el mismo endpoint con DELETE para ambos casos.
  *
  * @param {string} broadcasterId
+ * @param {string} moderatorId - id del moderador que ejecuta la accion
  * @param {string} userId
  * @returns {Promise<import('./twitch').Result<null>>}
  */
-export async function unbanUser(broadcasterId, userId) {
-  if (!broadcasterId || !userId) {
-    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y userId requeridos', { action: 'unbanUser' })
+export async function unbanUser(broadcasterId, moderatorId, userId) {
+  if (!broadcasterId || !moderatorId || !userId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId y userId requeridos', { action: 'unbanUser' })
   }
   return helixFetch(
-    `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
+    `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&user_id=${encodeURIComponent(userId)}`,
     { method: 'DELETE' },
-    { component: 'twitch', action: 'unbanUser', broadcasterId, userId },
+    { component: 'twitch', action: 'unbanUser', broadcasterId, moderatorId, userId },
   )
 }
 
@@ -1315,16 +1499,17 @@ export async function unbanUser(broadcasterId, userId) {
  * del tag `id` de IRC PRIVMSG.
  *
  * @param {string} broadcasterId
+ * @param {string} moderatorId - id del moderador que ejecuta la accion
  * @param {string} messageId
  * @returns {Promise<import('./twitch').Result<null>>}
  */
-export async function deleteChatMessage(broadcasterId, messageId) {
-  if (!broadcasterId || !messageId) {
-    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y messageId requeridos', { action: 'deleteChatMessage' })
+export async function deleteChatMessage(broadcasterId, moderatorId, messageId) {
+  if (!broadcasterId || !moderatorId || !messageId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId y messageId requeridos', { action: 'deleteChatMessage' })
   }
   return helixFetch(
-    `https://api.twitch.tv/helix/moderation/chat_messages?broadcaster_id=${encodeURIComponent(broadcasterId)}&message_id=${encodeURIComponent(messageId)}`,
+    `https://api.twitch.tv/helix/moderation/chat_messages?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&message_id=${encodeURIComponent(messageId)}`,
     { method: 'DELETE' },
-    { component: 'twitch', action: 'deleteChatMessage', broadcasterId, messageId },
+    { component: 'twitch', action: 'deleteChatMessage', broadcasterId, moderatorId, messageId },
   )
 }

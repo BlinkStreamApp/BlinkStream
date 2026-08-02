@@ -40,13 +40,14 @@ import { logError } from '../utils/errors'
 import { logEvent } from '../utils/eventLog'
 import {
   getCustomRewards,
+  getCustomRewardsGQL,
   getRedemptions,
   redeemCustomReward,
 } from '../utils/twitch'
 
 // Cache de rewards en modulo-level. Se comparte entre todos los
 // mounts del hook (un mismo canal en N componentes = un solo fetch).
-const _rewardsCache = new Map() // broadcasterId -> { ts: number, data: [] }
+const _rewardsCache = new Map() // broadcasterId -> { ts: number, data: [], balance?: number }
 
 /**
  * Worker pool con concurrencia limitada. Procesa un array de items
@@ -86,48 +87,47 @@ async function pMap(items, concurrency, fn) {
 }
 
 /**
- * @param {UseChannelPointsOptions} opts
+ * @param {UseChannelPointsOptions & { channel?: string }} opts
  * @returns {ChannelPointsState}
  */
-export function useChannelPoints({ broadcasterId, userToken, userId, cacheTtlMs = 5 * 60 * 1000 } = {}) {
+export function useChannelPoints({ broadcasterId, userToken, userId, channel, cacheTtlMs = 5 * 60 * 1000 } = {}) {
   const [rewards, setRewards] = useState([])
   const [myRedemptions, setMyRedemptions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  // balance: Twitch no expone balance publico por API. Mantenemos
-  // `balance: null` en el return para que la API del hook no rompa
-  // consumidores existentes (CPPanel.jsx ya lo lee como `viewer.balance`).
-  // Cuando se anada el endpoint, mover a useState.
-  const balance = null
+  const [balance, setBalance] = useState(null)
   const cancelledRef = useRef(false)
 
   const fetchRewards = useCallback(async () => {
-    if (!broadcasterId) {
+    if (!broadcasterId && !channel) {
       setRewards([])
       return
     }
     setLoading(true)
     setError(null)
 
+    const cacheKey = broadcasterId || channel
     // 1) Cache: si tenemos uno fresco, lo devolvemos sin red.
-    const cached = _rewardsCache.get(broadcasterId)
+    const cached = _rewardsCache.get(cacheKey)
     if (cached && (Date.now() - cached.ts) < cacheTtlMs) {
       setRewards(cached.data)
+      if (cached.balance !== undefined) setBalance(cached.balance)
       setLoading(false)
       return
     }
 
-    const res = await getCustomRewards(broadcasterId)
+    const res = await (channel ? getCustomRewardsGQL(channel, userToken) : getCustomRewards(broadcasterId, userToken))
     if (cancelledRef.current) return
     if (res.ok) {
-      _rewardsCache.set(broadcasterId, { ts: Date.now(), data: res.data })
+      _rewardsCache.set(cacheKey, { ts: Date.now(), data: res.data, balance: res.balance })
       setRewards(res.data)
+      if (res.balance !== undefined) setBalance(res.balance)
     } else {
       setError(res.error || 'Error cargando recompensas')
       setRewards([])
     }
     setLoading(false)
-  }, [broadcasterId, cacheTtlMs])
+  }, [broadcasterId, channel, userToken, cacheTtlMs])
 
   const fetchMyRedemptions = useCallback(async () => {
     if (!broadcasterId || !userId) {
@@ -139,7 +139,7 @@ export function useChannelPoints({ broadcasterId, userToken, userId, cacheTtlMs 
     // reward visible y filtrar por user_id. Limit 50.
     // Esto es suficiente para mostrar historial reciente.
     // Si no hay rewards, devolvemos vacio.
-    const rewardsRes = await getCustomRewards(broadcasterId)
+    const rewardsRes = await (channel ? getCustomRewardsGQL(channel, userToken) : getCustomRewards(broadcasterId, userToken))
     if (cancelledRef.current) return
     if (!rewardsRes.ok || rewardsRes.data.length === 0) {
       setMyRedemptions([])
@@ -154,7 +154,7 @@ export function useChannelPoints({ broadcasterId, userToken, userId, cacheTtlMs 
     const targets = rewardsRes.data.slice(0, 5)
     const all = await pMap(targets, 3, async (r) => {
       if (cancelledRef.current) return []
-      const res = await getRedemptions(broadcasterId, r.id, 'FULFILLED', undefined, userId, 20)
+      const res = await getRedemptions(broadcasterId, r.id, 'FULFILLED', userToken || 'viewer', userId, 20)
       if (cancelledRef.current) return []
       if (res.ok && res.data?.data) {
         return res.data.data

@@ -12,13 +12,11 @@
 //   GET /twitch-auth?refresh=RT        -> intercambia refresh_token Supabase por nuevo par
 //   GET /twitch-auth?debug=1           -> diagnostico
 
-import postgres from "npm:postgres";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import {
   buildCorsHeaders,
   checkGeneralRate,
   checkPollingRate,
-  consumeSingleUseToken,
   getClientIp,
   isDebugEnabled,
   isValidUuidV4,
@@ -30,7 +28,6 @@ const TWITCH_AUTH_URL = "https://id.twitch.tv/oauth2/authorize";
 const TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
 const TWITCH_CLIENT_ID = Deno.env.get("TWITCH_CLIENT_ID") || "";
 const TWITCH_CLIENT_SECRET = Deno.env.get("TWITCH_CLIENT_SECRET") || "";
-const DB_URL = Deno.env.get("SUPABASE_DB_URL") || "";
 // F-1 fix: envs para emitir Supabase JWT firmado. Si faltan, la emision
 // se desactiva y blinkstream-data seguira dando 401 (degradacion explicita).
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -49,9 +46,18 @@ function buildSecurityHeaders(): Record<string, string> {
   };
 }
 
-// Pool global (reutilizado entre requests)
-const sql = DB_URL ? postgres(DB_URL, { max: 3, idle_timeout: 10 }) : null;
+// Headers CORS para polling: usa * porque el Tauri WebView puede no enviar
+// Origin header, lo que haria que buildCorsHeaders() devuelva null y la
+// respuesta sea opaque (ilegible para fetch en el frontend).
+const pollingCors: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Max-Age": "86400",
+  "Vary": "Origin",
+};
 
+// Pool global (reutilizado entre requests)
 // Cliente Supabase con service_role. SOLO se usa server-side para emitir
 // sesiones firmadas a usuarios legitimos (los que pasaron OAuth de Twitch).
 // NUNCA exponer SERVICE_ROLE_KEY al cliente.
@@ -61,24 +67,6 @@ const supabaseAdmin = SUPABASE_URL && SERVICE_ROLE_KEY
   })
   : null;
 
-// Asegurar que la tabla existe
-if (sql) {
-  // Esquema extendido: consumed_at para single-use, refresh_token para F-1.
-  // CREATE TABLE IF NOT EXISTS no anade columnas a tablas existentes.
-  // Si la tabla ya existe, ejecutar manualmente:
-  //   ALTER TABLE public.auth_tokens
-  //     ADD COLUMN IF NOT EXISTS refresh_token TEXT,
-  //     ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ DEFAULT NULL;
-  sql`CREATE TABLE IF NOT EXISTS public.auth_tokens (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    request_id TEXT NOT NULL UNIQUE,
-    access_token TEXT NOT NULL,
-    refresh_token TEXT,
-    username TEXT,
-    consumed_at TIMESTAMPTZ DEFAULT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-  )`.catch(() => {});
-}
 
 // ============= F-1 fix: Emision de Supabase JWT =============
 //
@@ -118,28 +106,21 @@ async function issueSupabaseSession(twitchLogin: string): Promise<SupabaseSessio
 
     if (createErr) {
       // "User already registered" o similar: rotar password.
-      // B-4 fix: paginar TODOS los usuarios server-side. listUsers con perPage fijo
-      // falla en cuanto hay >N usuarios. getUserByEmail no existe en @supabase/auth-js
-      // 2.65.0 (usado por @supabase/supabase-js 2.45.4); la unica API admin estable
-      // es listUsers con paginacion, que recorremos completa hasta encontrar el email.
+      // Usamos RPC get_user_id_by_email (SQL directo, O(1) con indice)
+      // en vez de paginar listUsers (que era O(n) y degradaba con escala).
       let existing: { id: string; email?: string } | null = null;
       try {
-        for (let page = 1; ; page++) {
-          const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
-          if (listErr) {
-            console.error("issueSupabaseSession listUsers error:", listErr.message);
-            break;
-          }
-          const users = list?.users ?? [];
-          const found = users.find((u) => u.email === email);
-          if (found) { existing = found as unknown as { id: string; email?: string }; break; }
-          const lastPage = (list as unknown as { lastPage?: number } | null)?.lastPage;
-          if (!users.length || lastPage === undefined || lastPage === 0 || page >= lastPage) break;
-          // salvaguarda: max 100 paginas (100k usuarios) para no loops infinitos
-          if (page >= 100) break;
+        const { data: userId, error: rpcErr } = await supabaseAdmin.rpc(
+          "get_user_id_by_email",
+          { target_email: email },
+        );
+        if (rpcErr) {
+          console.error("issueSupabaseSession rpc error:", rpcErr.message);
+        } else if (userId) {
+          existing = { id: userId as string, email };
         }
       } catch (e) {
-        console.error("issueSupabaseSession listUsers pagination error:", (e as Error).message);
+        console.error("issueSupabaseSession rpc error:", (e as Error).message);
       }
       if (existing) {
         const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
@@ -227,9 +208,14 @@ Deno.serve(async (req: Request) => {
   const refreshTokenParam = url.searchParams.get("refresh");
 
   // === Issue #4: Validar Origin/Referer ===
-  // EXCEPCION: callback de Twitch (server-to-server, sin Origin) y debug
+  // EXCEPCION: callback de Twitch (server-to-server, sin Origin), debug,
+  // auth redirect (sistema operativo abre navegador sin Origin/Referer) y
+  // polling (token single-use + UUID v4 + rate limit 60/min como defensa).
+  const isAuthRedirect = !!requestIdParam;
   const originCheck = validateOriginReferer(req, {
     isTwitchCallback,
+    isAuthRedirect,
+    isPolling,
     isDebug,
   });
   if (!originCheck.valid) {
@@ -293,8 +279,7 @@ Deno.serve(async (req: Request) => {
     }
     const dbg: Record<string, unknown> = {
       debug_enabled: true,
-      db_url_set: !!DB_URL,
-      sql_ready: !!sql,
+
       has_client_id: !!TWITCH_CLIENT_ID,
       has_client_secret: !!TWITCH_CLIENT_SECRET,
       client_id_preview: TWITCH_CLIENT_ID.slice(0, 8) + "...",
@@ -314,7 +299,7 @@ Deno.serve(async (req: Request) => {
 
   // === Issue #3 + Polling: ?fetch=ID ===
   if (isPolling) {
-    return await handleFetch(fetchId!, securityHeaders, corsHeaders);
+    return await handleFetch(fetchId!, securityHeaders, pollingCors);
   }
 
   // === F-1 fix: Refresh de Supabase JWT ===
@@ -383,7 +368,6 @@ async function handleFetch(
   securityHeaders: Record<string, string>,
   corsHeaders: Record<string, string>,
 ) {
-  // Issue #7: validar UUID v4
   if (!isValidUuidV4(fetchId)) {
     return json(
       { found: false, error: "Invalid fetch id (must be UUID v4)" },
@@ -392,7 +376,7 @@ async function handleFetch(
       corsHeaders,
     );
   }
-  if (!sql) {
+  if (!supabaseAdmin) {
     return json(
       { found: false, error: "DB no disponible" },
       503,
@@ -401,10 +385,14 @@ async function handleFetch(
     );
   }
   try {
-    // Issue #3: consumir atomicamente. Solo el primer poll exitoso obtiene
-    // el token; los siguientes reciben 404 (race condition safe).
-    const consumed = await consumeSingleUseToken(sql, fetchId);
-    if (!consumed) {
+    // Atomic delete-and-return (single-use pattern)
+    const { data, error } = await supabaseAdmin
+      .from("auth_tokens")
+      .delete()
+      .match({ request_id: fetchId })
+      .select();
+
+    if (error || !data || data.length === 0) {
       return json(
         { found: false },
         404,
@@ -412,28 +400,14 @@ async function handleFetch(
         corsHeaders,
       );
     }
-    // Leer el token tras consumo
-    const rows = await sql`
-      SELECT access_token, refresh_token, username
-      FROM public.auth_tokens
-      WHERE request_id = ${fetchId}
-      LIMIT 1
-    `;
-    if (rows.length === 0) {
-      return json(
-        { found: false, error: "Token not found after consume" },
-        404,
-        securityHeaders,
-        corsHeaders,
-      );
-    }
-    const row = rows[0] as {
+
+    const row = data[0] as {
       access_token: string;
       refresh_token: string | null;
       username: string;
     };
-    // F-1: emitir Supabase JWT firmado para que el cliente pueda
-    // llamar a blinkstream-data. Si falla, devolvemos solo el token de Twitch.
+
+    // F-1: emitir Supabase JWT firmado
     const response: Record<string, unknown> = {
       found: true,
       access_token: row.access_token,
@@ -468,7 +442,7 @@ async function handleCallback(
   // Issue #7: validar UUID v4 en state
   if (!isValidUuidV4(requestId)) {
     return html(
-      getErrorHtml("State invalido (debe ser UUID v4)"),
+      getErrorHtml("State invalido (must be UUID v4)"),
       securityHeaders,
       corsHeaders,
     );
@@ -497,14 +471,9 @@ async function handleCallback(
     }
 
     if (!tokenData.access_token) {
-      return html(
-        getErrorHtml(
-          "Error de Twitch (" + tokenRes.status + "): " +
-          (String(tokenData.message ?? "") || rawText || "sin respuesta"),
-        ),
-        securityHeaders,
-        corsHeaders,
-      );
+      const errMsg = "Error de Twitch (" + tokenRes.status + "): " +
+        (String(tokenData.message ?? "") || rawText || "sin respuesta");
+      return html(getErrorHtml(errMsg), securityHeaders, corsHeaders);
     }
 
     const accessToken = String(tokenData.access_token);
@@ -528,39 +497,35 @@ async function handleCallback(
     } catch { /* ok, mantener default */ }
 
     // Guardar en DB con ON CONFLICT para idempotencia
-    if (sql) {
-      try {
-        await sql`
-          INSERT INTO public.auth_tokens
-            (request_id, access_token, refresh_token, username, consumed_at, created_at)
-          VALUES
-            (${requestId}, ${accessToken}, ${refreshToken}, ${username}, NULL, NOW())
-          ON CONFLICT (request_id) DO UPDATE SET
-            access_token = EXCLUDED.access_token,
-            refresh_token = EXCLUDED.refresh_token,
-            username = EXCLUDED.username,
-            consumed_at = NULL,
-            created_at = NOW()
-        `;
-      } catch (dbErr) {
-        const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
-        console.error("DB insert error:", msg);
-        return html(
-          getErrorHtml("Error guardando sesion: " + escapeHtml(msg)),
-          securityHeaders,
-          corsHeaders,
-        );
+    if (!supabaseAdmin) {
+      return html(getErrorHtml("Base de datos no disponible"), securityHeaders, corsHeaders);
+    }
+    try {
+      const { error: dbErr } = await supabaseAdmin
+        .from('auth_tokens')
+        .upsert({
+          request_id: requestId,
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          username: username,
+          consumed_at: null,
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'request_id', ignoreDuplicates: false })
+      if (dbErr) {
+        console.error("[twitch-auth] DB upsert error:", dbErr.message);
+        return html(getErrorHtml("Error guardando sesion: " + dbErr.message), securityHeaders, corsHeaders);
       }
+    } catch (dbErr) {
+      const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+      console.error("[twitch-auth] DB upsert exception:", msg);
+      return html(getErrorHtml("Error guardando sesion: " + msg), securityHeaders, corsHeaders);
     }
 
+    // ✅ Mostrar pagina de exito. El frontend hara polling para obtener el token.
     return html(getSuccessHtml(username), securityHeaders, corsHeaders);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return html(
-      getErrorHtml("Error interno: " + escapeHtml(msg)),
-      securityHeaders,
-      corsHeaders,
-    );
+    return html(getErrorHtml("Error interno: " + msg), securityHeaders, corsHeaders);
   }
 }
 

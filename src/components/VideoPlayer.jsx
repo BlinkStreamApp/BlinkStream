@@ -23,6 +23,7 @@ import { formatViewers } from '../utils/format'
 import { measureInvoke } from '../utils/perf'
 import { validateProps, isString, isNumber, isBoolean } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
+import { safeOpenUrl } from '../utils/tauriEnv'
 import QualitySelector from './QualitySelector'
 import ClipPlayer from './ClipPlayer'
 import VodPlayer from './VodPlayer'
@@ -685,7 +686,8 @@ export default function VideoPlayer({
         </div>
       </div>
 
-      <div className={`absolute bottom-4 left-4 right-4 z-30 flex items-center justify-between bg-black/70 backdrop-blur-xl border border-white/[0.08] px-5 py-3 rounded-xl transition-all duration-300 shadow-2xl ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+      {/* Control Bar - Isla flotante premium */}
+      <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
         <div className="flex items-center gap-4 text-white">
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? 'Pausar' : 'Reproducir'}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
           <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? 'Activar sonido' : 'Silenciar'}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
@@ -739,7 +741,7 @@ export default function VideoPlayer({
             <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch' : ''}`} title="Ajustes" aria-label="Ajustes del reproductor"><SettingsIcon/></button>
             <button onClick={onToggleTheatre} className={`hover:text-white transition-colors cursor-pointer ${theatreMode ? 'text-twitch' : ''}`} title="Teatro (T)" aria-label="Modo teatro"><TheatreIcon/></button>
             <button onClick={async () => {
-              try { await import('@tauri-apps/plugin-opener'); window.open(`https://www.twitch.tv/${channel}`, '_blank') } catch { /* ignore: fallback a window.open ya esta hecho */ }
+              try { safeOpenUrl(`https://www.twitch.tv/${channel}`, true) } catch { /* ignore: el helper ya hace fallback */ }
             }} className="hover:text-white transition-colors cursor-pointer" title="Abrir en navegador" aria-label="Abrir en navegador">
               <PhosphorIcon name="ArrowSquareOut" size={16} weight="regular" />
             </button>

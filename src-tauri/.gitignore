@@ -2,3 +2,11 @@
 # will have compiled files and executables
 /target/
 /gen/schemas
+
+# Env vars de build-time (secretos embebidos en el binario).
+# El root .gitignore ya bloquea .env* en el root, pero Tauri 2.x
+# lee .env desde src-tauri/ (donde esta Cargo.toml/tauri.conf.json),
+# asi que tenemos que excluirlo explicitamente aca tambien.
+# Si necesitas commitear un .env.example para documentar, anadelo
+# con `!src-tauri/.env.example`.
+/.env

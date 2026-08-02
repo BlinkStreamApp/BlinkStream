@@ -32,7 +32,7 @@ export function BanList({ bans, onUnban, loading }) {
           </div>
         )}
         {!loading && bans.length === 0 && (
-          <p className="p-3 text-[11px] text-text-muted/60 text-center">No hay usuarios baneados. ¡Bien!</p>
+          <p className="p-3 text-[11px] text-text-muted/60 text-center">No hay usuarios baneados. \u00a1Bien!</p>
         )}
         {!loading && bans.length > 0 && (
           <ul className="divide-y divide-bg-tertiary/30">

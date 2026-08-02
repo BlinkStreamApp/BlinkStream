@@ -52,23 +52,35 @@ describe('FIX 1: secureRandomInt', () => {
 })
 
 // ============================================================
-// FIX 2 (Hank / P1): window.open con noopener,noreferrer
+// FIX 2 (Hank / P1): abrir URLs externas con noopener,noreferrer
 // ============================================================
-describe('FIX 2: window.open con noopener,noreferrer', () => {
-  it('useAuth.js llama window.open con features correctas', () => {
-    const src = readSrc('../hooks/useAuth.js')
+// WT-20260628-134: refactor. Antes se validaba que useAuth.js tuviera
+// `window.open(url, '_blank', 'noopener,noreferrer')`. Ahora la politica
+// es MAS estricta: NINGUN archivo debe llamar `window.open(` directo
+// (pre-build hook lo bloquea, CWE-1022 anti-tabnabbing). Toda apertura
+// externa pasa por el helper `safeOpenUrl` en utils/tauriEnv, que
+// garantiza noopener,noreferrer en el path web y usa plugin-opener en
+// Tauri. El test verifica ambas cosas:
+//   1) safeOpenUrl esta exportado desde utils/tauriEnv
+//   2) useAuth.js usa safeOpenUrl en vez de window.open
+//   3) El helper incluye la flag 'noopener,noreferrer'
+// ============================================================
+describe('FIX 2: abrir URLs externas con noopener,noreferrer', () => {
+  it('utils/tauriEnv exporta el helper safeOpenUrl', () => {
+    const src = readSrc('../utils/tauriEnv.js')
+    expect(src).toContain('export function safeOpenUrl')
     expect(src).toContain("'noopener,noreferrer'")
   })
 
-  it('no hay una variante vulnerable a tabnabbing', () => {
+  it('useAuth.js NO usa window.open directo (debe usar safeOpenUrl)', () => {
     const src = readSrc('../hooks/useAuth.js')
-    // Solo debe haber una llamada a window.open y debe llevar features
-    const opens = src.match(/window\.open\(/g) || []
-    expect(opens.length).toBe(1)
-    // Esa llamada debe incluir 'noopener' en sus features
-    const only = src.match(/window\.open\([^)]+\)/g) || []
-    expect(only[0]).toContain('noopener')
-    expect(only[0]).toContain('noreferrer')
+    expect(src).not.toMatch(/window\.open\(/)
+    expect(src).toContain('safeOpenUrl')
+  })
+
+  it('useAuth.js importa safeOpenUrl desde tauriEnv', () => {
+    const src = readSrc('../hooks/useAuth.js')
+    expect(src).toMatch(/safeOpenUrl.*tauriEnv|tauriEnv.*safeOpenUrl/)
   })
 })
 

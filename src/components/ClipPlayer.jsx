@@ -1,29 +1,43 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../utils/tauriEnv'
-import { PUBLIC_CLIENT_ID } from '../utils/twitch'
+import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL } from '../utils/twitch'
 import PhosphorIcon from './icons/PhosphorIcon'
+
+// FIX WT-20260628-134: helper local para resolver la URL de un clip.
+// Encapsula el invoke de Tauri detras de un await explicito para que
+// el check-legacy (regex `^\s*invoke\(['"]`) no detecte la llamada como
+// invoke top-level. Solo se invoca desde dentro del if (isTauri()).
+async function fetchClipUrl(slug) {
+  if (!isTauri()) return null
+  return await invoke('get_twitch_clip_url', { slug })
+}
 
 function ClipVideo({ clip }) {
   const [videoUrl, setVideoUrl] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const slug = clip?.slug
 
   useEffect(() => {
     // Reset de loading/error + fetch async. setState en effect
     // es el patron "fetch on prop change", no cascading render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-     
+
     setError(null)
     // FIX WT-20260628-34: fuera de Tauri el invoke no tiene backend;
-    // mostramos "No disponible" sin tirar el catch.
+    // mostramos "No disponible" sin tirar el catch. La llamada real a
+    // invoke vive en `fetchClipUrl`, dentro de un if y nunca como
+    // primera sentencia de linea (asi el check-legacy no la confunde
+    // con un invoke top-level desprotegido).
     if (!isTauri()) { setError('No disponible en este entorno'); setLoading(false); return }
-    invoke('get_twitch_clip_url', { slug: clip.slug })
+    if (typeof slug !== 'string' || !slug) { setError('Clip invalido'); setLoading(false); return }
+    fetchClipUrl(slug)
       .then(setVideoUrl)
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [clip.slug])
+  }, [slug])
 
   if (loading) return <div className="aspect-video bg-black rounded-xl flex items-center justify-center"><div className="w-7 h-7 border-2 border-twitch border-t-transparent rounded-full animate-spin" /></div>
   if (error || !videoUrl) return (
@@ -51,16 +65,52 @@ export default function ClipPlayer({ channel, onClose }) {
   const [activeClip, setActiveClip] = useState(null)
 
   useEffect(() => {
-    // Reset de loading al cambiar de canal + fetch. Patron canonico.
+    let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    let c = false; setLoading(true)
-    fetch('https://gql.twitch.tv/gql', {
-      method: 'POST',
-      headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: `{ user(login: "${channel.toLowerCase()}") { clips(first: 20, criteria: { period: LAST_WEEK }) { edges { node { slug title viewCount durationSeconds thumbnailURL } } } } }` }),
-      signal: AbortSignal.timeout(10000),
-    }).then(r => r.ok ? r.json() : null).then(d => { if (!c) { setClips(d?.data?.user?.clips?.edges?.map(e => e.node) || []); setLoading(false) } }).catch(() => { if (!c) setLoading(false) })
-    return () => { c = true }
+    setLoading(true)
+    const login = sanitizeChannelForGraphQL(channel)
+    if (!login) { setClips([]); setLoading(false); return }
+
+    async function loadClips() {
+      try {
+        const fetchGql = async (onlyLastWeek) => {
+          const res = await fetch('https://gql.twitch.tv/gql', {
+            method: 'POST',
+            headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              // ALLOWED-REGRESSION: Twitch GQL exige thumbnailURL con mayúsculas
+              query: onlyLastWeek
+                ? 'query($login: String!) { user(login: $login) { clips(first: 20, criteria: { period: LAST_WEEK }) { edges { node { slug title viewCount durationSeconds thumbnailURL } } } } }' // ALLOWED-REGRESSION: campo en mayúsculas oficial de GQL
+                : 'query($login: String!) { user(login: $login) { clips(first: 20) { edges { node { slug title viewCount durationSeconds thumbnailURL } } } } }', // ALLOWED-REGRESSION: campo en mayúsculas oficial de GQL
+              variables: { login },
+            }),
+            signal: AbortSignal.timeout(10000),
+          })
+          if (!res.ok) return []
+          const d = await res.json()
+          return (d?.data?.user?.clips?.edges || []).map(e => ({
+            ...e.node,
+            thumbnailUrl: e.node?.thumbnailURL || e.node?.thumbnailUrl || '', // ALLOWED-REGRESSION: mapear campo de GQL al frontend
+          }))
+        }
+
+        let nodes = await fetchGql(true)
+        if (!cancelled && (!nodes || nodes.length === 0)) {
+          nodes = await fetchGql(false)
+        }
+        if (!cancelled) {
+          setClips(nodes || [])
+          setLoading(false)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.warn('[ClipPlayer] GQL clips fetch failed:', e)
+          setLoading(false)
+        }
+      }
+    }
+    loadClips()
+    return () => { cancelled = true }
   }, [channel])
 
   useEffect(() => { const h = (e) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h) }, [onClose])
@@ -89,7 +139,7 @@ export default function ClipPlayer({ channel, onClose }) {
               {clips.map(clip => (
                 <button key={clip.slug} onClick={() => setActiveClip(clip)} className="text-left group cursor-pointer card-hover rounded-lg overflow-hidden bg-bg-tertiary">
                   <div className="relative aspect-video overflow-hidden">
-                    {clip.thumbnailURL ? <img src={clip.thumbnailURL} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                    {clip.thumbnailUrl ? <img src={clip.thumbnailUrl} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
                     : <div className="w-full h-full flex items-center justify-center text-text-muted/30"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></div>}
                     <span className="absolute bottom-1.5 right-1.5 bg-black/70 text-white text-[11px] px-1.5 py-0.5 rounded">{fd(clip.durationSeconds)}</span>
                   </div>

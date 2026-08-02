@@ -24,7 +24,12 @@ log = "0.4"
 # del event loop). Tauri 2 ya depende transitivamente de tokio, pero
 # necesitamos declararlo para usar `spawn_blocking` desde este crate.
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
-tauri = { version = "2.11.2", features = [] }
+tauri = { version = "2.11.2", features = ["devtools"] }
+# FIX WT-20260628-77: habilitamos la feature "devtools" del propio
+# crate tauri para que `devtools: true` en tauri.conf.json surta efecto
+# en profile.release. En Tauri 2.x NO existe el crate separado
+# `tauri-plugin-devtools`; los DevTools vienen built-in detrás de esta
+# feature flag y NO requieren `.plugin(...)` en lib.rs.
 tauri-plugin-log = "2"
 tauri-plugin-process = "2"
 tauri-plugin-shell = "2"

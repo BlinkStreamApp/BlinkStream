@@ -64,9 +64,9 @@ describe('FIX 2: RedeemModal — reward.is_enabled', () => {
 
   it('si reward.is_enabled=false muestra banner y deshabilita submit', () => {
     renderRedeemModal({ is_enabled: false })
-    // Banner visible
+    // Banner visible (cp.redeem.disabled = "Esta recompensa ya no está disponible.")
     expect(
-      screen.getByText(/esta recompensa ya no esta disponible|no disponible|disabled/i)
+      screen.getByText(/esta recompensa ya no est[áa] disponible|no disponible|disabled/i)
     ).toBeInTheDocument()
     // El boton de submit (Canjear / Submit) debe estar deshabilitado
     const submitBtn = screen.getByRole('button', { name: /canjear|submit|✓/i })
@@ -204,7 +204,7 @@ describe('FIX 4: PendingRedemptions — paginacion', () => {
     // Boton "Ver mas" presente. El texto real es "cp.pending.loadMore"
     // (literal, esa key no existe en i18n.js todavia); matcheamos tambien
     // "ver mas"/"load more" para robustez futura.
-    expect(screen.getByRole('button', { name: /cp\.pending\.loadMore|ver mas|load more/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cp\.pending\.loadMore|ver m[áa]s|load more/i })).toBeInTheDocument()
   })
 
   it('click en "Ver mas" carga 50 mas', () => {
@@ -221,7 +221,7 @@ describe('FIX 4: PendingRedemptions — paginacion', () => {
         onRefresh={vi.fn()}
       />
     )
-    const loadMore = screen.getByRole('button', { name: /cp\.pending\.loadMore|ver mas|load more/i })
+    const loadMore = screen.getByRole('button', { name: /cp\.pending\.loadMore|ver m[áa]s|load more/i })
     fireEvent.click(loadMore)
     // Ahora user50 debe ser visible
     expect(screen.getByText('user50')).toBeInTheDocument()
@@ -229,7 +229,7 @@ describe('FIX 4: PendingRedemptions — paginacion', () => {
     // user100 sigue oculto
     expect(screen.queryByText('user100')).not.toBeInTheDocument()
     // Sigue habiendo "Ver mas" porque quedan 20 mas
-    expect(screen.getByRole('button', { name: /cp\.pending\.loadMore|ver mas|load more/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cp\.pending\.loadMore|ver m[áa]s|load more/i })).toBeInTheDocument()
   })
 
   it('con menos de 50 redenciones, NO aparece "Ver mas"', () => {
@@ -246,7 +246,7 @@ describe('FIX 4: PendingRedemptions — paginacion', () => {
         onRefresh={vi.fn()}
       />
     )
-    expect(screen.queryByRole('button', { name: /ver mas|load more/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /ver m[áa]s|load more/i })).not.toBeInTheDocument()
   })
 
   it('con exactamente 50 redenciones, NO aparece "Ver mas"', () => {
@@ -263,6 +263,6 @@ describe('FIX 4: PendingRedemptions — paginacion', () => {
         onRefresh={vi.fn()}
       />
     )
-    expect(screen.queryByRole('button', { name: /ver mas|load more/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /ver m[áa]s|load more/i })).not.toBeInTheDocument()
   })
 })

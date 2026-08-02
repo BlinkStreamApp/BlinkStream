@@ -60,7 +60,7 @@ export default function Onboarding({ onFinish }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-bg-primary flex items-center justify-center animate-fade-in">
+    <div className="fixed inset-0 z-[99999] bg-bg-primary flex items-center justify-center animate-fade-in">
       <div className="absolute inset-0">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-twitch/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-yellow-400/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />

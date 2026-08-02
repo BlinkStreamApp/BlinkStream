@@ -37,7 +37,7 @@ const LS_TAB_KEY = 'bs.settingsTab'
  */
 function Tabs({ tabs, active, onChange }) {
   return (
-    <div className="sticky top-0 z-10 flex border-b border-bg-tertiary/50 bg-bg-secondary/80 backdrop-blur-md -mx-5 px-5">
+    <div className="flex border-b border-bg-tertiary/50 bg-bg-secondary/80 backdrop-blur-md px-4 shrink-0 overflow-x-auto no-scrollbar">
       {tabs.map(tab => (
         <button
           key={tab.id}
@@ -114,8 +114,8 @@ export default function Settings({ onClose }) {
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-      <div className="bg-bg-secondary/80 backdrop-blur-md border border-bg-tertiary/50 rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="bg-bg-secondary/85 backdrop-blur-xl border border-bg-tertiary/50 rounded-2xl shadow-[0_15px_50px_rgba(0,0,0,0.75)] w-full max-w-md max-h-[calc(100vh-2.5rem)] flex flex-col overflow-hidden shrink-0" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-bg-tertiary/50 shrink-0">
           <div className="flex items-center gap-2">
             <BlinkStreamLogo size={20} />

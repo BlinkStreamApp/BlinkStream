@@ -18,6 +18,7 @@ import { PUBLIC_CLIENT_ID, getHeaders, sanitizeChannelForGraphQL } from '../util
 import { validateProps, isArray, optional } from '../utils/validateProps'
 import LiveBadge from './LiveBadge'
 import PhosphorIcon from './icons/PhosphorIcon'
+import StreamPreview from './StreamPreview'
 
 function exactViewers(n) {
   if (n == null) return null
@@ -274,10 +275,10 @@ const SectionHeader = memo(function SectionHeader({ title, onVerTodo }) {
   )
 })
 
-const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, currentIndex, onIndexChange }) {
+const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, currentIndex, onIndexChange, previewEnabled = true }) {
   if (!streams.length) {
     return (
-      <div className="relative w-full rounded-xl overflow-hidden bg-bg-tertiary mb-6" style={{ aspectRatio: '16/5', maxWidth: '1400px', margin: '0 auto 1.5rem' }}>
+      <div className="relative w-full min-w-0 rounded-xl overflow-hidden bg-bg-tertiary mb-6 aspect-[16/7] sm:aspect-[16/6] lg:aspect-[16/5] max-w-[1400px] mx-auto">
         <Skeleton className="w-full h-full rounded-none" />
       </div>
     )
@@ -292,14 +293,33 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
 
   return (
     <div
-      className="relative w-full rounded-xl overflow-hidden cursor-pointer group mb-6 shadow-2xl shadow-black/30 ring-1 ring-white/5"
-      style={{ aspectRatio: '16/5', maxWidth: '1400px', margin: '0 auto 1.5rem', minHeight: '320px' }}
+      className="relative w-full min-w-0 rounded-xl overflow-hidden cursor-pointer group mb-6 shadow-2xl shadow-black/30 ring-1 ring-white/5 aspect-[16/7] sm:aspect-[16/6] lg:aspect-[16/5] max-w-[1400px] mx-auto"
       onClick={() => onSelect(stream.user_login)}
     >
-      <img key={stream.id} src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover transition-all duration-500 animate-fade-in" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
+      {/* B02 fix (WT-20260628-96): invertir orden del DOM.
+          Antes: <img> estaba DEBAJO de cualquier <StreamPreview>, pero
+          como el <img> tenia opacity-30 + un futuro <StreamPreview>
+          iria despues (encima), el thumbnail se pintaba arriba del
+          video y el usuario veia solo el thumb semitransparente.
+          Ahora: <img> (z-0, opacity-30 si preview) ABAJO, <StreamPreview>
+          (z-10) ARRIBA. Asi el video es visible. */}
+      {previewEnabled && (
+        <StreamPreview
+          key={`preview-${stream.id}`}
+          stream={stream}
+          enabled={previewEnabled}
+          quality="best"
+        />
+      )}
+      <img
+        key={stream.id}
+        src={thumb}
+        alt=""
+        className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 animate-fade-in z-0 ${previewEnabled ? 'opacity-30' : 'opacity-100'}`}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent z-20 pointer-events-none" />
 
-      <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-6 lg:p-8 pb-5" onClick={() => onSelect(stream.user_login)}>
+      <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-6 lg:p-8 pb-5 z-20" onClick={() => onSelect(stream.user_login)}>
         <div className="flex items-center gap-2 mb-2.5">
           <LiveBadge />
           <span className="flex items-center gap-1.5 text-white/90 text-[13px] font-medium">
@@ -307,9 +327,6 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
             {exactViewers(stream.viewer_count)} viewers
           </span>
         </div>
-        <h1 className="text-white font-extrabold text-xl sm:text-2xl md:text-3xl lg:text-4xl leading-tight mb-2.5 drop-shadow-2xl line-clamp-2 max-w-full">
-          {stream.title}
-        </h1>
         {stream.game_name && (
           <p className="text-white/80 text-[14px] mb-4 max-w-2xl line-clamp-1 font-medium">
             {stream.game_name}
@@ -595,7 +612,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
   }, [favorites, liveStatus])
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden bg-bg-primary">
+    <div className="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden bg-bg-primary">
 
       <aside className="hidden md:flex flex-col w-[200px] lg:w-[240px] shrink-0 bg-bg-secondary/30 backdrop-blur-sm border-r border-white/[0.04]">
 
@@ -699,8 +716,8 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
         )}
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="w-full px-4 sm:px-6 lg:px-8 pt-5 pb-16">
+      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+        <div className="w-full min-w-0 px-4 sm:px-6 lg:px-8 pt-5 pb-16">
 
           {favorites.length === 0 && recentChannels.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center animate-fade-in">
@@ -724,7 +741,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
             </div>
           ) : (
             <>
-          <HeroCarousel streams={heroStreams} onSelect={onSelect} logos={channelLogos} currentIndex={heroIndex} onIndexChange={setHeroIndex} />
+          <HeroCarousel streams={heroStreams} onSelect={onSelect} logos={channelLogos} currentIndex={heroIndex} onIndexChange={setHeroIndex} previewEnabled={true} />
 
           {topGames.length > 0 && (
             <section className="mb-6 animate-fade-in">

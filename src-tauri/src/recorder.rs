@@ -21,7 +21,6 @@
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::OnceLock;
 use tauri::AppHandle;
 use tauri::Manager;
 
@@ -141,20 +140,11 @@ fn get_global_state_from_memory() -> GlobalRecordingState {
 
 const CHANNEL_RE: &str = r"^[a-zA-Z0-9][a-zA-Z0-9_]{2,24}$";
 
-// WT-20260628-24 / FIX 2: compilamos la regex una sola vez con OnceLock
-// en vez de recompilarla en cada llamada a `validate_channel`. Es un code
-// smell (alloc + parse en hot path) y un overhead evitable. La regex es
-// estática y nunca cambia, así que el costo de un init perezoso es ~0.
-static CHANNEL_REGEX: OnceLock<regex_lite::Regex> = OnceLock::new();
-
-fn channel_regex() -> &'static regex_lite::Regex {
-    CHANNEL_REGEX.get_or_init(|| {
-        regex_lite::Regex::new(CHANNEL_RE).expect("CHANNEL_RE estático - no debería fallar")
-    })
-}
+static CHANNEL_REGEX: std::sync::LazyLock<regex_lite::Regex> =
+    std::sync::LazyLock::new(|| regex_lite::Regex::new(CHANNEL_RE).expect("CHANNEL_RE estático"));
 
 fn validate_channel(name: &str) -> Result<(), String> {
-    if !channel_regex().is_match(name) {
+    if !CHANNEL_REGEX.is_match(name) {
         return Err(
             "Nombre de canal inválido. Solo letras, números y guión bajo (3-25 caracteres)."
                 .into(),

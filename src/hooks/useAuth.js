@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file Hook de autenticacion con Twitch (M-2 / Auditoria WT-20260628-01).
  * Maneja login OAuth via edge function, persistencia del token en keychain
  * (Tauri) o localStorage (fallback), y exposicion de la sesion al resto de la app.
@@ -47,51 +47,73 @@ const LS_AVATAR = 'blinkstream_twitch_avatar'
  */
 async function fetchUserInfo(token) {
   try {
-    const res = await fetch('https://api.twitch.tv/helix/users', {
+    let clientId = APP_CLIENT_ID
+    let username = null
+
+    let res = await fetch('https://api.twitch.tv/helix/users', {
       headers: {
-        'Client-ID': APP_CLIENT_ID,
+        'Client-ID': clientId,
         'Authorization': `Bearer ${token}`,
       },
     })
+
+    if (!res.ok) {
+      // Consultar al validador oficial OAuth por si hay disparidad entre APP_CLIENT_ID y el Client-ID que emitió el token
+      try {
+        const valRes = await fetch('https://id.twitch.tv/oauth2/validate', {
+          headers: { 'Authorization': `OAuth ${token}` },
+        })
+        if (valRes.status === 401) return { invalid: true }
+        if (valRes.ok) {
+          const valData = await valRes.json()
+          if (valData?.client_id) clientId = valData.client_id
+          if (valData?.login) username = valData.login
+          res = await fetch('https://api.twitch.tv/helix/users', {
+            headers: {
+              'Client-ID': clientId,
+              'Authorization': `Bearer ${token}`,
+            },
+          })
+        }
+      } catch { /* ignore error del validador */ }
+    }
+
     if (res.ok) {
       const data = await res.json()
       const userData = data?.data?.[0]
       if (userData) {
         const avatar = userData.profile_image_url || null
-        const username = userData.login || null
+        username = userData.login || username || null
         const displayName = userData.display_name || null
         if (avatar) localStorage.setItem(LS_AVATAR, avatar)
         if (username) localStorage.setItem(LS_USERNAME, username)
         return { username, avatar, displayName }
       }
     }
+
+    if (username) {
+      localStorage.setItem(LS_USERNAME, username)
+      return { username, avatar: null, displayName: username }
+    }
   } catch { /* ignore */ }
   return null
 }
 
 /**
- * Abre una URL en el navegador del sistema via Tauri opener plugin.
- * Si Tauri no esta disponible (dev web puro), cae a window.open.
+ * Abre una URL en el navegador del sistema.
+ * En Tauri usa @tauri-apps/plugin-opener; en web puro usa safeOpenUrl
+ * (helper que centraliza el fallback con noopener,noreferrer).
  *
  * @param {string} url
  * @returns {Promise<void>}
  */
 async function openSystemBrowser(url) {
+  const { safeOpenUrl } = await import('../utils/tauriEnv')
   try {
-    const { openUrl } = await import('@tauri-apps/plugin-opener')
-    await openUrl(url)
-    return
-  } catch { /* no Tauri → fallback */ }
-
-    // FIX 2 (Hank / P1): anadir noopener,noreferrer en window.open.
-  // - noopener: corta window.opener en la pestana abierta, evitando
-  //   que la URL abierta manipule window.location de BlinkStream
-  //   (defensa contra tabnabbing / reverse-tabnabbing, CWE-1022).
-  // - noreferrer: elimina el header Referer, evitando fuga de la URL
-  //   completa (incluye request_id) al navegador externo.
-  // Esto alinea la superficie con Chat.jsx:1439 que ya lo usaba.
-  const w = window.open(url, '_blank', 'noopener,noreferrer')
-  if (w) w.focus()
+    safeOpenUrl(url, true)
+  } catch (err) {
+    console.error('[auth] No se pudo abrir el navegador:', err)
+  }
 }
 
 /**
@@ -117,10 +139,10 @@ export function useAuth() {
   useEffect(() => {
     const init = async () => {
       try {
-        // 1º: Intentar cargar del keychain
+        // 1\u00ba: Intentar cargar del keychain
         let token = await measureInvoke('get_secret', { key: 'twitch_token' })
 
-        // 2º: Fallback a localStorage (migración silenciosa)
+        // 2\u00ba: Fallback a localStorage (migraci\u00f3n silenciosa)
         if (!token) {
           token = localStorage.getItem(LS_TOKEN) || ''
           if (token) {
@@ -139,6 +161,27 @@ export function useAuth() {
             identities: username ? [{ provider: 'twitch', identity_data: { login: username } }] : [],
           })
           logEvent('auth', 'session.restored', { username })
+
+          // WT-20260628-FIX: Consultar siempre a Twitch al inicializar para erradicar el placeholder 'twitch_user'
+          // reemplazándolo por tu cuenta real de Twitch, o limpiando automáticamente el keychain de Windows
+          // si el token que quedó persistido era de una versión de prueba o ha expirado (401).
+          fetchUserInfo(token).then(userInfo => {
+            if (userInfo && userInfo.username && userInfo.username !== 'twitch_user') {
+              if (userInfo.avatar) setAvatar(userInfo.avatar)
+              setUser({
+                username: userInfo.username,
+                identities: [{ provider: 'twitch', identity_data: { login: userInfo.username } }],
+              })
+              localStorage.setItem(LS_USERNAME, userInfo.username)
+            } else if (userInfo && userInfo.invalid) {
+              measureInvoke('delete_secret', { key: 'twitch_token' }).catch(() => {})
+              localStorage.removeItem(LS_TOKEN)
+              localStorage.removeItem(LS_USERNAME)
+              localStorage.removeItem(LS_AVATAR)
+              setCachedToken(null)
+              setUser(null)
+            }
+          }).catch(() => {})
         }
       } catch (err) { /* fallback a localStorage */
         logEvent('auth', 'session.restore.failed', { err: err?.message || String(err) })

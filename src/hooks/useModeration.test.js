@@ -35,11 +35,11 @@ describe('useModeration — acciones basicas', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('ban: llama al helper, persiste en auditLog, devuelve true', async () => {
-    const { result } = renderHook(() => useModeration({ broadcasterId: '111' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: '111', userId: 'mod1' }))
     let ok
     await act(async () => { ok = await result.current.ban('u1', 'alice', 'spam') })
     expect(ok).toBe(true)
-    expect(banUserMock).toHaveBeenCalledWith('111', 'u1', 'spam')
+    expect(banUserMock).toHaveBeenCalledWith('111', 'mod1', 'u1', 'spam')
     expect(result.current.auditLog).toHaveLength(1)
     expect(result.current.auditLog[0].action).toBe('ban')
     expect(result.current.auditLog[0].targetName).toBe('alice')
@@ -48,7 +48,7 @@ describe('useModeration — acciones basicas', () => {
 
   it('ban falla: registra error en audit y devuelve false', async () => {
     banUserMock.mockResolvedValueOnce({ success: false, error: { message: 'Forbidden' } })
-    const { result } = renderHook(() => useModeration({ broadcasterId: '111' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: '111', userId: 'mod1' }))
     let ok
     await act(async () => { ok = await result.current.ban('u1', 'alice', 'spam') })
     expect(ok).toBe(false)
@@ -57,24 +57,24 @@ describe('useModeration — acciones basicas', () => {
   })
 
   it('unban: llama a unbanUser, audit OK', async () => {
-    const { result } = renderHook(() => useModeration({ broadcasterId: '111' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: '111', userId: 'mod1' }))
     await act(async () => { await result.current.unban('u1', 'alice') })
-    expect(unbanUserMock).toHaveBeenCalledWith('111', 'u1')
+    expect(unbanUserMock).toHaveBeenCalledWith('111', 'mod1', 'u1')
     expect(result.current.auditLog[0].action).toBe('unban')
   })
 
   it('timeout: pasa duration en segundos al banUser', async () => {
-    const { result } = renderHook(() => useModeration({ broadcasterId: '111' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: '111', userId: 'mod1' }))
     await act(async () => { await result.current.timeout('u1', 'alice', 600, 'spam') })
-    expect(banUserMock).toHaveBeenCalledWith('111', 'u1', 'spam', 600)
+    expect(banUserMock).toHaveBeenCalledWith('111', 'mod1', 'u1', 'spam', 600)
     expect(result.current.auditLog[0].action).toBe('timeout')
     expect(result.current.auditLog[0].duration).toBe(600)
   })
 
   it('deleteMessage: llama a deleteChatMessage, audit OK', async () => {
-    const { result } = renderHook(() => useModeration({ broadcasterId: '111' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: '111', userId: 'mod1' }))
     await act(async () => { await result.current.deleteMessage('msg-1', 'alice') })
-    expect(deleteChatMessageMock).toHaveBeenCalledWith('111', 'msg-1')
+    expect(deleteChatMessageMock).toHaveBeenCalledWith('111', 'mod1', 'msg-1')
     expect(result.current.auditLog[0].action).toBe('delete')
   })
 
@@ -106,7 +106,7 @@ describe('useModeration — rate limit local', () => {
 
   it('20 acciones consecutivas permitidas, la 21 bloqueada', async () => {
     const { result } = renderHook(() =>
-      useModeration({ broadcasterId: '111', maxActions: 20, windowMs: 30000 }),
+      useModeration({ broadcasterId: '111', userId: 'mod1', maxActions: 20, windowMs: 30000 }),
     )
     // 20 oks
     for (let i = 0; i < 20; i++) {
@@ -138,7 +138,7 @@ describe('useModeration — rate limit local', () => {
       .mockResolvedValueOnce({ success: true, value: null })
       .mockResolvedValueOnce({ success: true, value: null })
     const { result } = renderHook(() =>
-      useModeration({ broadcasterId: 'FIX-P03', maxActions: 3, windowMs: 30000 }),
+      useModeration({ broadcasterId: 'FIX-P03', userId: 'mod1', maxActions: 3, windowMs: 30000 }),
     )
     // 1) ban con 403 — falla, NO consume
     let ok1
@@ -179,7 +179,7 @@ describe('useModeration — rate limit local', () => {
     // el slot completo disponible.
     banUserMock.mockResolvedValueOnce({ success: false, error: { message: 'Network down' } })
     const { result } = renderHook(() =>
-      useModeration({ broadcasterId: 'FIX-P03-2', maxActions: 2, windowMs: 30000 }),
+      useModeration({ broadcasterId: 'FIX-P03-2', userId: 'mod1', maxActions: 2, windowMs: 30000 }),
     )
     let ok1
     await act(async () => { ok1 = await result.current.ban('u1', 'alice') })
@@ -199,7 +199,7 @@ describe('useModeration — rate limit local', () => {
     Date.now = vi.fn(() => now)
     try {
       const { result } = renderHook(() =>
-        useModeration({ broadcasterId: '111', maxActions: 3, windowMs: 1000 }),
+        useModeration({ broadcasterId: '111', userId: 'mod1', maxActions: 3, windowMs: 1000 }),
       )
       for (let i = 0; i < 3; i++) {
         await act(async () => { await result.current.ban(`u${i}`, `u${i}`) })
@@ -233,7 +233,7 @@ describe('useModeration — audit log persistencia', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('audit log se guarda en localStorage por canal', async () => {
-    const { result } = renderHook(() => useModeration({ broadcasterId: 'C1' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: 'C1', userId: 'mod1' }))
     await act(async () => { await result.current.ban('u1', 'alice') })
     await act(async () => { await result.current.ban('u2', 'bob') })
     const stored = JSON.parse(localStorage.getItem('bs.modAudit.C1'))
@@ -248,13 +248,13 @@ describe('useModeration — audit log persistencia', () => {
       { id: '1', timestamp: 1000, action: 'ban', target: 'u1', targetName: 'old', success: true },
     ]
     localStorage.setItem('bs.modAudit.C2', JSON.stringify(seed))
-    const { result } = renderHook(() => useModeration({ broadcasterId: 'C2' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: 'C2', userId: 'mod1' }))
     await waitFor(() => expect(result.current.auditLog).toHaveLength(1))
     expect(result.current.auditLog[0].targetName).toBe('old')
   })
 
   it('clearAuditLog vacia el log del canal actual', async () => {
-    const { result } = renderHook(() => useModeration({ broadcasterId: 'C3' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: 'C3', userId: 'mod1' }))
     await act(async () => { await result.current.ban('u1', 'alice') })
     expect(result.current.auditLog).toHaveLength(1)
     act(() => result.current.clearAuditLog())
@@ -264,7 +264,7 @@ describe('useModeration — audit log persistencia', () => {
 
   it('audit log circular: max 100 entradas', async () => {
     // Hago el test con maxActions alto
-    const { result: r2 } = renderHook(() => useModeration({ broadcasterId: 'C5', maxActions: 200 }))
+    const { result: r2 } = renderHook(() => useModeration({ broadcasterId: 'C5', userId: 'mod1', maxActions: 200 }))
     for (let i = 0; i < 120; i++) {
       await act(async () => { await r2.current.ban(`u${i}`, `u${i}`) })
     }
@@ -285,7 +285,7 @@ describe('useModeration — chat modes + clear', () => {
   })
 
   it('setChatMode: audita con action=chat_mode, target=mode', async () => {
-    const { result } = renderHook(() => useModeration({ broadcasterId: 'C6' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: 'C6', userId: 'mod1' }))
     let ok
     await act(async () => { ok = await result.current.setChatMode('slow', '30') })
     expect(ok).toBe(true)
@@ -295,7 +295,7 @@ describe('useModeration — chat modes + clear', () => {
   })
 
   it('clearChat: audita con action=clear, target=channel', async () => {
-    const { result } = renderHook(() => useModeration({ broadcasterId: 'C7' }))
+    const { result } = renderHook(() => useModeration({ broadcasterId: 'C7', userId: 'mod1' }))
     let ok
     await act(async () => { ok = await result.current.clearChat() })
     expect(ok).toBe(true)

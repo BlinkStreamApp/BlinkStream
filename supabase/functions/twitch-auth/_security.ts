@@ -124,6 +124,7 @@ const ALLOWED_ORIGINS = new Set<string>([
   // Frontend BlinkStream
   "https://oncbojnqxpxctwnhehau.supabase.co",
   "http://localhost:1420",
+  "http://localhost:5173",
   "http://localhost:3000",
   // Tauri desktop
   "tauri://localhost",
@@ -159,10 +160,18 @@ export interface OriginCheckResult {
 
 export function validateOriginReferer(
   req: Request,
-  opts: { isTwitchCallback: boolean; isDebug: boolean },
+  opts: { isTwitchCallback: boolean; isAuthRedirect?: boolean; isPolling?: boolean; isDebug: boolean },
 ): OriginCheckResult {
   // Callback de Twitch: eximir validacion de Origin/Referer
   if (opts.isTwitchCallback) {
+    return { valid: true };
+  }
+  // Auth redirect: el sistema operativo abre el navegador sin Origin ni Referer
+  if (opts.isAuthRedirect) {
+    return { valid: true };
+  }
+  // Polling: token single-use, validacion UUID v4 + rate limit 60/min
+  if (opts.isPolling) {
     return { valid: true };
   }
   // Debug endpoint: el gate real esta en isDebugEnabled() upstream
@@ -276,43 +285,6 @@ export function getClientIp(req: Request): string {
   return req.headers.get("x-real-ip") ?? "unknown";
 }
 
-// ============= Single-Use Token (Issue #3) =============
-// Invalida el token inmediatamente despues de la primera lectura exitosa.
-// Usa UPDATE atomico con condicion consumed_at IS NULL para evitar
-// race conditions entre polls concurrentes.
-//
-// NOTA: Si la columna consumed_at no existe (schema legacy), fallback
-// a DELETE (que ya es single-use por naturaleza).
-type SqlTemplate = (
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-) => Promise<unknown[]>;
-
-export async function consumeSingleUseToken(
-  sql: SqlTemplate,
-  requestId: string,
-): Promise<boolean> {
-  try {
-    const result = await sql`
-      UPDATE public.auth_tokens
-      SET consumed_at = NOW()
-      WHERE request_id = ${requestId} AND consumed_at IS NULL
-      RETURNING request_id
-    `;
-    return Array.isArray(result) && result.length > 0;
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    if (/column .*consumed_at/i.test(errMsg) || /does not exist/i.test(errMsg)) {
-      const del = await sql`
-        DELETE FROM public.auth_tokens
-        WHERE request_id = ${requestId}
-        RETURNING request_id
-      `;
-      return Array.isArray(del) && del.length > 0;
-    }
-    throw err;
-  }
-}
 
 // ============= Debug Mode Gate (Issue #1) =============
 // El endpoint ?debug=1 SOLO esta activo si ENABLE_DEBUG=true.

@@ -117,7 +117,7 @@ export function clearRateLimitState(channelId) {
  * @param {UseModerationOptions} opts
  * @returns {UseModerationReturn}
  */
-export function useModeration({ broadcasterId, maxActions = 20, windowMs = 30000 } = {}) {
+export function useModeration({ broadcasterId, userId: moderatorId, maxActions = 20, windowMs = 30000 } = {}) {
   const [auditLog, setAuditLog] = useState([])
   const [isRateLimited, setIsRateLimited] = useState(false)
   const [remainingActions, setRemainingActions] = useState(maxActions)
@@ -252,9 +252,9 @@ export function useModeration({ broadcasterId, maxActions = 20, windowMs = 30000
   // Acciones ----------------------------------------------------------
 
   const ban = useCallback(async (targetUserId, username, reason) => {
-    if (!broadcasterId) return false
+    if (!broadcasterId || !moderatorId) return false
     if (!_checkAndClaimSlot()) return false
-    const result = await banUser(broadcasterId, targetUserId, reason)
+    const result = await banUser(broadcasterId, moderatorId, targetUserId, reason)
     if (result.success) {
       // Solo consumimos rate limit si la accion fue exitosa.
       _recordRate()
@@ -264,12 +264,12 @@ export function useModeration({ broadcasterId, maxActions = 20, windowMs = 30000
     // Falla: NO consumimos rate limit (FIX P0-3).
     _appendAudit({ action: 'ban', target: targetUserId, targetName: username, reason, success: false, error: result.error?.message })
     return false
-  }, [broadcasterId, _checkAndClaimSlot, _recordRate, _appendAudit])
+  }, [broadcasterId, moderatorId, _checkAndClaimSlot, _recordRate, _appendAudit])
 
   const unban = useCallback(async (targetUserId, username) => {
-    if (!broadcasterId) return false
+    if (!broadcasterId || !moderatorId) return false
     if (!_checkAndClaimSlot()) return false
-    const result = await unbanUser(broadcasterId, targetUserId)
+    const result = await unbanUser(broadcasterId, moderatorId, targetUserId)
     if (result.success) {
       _recordRate()
       _appendAudit({ action: 'unban', target: targetUserId, targetName: username, success: true })
@@ -277,16 +277,16 @@ export function useModeration({ broadcasterId, maxActions = 20, windowMs = 30000
     }
     _appendAudit({ action: 'unban', target: targetUserId, targetName: username, success: false, error: result.error?.message })
     return false
-  }, [broadcasterId, _checkAndClaimSlot, _recordRate, _appendAudit])
+  }, [broadcasterId, moderatorId, _checkAndClaimSlot, _recordRate, _appendAudit])
 
   /**
    * Timeout wrapper: usa banUser con duration. banUser ya soporta
    * `duration` en segundos; reusamos el helper para no duplicar logica.
    */
   const timeout = useCallback(async (targetUserId, username, duration, reason) => {
-    if (!broadcasterId) return false
+    if (!broadcasterId || !moderatorId) return false
     if (!_checkAndClaimSlot()) return false
-    const result = await banUser(broadcasterId, targetUserId, reason, duration)
+    const result = await banUser(broadcasterId, moderatorId, targetUserId, reason, duration)
     if (result.success) {
       _recordRate()
       _appendAudit({ action: 'timeout', target: targetUserId, targetName: username, reason, duration, success: true })
@@ -294,13 +294,13 @@ export function useModeration({ broadcasterId, maxActions = 20, windowMs = 30000
     }
     _appendAudit({ action: 'timeout', target: targetUserId, targetName: username, reason, duration, success: false, error: result.error?.message })
     return false
-  }, [broadcasterId, _checkAndClaimSlot, _recordRate, _appendAudit])
+  }, [broadcasterId, moderatorId, _checkAndClaimSlot, _recordRate, _appendAudit])
 
   const untimeout = useCallback(async (targetUserId, username) => {
     // Twitch: untimeout = unban. Mismo endpoint.
-    if (!broadcasterId) return false
+    if (!broadcasterId || !moderatorId) return false
     if (!_checkAndClaimSlot()) return false
-    const result = await unbanUser(broadcasterId, targetUserId)
+    const result = await unbanUser(broadcasterId, moderatorId, targetUserId)
     if (result.success) {
       _recordRate()
       _appendAudit({ action: 'untimeout', target: targetUserId, targetName: username, success: true })
@@ -308,12 +308,12 @@ export function useModeration({ broadcasterId, maxActions = 20, windowMs = 30000
     }
     _appendAudit({ action: 'untimeout', target: targetUserId, targetName: username, success: false, error: result.error?.message })
     return false
-  }, [broadcasterId, _checkAndClaimSlot, _recordRate, _appendAudit])
+  }, [broadcasterId, moderatorId, _checkAndClaimSlot, _recordRate, _appendAudit])
 
   const deleteMessage = useCallback(async (messageId, username) => {
-    if (!broadcasterId) return false
+    if (!broadcasterId || !moderatorId) return false
     if (!_checkAndClaimSlot()) return false
-    const result = await deleteChatMessage(broadcasterId, messageId)
+    const result = await deleteChatMessage(broadcasterId, moderatorId, messageId)
     if (result.success) {
       _recordRate()
       _appendAudit({ action: 'delete', target: messageId, targetName: username || 'msg', success: true })
@@ -321,7 +321,7 @@ export function useModeration({ broadcasterId, maxActions = 20, windowMs = 30000
     }
     _appendAudit({ action: 'delete', target: messageId, targetName: username || 'msg', success: false, error: result.error?.message })
     return false
-  }, [broadcasterId, _checkAndClaimSlot, _recordRate, _appendAudit])
+  }, [broadcasterId, moderatorId, _checkAndClaimSlot, _recordRate, _appendAudit])
 
   /**
    * /clear via IRC: mandamos el comando por el WebSocket del chat. Aqui

@@ -12,7 +12,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prebuild": "node scripts/check-legacy.mjs",
+    "prebuild:win": "powershell -ExecutionPolicy Bypass -File scripts/check-legacy.ps1",
+    "prebuild:node": "node scripts/check-legacy.mjs",
+    "check:legacy": "powershell -ExecutionPolicy Bypass -File scripts/check-legacy.ps1"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

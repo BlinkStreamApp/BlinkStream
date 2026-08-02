@@ -54,9 +54,9 @@ export default function AboutDialog({ onClose }) {
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="bg-bg-secondary/80 backdrop-blur-md border border-bg-tertiary/50 rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-bg-tertiary/50">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-md animate-fade-in" onClick={onClose}>
+      <div className="bg-bg-secondary/85 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.7)] w-full max-w-sm max-h-[calc(100vh-2.5rem)] overflow-y-auto transform transition-all animate-scale-up shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/5">
           <h2 className="text-sm font-bold text-text-primary">Acerca de BlinkStream</h2>
           <button onClick={onClose} className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors">
             <CloseIcon />

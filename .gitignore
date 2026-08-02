@@ -1,4 +1,4 @@
-﻿# Logs
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -44,3 +44,11 @@ lint.json
 
 # Debug files
 debug_*.txt
+build_output_*.txt
+
+# AI agents, backups and external tool vaults
+.claude/
+.mojibake_backup/
+.obsidian-vault/
+.gemini/
+.agents/

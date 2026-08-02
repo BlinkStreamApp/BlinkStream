@@ -10,6 +10,22 @@
 // servimos a quien los pida.
 
 import { isTauri } from './tauriEnv'
+// FIX WT-20260628-82 (Bug A): import del circuit-breaker para limpiarlo
+// cuando el usuario hace login exitoso o logout. Asi el siguiente effect
+// que se dispare puede volver a pegarle a la nube sin spamear.
+// Import lazy para evitar circular import (favoritesSync.js importa de
+// supabase.js, no al reves).
+let _clearAuthBrokenFlag = null
+async function getClearAuthBrokenFlag() {
+  if (_clearAuthBrokenFlag) return _clearAuthBrokenFlag
+  try {
+    const mod = await import('./favoritesSync')
+    _clearAuthBrokenFlag = mod.clearAuthBrokenFlag
+    return _clearAuthBrokenFlag
+  } catch {
+    return null
+  }
+}
 
 export const SUPABASE_URL = 'https://oncbojnqxpxctwnhehau.supabase.co'
 
@@ -256,6 +272,12 @@ async function saveBlinkstreamToken({ jwt, refreshToken, expiresIn, userId }) {
     localStorage.setItem(LS_BLINKSTREAM_EXPIRES, String(expiresAtMs))
     if (userId) localStorage.setItem(LS_BLINKSTREAM_USER_ID, userId)
 
+    // FIX WT-20260628-82 (Bug A): nuevo token = nuevo login. Limpiar el
+    // circuit-breaker de favoritesSync para que el siguiente merge no
+    // se quede corto-circuitado por el fallo anterior.
+    const clearFlag = await getClearAuthBrokenFlag()
+    if (clearFlag) clearFlag()
+
     // S-4 fix: el refresh token va al keychain, no a localStorage.
     if (refreshToken) {
       await storeBlinkstreamRefreshToken(refreshToken)
@@ -279,6 +301,9 @@ export function clearBlinkstreamToken() {
   // clearBlinkstreamToken se invoca en paths sincronos (logout) y no
   // esperamos al keychain.
   clearBlinkstreamRefreshToken().catch(() => { /* ignore */ })
+  // FIX WT-20260628-82 (Bug A): logout resetea el circuit-breaker
+  // para que el siguiente login empiece de cero. Fire-and-forget.
+  getClearAuthBrokenFlag().then(fn => { if (fn) fn() }).catch(() => { /* ignore */ })
 }
 
 /**

@@ -4,11 +4,46 @@ import { getBlinkstreamToken, refreshBlinkstreamToken, clearBlinkstreamToken } f
 
 const DATA_FN = `${SUPABASE_URL}/functions/v1/blinkstream-data`
 
+// FIX WT-20260628-82 (Bug A): circuit-breaker a nivel de modulo.
+// Si la nube nos devuelve 401 definitivo (sin token post-refresh),
+// seteamos authBroken=true. A partir de ahi TODOS los calls a
+// authedFetch devuelven inmediatamente una Response 401 sintetica sin
+// tocar la red. Asi cortamos el loop infinito de 500+ requests que
+// se observaba en el log del .exe cuando el usuario no estaba
+// logueado o su token estaba vencido.
+//
+// Se limpia (vuelve a false) cuando el usuario hace login exitoso
+// (ver saveBlinkstreamToken en supabase.js) o logout (via
+// clearBlinkstreamToken -> clearAuthBrokenFlag).
+let authBroken = false
+
+export function isAuthBroken() {
+  return authBroken
+}
+
+export function clearAuthBrokenFlag() {
+  authBroken = false
+}
+
 // Wrapper interno: hace fetch con Authorization Bearer y un unico retry
 // automatico en 401 (rotando el JWT via twitch-auth?refresh=). Si despues
 // del retry sigue 401, devolvemos el error para que el caller degrade
 // elegantemente (favoritos quedan locales).
+//
+// FIX WT-20260628-82: antes del fetch, comprobar el circuit-breaker.
+// Si esta abierto (authBroken=true), devolvemos una Response 401
+// sintetica para no salir a la red.
 async function authedFetch(url, options = {}) {
+  // Circuit-breaker: si la ultima llamada cerro el circuito, no salir
+  // a la red. Devolvemos 401 sintetico para que el caller degrade bien.
+  if (authBroken) {
+    return new Response(JSON.stringify({ error: 'auth_broken' }), {
+      status: 401,
+      statusText: 'Unauthorized',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   const buildHeaders = (token) => ({
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -16,16 +51,38 @@ async function authedFetch(url, options = {}) {
   })
 
   let token = getBlinkstreamToken()
+  if (!token) {
+    authBroken = true
+    return new Response(JSON.stringify({ error: 'no_token' }), {
+      status: 401,
+      statusText: 'Unauthorized',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
   let res = await fetch(url, { ...options, headers: buildHeaders(token) })
 
-  if (res.status === 401 && token) {
-    // Token vencido o invalido. Intentar refresh UNA vez.
-    const fresh = await refreshBlinkstreamToken()
-    if (fresh) {
-      res = await fetch(url, { ...options, headers: buildHeaders(fresh) })
+  if (res.status === 401) {
+    if (token) {
+      // Token vencido o invalido. Intentar refresh UNA vez.
+      const fresh = await refreshBlinkstreamToken()
+      if (fresh) {
+        res = await fetch(url, { ...options, headers: buildHeaders(fresh) })
+        if (res.status === 401) {
+          // Refresh NO resolvio el 401. Abrir circuit-breaker.
+          authBroken = true
+          clearBlinkstreamToken()
+        }
+      } else {
+        // No pudimos refrescar: limpiar estado y abrir circuit-breaker.
+        authBroken = true
+        clearBlinkstreamToken()
+      }
     } else {
-      // No pudimos refrescar: limpiar estado para forzar re-login.
-      clearBlinkstreamToken()
+      // No hay token: 401 era esperable. Abrimos el circuit-breaker
+      // para que los siguientes effects que se re-ejecuten (por
+      // cambio de favorites u otros deps) NO spameen la red.
+      // Se cierra cuando el usuario haga login.
+      authBroken = true
     }
   }
 

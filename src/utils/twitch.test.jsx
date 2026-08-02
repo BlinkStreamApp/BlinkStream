@@ -22,12 +22,9 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 describe('twitch.js — constants', () => {
-  it('PUBLIC_CLIENT_ID y APP_CLIENT_ID son strings no vacios', () => {
-    // Pueden ser los legacy fallbacks o los del .env, pero siempre strings.
+  it('PUBLIC_CLIENT_ID y APP_CLIENT_ID son strings', () => {
     expect(typeof PUBLIC_CLIENT_ID).toBe('string')
-    expect(PUBLIC_CLIENT_ID.length).toBeGreaterThan(0)
     expect(typeof APP_CLIENT_ID).toBe('string')
-    expect(APP_CLIENT_ID.length).toBeGreaterThan(0)
   })
 })
 
@@ -151,7 +148,7 @@ https://test-streams.example.com/480p.m3u8
     expect(gqlCall[0]).toContain('gql.twitch.tv/gql')
     const gqlBody = JSON.parse(gqlCall[1].body)
     expect(gqlBody.query).toContain('streamPlaybackAccessToken')
-    expect(gqlBody.query).toContain('tester')
+    expect(gqlBody.variables).toEqual({ channelName: 'tester' })
 
     // Verificamos que el usher recibio el token/sig decodificados.
     const usherCall = fetchSpy.mock.calls[1]

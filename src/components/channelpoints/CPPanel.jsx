@@ -43,9 +43,13 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
     broadcasterId: isBroadcaster ? null : broadcasterId, // si es broadcaster, NO usamos viewer hook (lo gestiona el manage)
     userToken,
     userId,
+    channel,
   })
 
-  const manage = useManageRewards({ broadcasterId })
+  const manage = useManageRewards({
+    broadcasterId: isBroadcaster ? broadcasterId : null,
+    token: userToken,
+  })
 
   // Tab activa. Si no es broadcaster, no puede ir a manage.
   const [tab, setTab] = useState(isBroadcaster ? 'manage' : 'rewards')
@@ -138,14 +142,14 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
       {/* Backdrop clickeable */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[99998] bg-black/30 backdrop-blur-sm animate-fade-in"
           onClick={onClose}
         />
       )}
 
       {/* Panel */}
       <aside
-        className={`fixed top-0 right-0 h-full z-50 bg-bg-secondary border-l border-bg-tertiary/40 shadow-2xl flex flex-col
+        className={`fixed top-0 right-0 h-full z-[99999] bg-bg-secondary border-l border-bg-tertiary/40 shadow-2xl flex flex-col
           transition-transform duration-240 ${open ? 'translate-x-0' : 'translate-x-full'}`}
         style={{ width: PANEL_WIDTH, transitionDuration: '240ms' }}
         aria-hidden={!open}
@@ -172,17 +176,36 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
           </button>
         </div>
 
-        {/* Balance (solo viewer) */}
+        {/* Balance / Catálogo Informativo (solo viewer) */}
         {!isBroadcaster && (
-          <div className="px-4 py-2.5 bg-bg-tertiary/20 border-b border-bg-tertiary/30">
+          <div className="px-4 py-3 bg-gradient-to-r from-twitch/15 via-purple-500/10 to-transparent border-b border-twitch/20">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-text-muted">{t('cp.balance.estimated')}</span>
-              <span className="text-[13px] font-bold text-yellow-400">
-                {viewer.balance != null ? viewer.balance.toLocaleString('es-ES') : '—'}
-              </span>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-twitch/20 flex items-center justify-center text-twitch">
+                  <CoinsIcon />
+                </div>
+                <span className="text-[12px] font-semibold text-text-primary">
+                  {viewer.balance == null ? t('cp.balance.catalog') : t('cp.balance.estimated')}
+                </span>
+              </div>
+              {viewer.balance != null ? (
+                <span
+                  className="text-[14px] font-extrabold text-yellow-400 font-mono tracking-tight drop-shadow-sm"
+                  title="Saldo sincronizado con Twitch"
+                >
+                  {viewer.balance.toLocaleString('es-ES')}
+                </span>
+              ) : (
+                <span
+                  className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-twitch/20 text-twitch border border-twitch/30"
+                  title="Por política de Twitch, tu saldo no se expone a apps de terceros por API pública."
+                >
+                  {t('cp.balance.private')}
+                </span>
+              )}
             </div>
-            <p className="text-[10px] text-text-muted/70 mt-1 italic leading-relaxed">
-              {t('cp.balance.disclaimer')}
+            <p className="text-[11px] text-text-muted/90 mt-2.5 leading-relaxed bg-bg-secondary/70 p-2.5 rounded-lg border border-bg-tertiary/40 backdrop-blur-sm shadow-inner">
+              {viewer.balance == null ? t('cp.balance.disclaimer_private') : t('cp.balance.disclaimer')}
             </p>
           </div>
         )}
@@ -227,8 +250,10 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
           {tab === 'rewards' && (
             <div className="space-y-3">
               {viewer.error && (
-                <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                  {viewer.error}
+                <div className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 font-mono break-all">
+                  <div className="font-bold mb-1">Error:</div>
+                  <div>{viewer.error}</div>
+                  <div className="text-[10px] text-red-400/60 mt-1">Ctrl+Shift+I para más detalles</div>
                 </div>
               )}
               {viewer.loading && viewer.rewards.length === 0 ? (

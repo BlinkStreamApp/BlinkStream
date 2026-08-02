@@ -2,7 +2,7 @@
 // Cobertura: formatViewers, formatDuration y formatDurationHMS
 // (ver WT-20260628-01 / M-4 y WT-20260628-52 / FIX P1 deduplicacion).
 import { describe, it, expect } from 'vitest'
-import { formatViewers, formatDuration, formatDurationHMS } from './format'
+import { formatViewers, formatDuration, formatDurationHMS, adjustColorContrast } from './format'
 
 describe('formatViewers', () => {
   it('formatea miles con un decimal + sufijo k', () => {
@@ -13,11 +13,8 @@ describe('formatViewers', () => {
     expect(formatViewers(0)).toBe('0')
   })
 
-  it('formatea millones con sufijo k (el codigo no tiene rama M, documentamos)', () => {
-    // NOTA: formatViewers solo maneja miles (k). No tiene rama para millones.
-    // Para 1.5M devuelve "1500.0k" — esto es una limitacion conocida del
-    // formatter. La mejora (sufijo M) queda como deuda tecnica.
-    expect(formatViewers(1500000)).toBe('1500.0k')
+  it('formatea millones con sufijo M (deuda tecnica resuelven en v1.0.4)', () => {
+    expect(formatViewers(1500000)).toBe('1.5M')
   })
 
   it('deja numeros pequenos sin sufijo', () => {
@@ -35,11 +32,8 @@ describe('formatDuration', () => {
     expect(formatDuration(65)).toBe('1:05')
   })
 
-  it('formatea 3661s como 61:01 (sin segmento de horas, ver codigo real)', () => {
-    // NOTA: la implementacion actual de formatDuration NO maneja horas
-    // (devuelve m:ss, no h:mm:ss). Documentamos el comportamiento real
-    // y dejamos la mejora como deuda tecnica.
-    expect(formatDuration(3661)).toBe('61:01')
+  it('formatea 3661s como 1:01:01 (segmento de horas con padding)', () => {
+    expect(formatDuration(3661)).toBe('1:01:01')
   })
 
   it('formatea 0s como 0:00', () => {
@@ -84,5 +78,23 @@ describe('formatDurationHMS', () => {
   it('trata null/undefined como 0', () => {
     expect(formatDurationHMS(null)).toBe('00:00:00')
     expect(formatDurationHMS(undefined)).toBe('00:00:00')
+  })
+})
+
+describe('adjustColorContrast', () => {
+  it('deja intacto un color claro o con suficiente luminiscencia', () => {
+    expect(adjustColorContrast('#a78bfa')).toBe('#a78bfa')
+  })
+
+  it('aclara un color excesivamente oscuro (#000033) para garantizar legibilidad WCAG AAA', () => {
+    const res = adjustColorContrast('#000033')
+    expect(res).not.toBe('#000033')
+    expect(res).toMatch(/^#[0-9a-f]{6}$/i)
+  })
+
+  it('devuelve el color de fallback para valores nulos o vacíos', () => {
+    expect(adjustColorContrast(null)).toBe('#adadb8')
+    expect(adjustColorContrast('')).toBe('#adadb8')
+    expect(adjustColorContrast('red')).toBe('red')
   })
 })

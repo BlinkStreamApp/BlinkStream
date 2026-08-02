@@ -1,4 +1,4 @@
-﻿use std::path::PathBuf;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
@@ -13,6 +13,7 @@ use wait_timeout::ChildExt;
 // se referencian directamente desde recorder::*.
 mod recorder;
 pub use recorder::{start_recording, stop_recording};
+pub mod installer;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -46,6 +47,7 @@ const TWITCH_APP_CLIENT_ID: &str = match option_env!("TWITCH_CLIENT_ID") {
     Some(id) if !id.is_empty() => id,
     _ => LEGACY_FALLBACK_CLIENT_ID,
 };
+const TWITCH_WEB_CLIENT_ID: &str = "kimne78kx3ncx6brgo4mv6wki5h1ko"; // ALLOWED-REGRESSION: Twitch GQL exige este Client ID para tokens de reproducción y VODs
 
 // El warning se imprime UNA SOLA VEZ por sesion del proceso (no por request).
 // Usamos std::sync::Once para no spammear logs en cada clip/VOD resuelto.
@@ -64,7 +66,11 @@ fn warn_legacy_client_id_once() {
     });
 }
 
-const LEGACY_FALLBACK_CLIENT_ID: &str = "kimne78kx3ncx6brgo4mv6wki5h1ko";
+// FIX WT-20260628-134: fallback a BlinkStream App Client ID del .env
+// (z8bat49d2evj5nkmg5kmkge24sa7z9) en vez de un Client ID first-party
+// de terceros que Twitch puede revocar en cualquier momento. Si
+// TWITCH_CLIENT_ID esta configurado, este const nunca se usa.
+const LEGACY_FALLBACK_CLIENT_ID: &str = "z8bat49d2evj5nkmg5kmkge24sa7z9";
 
 
 pub fn try_lock_single_instance(name: &str) -> bool {
@@ -146,9 +152,15 @@ const SLUG_RE: &str = r"^[a-zA-Z0-9_-]{1,100}$";
 // Solo dígitos, 1-20 caracteres de margen.
 const VOD_ID_RE: &str = r"^[0-9]{1,20}$";
 
+static CHANNEL_REGEX: std::sync::LazyLock<regex_lite::Regex> =
+    std::sync::LazyLock::new(|| regex_lite::Regex::new(CHANNEL_RE).expect("CHANNEL_RE estático"));
+static SLUG_REGEX: std::sync::LazyLock<regex_lite::Regex> =
+    std::sync::LazyLock::new(|| regex_lite::Regex::new(SLUG_RE).expect("SLUG_RE estático"));
+static VOD_ID_REGEX: std::sync::LazyLock<regex_lite::Regex> =
+    std::sync::LazyLock::new(|| regex_lite::Regex::new(VOD_ID_RE).expect("VOD_ID_RE estático"));
+
 fn validate_channel(name: &str) -> Result<(), String> {
-    let re = regex_lite::Regex::new(CHANNEL_RE).expect("CHANNEL_RE estático - no debería fallar");
-    if !re.is_match(name) {
+    if !CHANNEL_REGEX.is_match(name) {
         return Err(
             "Nombre de canal inválido. Solo letras, números y guión bajo (3-25 caracteres)."
                 .into(),
@@ -160,8 +172,7 @@ fn validate_channel(name: &str) -> Result<(), String> {
 /// Valida un slug de clip de Twitch. Devuelve Ok solo si cumple
 /// `^[a-zA-Z0-9_-]{1,100}$`. Esto blinda contra inyección GraphQL.
 fn validate_slug(slug: &str) -> Result<(), String> {
-    let re = regex_lite::Regex::new(SLUG_RE).expect("SLUG_RE estático - no debería fallar");
-    if !re.is_match(slug) {
+    if !SLUG_REGEX.is_match(slug) {
         return Err(
             "Slug de clip inválido. Solo letras, números, guion y guion bajo (1-100 caracteres)."
                 .into(),
@@ -172,8 +183,7 @@ fn validate_slug(slug: &str) -> Result<(), String> {
 
 /// Valida un VOD ID de Twitch. Debe ser numérico (1-20 dígitos).
 fn validate_vod_id(vod_id: &str) -> Result<(), String> {
-    let re = regex_lite::Regex::new(VOD_ID_RE).expect("VOD_ID_RE estático - no debería fallar");
-    if !re.is_match(vod_id) {
+    if !VOD_ID_REGEX.is_match(vod_id) {
         return Err("VOD ID inválido. Debe ser numérico (1-20 dígitos).".into());
     }
     Ok(())
@@ -409,15 +419,83 @@ fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<(String, String), St
 // El Mutex RECORDING tambien vive ahora en recorder.rs (single source of truth).
 
 #[tauri::command]
-fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Result<String, String> {
+async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Result<String, String> {
     validate_channel(&channel)?;
-    let (stdout, stderr) = run_streamlink(&app, &[&format!("twitch.tv/{}", channel), &quality, "--stream-url"])?;
-    let url = stdout.trim().to_string();
-    if url.is_empty() {
-        Err(format!("Streamlink no devolvió URL. stderr: {}", stderr.trim()))
-    } else {
-        Ok(url)
+    // FIX WT-20260628-88: Twitch HLS playlists devuelven 403 si la request
+    // no lleva un token valido (puede ser de usuario o app). Orden de
+    // resolucion:
+    //   1) `twitch_token` del keychain (usuario logueado) — mas permisos
+    //      (subscriber-only, prime, etc.) y priorizado por el frontend.
+    //   2) App Access Token via `get_app_token()` (client_credentials).
+    //      Autentica la request al playlist endpoint sin necesitar user.
+    //      Es el camino que resuelve el 403 cuando el usuario esta en
+    //      modo guest pero el stream no es totalmente publico.
+    //   3) Sin token (ultimo recurso): streamlink usara su propio
+    //      client_id de terceros; el 403 puede volver, pero no rompemos
+    //      el flujo ni lanzamos panic.
+    let mut args: Vec<String> = vec![
+        format!("twitch.tv/{}", channel),
+        quality,
+        "--stream-url".to_string(),
+    ];
+
+    let mut resolved_token: Option<String> = None;
+
+    // 1) Token de usuario (keychain).
+    if let Ok(token) = get_secret("twitch_token".to_string()).await {
+        if !token.is_empty() {
+            resolved_token = Some(token);
+        }
     }
+
+    // 2) Fallback a app token si no hay user token. get_app_token ya
+    //    cachea en memoria con TTL, asi que esto NO agrega un round-trip
+    //    a Twitch en cada preview.
+    if resolved_token.is_none() {
+        match get_app_token().await {
+            Ok(v) => {
+                if let Some(t) = v.get("token").and_then(|x| x.as_str()) {
+                    if !t.is_empty() {
+                        resolved_token = Some(t.to_string());
+                        log::info!(
+                            "get_stream_url: usando app token (no user token en keychain)"
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                // No es fatal: streamlink probara sin token. Logueamos
+                // para que el operador sepa por que volvio el 403 si
+                // vuelve.
+                log::warn!("get_stream_url: get_app_token fallo: {}", e);
+            }
+        }
+    }
+
+    if let Some(token) = resolved_token {
+        args.push("--twitch-api-header".to_string());
+        args.push(format!("Authorization=Bearer {}", token));
+    }
+
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let (stdout, stderr) = run_streamlink(&app, &arg_refs)?;
+    let url = stdout.trim().to_string();
+
+    // FIX WT-20260628-86: si streamlink falla (quality no disponible,
+    // canal offline, etc.) stdout arranca con "error: ..." en vez de
+    // una URL. Antes el codigo lo trataba como URL valida, se la pasaba
+    // a HLS.js y reventaba con un error opaco de CSP. Detectar y
+    // retornar un error explicito con sugerencia accionable.
+    if url.starts_with("error:") {
+        return Err(format!(
+            "Streamlink fallo: {}. Usa 'worst' o 'best' como quality para evitar este error (las qualities exactas como '480p' o '480p30' dependen del canal).",
+            url
+        ));
+    }
+    if url.is_empty() {
+        return Err(format!("Streamlink no devolvió URL. stderr: {}", stderr.trim()));
+    }
+    Ok(url)
 }
 
 /// Devuelve la URL del MASTER PLAYLIST (contiene todas las calidades).
@@ -463,6 +541,55 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
         variant_url
     );
     Ok(variant_url.to_string())
+}
+
+/// Trae el contenido de un M3U8 desde una URL externa sin restricciones CORS.
+/// Lo usa el frontend `StreamPreview.jsx` para evitar el error CORS al cargar
+/// el m3u8 directamente desde el webview.
+///
+/// Patron de Lecs/2026-06-23-fixes-cors-quality-loop.md: el webview del Tauri
+/// no puede hacer fetch a `*.ttvnw.net` por CSP, pero el backend Rust SI
+/// puede (sin CSP). Devolvemos el contenido del m3u8 al frontend, que lo
+/// envuelve en un Blob URL same-origin para que hls.js lo consuma sin CORS.
+///
+/// Whitelist explicita: solo permitimos hosts de Twitch / CDN de Twitch.
+/// Asi evitamos que esta command se use como proxy abierto a Internet.
+#[tauri::command]
+async fn fetch_m3u8_content(url: String) -> Result<String, String> {
+    // Sanity check de seguridad: solo URLs HTTPS hacia hosts conocidos.
+    if !url.starts_with("https://")
+        || (!url.contains("ttvnw.net")
+            && !url.contains("twitch.tv")
+            && !url.contains("cloudfront.net"))
+    {
+        return Err(format!("URL no permitida por seguridad: {}", url));
+    }
+
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
+
+    let response = client
+        .get(&url)
+        .header("Client-ID", TWITCH_WEB_CLIENT_ID)
+        .send()
+        .await
+        .map_err(|e| format!("Error en fetch: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("HTTP {}: {}", status, url));
+    }
+
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("Error leyendo respuesta: {}", e))?;
+
+    log::info!("fetch_m3u8_content: OK ({} bytes, {})", text.len(), url);
+    Ok(text)
 }
 
 const DEFAULT_QUALITIES: &[&str] = &[
@@ -573,7 +700,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
 
     let response = client
         .post("https://gql.twitch.tv/gql")
-        .header("Client-Id", TWITCH_APP_CLIENT_ID)
+        .header("Client-Id", TWITCH_WEB_CLIENT_ID)
         .json(&body)
         .send()
         .await
@@ -605,8 +732,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
         "Twitch API: respuesta inválida".to_string()
     })?;
 
-    let clip = data.get("data").and_then(|d| d.get("clip"));
-    if clip.is_none() {
+    let Some(clip) = data.get("data").and_then(|d| d.get("clip")) else {
         // S-6: el cuerpo puede contener HTML/JSON de error con info sensible;
         // nunca se lo devolvemos al frontend.
         log::error!(
@@ -615,9 +741,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
             &text[..200.min(text.len())]
         );
         return Err("Twitch API: clip no encontrado".to_string());
-    }
-    
-    let clip = clip.expect("clip debe existir");
+    };
     
     let source_url = clip.get("videoQualities")
         .and_then(|q| q.as_array())
@@ -668,7 +792,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
 
     let response = client
         .post("https://gql.twitch.tv/gql")
-        .header("Client-Id", TWITCH_APP_CLIENT_ID)
+        .header("Client-Id", TWITCH_WEB_CLIENT_ID)
         .json(&body)
         .send()
         .await
@@ -738,7 +862,7 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
 
     let gql_res = client
         .post("https://gql.twitch.tv/gql")
-        .header("Client-Id", TWITCH_APP_CLIENT_ID)
+        .header("Client-Id", TWITCH_WEB_CLIENT_ID)
         .header("Content-Type", "application/json")
         .json(&gql_body)
         .send()
@@ -779,7 +903,7 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
 
     let usher_res = client
         .get(&usher_url)
-        .header("Client-Id", TWITCH_APP_CLIENT_ID)
+        .header("Client-Id", TWITCH_WEB_CLIENT_ID)
         .send()
         .await
         .map_err(|e| format!("Error conectando con Twitch Usher: {}", e))?;
@@ -991,6 +1115,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        // FIX WT-20260628-77: DevTools se habilitan via la feature flag
+        // "devtools" en el crate `tauri` (ver Cargo.toml). NO se
+        // inicializa aqui como `.plugin(...)` porque en Tauri 2.x no
+        // existe el crate separado `tauri-plugin-devtools`; los DevTools
+        // son built-in y se activan automaticamente cuando la feature
+        // esta presente y `tauri.conf.json -> build.devtools = true`.
         .invoke_handler(tauri::generate_handler![
             store_secret,
             get_secret,
@@ -999,6 +1129,7 @@ pub fn run() {
             get_available_qualities,
             get_direct_stream_url,
             get_master_playlist,
+            fetch_m3u8_content,
             get_twitch_clip_url,
             get_vod_manifest_url,
             start_recording,
@@ -1009,10 +1140,31 @@ pub fn run() {
             recorder::recorder_get_global_state,
             recorder::recorder_list_active,
             recorder::recorder_get_full_state,
+            // Comandos IPC del Instalador/Bootstrapper
+            installer::get_bootstrapper_mode,
+            installer::get_default_install_dir,
+            installer::install_blinkstream_custom,
+            installer::launch_installed_app_and_exit,
+            installer::uninstall_blinkstream_custom,
         ])
         .setup(|app| {
             let mut labels_to_close = Vec::new();
             warn_legacy_client_id_once();
+
+            // Configurar ventana modal de 768x580px en caso de arrancar en modo instalador o desinstalador
+            if let Some(main_win) = app.get_webview_window("main") {
+                let mode = installer::detect_bootstrapper_mode();
+                if mode == "installer" || mode == "uninstaller" {
+                    let size = tauri::PhysicalSize::new(768, 580);
+                    let _ = main_win.set_min_size(Some(size));
+                    let _ = main_win.set_size(size);
+                    let _ = main_win.set_max_size(Some(size));
+                    let _ = main_win.set_resizable(false);
+                    let _ = main_win.center();
+                    let title = if mode == "installer" { "BlinkStream Setup" } else { "Desinstalar BlinkStream" };
+                    let _ = main_win.set_title(title);
+                }
+            }
 
             // G1 / WT-20260628-16: carga el estado global de grabacion
             // desde disco al Mutex en memoria. Si el archivo no existe

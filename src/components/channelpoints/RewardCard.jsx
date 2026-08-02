@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { t } from '../../utils/i18n'
 
 /**
  * Convierte segundos a string "Xh Ym" / "Ym Zs" / "Zs".
@@ -118,7 +119,7 @@ export default function RewardCard({ reward, userBalance, channelLive = true, on
           )}
           {disabled && disabledReason && (
             <span className="text-[10px] text-red-400/80 truncate">
-              {disabledReason.replace('cp.reward.disabled.', '')}
+              {t(disabledReason)}
             </span>
           )}
         </div>
