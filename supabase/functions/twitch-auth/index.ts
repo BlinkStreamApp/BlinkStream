@@ -42,7 +42,7 @@ function buildSecurityHeaders(): Record<string, string> {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store, no-cache, must-revalidate, private",
-    "Content-Security-Policy": "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'",
+    "Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;",
   };
 }
 
@@ -521,7 +521,7 @@ async function handleCallback(
       return html(getErrorHtml("Error guardando sesion: " + msg), securityHeaders, corsHeaders);
     }
 
-    // ✅ Mostrar pagina de exito. El frontend hara polling para obtener el token.
+    // âœ… Mostrar pagina de exito. El frontend hara polling para obtener el token.
     return html(getSuccessHtml(username), securityHeaders, corsHeaders);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -553,15 +553,15 @@ function handleAuthRedirect(
   authUrl.searchParams.set("client_id", TWITCH_CLIENT_ID);
   authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
   authUrl.searchParams.set("response_type", "code");
-  // F-2 fix: scopes actualizados (chat + moderación + channel points).
+  // F-2 fix: scopes actualizados (chat + moderaciÃ³n + channel points).
   // === TWITCH OAUTH SCOPES (11 total) ===
   // Chat (IRC):
   //   chat:read                       - leer mensajes via IRC (USERSTATE, PRIVMSG, etc.)
   //   chat:edit                       - enviar mensajes via IRC
   // Follows:
-  //   user:edit:follows               - follow/unfollow programático
+  //   user:edit:follows               - follow/unfollow programÃ¡tico
   //   user:read:follows               - listar follows del usuario
-  // Moderación (requiere ser mod en el canal objetivo):
+  // ModeraciÃ³n (requiere ser mod en el canal objetivo):
   //   moderator:manage:chat_messages  - /delete, /clear, pin/unpin
   //   moderator:manage:banned_users   - /ban, /unban, /timeout, /untimeout
   //   moderator:manage:chat_settings  - /slow, /followers, /emoteonly, /subscribers
@@ -596,13 +596,12 @@ function html(
   securityHeaders: Record<string, string>,
   corsHeaders: Record<string, string>,
 ): Response {
-  return new Response(body, {
-    headers: {
-      ...securityHeaders,
-      ...corsHeaders,
-      "Content-Type": "text/html; charset=utf-8",
-    },
+  const headers = new Headers({
+    ...securityHeaders,
+    ...corsHeaders,
+    "content-type": "text/html; charset=utf-8",
   });
+  return new Response(body, { status: 200, headers });
 }
 function json(
   data: Record<string, unknown>,
@@ -610,14 +609,12 @@ function json(
   securityHeaders: Record<string, string>,
   corsHeaders: Record<string, string>,
 ): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      ...securityHeaders,
-      ...corsHeaders,
-      "Content-Type": "application/json",
-    },
+  const headers = new Headers({
+    ...securityHeaders,
+    ...corsHeaders,
+    "content-type": "application/json; charset=utf-8",
   });
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
 function getSuccessHtml(username: string): string {

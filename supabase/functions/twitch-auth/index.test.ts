@@ -1,4 +1,4 @@
-﻿// supabase/functions/twitch-auth/index.test.ts
+// supabase/functions/twitch-auth/index.test.ts
 // Tests Deno de P0-3 hardening para twitch-auth edge function
 //
 // Ejecutar con:

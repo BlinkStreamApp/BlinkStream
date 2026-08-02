@@ -1,4 +1,4 @@
-﻿{
+{
   "imports": {
     "zod": "https://deno.land/x/zod@v3.23.8/mod.ts",
     "postgres": "npm:postgres@3.4.5",

@@ -1,4 +1,4 @@
-﻿// BlinkStream Data Sync - Security Tests
+// BlinkStream Data Sync - Security Tests
 // Ejecutar con: deno test --allow-net --allow-env supabase/functions/blinkstream-data/index.test.ts
 //
 // Cobertura:

@@ -1,4 +1,4 @@
-﻿// BlinkStream Data Sync - Validation Schemas
+// BlinkStream Data Sync - Validation Schemas
 // Schemas zod para validar inputs de la edge function.
 
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";

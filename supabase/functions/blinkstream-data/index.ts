@@ -1,4 +1,4 @@
-﻿// BlinkStream Data Sync - HARDENED v2
+// BlinkStream Data Sync - HARDENED v2
 // CRUD de favoritos con auth real, CORS estricto, rate limiting y queries parametrizadas.
 //
 // Endpoints (compatibles con v1):

@@ -1,4 +1,4 @@
-﻿// supabase/functions/twitch-auth/_security.ts
+// supabase/functions/twitch-auth/_security.ts
 // Helpers de seguridad centralizados para twitch-auth edge function
 //
 // Issues cubiertos (de ERR-WT-20260624-008):
