@@ -620,33 +620,33 @@ function json(
 function getSuccessHtml(username: string): string {
   return `
 ================================================================================
-                           [ âœ“ ]  B L I N K S T R E A M
+                          [ OK ]  B L I N K S T R E A M
 ================================================================================
 
-  Â¡ConexiÃ³n con Twitch completada con Ã©xito!
+  Conexion con Twitch completada con exito.
 
-  Has iniciado sesiÃ³n correctamente como:
-  ðŸ‘‰ ${username}
+  Has iniciado sesion correctamente como:
+  -> ${username}
 
 --------------------------------------------------------------------------------
-  âœ“ Ya puedes cerrar de forma segura esta ventana del navegador.
-  âœ“ Vuelve a la aplicaciÃ³n de BlinkStream; tu sesiÃ³n iniciarÃ¡ en unos segundos.
+  * Ya puedes cerrar de forma segura esta ventana del navegador.
+  * Vuelve a la aplicacion de BlinkStream; tu sesion iniciara en unos segundos.
 ================================================================================
 `.trim();
 }
 function getErrorHtml(msg: string): string {
   return `
 ================================================================================
-                           [ ! ]  B L I N K S T R E A M
+                       [ ERROR ]  B L I N K S T R E A M
 ================================================================================
 
-  Â¡Vaya! No se pudo completar el inicio de sesiÃ³n con Twitch.
+  No se pudo completar el inicio de sesion con Twitch.
 
   Motivo del error:
-  ðŸ‘‰ ${msg}
+  -> ${msg}
 
 --------------------------------------------------------------------------------
-  âœ— Por favor, cierra esta pestaÃ±a y vuelve a intentarlo desde la aplicaciÃ³n.
+  * Por favor, cierra esta pestana y vuelve a intentarlo desde la aplicacion.
 ================================================================================
 `.trim();
 }
