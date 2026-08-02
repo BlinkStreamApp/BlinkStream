@@ -43,8 +43,8 @@
 ### Windows
 Download the official installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases). Existing installations update automatically:
 - ⭐ **`BlinkStream-Setup_1.1.0_Custom.exe`** *(Recommended — 100% Custom Twitch-themed setup with path selection)*
-- `BlinkStream_1.1.0_x64-setup.exe` *(Standard NSIS installer)*
-- `BlinkStream_1.1.0_x64_en-US.msi` *(Enterprise MSI installer)*
+- `BlinkStream_1.1.0_Win_x64.exe` *(Standard NSIS installer)*
+- `BlinkStream_1.1.0_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
 > **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
