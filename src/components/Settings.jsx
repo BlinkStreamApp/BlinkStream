@@ -189,13 +189,23 @@ export default function Settings({ onClose }) {
 
               <div>
                 <label className="text-xs font-medium text-text-secondary mb-2 block">Idioma</label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { id: 'es', label: '🇪🇸 Español' },
                     { id: 'en', label: '🇬🇧 English' },
+                    { id: 'fr', label: '🇫🇷 Français' },
+                    { id: 'de', label: '🇩🇪 Deutsch' },
+                    { id: 'pt', label: '🇵🇹 Português' },
+                    { id: 'ja', label: '🇯🇵 日本語' },
+                    { id: 'ko', label: '🇰🇷 한국어' },
+                    { id: 'ru', label: '🇷🇺 Русский' },
                   ].map(({ id, label }) => (
                     <button key={id} onClick={() => { setLang(id); setLanguage(id) }}
-                      className={`text-[12px] px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${lang === id ? 'bg-twitch/20 text-twitch' : 'bg-bg-tertiary text-text-muted hover:bg-hover'}`}>
+                      className={`text-[12px] px-3 py-2 rounded-xl border text-center font-medium cursor-pointer transition-all ${
+                        lang === id
+                          ? 'bg-twitch/20 text-white border-twitch shadow-sm shadow-twitch/10 font-bold'
+                          : 'bg-bg-tertiary/60 text-text-muted border-white/5 hover:bg-hover hover:border-white/10 hover:text-text-primary'
+                      }`}>
                       {label}
                     </button>
                   ))}

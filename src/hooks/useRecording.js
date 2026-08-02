@@ -106,10 +106,15 @@ export function useRecording() {
     let path = suggestedPath
     if (!path) {
       try {
+        const recFormat = (() => { try { return localStorage.getItem('blinkstream_rec_format') || 'mp4' } catch { return 'mp4' } })()
+        const recPath = (() => { try { return localStorage.getItem('blinkstream_rec_path') || '' } catch { return '' } })()
+        const fileName = `${channel}_${new Date().toISOString().replace(/[:.]/g, '-')}.${recFormat}`
+        const fullDefault = recPath ? `${recPath}\\${fileName}` : fileName
+
         const { save } = await import('@tauri-apps/plugin-dialog')
         path = await save({
-          defaultPath: `${channel}_${Date.now()}.ts`,
-          filters: [{ name: 'Video', extensions: ['ts', 'mp4'] }],
+          defaultPath: fullDefault,
+          filters: [{ name: 'Video', extensions: [recFormat, 'mp4', 'ts'].filter((v, i, a) => a.indexOf(v) === i) }],
         })
       } catch (e) {
         const msg = typeof e === 'string' ? e : e?.message || String(e)

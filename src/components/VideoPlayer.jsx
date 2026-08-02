@@ -153,6 +153,15 @@ export default function VideoPlayer({
 
   useEffect(() => { volumeRef.current = volume }, [volume])
 
+  useEffect(() => {
+    if (streamUrl && channel && !recording && localStorage.getItem('blinkstream_rec_autostart') === 'true') {
+      const timer = setTimeout(() => {
+        startRecording(channel).catch(() => {})
+      }, 2500)
+      return () => clearTimeout(timer)
+    }
+  }, [streamUrl, channel, recording, startRecording])
+
   // ── Sistema ORIGINAL: get_stream_url con calidad específica ──
   const fetchStream = useCallback(async (ch, q) => {
     if (!ch) return
