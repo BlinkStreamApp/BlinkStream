@@ -160,9 +160,9 @@ jobs:
           fi
           DMG_PATH="src-tauri/target/${{ matrix.target }}/release/bundle/dmg/$DMG_NAME"
           echo "🔏 Generando signature para auto-updater..."
-          # Escribir clave a archivo temporal seguro y firmar el DMG
+          # Escribir clave a archivo temporal seguro y firmar el DMG con contraseña explícita
           python3 -c "import os; open('/tmp/tauri-key.pem','w').write(os.environ['TAURI_PRIVATE_KEY'].strip())"
-          npx @tauri-apps/cli signer sign --private-key "$(cat /tmp/tauri-key.pem)" "$DMG_PATH"
+          npx @tauri-apps/cli signer sign --private-key "$(cat /tmp/tauri-key.pem)" --password "$TAURI_KEY_PASSWORD" "$DMG_PATH"
           rm -f /tmp/tauri-key.pem
           echo "✅ Signature: ${DMG_NAME}.sig"
 
