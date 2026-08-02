@@ -193,11 +193,13 @@ export default function MultiStreamGrid({
             {activeChatChannel ? (
               <Suspense fallback={<ChatFallback />}>
                 <Chat
+                  key={activeChatChannel}
                   channel={activeChatChannel}
                   isLoggedIn={isLoggedIn}
                   twitchToken={twitchToken}
                   twitchUsername={twitchUsername}
                   broadcasterId=""
+                  isGridMode={true}
                 />
               </Suspense>
             ) : (

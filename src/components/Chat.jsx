@@ -211,13 +211,19 @@ function UserCardPopup({ username, position, onClose }) {
 
 let msgIdCounter = 0
 
-const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage, onContextMenu }) => {
+const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage, onContextMenu, isGridMode }) => {
   return (
     <div
       className={`flex items-baseline gap-1.5 text-sm leading-relaxed hover:bg-white/[0.04] px-2.5 py-1.5 my-0.5 rounded-xl border border-transparent hover:border-white/[0.05] transition-all group/msg animate-fade-in ${msg.isNotice ? 'bg-twitch/10 border-l-2 border-l-twitch/70 pl-3 my-1 rounded-l-none shadow-sm' : ''}`}
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, msg) : undefined}
     >
       <div className="flex items-center gap-1 shrink-0 select-none self-center">
+        {isGridMode && msg.channel && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded mr-1 bg-gradient-to-r from-twitch/40 to-fuchsia-600/40 border border-twitch/60 text-fuchsia-200 font-extrabold text-[10px] tracking-tight shadow-sm select-none self-center uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse" />
+            {msg.channel}
+          </span>
+        )}
         {msg.badges.length > 0 && (
           <span className="inline-flex gap-0.5 items-center mr-0.5">
             {msg.badges.map((b, i) => {
@@ -255,7 +261,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
   )
 })
 
-export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken }) {
+export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken, isGridMode }) {
   const t = useT()
   const [messages, setMessages] = useState([])
   const [antiSpam, setAntiSpam] = useState(() => {
@@ -851,6 +857,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
     // efecto siguiente ya depende de `channel`/`connError` vía el closure.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setConnError('')
+    setMessages([])
     lineBufferRef.current = ''
     
     // Búfer por lotes (Batching Buffer) para evitar tormentas de re-renders
@@ -962,6 +969,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
 
             msgBatch.push({
               id: ++msgIdCounter,
+              channel,
               user: displayName,
               user_id: parsed['user-id'] || '',
               user_login: displayName.toLowerCase(),
@@ -995,6 +1003,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
 
           msgBatch.push({
             id: ++msgIdCounter,
+            channel,
             user: userRaw,
             user_id: userId,
             user_login: userRaw.toLowerCase(),
@@ -1081,6 +1090,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
     if (cmd) {
       setMessages(prev => [...prev, {
         id: ++msgIdCounter,
+        channel,
         user: auth.username,
         color: '#bf94ff',
         message: text,
@@ -1297,6 +1307,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
                   setUserCard={setUserCard}
                   renderMessage={renderMessage}
                   onContextMenu={isModerator ? handleContextMenu : undefined}
+                  isGridMode={isGridMode}
                 />
               ))}
           </div>
