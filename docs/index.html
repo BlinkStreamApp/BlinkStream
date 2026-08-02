@@ -525,6 +525,138 @@
     .footer-links a:hover {
       color: white;
     }
+
+    /* Roadmap Timeline Section */
+    .roadmap-container {
+      max-width: 980px;
+      margin: 0 auto 8rem;
+      position: relative;
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 2.5rem;
+      border-left: 2px solid rgba(145, 71, 255, 0.25);
+      margin-top: 2rem;
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 3.5rem;
+      background: var(--card-bg);
+      backdrop-filter: blur(18px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2.5rem 2.25rem;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .timeline-item:hover {
+      transform: translateX(6px);
+      border-color: var(--card-border-hover);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 35px rgba(145, 71, 255, 0.15);
+    }
+
+    .timeline-dot {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      left: -2.5rem;
+      top: 2.5rem;
+      transform: translateX(-10px);
+      border: 4px solid var(--bg-dark);
+      box-shadow: 0 0 15px currentColor;
+    }
+
+    .dot-current { background: #4ade80; color: #4ade80; }
+    .dot-next { background: var(--twitch-purple); color: var(--twitch-purple); }
+    .dot-future { background: var(--cyan-glow); color: var(--cyan-glow); }
+    .dot-horizon { background: #ffbd2e; color: #ffbd2e; }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 1rem;
+    }
+
+    .timeline-title {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: white;
+    }
+
+    .timeline-tag {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.3rem 0.85rem;
+      border-radius: 999px;
+    }
+
+    .tag-active { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.4); }
+    .tag-pro { background: rgba(145, 71, 255, 0.18); color: var(--twitch-glow); border: 1px solid rgba(145, 71, 255, 0.4); }
+    .tag-plan { background: rgba(0, 242, 255, 0.15); color: var(--cyan-glow); border: 1px solid rgba(0, 242, 255, 0.4); }
+    .tag-horizon { background: rgba(255, 189, 46, 0.15); color: #ffbd2e; border: 1px solid rgba(255, 189, 46, 0.4); }
+
+    .roadmap-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .roadmap-cols { grid-template-columns: 1fr; gap: 1.5rem; }
+    }
+
+    .roadmap-col h4 {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #dfdfea;
+    }
+
+    .roadmap-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .roadmap-list li {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      line-height: 1.5;
+    }
+
+    .roadmap-list li::before {
+      content: '▸';
+      color: var(--twitch-glow);
+      font-weight: 700;
+    }
+
+    .roadmap-cta-block {
+      text-align: center;
+      margin-top: 3rem;
+      padding: 2rem;
+      background: rgba(255,255,255,0.03);
+      border: 1px dashed rgba(255,255,255,0.15);
+      border-radius: 16px;
+    }
   </style>
 </head>
 <body>
@@ -546,6 +678,7 @@
 
       <ul class="nav-links">
         <li><a href="#caracteristicas">Características</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
         <li><a href="https://github.com/BlinkStreamApp/BlinkStream/releases" target="_blank">Releases</a></li>
         <li><a href="https://github.com/BlinkStreamApp/BlinkStream" target="_blank">Repositorio</a></li>
       </ul>
@@ -656,6 +789,133 @@
         <div class="feature-icon">🌙</div>
         <h3>Diseño Dark-Mode OLED</h3>
         <p>Una interfaz con tonos oscuros profundos, contrastes calibrados en HSL y bordes de cristal esmerilado concebida para cuidar tus ojos en extensas sesiones de streaming.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Roadmap Section -->
+  <section class="container" id="roadmap">
+    <h2 class="section-title">Roadmap Técnico & Futuro</h2>
+    <p class="section-desc">
+      Una visión transparente de nuestra evolución arquitectónica y visual. Nuestro objetivo es liderar el estándar mundial en clientes de streaming nativo de escritorio.
+    </p>
+
+    <div class="roadmap-container">
+      <div class="timeline">
+
+        <!-- Phase 1 -->
+        <div class="timeline-item">
+          <div class="timeline-dot dot-current"></div>
+          <div class="timeline-header">
+            <div class="timeline-title">Fase 1: v1.1.x — Calidad, Estabilidad & Fluidez (Q3 2026)</div>
+            <span class="timeline-tag tag-active">En Despliegue</span>
+          </div>
+          <div class="roadmap-cols">
+            <div class="roadmap-col">
+              <h4>🎨 Mejoras UI / UX</h4>
+              <ul class="roadmap-list">
+                <li><strong>Modo Cine Minimalista:</strong> Interfaz autoprotegida que esconde bordes y controles en pantalla completa.</li>
+                <li><strong>Dock Lateral Plegable:</strong> Barra flotante ultrarrápida para alternar al instante entre canales seguidos en vivo.</li>
+                <li><strong>Notificaciones Acústicas & Toast:</strong> Avisos auditivos en tiempo real en el milisegundo exacto en que tus streamers inician directo.</li>
+              </ul>
+            </div>
+            <div class="roadmap-col">
+              <h4>⚙️ Funcionalidades Core</h4>
+              <ul class="roadmap-list">
+                <li><strong>Decodificación por Hardware AV1/H.265:</strong> Optimización avanzada para tarjetas gráficas de última generación.</li>
+                <li><strong>Filtros Anti-Spam Inteligentes:</strong> Compresión mediante expresiones regulares de inundaciones masivas en el chat en torneos.</li>
+                <li><strong>Capturador Instantáneo (Ctrl+Shift+S):</strong> Guardado de fotogramas HD sin pérdida directamente en el disco duro.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="timeline-item">
+          <div class="timeline-dot dot-next"></div>
+          <div class="timeline-header">
+            <div class="timeline-title">Fase 2: v1.3.x — La Expansión "Pro Command Center" (Q4 2026)</div>
+            <span class="timeline-tag tag-pro">Próximo Hito</span>
+          </div>
+          <div class="roadmap-cols">
+            <div class="roadmap-col">
+              <h4>🎨 Mejoras UI / UX</h4>
+              <ul class="roadmap-list">
+                <li><strong>Picture-in-Picture (PiP) Siempre Activo:</strong> Ventana flotante sin bordes ni fondo, ideal sobre videojuegos a pantalla completa.</li>
+                <li><strong>Arquitecto de Temas HSL:</strong> Calibración de color personalizada más allá del púrpura (Cyan Neón, Cyberpunk Gold, OLED Puro).</li>
+                <li><strong>Grid Multi-Stream:</strong> Visualización simultánea de hasta 4 canales en directo con mezclador de audio independiente.</li>
+              </ul>
+            </div>
+            <div class="roadmap-col">
+              <h4>⚙️ Funcionalidades Core</h4>
+              <ul class="roadmap-list">
+                <li><strong>Auto-Reclamador de Twitch Drops:</strong> Dashboard en segundo plano con progresión exacta y recolección automática de recompensas de videojuegos.</li>
+                <li><strong>Gestor de Descarga VOD & Clips:</strong> Motor integrado para descargar transmisiones pasadas en MP4 a máxima velocidad.</li>
+                <li><strong>Integración con Stream Deck & Macros:</strong> Atajos globales de teclado físicos para pronósticos y puntos de canal.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 3 -->
+        <div class="timeline-item">
+          <div class="timeline-dot dot-future"></div>
+          <div class="timeline-header">
+            <div class="timeline-title">Fase 3: v1.6.x — Analíticas & Inmersión de Comunidad (Q1 2027)</div>
+            <span class="timeline-tag tag-plan">En Planificación</span>
+          </div>
+          <div class="roadmap-cols">
+            <div class="roadmap-col">
+              <h4>🎨 Mejoras UI / UX</h4>
+              <ul class="roadmap-list">
+                <li><strong>HUD de Telemetría ("Nerd Stats"):</strong> Medidor en tiempo real de FPS, bitrate de red (Kbps), latencia y uso real de memoria RAM.</li>
+                <li><strong>Widget de Encuestas & Pronósticos:</strong> Banners glassmorphic sobre el vídeo para votar con puntos de canal de forma ultrarrápida.</li>
+                <li><strong>Fuentes y Emblemas Custom:</strong> Control tipográfico y reemplazo local de emblemas del chat a tu gusto.</li>
+              </ul>
+            </div>
+            <div class="roadmap-col">
+              <h4>⚙️ Funcionalidades Core</h4>
+              <ul class="roadmap-list">
+                <li><strong>Repetición de Chat Sincronizada:</strong> Reproducción temporal exacta de las reacciones de la comunidad durante VODs grabados.</li>
+                <li><strong>Resumen con IA Local:</strong> Procesamiento ligero en dispositivo para resumir qué pasó en el stream si te fuiste unos minutos.</li>
+                <li><strong>Modo Ahorro de Ancho de Banda:</strong> Reducción inteligente de tasa de datos en ventanas secundarias minimizadas.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 4 -->
+        <div class="timeline-item">
+          <div class="timeline-dot dot-horizon"></div>
+          <div class="timeline-header">
+            <div class="timeline-title">Fase 4: v2.0.0 — El Horizonte Open-Source (2027)</div>
+            <span class="timeline-tag tag-horizon">Visión Larga</span>
+          </div>
+          <div class="roadmap-cols">
+            <div class="roadmap-col">
+              <h4>🌐 Ecosystem & Ecosistema</h4>
+              <ul class="roadmap-list">
+                <li><strong>Soporte Linux Universal:</strong> Distribuciones certificadas en AppImage, Flatpak y Snap.</li>
+                <li><strong>Optimización Apple Silicon (macOS):</strong> Compilación nativa M1/M2/M3/M4 con soporte para Apple TouchBar y vídeo por hardware.</li>
+                <li><strong>Mando Remoto Móvil por Wi-Fi:</strong> Transforma tu teléfono en un control remoto táctil para tu BlinkStream de escritorio en el salón.</li>
+              </ul>
+            </div>
+            <div class="roadmap-col">
+              <h4>🔌 Extensibilidad & SDK</h4>
+              <ul class="roadmap-list">
+                <li><strong>SDK para Plugins y Widgets:</strong> API local segura en sandbox para que desarrolladores y streamers construyan extensiones y bots de chat directamente dentro de la app.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="roadmap-cta-block">
+        <p style="margin-bottom: 1rem; color: #dfdfea; font-weight: 500;">¿Tienes una propuesta o deseas consultar la documentación técnica completa?</p>
+        <a href="https://github.com/BlinkStreamApp/BlinkStream/blob/master/ROADMAP.md" target="_blank" class="cta-button">
+          📋 Ver ROADMAP.md Oficial en GitHub
+        </a>
       </div>
     </div>
   </section>
