@@ -94,13 +94,11 @@ export default function GridCell({
       hls.loadSource(streamUrl)
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (isPlaying) {
-          video.play().catch(() => {/* ignore play policy error */})
-        }
+        video.play().then(() => setIsPlaying(true)).catch(() => {/* ignore play policy error */})
       })
       hlsRef.current = hls
     }
-  }, [streamUrl, isPlaying])
+  }, [streamUrl])
 
   // Ajuste preciso y seguro de volumen
   useEffect(() => {
@@ -123,11 +121,18 @@ export default function GridCell({
   const togglePlayPause = () => {
     const video = videoRef.current
     if (!video) return
-    if (isPlaying) {
+    if (!video.paused) {
       video.pause()
+      if (hlsRef.current) {
+        try { hlsRef.current.stopLoad() } catch { /* ignore */ }
+      }
       setIsPlaying(false)
     } else {
+      if (hlsRef.current) {
+        try { hlsRef.current.startLoad() } catch { /* ignore */ }
+      }
       video.play().then(() => setIsPlaying(true)).catch(() => {})
+      setIsPlaying(true)
     }
   }
 
@@ -195,6 +200,8 @@ export default function GridCell({
           ref={videoRef}
           className="w-full h-full object-contain cursor-pointer"
           onClick={togglePlayPause}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
           autoPlay
           playsInline
           muted={!isAudioFocused}
