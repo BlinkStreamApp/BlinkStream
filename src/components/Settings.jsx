@@ -74,6 +74,13 @@ export default function Settings({ onClose }) {
   )
 
   const t = useT()
+  const currentTabs = [
+    { id: 'general', label: t('tab.general', 'General') },
+    { id: 'account', label: t('tab.account', 'Cuenta') },
+    { id: 'moderation', label: t('tab.moderation', 'Moderación') },
+    { id: 'recording', label: t('tab.recording', 'Grabación') },
+    { id: 'advanced', label: t('tab.advanced', 'Avanzado') },
+  ]
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const stored = localStorage.getItem(LS_TAB_KEY)
@@ -126,13 +133,13 @@ export default function Settings({ onClose }) {
           </button>
         </div>
 
-        <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
+        <Tabs tabs={currentTabs} active={activeTab} onChange={setActiveTab} />
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {activeTab === 'general' && (
             <div className="space-y-5">
               <div>
-                <label className="text-xs font-medium text-text-secondary mb-1.5 block">Calidad de stream</label>
+                <label className="text-xs font-medium text-text-secondary mb-1.5 block">{t('set.streamQuality', 'Calidad de stream')}</label>
                 <select value={prefQuality} onChange={e => setPrefQuality(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm border border-bg-tertiary focus:border-twitch focus:outline-none transition-colors">
                   <option value="1080p60">1080p60</option>
@@ -140,41 +147,41 @@ export default function Settings({ onClose }) {
                   <option value="480p30">480p30</option>
                   <option value="360p30">360p30</option>
                   <option value="160p30">160p30</option>
-                  <option value="audio_only">Solo audio</option>
+                  <option value="audio_only">{t('set.audioOnly', 'Solo audio')}</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-text-secondary mb-1.5 block">Volumen predeterminado: {defaultVol}%</label>
+                <label className="text-xs font-medium text-text-secondary mb-1.5 block">{t('set.defaultVolume', 'Volumen predeterminado')}: {defaultVol}%</label>
                 <input type="range" min="0" max="100" value={defaultVol} onChange={e => setDefaultVol(Number(e.target.value))}
                   className="w-full accent-twitch" />
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-text-primary">Modo teatro automático</span>
+                <span className="text-sm text-text-primary">{t('set.autoTheatre', 'Modo teatro automático')}</span>
                 <ToggleSwitch active={autoTheatre} onClick={() => setAutoTheatre(p => !p)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-text-primary">Chat a la derecha</span>
+                <span className="text-sm text-text-primary">{t('set.chatRight', 'Chat a la derecha')}</span>
                 <ToggleSwitch active={chatOnRight} onClick={() => setChatOnRight(p => !p)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-text-primary">Modo compacto</span>
+                <span className="text-sm text-text-primary">{t('set.compactMode', 'Modo compacto')}</span>
                 <ToggleSwitch active={compactMode} onClick={() => setCompactMode(p => !p)} />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-text-secondary mb-2 block">Color de acento</label>
+                <label className="text-xs font-medium text-text-secondary mb-2 block">{t('set.accentColor', 'Color de acento')}</label>
                 <div className="flex gap-2 flex-wrap">
                   {[
-                    { id: 'purple', color: '#9146ff', label: 'Púrpura' },
-                    { id: 'blue', color: '#3b82f6', label: 'Azul' },
-                    { id: 'green', color: '#22c55e', label: 'Verde' },
-                    { id: 'orange', color: '#f97316', label: 'Naranja' },
-                    { id: 'pink', color: '#ec4899', label: 'Rosa' },
-                    { id: 'red', color: '#ef4444', label: 'Rojo' },
+                    { id: 'purple', color: '#9146ff', label: t('color.purple', 'Púrpura') },
+                    { id: 'blue', color: '#3b82f6', label: t('color.blue', 'Azul') },
+                    { id: 'green', color: '#22c55e', label: t('color.green', 'Verde') },
+                    { id: 'orange', color: '#f97316', label: t('color.orange', 'Naranja') },
+                    { id: 'pink', color: '#ec4899', label: t('color.pink', 'Rosa') },
+                    { id: 'red', color: '#ef4444', label: t('color.red', 'Rojo') },
                   ].map(({ id, color, label }) => (
                     <button key={id} onClick={() => setAccentColor(id)}
                       className="flex flex-col items-center gap-1 cursor-pointer"
@@ -188,7 +195,7 @@ export default function Settings({ onClose }) {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-text-secondary mb-2 block">Idioma</label>
+                <label className="text-xs font-medium text-text-secondary mb-2 block">{t('set.language', 'Idioma')}</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { id: 'es', label: '🇪🇸 Español' },
@@ -214,7 +221,7 @@ export default function Settings({ onClose }) {
 
               <div className="border-t border-bg-tertiary/50 pt-4">
                 <p className="text-[11px] text-text-muted/50 leading-relaxed">
-                  Los cambios se guardan automáticamente. Algunas opciones requieren reiniciar el stream.
+                  {t('set.footer', 'Los cambios se guardan automáticamente. Algunas opciones requieren reiniciar el stream.')}
                 </p>
               </div>
             </div>

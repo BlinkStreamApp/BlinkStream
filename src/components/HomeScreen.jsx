@@ -19,6 +19,7 @@ import { validateProps, isArray, optional } from '../utils/validateProps'
 import LiveBadge from './LiveBadge'
 import PhosphorIcon from './icons/PhosphorIcon'
 import StreamPreview from './StreamPreview'
+import { useT } from '../utils/i18n'
 
 function exactViewers(n) {
   if (n == null) return null
@@ -410,6 +411,7 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
  * @param {HomeScreenProps} props
  */
 export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, favorites, recentChannels = [], onRemoveRecent }) {
+  const t = useT()
   // M-7: validamos las props criticas que vienen del padre. No bloqueamos
   // la UI; solo loggeamos fallos para detectar drift de contrato temprano.
   const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
@@ -653,7 +655,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
             {!miniDock ? (
               <div className="flex items-center justify-between px-3 mb-2">
                 <span className="text-[12px] font-bold text-text-primary tracking-wide">
-                  Canales Favoritos
+                  {t('favChannels', 'Canales Favoritos')}
                 </span>
                 <div className="flex items-center gap-0.5">
                   <button
@@ -703,7 +705,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                 onClick={() => setSidebarExpanded(true)}
                 className="w-full text-left px-3 py-1.5 text-[12px] text-twitch hover:text-twitch-light cursor-pointer transition-colors"
               >
-                Mostrar más ({favorites.length - 5})
+                {t('showMore', 'Mostrar más')} ({favorites.length - 5})
               </button>
             )}
           </div>
@@ -714,7 +716,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
             {!miniDock && (
               <div className="px-3 mb-2">
                 <span className="text-[12px] font-bold text-text-primary tracking-wide">
-                  Vistos Recientemente
+                  {t('recentWatched', 'Vistos Recientemente')}
                 </span>
               </div>
             )}
@@ -737,7 +739,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                 onClick={() => setRecentExpanded(true)}
                 className="w-full text-left px-3 py-1.5 text-[12px] text-twitch hover:text-twitch-light cursor-pointer transition-colors"
               >
-                Mostrar más ({recentChannels.length - 5})
+                {t('showMore', 'Mostrar más')} ({recentChannels.length - 5})
               </button>
             )}
           </div>
@@ -751,10 +753,10 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
               className={`flex items-center gap-2.5 w-full rounded-xl text-[13px] text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all ${
                 miniDock ? 'p-2 justify-center w-auto' : 'px-3 py-2'
               }`}
-              title="Acerca de BlinkStream"
+              title={t('aboutTitle', 'Acerca de BlinkStream')}
             >
               <PhosphorIcon name="Info" size={18} weight="regular" className="shrink-0" />
-              {!miniDock && <span>Acerca de BlinkStream</span>}
+              {!miniDock && <span>{t('aboutTitle', 'Acerca de BlinkStream')}</span>}
             </button>
           </footer>
         )}
@@ -789,7 +791,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
 
           {topGames.length > 0 && (
             <section className="mb-6 animate-fade-in">
-              <SectionHeader title="Juegos populares" />
+              <SectionHeader title={t('topGames', 'Juegos populares')} />
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
                 {topGames.map(game => (
                   <button key={game.id} onClick={async () => {
@@ -816,11 +818,11 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
               {activeGameId && (
                 <div className="mt-4 p-3 rounded-xl bg-bg-secondary/50 border border-bg-tertiary/40">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-[13px] font-bold text-text-primary">En vivo ahora</h3>
+                    <h3 className="text-[13px] font-bold text-text-primary">{t('liveNow', 'En vivo ahora')}</h3>
                     <button onClick={() => { setActiveGameId(null); setGameStreams([]) }} className="text-[11px] text-text-muted hover:text-text-primary cursor-pointer">✕</button>
                   </div>
                   {gameLoading ? <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin" /></div>
-                  : gameStreams.length === 0 ? <p className="text-[12px] text-text-muted text-center py-2">No hay streams en vivo</p>
+                  : gameStreams.length === 0 ? <p className="text-[12px] text-text-muted text-center py-2">{t('noLiveStreams', 'No hay streams en vivo')}</p>
                   : (
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {gameStreams.map(s => (
@@ -864,7 +866,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
             if (!liveChannels.length) return null
             return (
               <section className="mb-8 animate-fade-in">
-                <SectionHeader title="Canales en vivo" />
+                <SectionHeader title={t('liveChannels', 'Canales en vivo')} />
                 <div className="grid gap-3 sm:gap-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))' }}>
                   {liveChannels.map(stream => (
                     <StreamCard key={stream.user_login} stream={stream} onSelect={onSelect} logo={channelLogos[stream.user_login.toLowerCase()]} />
@@ -876,7 +878,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
 
           {recentChannels.length > 0 && (
             <section className="mb-8 animate-fade-in">
-              <SectionHeader title="Vistos Recientemente" />
+              <SectionHeader title={t('recentWatched', 'Vistos Recientemente')} />
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
                 {recentChannels.map(name => {
                   const key = name.toLowerCase()

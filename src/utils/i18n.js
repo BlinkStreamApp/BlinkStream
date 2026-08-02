@@ -8,7 +8,7 @@
 // Uso: `import { useT } from '../utils/i18n'; const t = useT(); t('mod.tab.viewers')`
 // Si una key no existe en el idioma actual, cae a `es` y finalmente
 // al string de la key (mismo patron que antes).
-// ============================================================
+import { useState, useEffect, useCallback } from 'react'
 
 const translations = {
   es: {
@@ -197,6 +197,38 @@ const translations = {
     'uninst.btn.uninstalling': 'Limpiando archivos...',
     'uninst.success.title': 'BlinkStream se ha desinstalado',
     'uninst.success.desc': 'Gracias por haber usado nuestra aplicación. ¡Esperamos verte pronto!', // ALLOWED-REGRESSION: exclamacion espanol
+    // Interfaz UI general y Ajustes
+    'tab.general': 'General',
+    'tab.account': 'Cuenta',
+    'tab.moderation': 'Moderación',
+    'tab.recording': 'Grabación',
+    'tab.advanced': 'Avanzado',
+    'set.streamQuality': 'Calidad de stream',
+    'set.audioOnly': 'Solo audio',
+    'set.defaultVolume': 'Volumen predeterminado',
+    'set.autoTheatre': 'Modo teatro automático',
+    'set.chatRight': 'Chat a la derecha',
+    'set.compactMode': 'Modo compacto',
+    'set.accentColor': 'Color de acento',
+    'set.language': 'Idioma',
+    'set.footer': 'Los cambios se guardan automáticamente. Algunas opciones requieren reiniciar el stream.',
+    'color.purple': 'Púrpura',
+    'color.blue': 'Azul',
+    'color.green': 'Verde',
+    'color.orange': 'Naranja',
+    'color.pink': 'Rosa',
+    'color.red': 'Rojo',
+    'favChannels': 'Canales Favoritos',
+    'recentWatched': 'Vistos Recientemente',
+    'showMore': 'Mostrar más',
+    'topGames': 'Juegos populares',
+    'liveNow': 'En vivo ahora',
+    'noLiveStreams': 'No hay streams en vivo',
+    'liveChannels': 'Canales en vivo',
+    'aboutTitle': 'Acerca de BlinkStream',
+    'aboutDesc': 'Cliente ligero de Twitch sin anuncios. Transmisiones limpias, rápidas y sin interrupciones.',
+    'aboutCoffee': 'Invitar a un café',
+    'aboutMadeWith': 'Hecho con ♥ para la comunidad',
   },
   en: {
     // Legacy
@@ -384,6 +416,38 @@ const translations = {
     'uninst.btn.uninstalling': 'Cleaning up files...',
     'uninst.success.title': 'BlinkStream has been uninstalled',
     'uninst.success.desc': 'Thank you for using our app. We hope to see you again soon!',
+    // General UI and Settings
+    'tab.general': 'General',
+    'tab.account': 'Account',
+    'tab.moderation': 'Moderation',
+    'tab.recording': 'Recording',
+    'tab.advanced': 'Advanced',
+    'set.streamQuality': 'Stream Quality',
+    'set.audioOnly': 'Audio only',
+    'set.defaultVolume': 'Default Volume',
+    'set.autoTheatre': 'Auto Theatre Mode',
+    'set.chatRight': 'Chat on right side',
+    'set.compactMode': 'Compact Mode',
+    'set.accentColor': 'Accent Color',
+    'set.language': 'Language',
+    'set.footer': 'Changes are saved automatically. Some options require restarting the stream.',
+    'color.purple': 'Purple',
+    'color.blue': 'Blue',
+    'color.green': 'Green',
+    'color.orange': 'Orange',
+    'color.pink': 'Pink',
+    'color.red': 'Red',
+    'favChannels': 'Favorite Channels',
+    'recentWatched': 'Recently Watched',
+    'showMore': 'Show more',
+    'topGames': 'Top Games',
+    'liveNow': 'Live Now',
+    'noLiveStreams': 'No live streams',
+    'liveChannels': 'Live Channels',
+    'aboutTitle': 'About BlinkStream',
+    'aboutDesc': 'Lightweight Twitch client without ads. Clean, fast, and smooth streams.',
+    'aboutCoffee': 'Buy me a coffee',
+    'aboutMadeWith': 'Made with ♥ for the community',
   },
   fr: {
     search: 'Rechercher une chaîne...',
@@ -428,6 +492,37 @@ const translations = {
     emoteRecent: 'Récents',
     emoteChannel: 'De la chaîne',
     emoteGlobal: 'Globaux',
+    'tab.general': 'Général',
+    'tab.account': 'Compte',
+    'tab.moderation': 'Modération',
+    'tab.recording': 'Enregistrement',
+    'tab.advanced': 'Avancé',
+    'set.streamQuality': 'Qualité du stream',
+    'set.audioOnly': 'Audio uniquement',
+    'set.defaultVolume': 'Volume par défaut',
+    'set.autoTheatre': 'Mode cinéma auto',
+    'set.chatRight': 'Chat à droite',
+    'set.compactMode': 'Mode compact',
+    'set.accentColor': "Couleur d'accent",
+    'set.language': 'Langue',
+    'set.footer': 'Les modifications sont enregistrées automatiquement. Certaines options nécessitent le redémarrage du stream.',
+    'color.purple': 'Pourpre',
+    'color.blue': 'Bleu',
+    'color.green': 'Vert',
+    'color.orange': 'Orange',
+    'color.pink': 'Rose',
+    'color.red': 'Rouge',
+    'favChannels': 'Chaînes favorites',
+    'recentWatched': 'Récemment vus',
+    'showMore': 'Afficher plus',
+    'topGames': 'Jeux populaires',
+    'liveNow': 'En direct',
+    'noLiveStreams': 'Aucun stream en direct',
+    'liveChannels': 'Chaînes en direct',
+    'aboutTitle': 'À propos de BlinkStream',
+    'aboutDesc': 'Client Twitch léger et sans pub. Streams fluides et rapides.',
+    'aboutCoffee': "M'offrir un café",
+    'aboutMadeWith': 'Fait avec ♥ pour la communauté',
   },
   de: {
     search: 'Kanal suchen...',
@@ -472,6 +567,37 @@ const translations = {
     emoteRecent: 'Kürzlich',
     emoteChannel: 'Kanal',
     emoteGlobal: 'Global',
+    'tab.general': 'Allgemein',
+    'tab.account': 'Konto',
+    'tab.moderation': 'Moderation',
+    'tab.recording': 'Aufnahme',
+    'tab.advanced': 'Erweitert',
+    'set.streamQuality': 'Stream-Qualität',
+    'set.audioOnly': 'Nur Audio',
+    'set.defaultVolume': 'Standardlautstärke',
+    'set.autoTheatre': 'Autom. Theater-Modus',
+    'set.chatRight': 'Chat rechts',
+    'set.compactMode': 'Kompakt-Modus',
+    'set.accentColor': 'Akzentfarbe',
+    'set.language': 'Sprache',
+    'set.footer': 'Änderungen werden automatisch gespeichert. Einige Optionen erfordern einen Neustart des Streams.',
+    'color.purple': 'Lila',
+    'color.blue': 'Blau',
+    'color.green': 'Grün',
+    'color.orange': 'Orange',
+    'color.pink': 'Rosa',
+    'color.red': 'Rot',
+    'favChannels': 'Favorisierte Kanäle',
+    'recentWatched': 'Kürzlich angesehen',
+    'showMore': 'Mehr anzeigen',
+    'topGames': 'Beliebte Spiele',
+    'liveNow': 'Jetzt Live',
+    'noLiveStreams': 'Keine Live-Streams',
+    'liveChannels': 'Live-Kanäle',
+    'aboutTitle': 'Über BlinkStream',
+    'aboutDesc': 'Leichter Twitch-Client ohne Werbung. Saubere und schnelle Streams.',
+    'aboutCoffee': 'Spendier mir einen Kaffee',
+    'aboutMadeWith': 'Mit ♥ für die Community gemacht',
   },
   pt: {
     search: 'Buscar canal...',
@@ -516,6 +642,37 @@ const translations = {
     emoteRecent: 'Recentes',
     emoteChannel: 'Do canal',
     emoteGlobal: 'Globais',
+    'tab.general': 'Geral',
+    'tab.account': 'Conta',
+    'tab.moderation': 'Moderação',
+    'tab.recording': 'Gravação',
+    'tab.advanced': 'Avançado',
+    'set.streamQuality': 'Qualidade do stream',
+    'set.audioOnly': 'Apenas áudio',
+    'set.defaultVolume': 'Volume padrão',
+    'set.autoTheatre': 'Modo teatro auto',
+    'set.chatRight': 'Chat à direita',
+    'set.compactMode': 'Modo compacto',
+    'set.accentColor': 'Cor de destaque',
+    'set.language': 'Idioma',
+    'set.footer': 'As alterações são salvas automaticamente. Algumas opções exigem reiniciar a stream.',
+    'color.purple': 'Roxo',
+    'color.blue': 'Azul',
+    'color.green': 'Verde',
+    'color.orange': 'Laranja',
+    'color.pink': 'Rosa',
+    'color.red': 'Vermelho',
+    'favChannels': 'Canais Favoritos',
+    'recentWatched': 'Vistos Recentemente',
+    'showMore': 'Mostrar mais',
+    'topGames': 'Jogos populares',
+    'liveNow': 'Ao vivo agora',
+    'noLiveStreams': 'Nenhum stream ao vivo',
+    'liveChannels': 'Canais ao vivo',
+    'aboutTitle': 'Sobre o BlinkStream',
+    'aboutDesc': 'Cliente Twitch leve sem anúncios. Streams limpas e rápidas.',
+    'aboutCoffee': 'Pagar um café',
+    'aboutMadeWith': 'Feito com ♥ para a comunidade',
   },
   ja: {
     search: 'チャンネルを検索...',
@@ -560,6 +717,37 @@ const translations = {
     emoteRecent: '最近',
     emoteChannel: 'チャンネル',
     emoteGlobal: 'グローバル',
+    'tab.general': '一般',
+    'tab.account': 'アカウント',
+    'tab.moderation': 'モデレーション',
+    'tab.recording': '録画',
+    'tab.advanced': '詳細',
+    'set.streamQuality': 'ストリーム画質',
+    'set.audioOnly': '音声のみ',
+    'set.defaultVolume': 'デフォルト音量',
+    'set.autoTheatre': '自動シアターモード',
+    'set.chatRight': 'チャット右側配置',
+    'set.compactMode': 'コンパクトモード',
+    'set.accentColor': 'アクセントカラー',
+    'set.language': '言語',
+    'set.footer': '変更は自動的に保存されます。一部の設定はストリームの再起動が必要です。',
+    'color.purple': 'パープル',
+    'color.blue': 'ブルー',
+    'color.green': 'グリーン',
+    'color.orange': 'オレンジ',
+    'color.pink': 'ピンク',
+    'color.red': 'レッド',
+    'favChannels': 'お気に入りチャンネル',
+    'recentWatched': '最近見たチャンネル',
+    'showMore': 'もっと見る',
+    'topGames': '人気ゲーム',
+    'liveNow': 'ライブ配信中',
+    'noLiveStreams': 'ライブ配信はありません',
+    'liveChannels': 'ライブチャンネル',
+    'aboutTitle': 'BlinkStreamについて',
+    'aboutDesc': '広告なしの軽量Twitchクライアント。快適で高速な配信再生。',
+    'aboutCoffee': 'コーヒーを奢る',
+    'aboutMadeWith': 'コミュニティのために♥を込めて制作',
   },
   ko: {
     search: '채널 검색...',
@@ -604,6 +792,37 @@ const translations = {
     emoteRecent: '최근 사용',
     emoteChannel: '채널 전용',
     emoteGlobal: '공용',
+    'tab.general': '일반',
+    'tab.account': '계정',
+    'tab.moderation': '관리',
+    'tab.recording': '녹화',
+    'tab.advanced': '고급',
+    'set.streamQuality': '스트림 화질',
+    'set.audioOnly': '오디오 전용',
+    'set.defaultVolume': '기본 음량',
+    'set.autoTheatre': '자동 극장 모드',
+    'set.chatRight': '채팅 우측 배치',
+    'set.compactMode': '컴팩트 모드',
+    'set.accentColor': '강조 색상',
+    'set.language': '언어',
+    'set.footer': '변경 사항이 자동으로 저장됩니다. 일부 옵션은 스트림을 재시작해야 합니다.',
+    'color.purple': '보라색',
+    'color.blue': '파란색',
+    'color.green': '초록색',
+    'color.orange': '주황색',
+    'color.pink': '분홍색',
+    'color.red': '빨간색',
+    'favChannels': '즐겨찾는 채널',
+    'recentWatched': '최근 시청한 채널',
+    'showMore': '더 보기',
+    'topGames': '인기 게임',
+    'liveNow': '실시간 생방송',
+    'noLiveStreams': '생방송이 없습니다',
+    'liveChannels': '생방송 채널',
+    'aboutTitle': 'BlinkStream 정보',
+    'aboutDesc': '광고 없는 가벼운 트위치 클라이언트. 빠르고 끊김 없는 시청.',
+    'aboutCoffee': '커피 후원하기',
+    'aboutMadeWith': '커뮤니티를 위해 ♥로 제작됨',
   },
   ru: {
     search: 'Поиск канала...',
@@ -648,6 +867,37 @@ const translations = {
     emoteRecent: 'Недавние',
     emoteChannel: 'Канал',
     emoteGlobal: 'Общие',
+    'tab.general': 'Общие',
+    'tab.account': 'Аккаунт',
+    'tab.moderation': 'Модерация',
+    'tab.recording': 'Запись',
+    'tab.advanced': 'Дополнительно',
+    'set.streamQuality': 'Качество стрима',
+    'set.audioOnly': 'Только аудио',
+    'set.defaultVolume': 'Громкость по умолчанию',
+    'set.autoTheatre': 'Авто-режим кинотеатра',
+    'set.chatRight': 'Чат справа',
+    'set.compactMode': 'Компактный режим',
+    'set.accentColor': 'Цвет акцента',
+    'set.language': 'Язык',
+    'set.footer': 'Изменения сохраняются автоматически. Некоторые параметры требуют перезапуска стрима.',
+    'color.purple': 'Фиолетовый',
+    'color.blue': 'Синий',
+    'color.green': 'Зеленый',
+    'color.orange': 'Оранжевый',
+    'color.pink': 'Розовый',
+    'color.red': 'Красный',
+    'favChannels': 'Избранные каналы',
+    'recentWatched': 'Недавно просмотренные',
+    'showMore': 'Показать еще',
+    'topGames': 'Популярные игры',
+    'liveNow': 'Сейчас в эфире',
+    'noLiveStreams': 'Нет прямых трансляций',
+    'liveChannels': 'Прямые трансляции',
+    'aboutTitle': 'О BlinkStream',
+    'aboutDesc': 'Легкий клиент Twitch без рекламы. Быстрые и чистые трансляции.',
+    'aboutCoffee': 'Угостить кофе',
+    'aboutMadeWith': 'Сделано с ♥ для сообщества',
   },
 }
 
@@ -656,9 +906,12 @@ let currentLang = (() => {
   catch { return 'es' }
 })()
 
+const listeners = new Set()
+
 export function setLanguage(lang) {
   currentLang = lang
   try { localStorage.setItem('blinkstream_lang', lang) } catch { /* ignore */ }
+  listeners.forEach((cb) => cb(lang))
 }
 
 export function getLanguage() {
@@ -667,20 +920,29 @@ export function getLanguage() {
 
 /**
  * Traductor. Si la key no existe en el idioma actual, cae a es y
- * finalmente al string de la key (no rompe UI).
+ * finalmente al string de la key o valor de respaldo (no rompe UI).
  * @param {string} key
+ * @param {string} [fallback]
  * @returns {string}
  */
-export function t(key) {
-  return translations[currentLang]?.[key] || translations.es[key] || key
+export function t(key, fallback) {
+  return translations[currentLang]?.[key] || translations.es[key] || fallback || key
 }
 
 /**
- * Hook-friendly: devuelve la funcion t. Si cambia el idioma, el componente
- * se re-renderiza solo si pasas una version. Para casos simples, usa t
- * directamente. Los consumidores existentes (Settings, Chat) ya importan
- * useT de este modulo.
+ * Hook reactivo: suscribe el componente a cambios en el idioma actual
+ * para que toda la interfaz re-renderice al instante al pulsar un botón de idioma.
  */
 export function useT() {
-  return t
+  const [lang, setLang] = useState(currentLang)
+
+  useEffect(() => {
+    const handler = (newLang) => setLang(newLang)
+    listeners.add(handler)
+    return () => listeners.delete(handler)
+  }, [])
+
+  return useCallback((key, fallback) => {
+    return translations[lang]?.[key] || translations.es[key] || fallback || key
+  }, [lang])
 }

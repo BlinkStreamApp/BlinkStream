@@ -12,6 +12,7 @@ import { getVersion } from '@tauri-apps/api/app'
 import { validateProps } from '../utils/validateProps'
 import { logError } from '../utils/errors'
 import PhosphorIcon from './icons/PhosphorIcon'
+import { useT } from '../utils/i18n'
 
 function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> }
 
@@ -36,6 +37,7 @@ export default function AboutDialog({ onClose }) {
     'AboutDialog props',
   )
 
+  const t = useT()
   const [appVersion, setAppVersion] = useState('...')
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function AboutDialog({ onClose }) {
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-md animate-fade-in" onClick={onClose}>
       <div className="bg-bg-secondary/85 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.7)] w-full max-w-sm max-h-[calc(100vh-2.5rem)] overflow-y-auto transform transition-all animate-scale-up shrink-0" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/5">
-          <h2 className="text-sm font-bold text-text-primary">Acerca de BlinkStream</h2>
+          <h2 className="text-sm font-bold text-text-primary">{t('aboutTitle', 'Acerca de BlinkStream')}</h2>
           <button onClick={onClose} className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors">
             <CloseIcon />
           </button>
@@ -79,8 +81,7 @@ export default function AboutDialog({ onClose }) {
           </div>
 
           <p className="text-sm text-text-secondary leading-relaxed max-w-xs">
-            Cliente ligero de Twitch sin anuncios.
-            Transmisiones limpias, rápidas y sin interrupciones.
+            {t('aboutDesc', 'Cliente ligero de Twitch sin anuncios. Transmisiones limpias, rápidas y sin interrupciones.')}
           </p>
 
           <a
@@ -90,7 +91,7 @@ export default function AboutDialog({ onClose }) {
             className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0070ba]/10 text-[#0070ba] hover:bg-[#0070ba]/20 text-[13px] font-medium transition-all cursor-pointer"
           >
             <PayPalIcon />
-            Invitar a un café
+            {t('aboutCoffee', 'Invitar a un café')}
           </a>
 
           <div className="mt-6 w-full border-t border-bg-tertiary/50 pt-4 text-[12px] text-text-muted/60">
@@ -98,7 +99,7 @@ export default function AboutDialog({ onClose }) {
           </div>
 
           <div className="mt-3 flex gap-3 text-[12px]">
-            <span className="text-twitch/70">Hecho con ♥ para la comunidad</span>
+            <span className="text-twitch/70">{t('aboutMadeWith', 'Hecho con ♥ para la comunidad')}</span>
           </div>
 
           {/* FASE 4 / WT-20260628-45: Lordicon requiere atribucion visible. */}
