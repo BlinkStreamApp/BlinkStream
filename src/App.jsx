@@ -414,7 +414,7 @@ function MainApp() {
       <TitleBar />
 
         <header className={`flex items-center gap-3 px-4 py-2 bg-bg-secondary/50 backdrop-blur-xl border-b border-white/[0.04] shrink-0 select-none relative z-[1000] ${showOnboarding ? 'hidden pointer-events-none' : ''} ${theatreMode ? 'opacity-0 max-h-0 overflow-hidden pointer-events-none' : ''} transition-all duration-300`}>
-          <div className="flex items-center gap-3 mr-1.5 cursor-pointer" onClick={() => { if (channel) setChannel('') }} title={channel ? 'Volver al inicio' : 'BlinkStream'}>
+          <div className="flex items-center gap-3 mr-1.5 cursor-pointer" onClick={() => { if (channel) setChannel('') }} title={channel ? t('nav.home', 'Volver al inicio') : 'BlinkStream'}>
             <BlinkStreamLogo size={30} />
             <span className="text-base font-extrabold tracking-tight hidden sm:inline">
               <span className="text-text-primary">Blink</span>

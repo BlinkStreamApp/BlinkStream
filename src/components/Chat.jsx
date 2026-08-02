@@ -1275,14 +1275,14 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         )}
         {messages.length === 0 && !connError && !authing && !chatHidden && (
           <p className="text-text-muted/50 text-xs text-center mt-6">
-            {connected ? 'Esperando mensajes...' : 'Conectando al chat...'}
+            {connected ? t('chat.waiting', 'Esperando mensajes...') : t('chat.placeholder.connecting', 'Conectando al chat...')}
           </p>
         )}
 
         {/* WT-20260628-48: cuando chatHidden es true, mostrar placeholder en vez de mensajes */}
         {chatHidden ? (
           <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted/50 text-sm">
-            Chat oculto
+            {t('chat.hidden', 'Chat oculto')}
           </div>
         ) : (
           <div className="space-y-0.5">

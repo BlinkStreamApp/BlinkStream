@@ -1485,9 +1485,20 @@ const extendedKeys = {
   }
 }
 
+const finalKeys = {
+  es: { 'nav.home': 'Volver al inicio', 'chat.waiting': 'Esperando mensajes...', 'chat.hidden': 'Chat oculto' },
+  en: { 'nav.home': 'Back to home', 'chat.waiting': 'Waiting for messages...', 'chat.hidden': 'Chat hidden' },
+  fr: { 'nav.home': "Retour à l'accueil", 'chat.waiting': 'En attente de messages...', 'chat.hidden': 'Chat masqué' },
+  de: { 'nav.home': 'Zurück zur Startseite', 'chat.waiting': 'Warten auf Nachrichten...', 'chat.hidden': 'Chat ausgeblendet' },
+  pt: { 'nav.home': 'Voltar ao início', 'chat.waiting': 'Aguardando mensagens...', 'chat.hidden': 'Chat oculto' },
+  ja: { 'nav.home': 'ホームに戻る', 'chat.waiting': 'メッセージを待機中...', 'chat.hidden': 'チャット非表示' },
+  ko: { 'nav.home': '홈으로 돌아가기', 'chat.waiting': '메시지 대기 중...', 'chat.hidden': '채팅 숨김' },
+  ru: { 'nav.home': 'Вернуться на главную', 'chat.waiting': 'Ожидание сообщений...', 'chat.hidden': 'Чат скрыт' },
+}
+
 Object.keys(extendedKeys).forEach((lang) => {
   if (translations[lang]) {
-    Object.assign(translations[lang], extendedKeys[lang])
+    Object.assign(translations[lang], extendedKeys[lang], finalKeys[lang] || {})
   }
 })
 
