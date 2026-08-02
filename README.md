@@ -46,6 +46,17 @@ Download the official installer from [GitHub Releases](https://github.com/BlinkS
 - `BlinkStream_1.1.0_x64-setup.exe` *(Standard NSIS installer)*
 - `BlinkStream_1.1.0_x64_en-US.msi` *(Enterprise MSI installer)*
 
+> [!NOTE]  
+> **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
+> Because BlinkStream is an independent, free open-source software project distributed without costly commercial EV (Extended Validation) code signing certificates ($300+/year), Microsoft Defender may occasionally flag brand-new compiled builds with machine learning heuristics warnings upon initial download (such as `Trojan:Win32/Wacatac.B!ml` or SmartScreen screen blocks).  
+> 
+> **Why does this happen?** The `!ml` suffix stands for *Machine Learning*. When downloading unsigned executables that perform legitimate installation procedures (creating shortcuts, registering uninstall entries), automated predictive heuristic models may temporarily flag newly released binaries simply due to their initial "zero reputation" score in cloud databases.  
+> 
+> **How to proceed:**  
+> - **Windows Security / Defender:** Open the threat log and select **Actions** ➔ **Allow on device** (or *Restore*).  
+> - **Windows SmartScreen Prompt:** Click **More info** ➔ **Run anyway**.  
+> - *Transparency guarantee:* Every single BlinkStream binary is compiled directly within public, highly monitored GitHub Actions cloud runner infrastructure with automated security auditing. Users are encouraged to inspect source workflows or compile binaries locally using our build instructions below!
+
 ### macOS
 ```bash
 brew install streamlink
