@@ -547,6 +547,7 @@ function MainApp() {
             twitchToken={getTwitchToken()}
             twitchUsername={username || localStorage.getItem('blinkstream_twitch_username')}
             chatOnRight={chatOnRight}
+            onSelectChannel={selectChannel}
             onExit={() => setViewMode('normal')}
           />
         </Suspense>

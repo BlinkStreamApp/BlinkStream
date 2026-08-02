@@ -19,6 +19,7 @@ export default function MultiStreamGrid({
   twitchToken = '',
   twitchUsername = '',
   chatOnRight = true,
+  onSelectChannel,
   onExit
 }) {
   const t = useT()
@@ -144,6 +145,7 @@ export default function MultiStreamGrid({
                 onFocusAudio={setFocusedAudioIdx}
                 isChatActive={activeChatIdx === i || (activeChatIdx !== i && channels[i] === activeChatChannel && channels[i] !== '')}
                 onSelectChat={(idx) => setActiveChatIdx(idx)}
+                onSelectSingleChannel={onSelectChannel}
                 gridCount={gridCount}
               />
             </div>

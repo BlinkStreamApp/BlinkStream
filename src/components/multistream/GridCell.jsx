@@ -14,6 +14,7 @@ export default function GridCell({
   onFocusAudio,
   isChatActive,
   onSelectChat,
+  onSelectSingleChannel,
   gridCount = 2
 }) {
   const t = useT()
@@ -21,21 +22,28 @@ export default function GridCell({
   const [streamUrl, setStreamUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  
+  // Controles de Reproductor integrado
+  const [isPlaying, setIsPlaying] = useState(true)
+  const [quality, setQuality] = useState(gridCount >= 3 ? '720p60' : '1080p60')
+  const [volume, setVolume] = useState(() => {
+    const v = Number(localStorage.getItem('blinkstream_volume'))
+    return !isNaN(v) && v > 0 ? v : 40 // Default seguro al 40% para evitar daños de audición
+  })
+
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
 
-  // Calidad optimizada de bajo consumo si hay 3 o 4 streams a la vez
-  const targetQuality = gridCount >= 3 ? '720p60' : '1080p60'
-
-  const fetchStream = useCallback(async (ch) => {
+  const fetchStream = useCallback(async (ch, targetQ) => {
     if (!ch) return
     setLoading(true)
     setError('')
     setStreamUrl('')
+    const q = targetQ || quality
     try {
       let url = ''
       try {
-        url = await measureInvoke('get_stream_url', { channel: ch, quality: targetQuality })
+        url = await measureInvoke('get_stream_url', { channel: ch, quality: q })
       } catch {
         url = await measureInvoke('get_stream_url', { channel: ch, quality: 'best' })
       }
@@ -46,11 +54,11 @@ export default function GridCell({
     } finally {
       setLoading(false)
     }
-  }, [targetQuality])
+  }, [quality])
 
   useEffect(() => {
     if (channel) {
-      fetchStream(channel)
+      fetchStream(channel, quality)
     } else {
       setStreamUrl('')
       setError('')
@@ -61,7 +69,7 @@ export default function GridCell({
         hlsRef.current = null
       }
     }
-  }, [channel, fetchStream])
+  }, [channel, quality, fetchStream])
 
   useEffect(() => {
     const video = videoRef.current
@@ -86,20 +94,42 @@ export default function GridCell({
       hls.loadSource(streamUrl)
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {/* ignore play policy error */})
+        if (isPlaying) {
+          video.play().catch(() => {/* ignore play policy error */})
+        }
       })
       hlsRef.current = hls
     }
-  }, [streamUrl])
+  }, [streamUrl, isPlaying])
 
+  // Ajuste preciso y seguro de volumen
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.muted = !isAudioFocused
+      videoRef.current.muted = !isAudioFocused || volume === 0
       if (isAudioFocused) {
-        videoRef.current.volume = 1.0
+        videoRef.current.volume = Math.min(1.0, Math.max(0, volume / 100))
       }
     }
-  }, [isAudioFocused])
+  }, [isAudioFocused, volume])
+
+  const handleVolumeChange = (val) => {
+    const v = Number(val)
+    setVolume(v)
+    try {
+      localStorage.setItem('blinkstream_volume', String(v))
+    } catch { /* ignore */ }
+  }
+
+  const togglePlayPause = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (isPlaying) {
+      video.pause()
+      setIsPlaying(false)
+    } else {
+      video.play().then(() => setIsPlaying(true)).catch(() => {})
+    }
+  }
 
   const handleFormSubmit = (e) => {
     e.preventDefault()
@@ -138,7 +168,7 @@ export default function GridCell({
     )
   }
 
-  // Celda con canal reproduciendo
+  // Celda con canal reproduciendo y controles de Mini-Reproductor Pro
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl group flex flex-col justify-between">
       {/* Contenedor del video */}
@@ -154,7 +184,7 @@ export default function GridCell({
             <PhosphorIcon name="WarningCircle" size={32} className="text-red-400" weight="duotone" />
             <p className="text-[13px] font-semibold text-red-300">{error}</p>
             <button
-              onClick={() => fetchStream(channel)}
+              onClick={() => fetchStream(channel, quality)}
               className="px-3 py-1 mt-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-[11px] text-red-200 font-bold cursor-pointer transition-colors"
             >
               {t('player.retry', 'Reintentar')}
@@ -163,38 +193,76 @@ export default function GridCell({
         )}
         <video
           ref={videoRef}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain cursor-pointer"
+          onClick={togglePlayPause}
           autoPlay
           playsInline
           muted={!isAudioFocused}
         />
+        {!isPlaying && !loading && !error && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 pointer-events-none">
+            <div className="w-16 h-16 rounded-full bg-twitch/80 border border-white/30 flex items-center justify-center text-white shadow-2xl backdrop-blur-sm">
+              <PhosphorIcon name="Pause" size={36} weight="fill" />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Cabecera flotante de información y controles del Grid Cell */}
-      <div className="relative z-20 flex items-center justify-between p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent opacity-90 group-hover:opacity-100 transition-opacity">
+      {/* Cabecera flotante con controles de reproductor en tiempo real */}
+      <div className="relative z-20 flex items-center justify-between p-2.5 bg-gradient-to-b from-black/90 via-black/50 to-transparent opacity-95 group-hover:opacity-100 transition-opacity gap-2">
         <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={togglePlayPause}
+            title={isPlaying ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}
+            className="p-1 rounded-md bg-white/10 hover:bg-white/20 text-white cursor-pointer transition-colors shrink-0"
+          >
+            <PhosphorIcon name={isPlaying ? "Pause" : "Play"} size={14} weight="fill" />
+          </button>
           <LiveBadge />
-          <span className="font-bold text-[13px] text-white tracking-tight truncate shadow-sm">{channel}</span>
-          {gridCount >= 3 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-text-secondary font-mono border border-white/10 hidden sm:inline" title={t('grid.maxWarning', 'Optimizado a 720p para ahorro de recursos')}>
-              720p60
-            </span>
-          )}
+          <span className="font-extrabold text-[13px] text-white tracking-tight truncate shadow-sm">{channel}</span>
+
+          {/* Selector de Calidad Dinámico del Grid */}
+          <select
+            value={quality}
+            onChange={(e) => setQuality(e.target.value)}
+            className="bg-black/60 border border-white/20 rounded-lg px-1.5 py-0.5 text-[10px] font-mono text-twitch-light focus:outline-none focus:border-twitch cursor-pointer hover:bg-black/80 transition-colors hidden sm:inline"
+            title={t('set.streamQuality', 'Calidad de stream')}
+          >
+            {['best', '1080p60', '720p60', '480p30', '360p30', 'audio_only'].map(q => (
+              <option key={q} value={q} className="bg-bg-secondary text-text-primary">{q}</option>
+            ))}
+          </select>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Foco de Audio */}
-          <button
-            onClick={() => onFocusAudio(index)}
-            title={t('grid.audioTip', 'Clic para enfocar audio de este stream')}
-            className={`p-1.5 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
-              isAudioFocused
-                ? 'bg-twitch text-white border-twitch shadow-[0_0_15px_rgba(145,70,255,0.6)] scale-105'
-                : 'bg-black/60 text-text-muted hover:text-white border-white/10 hover:border-white/30'
-            }`}
-          >
-            <PhosphorIcon name={isAudioFocused ? "SpeakerHigh" : "SpeakerSlash"} size={17} weight={isAudioFocused ? "fill" : "regular"} />
-          </button>
+          {/* Foco de Audio + Slider Anti-Sordera */}
+          <div className={`flex items-center gap-1.5 px-1.5 py-1 rounded-lg border transition-all ${
+            isAudioFocused
+              ? 'bg-twitch/30 border-twitch shadow-[0_0_15px_rgba(145,70,255,0.4)]'
+              : 'bg-black/60 border-white/10'
+          }`}>
+            <button
+              onClick={() => onFocusAudio(index)}
+              title={t('grid.audioTip', 'Clic para enfocar audio de este stream')}
+              className={`flex items-center justify-center transition-transform cursor-pointer ${
+                isAudioFocused ? 'text-green-400 scale-110 font-bold' : 'text-text-muted hover:text-white'
+              }`}
+            >
+              <PhosphorIcon name={isAudioFocused && volume > 0 ? "SpeakerHigh" : "SpeakerSlash"} size={17} weight={isAudioFocused ? "fill" : "regular"} />
+            </button>
+
+            {isAudioFocused && (
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={volume}
+                onChange={(e) => handleVolumeChange(e.target.value)}
+                className="w-16 sm:w-20 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer accent-twitch transition-all"
+                title={`${t('set.defaultVolume', 'Volumen')}: ${volume}%`}
+              />
+            )}
+          </div>
 
           {/* Seleccionar como Chat activo */}
           <button
@@ -208,6 +276,17 @@ export default function GridCell({
           >
             <PhosphorIcon name="ChatCircleDots" size={17} weight={isChatActive ? "fill" : "regular"} />
           </button>
+
+          {/* Salir a modo reproductor individual en grande */}
+          {onSelectSingleChannel && (
+            <button
+              onClick={() => onSelectSingleChannel(channel)}
+              title={t('grid.jumpSingle', 'Ver en reproductor principal individual (pantalla completa / teatro)')}
+              className="p-1.5 rounded-lg border border-white/10 bg-black/60 text-text-muted hover:text-twitch-light hover:border-twitch/40 transition-all cursor-pointer hidden md:inline-flex"
+            >
+              <PhosphorIcon name="CornersOut" size={17} weight="regular" />
+            </button>
+          )}
 
           {/* Eliminar celda */}
           <button
