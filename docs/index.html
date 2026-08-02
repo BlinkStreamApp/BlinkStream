@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BlinkStream — La Revolución Nativa en Twitch Streaming</title>
+  <meta name="description" content="Una experiencia de escritorio nativa para Twitch, sin publicidad, sin lag y con integración total de 7TV y BetterTTV con un consumo de recursos ultra-eficiente.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #09090f;
+      --bg-gradient-1: rgba(145, 71, 255, 0.15);
+      --bg-gradient-2: rgba(0, 242, 255, 0.12);
+      --card-bg: rgba(22, 23, 35, 0.65);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --card-border-hover: rgba(145, 71, 255, 0.5);
+      --twitch-purple: #9147ff;
+      --twitch-glow: #bf94ff;
+      --cyan-glow: #00f2ff;
+      --text-main: #f5f5f7;
+      --text-muted: #9e9eb8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', -apple-system, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow-x: hidden;
+      line-height: 1.5;
+      selection-background-color: var(--twitch-purple);
+      selection-color: white;
+    }
+
+    /* Ambient animated neon backgrounds */
+    .ambient-light {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(140px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.55;
+      animation: floatOrbs 20s infinite alternate ease-in-out;
+    }
+
+    .light-1 {
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--twitch-purple) 0%, transparent 70%);
+      top: -150px;
+      left: 10%;
+    }
+
+    .light-2 {
+      width: 550px;
+      height: 550px;
+      background: radial-gradient(circle, var(--cyan-glow) 0%, transparent 70%);
+      bottom: 10%;
+      right: -100px;
+      animation-duration: 25s;
+      animation-direction: alternate-reverse;
+    }
+
+    @keyframes floatOrbs {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(50px, -40px) scale(1.15); }
+      100% { transform: translate(-40px, 40px) scale(0.95); }
+    }
+
+    /* Layout & Utilities */
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      position: relative;
+      z-index: 10;
+    }
+
+    header {
+      padding: 1.75rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      text-decoration: none;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--twitch-purple), var(--cyan-glow));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 15px rgba(145, 71, 255, 0.4);
+    }
+
+    .logo-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: white;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: color 0.2s, transform 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: white;
+    }
+
+    .cta-button {
+      background: linear-gradient(135deg, #7c2cf1, var(--twitch-purple));
+      color: white !important;
+      padding: 0.65rem 1.45rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      box-shadow: 0 8px 25px rgba(145, 71, 255, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .cta-button:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 12px 35px rgba(145, 71, 255, 0.65);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 7rem 0 6rem;
+      text-align: center;
+    }
+
+    .release-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(145, 71, 255, 0.15);
+      border: 1px solid rgba(145, 71, 255, 0.35);
+      padding: 0.4rem 1.25rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--twitch-glow);
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 20px rgba(145, 71, 255, 0.15);
+      animation: pulsePill 3s infinite alternate;
+    }
+
+    @keyframes pulsePill {
+      0% { border-color: rgba(145, 71, 255, 0.35); }
+      100% { border-color: rgba(0, 242, 255, 0.6); box-shadow: 0 4px 25px rgba(0, 242, 255, 0.25); }
+    }
+
+    h1.hero-title {
+      font-size: clamp(2.8rem, 5.5vw, 4.8rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+      margin-bottom: 1.5rem;
+      max-width: 960px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #ffffff 10%, #bf94ff 60%, var(--cyan-glow) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+    }
+
+    p.hero-subtitle {
+      font-size: clamp(1.15rem, 2vw, 1.35rem);
+      color: var(--text-muted);
+      max-width: 720px;
+      margin: 0 auto 3rem;
+      font-weight: 400;
+    }
+
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: white;
+      padding: 0.75rem 1.75rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 1.05rem;
+      text-decoration: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .btn-primary {
+      padding: 0.75rem 2.25rem;
+      font-size: 1.05rem;
+    }
+
+    /* Mockup Preview Section */
+    .mockup-section {
+      margin: 3rem auto 6rem;
+      max-width: 1040px;
+      perspective: 1000px;
+    }
+
+    .window-frame {
+      background: rgba(16, 17, 26, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.7), 0 0 80px rgba(145, 71, 255, 0.15);
+      overflow: hidden;
+      backdrop-filter: blur(24px);
+      transform: rotateX(2deg);
+      transition: transform 0.5s ease;
+    }
+
+    .window-frame:hover {
+      transform: rotateX(0deg);
+    }
+
+    .window-topbar {
+      background: rgba(255, 255, 255, 0.04);
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .window-controls {
+      display: flex;
+      gap: 0.45rem;
+    }
+
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #ff5f56; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #27c93f; }
+
+    .window-title {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #7b7b99;
+    }
+
+    .mockup-content {
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+      min-height: 420px;
+    }
+
+    @media (max-width: 850px) {
+      .mockup-content { grid-template-columns: 1fr; }
+    }
+
+    .stream-player {
+      background: radial-gradient(circle at center, #1b1c2e, #10111a);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stream-player::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(45deg, transparent, rgba(145, 71, 255, 0.08), transparent);
+      animation: sweep 4s infinite linear;
+    }
+
+    @keyframes sweep {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .stream-badge {
+      background: #e91916;
+      color: white;
+      font-weight: 800;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      position: absolute;
+      top: 1.25rem; left: 1.25rem;
+      box-shadow: 0 0 15px rgba(233, 25, 22, 0.5);
+      letter-spacing: 0.05em;
+    }
+
+    .stream-center {
+      text-align: center;
+      z-index: 2;
+    }
+
+    .stream-center h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+    }
+
+    .stream-center p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .chat-box {
+      background: rgba(13, 14, 22, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .chat-header {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      font-size: 0.88rem;
+      flex-grow: 1;
+    }
+
+    .chat-line {
+      line-height: 1.4;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .user-badge { font-weight: 700; margin-right: 0.4rem; }
+    .user-1 { color: #ff5757; }
+    .user-2 { color: #4ade80; }
+    .user-3 { color: #00f2ff; }
+    .user-4 { color: #bf94ff; }
+    .emote { background: rgba(255, 255, 255, 0.1); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; margin-left: 0.25rem; color: #ffcc00; }
+
+    /* Features Grid */
+    .section-title {
+      text-align: center;
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+    }
+
+    .section-desc {
+      text-align: center;
+      color: var(--text-muted);
+      max-width: 620px;
+      margin: 0 auto 4rem;
+      font-size: 1.15rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 8rem;
+    }
+
+    .feature-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2.25rem 2rem;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--twitch-purple), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-6px);
+      border-color: var(--card-border-hover);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 30px rgba(145, 71, 255, 0.15);
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon {
+      width: 54px;
+      height: 54px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: white;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.96rem;
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      padding: 4rem 0;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <!-- Ambient glow background -->
+  <div class="ambient-light light-1"></div>
+  <div class="ambient-light light-2"></div>
+
+  <!-- Header / Navigation -->
+  <header>
+    <div class="container nav-container">
+      <a href="#" class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+          </svg>
+        </div>
+        <span>BlinkStream</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#caracteristicas">Características</a></li>
+        <li><a href="https://github.com/BlinkStreamApp/BlinkStream/releases" target="_blank">Releases</a></li>
+        <li><a href="https://github.com/BlinkStreamApp/BlinkStream" target="_blank">Repositorio</a></li>
+      </ul>
+
+      <a href="https://github.com/BlinkStreamApp/BlinkStream/releases/latest" target="_blank" class="cta-button">
+        ⚡ Descargar v2.0.2
+      </a>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero container">
+    <div class="release-pill">
+      <span>●</span> Nueva Versión 2.0.2 Disponible • 100% Libre y Open-Source
+    </div>
+
+    <h1 class="hero-title">
+      El futuro del streaming en Twitch.<br>
+      <span class="gradient-text">Sin publicidad. Sin lag.</span>
+    </h1>
+
+    <p class="hero-subtitle">
+      Disfruta de tus canales favoritos de Twitch con una interfaz de escritorio verdaderamente nativa, ultraligera y optimizada al máximo. Adiós al consumo abusivo de RAM.
+    </p>
+
+    <div class="hero-actions">
+      <a href="https://github.com/BlinkStreamApp/BlinkStream/releases/latest" target="_blank" class="cta-button btn-primary">
+        ⭐ Descargar para Windows
+      </a>
+      <a href="https://github.com/BlinkStreamApp/BlinkStream" target="_blank" class="btn-secondary">
+        Ver en GitHub 💻
+      </a>
+    </div>
+
+    <!-- Live Architectural Mockup -->
+    <div class="mockup-section">
+      <div class="window-frame">
+        <div class="window-topbar">
+          <div class="window-controls">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <div class="window-title">BlinkStream Desktop — Transmisión en directo (60 FPS Ultra-HD)</div>
+          <div style="width: 40px;"></div>
+        </div>
+        <div class="mockup-content">
+          <div class="stream-player">
+            <div class="stream-badge">EN VIVO</div>
+            <div class="stream-center">
+              <h3>⚡ Reproductor Nativo sin Interrupciones</h3>
+              <p>Rendimiento acelerado por hardware sin anuncios de intermedio</p>
+            </div>
+          </div>
+          <div class="chat-box">
+            <div class="chat-header">Chat del canal (7TV Integrado)</div>
+            <div class="chat-messages" id="chat-feed">
+              <div class="chat-line"><span class="user-badge user-1">NinjaStreamer:</span>¡La fluidez en esta app es una locura! <span class="emote">POGGERS</span></div>
+              <div class="chat-line"><span class="user-badge user-2">albertplayxd:</span>Cero lag en dos monitores 2K 🔥</div>
+              <div class="chat-line"><span class="user-badge user-3">TechGamer_99:</span>Por fin sin anuncios que corten las jugadas <span class="emote">EZ</span></div>
+              <div class="chat-line"><span class="user-badge user-4">Mod_Elena:</span>¡Bienvenidos a la versión 2.0.2! <span class="emote">HYPERS</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section class="container" id="caracteristicas">
+    <h2 class="section-title">Ingeniería concebida para la Excelencia</h2>
+    <p class="section-desc">
+      BlinkStream no es un simple contenedor web; es una aplicación nativa rediseñada desde el primer bit para ofrecer la experiencia más pura, segura y eficiente posible.
+    </p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>Cero Publicidad ni Rastreos</h3>
+        <p>Nuestro sistema bloquea automáticamente los anuncios intrusivos y rastreadores en vivo para que no pierdas ni una sola jugada crítica de tu streamer preferido.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🦄</div>
+        <h3>Integración Nativa de 7TV</h3>
+        <p>Disfruta de todos los emotes animados de la comunidad (7TV, BetterTTV y FrankerFaceZ) renderizados directamente a 60 FPS sin extensiones de terceros ni retrasos de chat.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Consumo Mínimo de RAM</h3>
+        <p>Desarrollado sobre tecnologías de vanguardia (Vite + Desktop Nativo). Consume hasta un 80% menos memoria RAM y CPU que Google Chrome o el reproductor web tradicional.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔐</div>
+        <h3>Autenticación Cifrada en Nube</h3>
+        <p>Conecta tu cuenta oficial de Twitch mediante un flujo OAuth encriptado a través de servidores Supabase. Tus tokens residen única y exclusivamente en tu dispositivo.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🎮</div>
+        <h3>Modo Multi-Stream & Cine</h3>
+        <p>Optimizado para configuraciones multi-monitor. Reproduce múltiples canales simultáneamente en ventanas flotantes siempre activas con aceleración por GPU.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🌙</div>
+        <h3>Diseño Dark-Mode OLED</h3>
+        <p>Una interfaz con tonos oscuros profundos, contrastes calibrados en HSL y bordes de cristal esmerilado concebida para cuidar tus ojos en extensas sesiones de streaming.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-content">
+      <div class="footer-copy">
+        © 2026 BlinkStream Team. Todos los derechos reservados. Proyecto Open-Source bajo licencia MIT.
+      </div>
+      <ul class="footer-links">
+        <li><a href="https://github.com/BlinkStreamApp/BlinkStream/blob/master/docs/SECURITY.md" target="_blank">Seguridad</a></li>
+        <li><a href="https://github.com/BlinkStreamApp/BlinkStream/releases" target="_blank">Notas de la Versión</a></li>
+        <li><a href="https://github.com/BlinkStreamApp/BlinkStream" target="_blank">GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script>
+    // Micro-animation to keep chat feeling alive and dynamic
+    const emotes = ["POGGERS", "KEKW", "CatJam", "Clap", "EZ", "HYPERS", "MonkaW"];
+    const users = ["VikingStream", "GamerPro_X", "Sarah_Dev", "QuantumTwitch", "Retro_Bit"];
+    const colors = ["#ff5757", "#4ade80", "#00f2ff", "#bf94ff", "#ffbd2e"];
+    const msgs = [
+      "¡Qué burrada de calidad! 🔥",
+      "Increíble el rendimiento en Windows 11",
+      "Ya era hora de tener un cliente decente para Twitch",
+      "Lo acabo de probar en dual monitor y va finísimo",
+      "¡Ojalá haber descubierto esto antes! 🚀",
+      "El chat va ultra fluido sin cortes"
+    ];
+
+    setInterval(() => {
+      const feed = document.getElementById("chat-feed");
+      if (!feed) return;
+
+      const user = users[Math.floor(Math.random() * users.length)];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const msg = msgs[Math.floor(Math.random() * msgs.length)];
+      const emote = emotes[Math.floor(Math.random() * emotes.length)];
+
+      const newEl = document.createElement("div");
+      newEl.className = "chat-line";
+      newEl.innerHTML = `<span class="user-badge" style="color:${color}">${user}:</span>${msg} <span class="emote">${emote}</span>`;
+
+      feed.appendChild(newEl);
+      if (feed.children.length > 5) {
+        feed.removeChild(feed.children[0]);
+      }
+    }, 4000);
+  </script>
+</body>
+</html>
