@@ -237,8 +237,13 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
         </span>
         <span className="text-text-muted/40 font-bold text-[11px] mr-1">:</span>
       </div>
-      <span className="text-white/95 break-words min-w-0 font-normal leading-normal tracking-wide" style={{ fontSize: `${chatFontSize}px` }}>
+      <span className="text-white/95 break-words min-w-0 font-normal leading-normal tracking-wide flex-1" style={{ fontSize: `${chatFontSize}px` }}>
         {renderMessage(msg.message, msg.emotes)}
+        {msg.spamCount > 1 && (
+          <span className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-twitch/20 border border-twitch/60 text-fuchsia-300 shadow-sm shadow-twitch/30 tabular-nums animate-pulse">
+            x{msg.spamCount}
+          </span>
+        )}
       </span>
       {msg.timestamp && (
         <span className="text-[10px] text-text-muted/30 opacity-0 group-hover/msg:opacity-100 shrink-0 self-start ml-auto tabular-nums font-mono transition-opacity pl-1.5 pt-0.5">
@@ -251,6 +256,10 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
 
 export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken }) {
   const [messages, setMessages] = useState([])
+  const [antiSpam, setAntiSpam] = useState(() => {
+    return localStorage.getItem('blinkstream_antispam') === 'true'
+  })
+  const antiSpamRef = useRef(localStorage.getItem('blinkstream_antispam') === 'true')
   const [emotes, setEmotes] = useState({})
   const [badgeUrls, setBadgeUrls] = useState({})
   const [connected, setConnected] = useState(false)
@@ -849,7 +858,29 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         const toFlush = msgBatch.slice()
         msgBatch.length = 0
         setMessages(prev => {
-          const updated = [...prev, ...toFlush]
+          let updated = [...prev]
+          if (antiSpamRef.current && toFlush.length > 0) {
+            for (const msg of toFlush) {
+              const last = updated[updated.length - 1]
+              if (
+                last &&
+                last.message &&
+                msg.message &&
+                last.message.trim().toLowerCase() === msg.message.trim().toLowerCase() &&
+                !last.isNotice
+              ) {
+                updated[updated.length - 1] = {
+                  ...last,
+                  spamCount: (last.spamCount || 1) + (msg.spamCount || 1),
+                  timestamp: msg.timestamp || last.timestamp,
+                }
+              } else {
+                updated.push(msg)
+              }
+            }
+          } else {
+            updated = [...prev, ...toFlush]
+          }
           return updated.length > 500 ? updated.slice(-500) : updated
         })
         if (!isAtBottomRef.current) {
@@ -1072,6 +1103,27 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         </span>
 
         <div className="flex-1" />
+
+        <button
+          onClick={() => {
+            setAntiSpam(p => {
+              const n = !p
+              localStorage.setItem('blinkstream_antispam', String(n))
+              antiSpamRef.current = n
+              return n
+            })
+          }}
+          className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+            antiSpam
+              ? 'bg-purple-600/20 text-purple-300 border-purple-500/60 shadow-sm shadow-purple-500/20'
+              : 'bg-white/[0.03] text-text-muted border-white/10 hover:border-white/20'
+          }`}
+          title={antiSpam ? 'Anti-Spam Torneo activado: agrupa mensajes idénticos [x15]' : 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos y spam)'}
+          aria-label="Toggle Anti-Spam Modo Torneo"
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${antiSpam ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
+          Anti-Spam
+        </button>
 
         {/* WT-20260628-48: el boton de ajustes (gear) se movio a la barra de input.
             El popup con "Ocultar chat" vive ahora justo encima del boton Enviar. */}

@@ -579,6 +579,38 @@ export default function VideoPlayer({
     return () => clearInterval(id)
   }, [streamStartTime])
 
+  const [snapshotToast, setSnapshotToast] = useState(false)
+
+  const captureSnapshot = useCallback(() => {
+    const video = videoRef.current
+    if (!video || !video.videoWidth || !video.videoHeight) return
+
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        const url = URL.createObjectURL(blob) // ALLOWED-REGRESSION: snapshot export download blob URL
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `BlinkStream_${channel}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+
+        setSnapshotToast(true)
+        setTimeout(() => setSnapshotToast(false), 3500)
+      }, 'image/png')
+    } catch (err) {
+      console.error('[VideoPlayer] Error capturando snapshot:', err)
+    }
+  }, [channel])
+
   useEffect(() => {
     const handleKey = (e) => {
       const tag = e.target.tagName
@@ -595,6 +627,8 @@ export default function VideoPlayer({
           if (!e.ctrlKey && !e.metaKey) onToggleTheatre(); break
         case 'KeyC':
           if (!e.ctrlKey && !e.metaKey && onToggleChat) onToggleChat(); break
+        case 'KeyS':
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey) { e.preventDefault(); captureSnapshot(); } break
         case 'KeyD':
           if (e.ctrlKey || e.metaKey) { e.preventDefault(); setShowStats(p => !p); } break
         case 'ArrowUp':
@@ -609,7 +643,7 @@ export default function VideoPlayer({
     // provistos por el padre. Si los añadimos a deps, el listener se
     // re-montaría en cada render del padre (no estan memoizados).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [volume, muted, streamUrl, playing])
+  }, [volume, muted, streamUrl, playing, captureSnapshot])
 
   // ──────────────────────── RENDER ────────────────────────
   return (
@@ -654,6 +688,16 @@ export default function VideoPlayer({
           <p className="mt-1 text-[10px] text-white/50">
             Se borrará al reintentar.
           </p>
+        </div>
+      )}
+
+      {snapshotToast && (
+        <div className="absolute top-14 right-3 z-40 bg-[#12121a]/95 backdrop-blur-md border border-white/15 rounded-xl px-4 py-2.5 flex items-center gap-2.5 shadow-2xl animate-bounce-short text-white text-xs font-semibold select-none">
+          <PhosphorIcon name="Camera" size={20} className="text-twitch" weight="duotone" />
+          <div>
+            <p className="leading-tight">📸 Fotograma HD capturado</p>
+            <p className="text-[10px] text-text-muted font-normal mt-0.5">Guardado en alta definición sin pérdida</p>
+          </div>
         </div>
       )}
 
@@ -736,6 +780,14 @@ export default function VideoPlayer({
               ) : (
                 <PhosphorIcon name="Record" size={18} weight="duotone" />
               )}
+            </button>
+            <button
+              onClick={captureSnapshot}
+              className="hover:text-white transition-colors cursor-pointer hover:scale-110 active:scale-95"
+              title="Captura de Pantalla HD (Ctrl+Shift+S)"
+              aria-label="Tomar captura de pantalla en HD"
+            >
+              <PhosphorIcon name="Camera" size={18} weight="duotone" />
             </button>
           </div>
 
