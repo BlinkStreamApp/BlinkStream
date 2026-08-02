@@ -220,6 +220,7 @@ const SidebarChannel = memo(function SidebarChannel({ name, status, onSelect, on
 })
 
 const StreamCard = memo(function StreamCard({ stream, onSelect, logo }) {
+  const t = useT()
   const [imgLoaded, setImgLoaded] = useState(false)
   const thumb = stream.thumbnail_url?.replace('{width}', '440').replace('{height}', '248') || ''
 
@@ -246,7 +247,7 @@ const StreamCard = memo(function StreamCard({ stream, onSelect, logo }) {
           </div>
         )}
         <div className="absolute bottom-1.5 right-1.5 bg-black/80 backdrop-blur-sm px-1 py-0.5 rounded text-[11px] text-white/60 leading-none">
-          EN VIVO
+          {t('badge.live', 'EN VIVO')}
         </div>
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors duration-200" />
       </div>
@@ -279,6 +280,7 @@ const StreamCard = memo(function StreamCard({ stream, onSelect, logo }) {
 })
 
 const SectionHeader = memo(function SectionHeader({ title, onVerTodo }) {
+  const t = useT()
   return (
     <div className="flex items-center justify-between mb-4">
       <h2 className="text-[15px] font-bold text-text-primary">{title}</h2>
@@ -287,7 +289,7 @@ const SectionHeader = memo(function SectionHeader({ title, onVerTodo }) {
           onClick={onVerTodo}
           className="text-[12px] text-twitch hover:text-twitch-light cursor-pointer transition-colors"
         >
-          Ver todo
+          {t('showMore', 'Ver todo')}
         </button>
       )}
     </div>
@@ -295,6 +297,7 @@ const SectionHeader = memo(function SectionHeader({ title, onVerTodo }) {
 })
 
 const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, currentIndex, onIndexChange, previewEnabled = true }) {
+  const t = useT()
   if (!streams.length) {
     return (
       <div className="relative w-full min-w-0 rounded-xl overflow-hidden bg-bg-tertiary mb-6 aspect-[16/7] sm:aspect-[16/6] lg:aspect-[16/5] max-w-[1400px] mx-auto">
@@ -356,7 +359,7 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
           className="flex items-center gap-2 bg-gradient-to-r from-twitch to-purple-600 hover:from-twitch-dark hover:to-purple-700 text-white font-bold text-sm px-6 py-3 rounded-lg cursor-pointer transition-all shadow-lg shadow-twitch/30 hover:shadow-twitch/50 hover:scale-105 active:scale-95 w-fit"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
-          Ver ahora
+          {t('card.watchNow', 'Ver ahora')}
         </button>
 
         <div className="absolute bottom-5 right-5 flex items-center gap-2.5 bg-black/70 backdrop-blur-md rounded-xl px-3 py-2 ring-1 ring-white/10">
@@ -366,7 +369,7 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
               {stream.user_name || stream.user_login}
             </p>
             <p className="text-white/60 text-[11px] leading-tight truncate max-w-[180px]">
-              {stream.game_name ? `Jugando a ${stream.game_name}` : 'En vivo'}
+              {stream.game_name ? `${t('card.playing', 'Jugando a')} ${stream.game_name}` : t('card.live', 'En vivo')}
             </p>
           </div>
         </div>

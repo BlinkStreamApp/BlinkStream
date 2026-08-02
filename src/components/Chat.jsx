@@ -9,6 +9,7 @@ import { adjustColorContrast } from '../utils/format'
 // propagamos como prop `isModerator` abajo.
 import { MessageContextMenu } from './moderation/MessageContextMenu'
 import { useModerationDialogSafe } from './moderation/moderationContextValue'
+import { useT } from '../utils/i18n'
 
 // FIX-5 (Hank / P0): helper para pedir `user(login: $login) { id }`
 // usando variables GraphQL (no interpolacion) + validacion previa
@@ -255,6 +256,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
 })
 
 export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken }) {
+  const t = useT()
   const [messages, setMessages] = useState([])
   const [antiSpam, setAntiSpam] = useState(() => {
     return localStorage.getItem('blinkstream_antispam') === 'true'
@@ -1099,7 +1101,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
 
         {/* WT-20260628-47: badge estilo Twitch nativo */}
         <span className="text-[10px] text-text-muted/60 bg-bg-tertiary/40 px-1.5 py-0.5 rounded">
-          Chat
+          {t('chat.title', 'Chat')}
         </span>
 
         <div className="flex-1" />
@@ -1118,7 +1120,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
               ? 'bg-purple-600/20 text-purple-300 border-purple-500/60 shadow-sm shadow-purple-500/20'
               : 'bg-white/[0.03] text-text-muted border-white/10 hover:border-white/20'
           }`}
-          title={antiSpam ? 'Anti-Spam Torneo activado: agrupa mensajes idénticos [x15]' : 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos y spam)'}
+          title={antiSpam ? t('chat.antispam.on', 'Anti-Spam Torneo activado: agrupa mensajes idénticos') : t('chat.antispam.off', 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos y spam)')}
           aria-label="Toggle Anti-Spam Modo Torneo"
         >
           <span className={`w-1.5 h-1.5 rounded-full ${antiSpam ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
@@ -1131,7 +1133,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         {auth.token ? (
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-twitch/80 font-medium truncate max-w-[80px]">
-              {auth.username || 'Conectado'}
+              {auth.username || t('chat.connected', 'Conectado')}
             </span>
             <span className="text-[9px] text-green-400/60">✓</span>
           </div>
@@ -1145,10 +1147,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
               {authing ? (
                 <>
                   <span className="w-2.5 h-2.5 border border-twitch border-t-transparent rounded-full animate-spin" />
-                  Conectando…
+                  {t('chat.connecting', 'Conectando…')}
                 </>
               ) : (
-                'Iniciar sesión'
+                t('chat.login', 'Iniciar sesión')
               )}
             </button>
 
@@ -1364,7 +1366,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
                     type="text"
                     value={emoteSearch}
                     onChange={e => { setEmoteSearch(e.target.value); if (e.target.value) setEmoteTab('all') }}
-                    placeholder="Buscar entre cientos de emotes..."
+                    placeholder={t('chat.emoteSearch', 'Buscar entre cientos de emotes...')}
                     className="w-full pl-9 pr-7 py-2 rounded-xl bg-black/40 text-white placeholder-text-muted/50 text-xs border border-white/10 focus:border-twitch focus:bg-black/60 focus:ring-2 focus:ring-twitch/30 focus:outline-none transition-all"
                     autoFocus
                   />
@@ -1380,10 +1382,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
               {!emoteSearch && (
                 <div className="flex items-center gap-1.5 px-2 py-2 border-b border-white/[0.04] bg-black/20 overflow-x-auto no-scrollbar">
                   {[
-                    { id: 'all', label: 'Todos', count: emoteList.length, icon: <PhosphorIcon name="Cat" size={14} weight="duotone" /> },
-                    { id: 'favs', label: 'Fav', count: favoriteEmotes.filter(f => emoteList.some(e => e.name === f)).length, icon: <PhosphorIcon name="Heart" size={14} weight="fill" className="text-red-400" /> },
-                    { id: 'recent', label: 'Rec', count: recentEmotes.filter(r => emoteList.some(e => e.name === r.name)).length, icon: <PhosphorIcon name="ClockCounterClockwise" size={14} weight="bold" className="text-amber-400" /> },
-                    { id: 'channel', label: 'Canal', count: emoteList.filter(e => e.section === 'channel').length, icon: <PhosphorIcon name="Television" size={14} weight="duotone" className="text-purple-400" /> },
+                    { id: 'all', label: t('chat.tab.all', 'Todos'), count: emoteList.length, icon: <PhosphorIcon name="Cat" size={14} weight="duotone" /> },
+                    { id: 'favs', label: t('chat.tab.favs', 'Fav'), count: favoriteEmotes.filter(f => emoteList.some(e => e.name === f)).length, icon: <PhosphorIcon name="Heart" size={14} weight="fill" className="text-red-400" /> },
+                    { id: 'recent', label: t('chat.tab.rec', 'Rec'), count: recentEmotes.filter(r => emoteList.some(e => e.name === r.name)).length, icon: <PhosphorIcon name="ClockCounterClockwise" size={14} weight="bold" className="text-amber-400" /> },
+                    { id: 'channel', label: t('chat.tab.channel', 'Canal'), count: emoteList.filter(e => e.section === 'channel').length, icon: <PhosphorIcon name="Television" size={14} weight="duotone" className="text-purple-400" /> },
                     { id: '7tv', label: '7TV', count: emoteList.filter(e => e.provider === '7tv').length, icon: <img src={logo7tv} alt="7TV" className="w-4 h-4 object-contain" /> },
                     { id: 'bttv', label: 'BTTV', count: emoteList.filter(e => e.provider === 'bttv').length, icon: <img src={logoBttv} alt="BTTV" className="w-4 h-4 object-contain" /> },
                     { id: 'ffz', label: 'FFZ', count: emoteList.filter(e => e.provider === 'ffz').length, icon: <img src={logoFfz} alt="FFZ" className="w-4 h-4 object-contain" /> },
@@ -1402,7 +1404,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
                 {emoteList.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-text-muted/50 gap-2">
                     <div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin" />
-                    <p className="text-xs">Cargando catálogo de emotes...</p>
+                    <p className="text-xs">{t('chat.loadingEmotes', 'Cargando catálogo de emotes...')}</p>
                   </div>
                 ) : (
                   <>
@@ -1481,7 +1483,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
                   </div>
                 ) : (
                   <span className="text-text-muted/50 text-[11px] truncate font-medium">
-                    Haz clic para enviar · <strong className="text-text-muted/70">Clic derecho</strong> para ❤️ Fav
+                    {t('chat.clickToSend', 'Haz clic para enviar · Clic derecho para ❤️ Fav')}
                   </span>
                 )}
               </div>
@@ -1496,9 +1498,9 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder={
-                !connected ? 'Conectando al chat...' :
-                !auth.token ? 'Inicia sesión para participar' :
-                'Enviar un mensaje al chat...'
+                !connected ? t('chat.placeholder.connecting', 'Conectando al chat...') :
+                !auth.token ? t('chat.placeholder.login', 'Inicia sesión para participar') :
+                t('chat.placeholder.send', 'Enviar un mensaje al chat...')
               }
               disabled={!connected || !auth.token}
               maxLength={500}
@@ -1517,7 +1519,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
               type="button"
               onClick={onOpenCPPanel}
               className="shrink-0 p-2 rounded-xl text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/20 cursor-pointer transition-all shadow-md shadow-amber-500/10 hover:scale-105 active:scale-95 flex items-center justify-center"
-              title="Recompensas y Puntos del canal"
+              title={t('chat.cpTitle', 'Recompensas y Puntos del canal')}
               aria-label="Puntos del canal"
             >
               <PhosphorIcon name="Coins" size={22} weight="duotone" className="animate-pulse" />
@@ -1529,7 +1531,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
             disabled={!connected || !inputText.trim() || !auth.token}
             className="shrink-0 px-4 py-2 rounded-xl bg-gradient-to-r from-twitch via-purple-600 to-indigo-600 hover:from-twitch-dark hover:via-purple-700 hover:to-indigo-700 text-white text-[13px] font-bold cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed transition-all shadow-lg shadow-twitch/25 hover:shadow-twitch/40 hover:scale-[1.02] active:scale-95"
           >
-            Enviar
+            {t('chat.sendBtn', 'Enviar')}
           </button>
         </form>
       </div>

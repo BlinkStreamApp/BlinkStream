@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { t } from '../../utils/i18n'
+import { useT } from '../../utils/i18n'
 import { useChannelPoints } from '../../hooks/useChannelPoints'
 import { useManageRewards } from '../../hooks/useManageRewards'
 import RewardCard from './RewardCard'
@@ -37,6 +37,7 @@ function CoinsIcon() {
 }
 
 export default function CPPanel({ open, onClose, channel, broadcasterId, userId, userToken, isBroadcaster }) {
+  const t = useT()
   // ── Hooks (siempre se llaman en el mismo orden, incluso si no
   //    hay canal: asi evitamos violation of rules of hooks).
   const viewer = useChannelPoints({

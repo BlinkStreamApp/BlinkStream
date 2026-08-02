@@ -24,6 +24,7 @@ import { measureInvoke } from '../utils/perf'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
 import { safeOpenUrl } from '../utils/tauriEnv'
+import { useT } from '../utils/i18n'
 import QualitySelector from './QualitySelector'
 import ClipPlayer from './ClipPlayer'
 import VodPlayer from './VodPlayer'
@@ -89,6 +90,7 @@ export default function VideoPlayer({
   channel, quality, onQualityChange, volume, onVolumeChange,
   theatreMode, onToggleTheatre, compact, onToggleCompact, showChat, onToggleChat,
 }) {
+  const t = useT()
   // M-7: validamos props criticas (vienen de App.jsx). Solo loggea.
   const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
   validateProps(
@@ -677,7 +679,7 @@ export default function VideoPlayer({
 
       {showTheatreToast && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-black/60 backdrop-blur-md rounded-full px-4 py-1.5 text-[12px] text-white/70 animate-fade-in pointer-events-none">
-          🎭 Modo teatro · Presiona <kbd className="px-1 py-0.5 bg-white/10 rounded text-[11px]">T</kbd> para salir
+          {t('player.theatreNotice', '🎭 Modo teatro · Presiona T para salir')}
         </div>
       )}
 
@@ -687,7 +689,7 @@ export default function VideoPlayer({
           <div className="w-16 h-16 rounded-2xl bg-twitch/20 flex items-center justify-center mb-3 animate-pulse-glow">
             <PhosphorIcon name="Headphones" size={32} weight="regular" />
           </div>
-          <p className="text-white/60 text-sm font-medium">Modo solo audio</p>
+          <p className="text-white/60 text-sm font-medium">{t('player.audioOnly', 'Modo solo audio')}</p>
           <p className="text-text-muted text-[12px] mt-1">{channel}</p>
         </div>
       )}
@@ -750,10 +752,10 @@ export default function VideoPlayer({
       <div className={`absolute top-0 left-0 right-0 z-30 flex items-center justify-end px-6 py-4 bg-gradient-to-b from-black/80 to-transparent transition-all duration-300 select-none ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}>
         <div className="flex items-center gap-3">
           {streamInfo?.viewer_count != null && (
-            <span className="text-[12px] text-white/70 font-medium">{formatViewers(streamInfo.viewer_count)} viewers</span>
+            <span className="text-[12px] text-white/70 font-medium">{formatViewers(streamInfo.viewer_count)} {t('player.viewers', 'viewers')}</span>
           )}
           <LiveBadge />
-          <button onClick={() => setShowMacHelp(true)} className="text-white/40 hover:text-white transition-colors cursor-pointer ml-1" title="Ayuda macOS" aria-label="Ayuda">
+          <button onClick={() => setShowMacHelp(true)} className="text-white/40 hover:text-white transition-colors cursor-pointer ml-1" title={t('player.help', 'Ayuda macOS')} aria-label="Ayuda">
             <PhosphorIcon name="Question" size={15} weight="regular" />
           </button>
         </div>
@@ -762,10 +764,10 @@ export default function VideoPlayer({
       {/* Control Bar - Isla flotante premium */}
       <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
         <div className="flex items-center gap-4 text-white">
-          <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? 'Pausar' : 'Reproducir'}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
-          <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? 'Activar sonido' : 'Silenciar'}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
+          <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
+          <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? t('player.unmute', 'Activar sonido') : t('player.mute', 'Silenciar')}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
           <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={handleVolume} className="w-20 h-1 accent-twitch bg-white/20 rounded-lg appearance-none cursor-pointer" aria-label="Volumen" aria-valuemin="0" aria-valuemax="100" aria-valuenow={muted ? 0 : volume} />
-          <button onClick={toggleAudioOnly} className={`hover:text-white transition-colors cursor-pointer ${audioOnly ? 'text-twitch' : ''}`} title={audioOnly ? 'Modo video' : 'Solo audio'} aria-label="Solo audio">
+          <button onClick={toggleAudioOnly} className={`hover:text-white transition-colors cursor-pointer ${audioOnly ? 'text-twitch' : ''}`} title={audioOnly ? t('player.videoMode', 'Modo video') : t('player.audioOnly', 'Solo audio')} aria-label="Solo audio">
             {audioOnly ? (
               <PhosphorIcon name="Monitor" size={18} weight="regular" />
             ) : (
@@ -782,8 +784,8 @@ export default function VideoPlayer({
             ) : availableQualities.length > 0 ? (
               <QualitySelector current={quality} onChange={handleQualityChange} qualities={availableQualities} />
             ) : null}
-            <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title="Clips" aria-label="Abrir clips"><ClipIcon/></button>
-            <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title="VODs" aria-label="Ver VODs"><VodIcon/></button>
+            <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.clips', 'Clips')} aria-label="Abrir clips"><ClipIcon/></button>
+            <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.vods', 'VODs')} aria-label="Ver VODs"><VodIcon/></button>
             <button onClick={async () => {
               // G1 / WT-20260628-16: delega al hook useRecording.
               // El hook se encarga del dialog save, errores, y eventLog.
@@ -792,7 +794,7 @@ export default function VideoPlayer({
               } else {
                 await startRecording(channel)
               }
-            }} className={`hover:text-white transition-colors cursor-pointer ${recording ? 'text-red-500' : ''}`} title={recording ? 'Detener grabación' : 'Grabar stream'} aria-label="Grabar stream">
+            }} className={`hover:text-white transition-colors cursor-pointer ${recording ? 'text-red-500' : ''}`} title={recording ? t('player.stopRecord', 'Detener grabación') : t('player.record', 'Grabar stream')} aria-label="Grabar stream">
               {recording ? (
                 // FASE 4 / WT-20260628-45: Lordicon animado. Si la red/CDN
                 // falla, AnimatedIcon cae a Phosphor Record duotone.
@@ -809,7 +811,7 @@ export default function VideoPlayer({
             <button
               onClick={captureSnapshot}
               className="hover:text-white transition-colors cursor-pointer hover:scale-110 active:scale-95"
-              title="Captura de Pantalla HD (Ctrl+Shift+S)"
+              title={t('player.snapshot', 'Captura de Pantalla HD (Ctrl+Shift+S)')}
               aria-label="Tomar captura de pantalla en HD"
             >
               <PhosphorIcon name="Camera" size={18} weight="duotone" />
@@ -819,13 +821,13 @@ export default function VideoPlayer({
           <div className="w-px h-5 bg-white/10 mx-1" />
 
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch' : ''}`} title="Ajustes" aria-label="Ajustes del reproductor"><SettingsIcon/></button>
-            <button onClick={onToggleTheatre} className={`hover:text-white transition-colors cursor-pointer ${theatreMode ? 'text-twitch' : ''}`} title="Teatro (T)" aria-label="Modo teatro"><TheatreIcon/></button>
+            <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch' : ''}`} title={t('player.settings', 'Ajustes')} aria-label="Ajustes del reproductor"><SettingsIcon/></button>
+            <button onClick={onToggleTheatre} className={`hover:text-white transition-colors cursor-pointer ${theatreMode ? 'text-twitch' : ''}`} title={t('player.theatre', 'Teatro (T)')} aria-label="Modo teatro"><TheatreIcon/></button>
             {onToggleChat && (
               <button
                 onClick={onToggleChat}
                 className={`hover:text-white transition-colors cursor-pointer ${showChat ? 'text-twitch' : ''}`}
-                title={showChat ? 'Ocultar chat (C)' : 'Mostrar chat (C)'}
+                title={showChat ? t('player.hideChat', 'Ocultar chat (C)') : t('player.showChat', 'Mostrar chat (C)')}
                 aria-label="Alternar chat"
               >
                 <PhosphorIcon name="ChatCircleDots" size={18} weight={showChat ? "fill" : "regular"} />
@@ -833,13 +835,13 @@ export default function VideoPlayer({
             )}
             <button onClick={async () => {
               try { safeOpenUrl(`https://www.twitch.tv/${channel}`, true) } catch { /* ignore: el helper ya hace fallback */ }
-            }} className="hover:text-white transition-colors cursor-pointer" title="Abrir en navegador" aria-label="Abrir en navegador">
+            }} className="hover:text-white transition-colors cursor-pointer" title={t('player.browser', 'Abrir en navegador')} aria-label="Abrir en navegador">
               <PhosphorIcon name="ArrowSquareOut" size={16} weight="regular" />
             </button>
-            <button onClick={togglePiP} className={`hover:text-white transition-colors cursor-pointer ${isPiP ? 'text-twitch' : ''}`} title="Picture-in-Picture" aria-label="Picture-in-Picture">
+            <button onClick={togglePiP} className={`hover:text-white transition-colors cursor-pointer ${isPiP ? 'text-twitch' : ''}`} title={t('player.pip', 'Picture-in-Picture')} aria-label="Picture-in-Picture">
               <PhosphorIcon name="PictureInPicture" size={16} weight="regular" />
             </button>
-            <button onClick={toggleFullscreen} className="hover:text-white transition-colors cursor-pointer" title="Fullscreen (F)" aria-label="Pantalla completa"><FullscreenIcon/></button>
+            <button onClick={toggleFullscreen} className="hover:text-white transition-colors cursor-pointer" title={t('player.fullscreen', 'Fullscreen (F)')} aria-label="Pantalla completa"><FullscreenIcon/></button>
           </div>
         </div>
 

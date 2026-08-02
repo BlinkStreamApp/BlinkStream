@@ -11,7 +11,7 @@
 
 import { useState, useEffect } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
-import { t } from '../../utils/i18n'
+import { useT } from '../../utils/i18n'
 
 /**
  * Convierte segundos a string "Xh Ym" / "Ym Zs" / "Zs".
@@ -28,6 +28,7 @@ function fmtCooldown(totalSec) {
 }
 
 export default function RewardCard({ reward, userBalance, channelLive = true, onClick }) {
+  const t = useT()
   // `now` se refresca cada 1s para que el cooldown se actualice sin
   // re-renders espurios. Antes se llamaba Date.now() en render y la
   // regla `react-hooks/purity` marcaba impure function during render.

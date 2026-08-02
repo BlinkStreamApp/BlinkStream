@@ -40,6 +40,7 @@ import { relaunch } from '@tauri-apps/plugin-process'
 import { validateToken, clearStoredToken } from './utils/twitch'
 import { logError } from './utils/errors'
 import { isTauri } from './utils/tauriEnv'
+import { useT } from './utils/i18n'
 // WT-20260628-56: sistema de moderacion cableado estilo Twitch.
 // ModerationProvider expone openAction/closeAction para que el click
 // derecho en Chat.jsx pueda disparar el ActionModal sin acoplarse a
@@ -119,6 +120,7 @@ function loadVolume() { const v = Number(localStorage.getItem('blinkstream_volum
 function loadTheatre() { return localStorage.getItem('blinkstream_theatre') === 'true' }
 
 function MainApp() {
+  const t = useT()
   useEffect(() => {
     const accent = localStorage.getItem('blinkstream_accent') || 'purple'
     document.documentElement.setAttribute('data-accent', accent)
@@ -491,14 +493,14 @@ function MainApp() {
                 <div className="absolute right-0 top-full mt-2 w-48 bg-bg-secondary border border-bg-tertiary/60 rounded-xl shadow-2xl z-[9999] overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
                   <div className="px-4 py-3 border-b border-bg-tertiary/40">
                     <p className="text-[12px] font-medium text-text-primary truncate">{username}</p>
-                    <p className="text-[10px] text-text-muted">Conectado</p>
+                    <p className="text-[10px] text-text-muted">{t('nav.connected', 'Conectado')}</p>
                   </div>
                   <button
                     onClick={() => { setShowUserMenu(false); setShowLogoutConfirm(true) }}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-[12px] text-text-secondary hover:bg-hover hover:text-red-400 cursor-pointer transition-colors"
                   >
                     <PhosphorIcon name="SignOut" size={16} weight="regular" />
-                    Cerrar sesión
+                    {t('nav.logout', 'Cerrar sesión')}
                   </button>
                 </div>
               )}
@@ -608,9 +610,9 @@ function MainApp() {
       )}
       {showLogoutConfirm && (
         <ConfirmDialog
-          title="Cerrar sesión"
-          message="¿Estás seguro de que quieres cerrar sesión? Tus favoritos en la nube se conservarán."
-          confirmText="Cerrar sesión"
+          title={t('nav.logout', 'Cerrar sesión')}
+          message={t('nav.logoutConfirmDesc', '¿Estás seguro de que quieres cerrar sesión? Tus favoritos en la nube se conservarán.')}
+          confirmText={t('nav.logout', 'Cerrar sesión')}
           onConfirm={() => { setShowLogoutConfirm(false); logout() }}
           onCancel={() => setShowLogoutConfirm(false)}
         />

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { searchChannels } from '../utils/twitch'
 import PhosphorIcon from './icons/PhosphorIcon'
+import { useT } from '../utils/i18n'
 
 const CHANNEL_RE = /^[a-zA-Z][a-zA-Z0-9_]{2,24}$/
 
 export default function ChannelSearch({ onSelect, currentChannel }) {
+  const t = useT()
   const [input, setInput] = useState('')
   const [error, setError] = useState('')
   const [suggestions, setSuggestions] = useState([])
@@ -103,10 +105,10 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
           value={input}
           onChange={(e) => { setInput(e.target.value); setError('') }}
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-          placeholder="Buscar canal…"
+          placeholder={t('nav.searchPlaceholder', 'Buscar canal…')}
           maxLength={25}
           className="w-full pl-9 pr-12 py-2 rounded-lg bg-bg-primary/80 text-text-primary placeholder-text-muted/60 text-sm border border-bg-tertiary focus:border-twitch/60 focus:bg-bg-primary focus:ring-2 focus:ring-twitch/20 focus:outline-none transition-all shadow-sm"
-          aria-label="Buscar canal de Twitch"
+          aria-label={t('nav.searchAria', 'Buscar canal de Twitch')}
           autoComplete="off"
         />
         {searching ? (
