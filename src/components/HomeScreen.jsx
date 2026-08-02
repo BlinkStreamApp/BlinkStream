@@ -745,13 +745,16 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
         </div>
 
         {onShowAbout && (
-          <footer className="shrink-0 border-t border-white/[0.04] px-3 py-2.5">
+          <footer className={`shrink-0 border-t border-white/[0.04] ${miniDock ? 'px-2 py-2.5 flex justify-center' : 'px-3 py-2.5'}`}>
             <button
               onClick={onShowAbout}
-              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[13px] text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all"
+              className={`flex items-center gap-2.5 w-full rounded-xl text-[13px] text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-all ${
+                miniDock ? 'p-2 justify-center w-auto' : 'px-3 py-2'
+              }`}
+              title="Acerca de BlinkStream"
             >
-              <PhosphorIcon name="Info" size={18} weight="regular" />
-              <span>Acerca de BlinkStream</span>
+              <PhosphorIcon name="Info" size={18} weight="regular" className="shrink-0" />
+              {!miniDock && <span>Acerca de BlinkStream</span>}
             </button>
           </footer>
         )}

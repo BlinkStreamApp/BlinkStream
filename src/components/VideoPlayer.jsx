@@ -579,11 +579,16 @@ export default function VideoPlayer({
     return () => clearInterval(id)
   }, [streamStartTime])
 
-  const [snapshotToast, setSnapshotToast] = useState(false)
+  const [snapshotToast, setSnapshotToast] = useState({ show: false, error: '' })
 
-  const captureSnapshot = useCallback(() => {
+  const captureSnapshot = useCallback((e) => {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation()
     const video = videoRef.current
-    if (!video || !video.videoWidth || !video.videoHeight) return
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setSnapshotToast({ show: true, error: 'El vídeo aún no está listo para capturar.' })
+      setTimeout(() => setSnapshotToast({ show: false, error: '' }), 3500)
+      return
+    }
 
     try {
       const canvas = document.createElement('canvas')
@@ -592,22 +597,29 @@ export default function VideoPlayer({
       const ctx = canvas.getContext('2d')
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-      canvas.toBlob((blob) => {
-        if (!blob) return
-        const url = URL.createObjectURL(blob) // ALLOWED-REGRESSION: snapshot export download blob URL
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `BlinkStream_${channel}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+      let dataUrl
+      try {
+        dataUrl = canvas.toDataURL('image/png') // ALLOWED-REGRESSION: snapshot export download blob URL
+      } catch (secErr) {
+        console.error('[VideoPlayer] Tainted canvas o CORS al capturar:', secErr)
+        setSnapshotToast({ show: true, error: 'Restricción CORS del CDN al exportar el frame.' })
+        setTimeout(() => setSnapshotToast({ show: false, error: '' }), 4500)
+        return
+      }
 
-        setSnapshotToast(true)
-        setTimeout(() => setSnapshotToast(false), 3500)
-      }, 'image/png')
+      const a = document.createElement('a')
+      a.href = dataUrl
+      a.download = `BlinkStream_${channel}_${new Date().toISOString().replace(/[:.]/g, '-')}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+
+      setSnapshotToast({ show: true, error: '' })
+      setTimeout(() => setSnapshotToast({ show: false, error: '' }), 3500)
     } catch (err) {
       console.error('[VideoPlayer] Error capturando snapshot:', err)
+      setSnapshotToast({ show: true, error: `Error de captura: ${err.message || err}` })
+      setTimeout(() => setSnapshotToast({ show: false, error: '' }), 4000)
     }
   }, [channel])
 
@@ -628,7 +640,11 @@ export default function VideoPlayer({
         case 'KeyC':
           if (!e.ctrlKey && !e.metaKey && onToggleChat) onToggleChat(); break
         case 'KeyS':
-          if ((e.ctrlKey || e.metaKey) && e.shiftKey) { e.preventDefault(); captureSnapshot(); } break
+          if (((e.ctrlKey || e.metaKey) && e.shiftKey) || (!e.ctrlKey && !e.metaKey && !e.altKey)) {
+            e.preventDefault()
+            captureSnapshot()
+          }
+          break
         case 'KeyD':
           if (e.ctrlKey || e.metaKey) { e.preventDefault(); setShowStats(p => !p); } break
         case 'ArrowUp':
@@ -656,7 +672,7 @@ export default function VideoPlayer({
         </div>
       )}
 
-      <video ref={videoRef} className={`w-full h-full object-contain ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
+      <video ref={videoRef} crossOrigin="anonymous" className={`w-full h-full object-contain ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
       {audioOnly && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 select-none">
           <div className="w-16 h-16 rounded-2xl bg-twitch/20 flex items-center justify-center mb-3 animate-pulse-glow">
@@ -691,12 +707,12 @@ export default function VideoPlayer({
         </div>
       )}
 
-      {snapshotToast && (
-        <div className="absolute top-14 right-3 z-40 bg-[#12121a]/95 backdrop-blur-md border border-white/15 rounded-xl px-4 py-2.5 flex items-center gap-2.5 shadow-2xl animate-bounce-short text-white text-xs font-semibold select-none">
-          <PhosphorIcon name="Camera" size={20} className="text-twitch" weight="duotone" />
+      {snapshotToast.show && (
+        <div className={`absolute top-14 right-3 z-40 bg-[#12121a]/95 backdrop-blur-md border ${snapshotToast.error ? 'border-red-500/50' : 'border-white/15'} rounded-xl px-4 py-2.5 flex items-center gap-2.5 shadow-2xl animate-bounce-short text-white text-xs font-semibold select-none`}>
+          <PhosphorIcon name="Camera" size={20} className={snapshotToast.error ? 'text-red-400' : 'text-twitch'} weight="duotone" />
           <div>
-            <p className="leading-tight">📸 Fotograma HD capturado</p>
-            <p className="text-[10px] text-text-muted font-normal mt-0.5">Guardado en alta definición sin pérdida</p>
+            <p className="leading-tight">{snapshotToast.error ? '⚠️ No se pudo capturar' : '📸 Fotograma HD capturado'}</p>
+            <p className="text-[10px] text-text-muted font-normal mt-0.5">{snapshotToast.error || 'Guardado en alta definición sin pérdida'}</p>
           </div>
         </div>
       )}
