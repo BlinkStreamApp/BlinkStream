@@ -256,6 +256,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master
 
       - name: Download all signatures
         uses: actions/download-artifact@v4
@@ -269,15 +271,18 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "Construyendo updater.json para v$VERSION"
 
-          # Template base
-          cat > updater.json << EOF
-          {
-            "version": "$VERSION",
-            "notes": "Novedades de BlinkStream v$VERSION",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {}
-          }
-          EOF
+          node -e "
+            const fs = require('fs');
+            let data = {};
+            if (fs.existsSync('updater.json')) {
+              try { data = JSON.parse(fs.readFileSync('updater.json', 'utf8')); } catch (e) {}
+            }
+            data.version = '$VERSION';
+            data.notes = data.notes || 'Novedades de BlinkStream v$VERSION';
+            data.pub_date = new Date().toISOString();
+            data.platforms = data.platforms || {};
+            fs.writeFileSync('updater.json', JSON.stringify(data, null, 2) + '\n');
+          "
 
           # Función para añadir plataforma
           add_platform() {
@@ -331,5 +336,4 @@ jobs:
           git config user.name "BlinkStream Bot"
           git config user.email "bot@blinkstream.app"
           git add updater.json
-          git diff --cached --exit-code || git commit -m "Update updater.json for v$VERSION"
-          git push
+          git diff --cached --exit-code || (git commit -m "chore(release): update updater.json for v${{ github.ref_name }} [skip ci]" && git push origin HEAD:master)
