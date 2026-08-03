@@ -553,15 +553,15 @@ function handleAuthRedirect(
   authUrl.searchParams.set("client_id", TWITCH_CLIENT_ID);
   authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
   authUrl.searchParams.set("response_type", "code");
-  // F-2 fix: scopes actualizados (chat + moderaciÃƒÆ’Ã‚Â³n + channel points).
+  // F-2 fix: scopes actualizados (chat + moderacion + channel points).
   // === TWITCH OAUTH SCOPES (11 total) ===
   // Chat (IRC):
   //   chat:read                       - leer mensajes via IRC (USERSTATE, PRIVMSG, etc.)
   //   chat:edit                       - enviar mensajes via IRC
   // Follows:
-  //   user:edit:follows               - follow/unfollow programÃƒÆ’Ã‚Â¡tico
+  //   user:edit:follows               - follow/unfollow programatico
   //   user:read:follows               - listar follows del usuario
-  // ModeraciÃƒÆ’Ã‚Â³n (requiere ser mod en el canal objetivo):
+  // Moderation (requiere ser mod en el canal objetivo):
   //   moderator:manage:chat_messages  - /delete, /clear, pin/unpin
   //   moderator:manage:banned_users   - /ban, /unban, /timeout, /untimeout
   //   moderator:manage:chat_settings  - /slow, /followers, /emoteonly, /subscribers

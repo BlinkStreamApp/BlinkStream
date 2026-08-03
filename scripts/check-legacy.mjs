@@ -40,7 +40,7 @@ function walk(dir, files = []) {
       if (EXCLUDE_DIRS.includes(entry)) continue
       walk(full, files)
     } else {
-      const isIncluded = INCLUDE_GLOBS.some(g => full.includes(g))
+      const isIncluded = INCLUDE_GLOBS.some(g => full.replaceAll('\\', '/').includes(g))
       const hasExt = INCLUDE_EXT.some(ext => entry.endsWith(ext))
       if (isIncluded && hasExt) files.push(full)
     }
