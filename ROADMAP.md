@@ -61,8 +61,9 @@ Below is our structured technical vision, detailing upcoming improvements across
 - **macOS Apple Silicon Notarization**: Full native architecture support (M1/M2/M3/M4) with dedicated hardware decoding optimization and Apple TouchBar controls.
 - **Mobile Wi-Fi Companion Remote**: Turn your smartphone or tablet into an instantaneous interactive Wi-Fi remote control for your living room BlinkStream desktop setup.
 
-### 🔌 Extensibility & API
+### 🔌 Extensibility & AI Next-Gen
 - **BlinkStream Plugin & Widget SDK**: Secure local sandboxed API empowering external developers and streamers to build personalized widgets, overlay extensions, and custom Twitch Bot integrations natively inside the application.
+- **Real-Time AI Live Translation & Subtitles Engine**: Advanced multi-lingual speech-to-text (Whisper/Silero VAD) and neural translation pipeline producing ultra-low-latency neon subtitle overlays directly over foreign broadcasts (e.g., English/Japanese ➔ Spanish).
 
 ---
 
