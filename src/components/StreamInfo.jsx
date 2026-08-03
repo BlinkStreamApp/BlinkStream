@@ -68,7 +68,9 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
 
   useEffect(() => {
     if (!channel) return
-    let cancelled = false
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 6000)
+
     // Reset al cambiar de canal: estado UI que se sustituye en el
     // siguiente fetch. setState en effect es el patron canonico.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -80,19 +82,20 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
 
     ;(async () => {
       const helixHeaders = await getHeaders()
+      if (controller.signal.aborted) return
       const [helixData, gqlData] = await Promise.all([
         fetch(`https://api.twitch.tv/helix/streams?user_login=${channel}`, {
           headers: helixHeaders,
-          signal: AbortSignal.timeout(6000),
+          signal: controller.signal,
         }).then(res => res.ok ? res.json() : null).catch(() => null),
         fetch('https://gql.twitch.tv/gql', {
           method: 'POST',
           headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
           body: (() => { const q = buildGqlQuery(channel); return q.ok ? JSON.stringify({ query: q.query, variables: q.variables }) : JSON.stringify({ query: '{ __typename }' }) })(),
-          signal: AbortSignal.timeout(6000),
+          signal: controller.signal,
         }).then(res => res.ok ? res.json() : null).catch(() => null),
       ])
-      if (cancelled) return
+      if (controller.signal.aborted) return
 
       const gqlUser = gqlData?.data?.user
       setAvatar(gqlUser?.profileImageURL || null)
@@ -127,7 +130,10 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
       }
     })().catch(() => { /* ignore: si falla el fetch dejamos el estado anterior */ })
 
-    return () => { cancelled = true }
+    return () => {
+      clearTimeout(timeoutId)
+      controller.abort()
+    }
   }, [channel])
 
   const isLive = !!info
@@ -163,9 +169,9 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
   }, [info?.started_at])
 
   return (
-    <div className="shrink-0 px-4 py-2.5 bg-bg-secondary/20 backdrop-blur-sm border-b border-white/[0.04] flex items-center gap-3 select-none">
+    <div className="shrink-0 px-4 py-2.5 bg-[#101014]/85 backdrop-blur-2xl border-b border-white/10 shadow-sm flex items-center gap-3 select-none transition-all duration-300">
       <div className="relative shrink-0">
-        <div className="h-9 w-9 rounded-full border-2 border-twitch/30 overflow-hidden bg-bg-tertiary flex items-center justify-center">
+        <div className="h-9 w-9 rounded-full border-2 border-twitch/60 shadow-sm shadow-twitch/30 overflow-hidden bg-bg-tertiary flex items-center justify-center transition-transform duration-200 hover:scale-105">
           {avatar ? (
             <img src={avatar} alt="" className="h-full w-full object-cover" />
           ) : (

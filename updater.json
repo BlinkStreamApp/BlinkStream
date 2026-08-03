@@ -1,23 +1,23 @@
 {
-  "version": "1.1.0",
-  "notes": "Novedades de BlinkStream v1.1.0:\n- Auto-updater: la app se actualiza sola\n- Notificaciones nativas cuando tus canales favoritos se conectan\n- Keychain: tu token de Twitch ahora está seguro\n- Varias mejoras de rendimiento y estabilidad",
-  "pub_date": "2026-06-08T00:00:00Z",
+  "version": "1.2.0",
+  "notes": "Novedades de BlinkStream v1.2.0:\n- Estudio de Personalización: temas avanzados (AMOLED, Cyberpunk, Esmeralda) y selección de tipografías y fuentes\n- Rediseño ergonómico del reproductor: controles centralizados con engranaje Glassmorphic y limpieza visual de la barra superior\n- Estadísticas en Vivo (Nerd Stats): medición real de FPS, bitrate y fotogramas descartados en directo\n- Saneamiento de red: nuevo circuit-breaker inteligente contra caídas de conexión y optimización de consola",
+  "pub_date": "2026-08-03T00:00:00Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_Win_x64.exe"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.2.0/BlinkStream_1.2.0_Win_x64.exe"
     },
     "darwin-aarch64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_macOS_arm64.dmg"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.2.0/BlinkStream_1.2.0_macOS_arm64.dmg"
     },
     "darwin-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_macOS_x64.dmg"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.2.0/BlinkStream_1.2.0_macOS_x64.dmg"
     },
     "linux-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.1.0/BlinkStream_1.1.0_Linux_x86_64.deb"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.2.0/BlinkStream_1.2.0_Linux_x86_64.deb"
     }
   }
 }

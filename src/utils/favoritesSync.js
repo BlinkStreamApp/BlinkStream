@@ -34,8 +34,6 @@ export function clearAuthBrokenFlag() {
 // Si esta abierto (authBroken=true), devolvemos una Response 401
 // sintetica para no salir a la red.
 async function authedFetch(url, options = {}) {
-  // Circuit-breaker: si la ultima llamada cerro el circuito, no salir
-  // a la red. Devolvemos 401 sintetico para que el caller degrade bien.
   if (authBroken) {
     return new Response(JSON.stringify({ error: 'auth_broken' }), {
       status: 401,
@@ -59,34 +57,40 @@ async function authedFetch(url, options = {}) {
       headers: { 'Content-Type': 'application/json' },
     })
   }
-  let res = await fetch(url, { ...options, headers: buildHeaders(token) })
 
-  if (res.status === 401) {
-    if (token) {
-      // Token vencido o invalido. Intentar refresh UNA vez.
-      const fresh = await refreshBlinkstreamToken()
-      if (fresh) {
-        res = await fetch(url, { ...options, headers: buildHeaders(fresh) })
-        if (res.status === 401) {
-          // Refresh NO resolvio el 401. Abrir circuit-breaker.
+  try {
+    let res = await fetch(url, { ...options, headers: buildHeaders(token) })
+
+    if (res.status === 401) {
+      if (token) {
+        const fresh = await refreshBlinkstreamToken()
+        if (fresh) {
+          res = await fetch(url, { ...options, headers: buildHeaders(fresh) })
+          if (res.status === 401 || !res.ok) {
+            authBroken = true
+            if (res.status === 401) clearBlinkstreamToken()
+          }
+        } else {
           authBroken = true
           clearBlinkstreamToken()
         }
       } else {
-        // No pudimos refrescar: limpiar estado y abrir circuit-breaker.
         authBroken = true
-        clearBlinkstreamToken()
       }
-    } else {
-      // No hay token: 401 era esperable. Abrimos el circuit-breaker
-      // para que los siguientes effects que se re-ejecuten (por
-      // cambio de favorites u otros deps) NO spameen la red.
-      // Se cierra cuando el usuario haga login.
-      authBroken = true
     }
+    return res
+  } catch (err) {
+    // Excepción de red o bloqueo de CORS en el navegador. Abrir inmediatamente el circuit breaker.
+    authBroken = true
+    if (import.meta.env.DEV) {
+      console.warn(`[authedFetch] Error de red o CORS al comunicar con ${url}. Sincronización cambiada a modo local/offline.`)
+    }
+    return new Response(JSON.stringify({ error: 'network_or_cors_error' }), {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
-
-  return res
 }
 
 /**

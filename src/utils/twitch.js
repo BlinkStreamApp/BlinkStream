@@ -365,7 +365,8 @@ export function getGqlHeaders() {
  * @returns {Promise<{value: string, signature: string}>}
  * @throws {Error} si la peticion falla o la respuesta no trae token
  */
-export async function getAccessToken(channel, type = 'stream') {
+export async function getAccessToken(channel, type = 'stream', customSignal = null) {
+  if (customSignal?.aborted) throw new Error('Aborted')
   const isVod = type === 'video'
   const sanitized = isVod ? String(channel).replace(/[^0-9]/g, '') : sanitizeChannelForGraphQL(channel)
   if (!sanitized) throw new Error('GQL: canal/VOD invalido')
@@ -378,7 +379,7 @@ export async function getAccessToken(channel, type = 'stream') {
     method: 'POST',
     headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
-    signal: safeTimeout(8000),
+    signal: customSignal || safeTimeout(8000),
   })
   if (!gqlRes.ok) throw new Error('GQL access token failed')
   const gqlData = await gqlRes.json()
@@ -398,8 +399,9 @@ export async function getAccessToken(channel, type = 'stream') {
  * @returns {Promise<string>}
  * @throws {Error} si la peticion a usher falla
  */
-export async function getDirectStreamUrl(channel, quality = '1080p60') {
-  const at = await getAccessToken(channel)
+export async function getDirectStreamUrl(channel, quality = '1080p60', customSignal = null) {
+  if (customSignal?.aborted) throw new Error('Aborted')
+  const at = await getAccessToken(channel, 'stream', customSignal)
   const token = at.value; const sig = at.signature
 
   const params = new URLSearchParams({
@@ -418,7 +420,7 @@ export async function getDirectStreamUrl(channel, quality = '1080p60') {
   const usherUrl = `https://usher.ttvnw.net/api/channel/hls/${encodeURIComponent(channel)}.m3u8?${params}`
   const res = await measureFetch(usherUrl, {
     headers: { 'Client-ID': PUBLIC_CLIENT_ID },
-    signal: safeTimeout(10000),
+    signal: customSignal || safeTimeout(10000),
   })
   if (!res.ok) throw new Error(`Usher: HTTP ${res.status}`)
 
@@ -458,11 +460,12 @@ export async function getDirectStreamUrl(channel, quality = '1080p60') {
  * @param {string} channel
  * @returns {Promise<object|null>}
  */
-export async function getStreamInfo(channel) {
+export async function getStreamInfo(channel, customSignal = null) {
+  if (customSignal?.aborted) return null
   const headers = await getHeaders()
   const res = await measureFetch(
     `https://api.twitch.tv/helix/streams?user_login=${encodeURIComponent(channel)}`,
-    { headers, signal: safeTimeout(5000) }
+    { headers, signal: customSignal || safeTimeout(5000) }
   )
   if (!res.ok) return null
   const data = await res.json()

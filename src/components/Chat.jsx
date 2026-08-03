@@ -10,6 +10,8 @@ import { adjustColorContrast } from '../utils/format'
 import { MessageContextMenu } from './moderation/MessageContextMenu'
 import { useModerationDialogSafe } from './moderation/moderationContextValue'
 import { useT } from '../utils/i18n'
+import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
+import { safeOpenUrl, isTauri } from '../utils/tauriEnv'
 
 // FIX-5 (Hank / P0): helper para pedir `user(login: $login) { id }`
 // usando variables GraphQL (no interpolacion) + validacion previa
@@ -51,10 +53,60 @@ const EMOTE_RE = /^[\w-]+$/
 function parseMessageTags(tags) {
   const obj = {}
   tags.split(';').forEach(pair => {
-    const [k, v] = pair.split('=')
-    if (k) obj[k] = v || ''
+    const idx = pair.indexOf('=')
+    if (idx === -1) {
+      if (pair) obj[pair] = ''
+      return
+    }
+    const k = pair.slice(0, idx)
+    let v = pair.slice(idx + 1)
+    if (k && v) {
+      v = v.replace(/\\s/g, ' ').replace(/\\:/g, ':').replace(/\\;/g, ';').replace(/\\\\/g, '\\').replace(/\\r/g, '').replace(/\\n/g, ' ')
+    }
+    obj[k] = v || ''
   })
   return obj
+}
+
+const URL_REGEX = /((?:https?:\/\/[^\s]+|www\.[^\s]+|\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:tv|com|gg|co|io|net|org|es|me|app|dev|ai|live|pro|fm|store|shop|tech|space|site|online|ws|gs|xyz|club|info|biz|lat|uk|de|fr|br|nl|eu|ca|au|in|pl|tr|sr|st|su|se|no|fi|ch|at|gr|pt|dk|cz|hu|ro|sk|si|hr|bg|lt|lv|ee|ie|is|lu|mt|mc|by|kr|tw|hk|sg|ph|my|id|th|vn|ae|il|za|pr|ec|pe|uy|pa|do|ve|cr|gt|bo|ni|hn|py|sv|bz)(?:\/[^\s]*)?))/gi
+function renderTextWithLinks(text, partIdx) {
+  if (!text || !text.match(URL_REGEX)) return text
+  const parts = []
+  let lastIdx = 0
+  text.replace(URL_REGEX, (...args) => {
+    const match = args[0]
+    const offset = args[args.length - 2]
+    if (offset > lastIdx) {
+      parts.push(text.slice(lastIdx, offset))
+    }
+    let url = match
+    let trailing = ''
+    while (url.length > 0 && /[.,)!?;:"']$/.test(url)) {
+      trailing = url.slice(-1) + trailing
+      url = url.slice(0, -1)
+    }
+    const href = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`
+    parts.push(
+      <span
+        key={`url-${partIdx}-${offset}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          try { safeOpenUrl(href, true) } catch { /* ignore */ }
+        }}
+        className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 decoration-cyan-500/60 hover:decoration-cyan-300 font-medium cursor-pointer transition-colors break-all inline-flex items-center gap-0.5"
+        title={`Abrir enlace en navegador: ${href}`}
+      >
+        {url}
+      </span>
+    )
+    if (trailing) parts.push(trailing)
+    lastIdx = offset + match.length
+  })
+  if (lastIdx < text.length) {
+    parts.push(text.slice(lastIdx))
+  }
+  return parts
 }
 
 function buildEmoteTrie(emotes) {
@@ -142,22 +194,112 @@ function matchEmotesInText(text, twitchEmotesStr, trie) {
   return parts
 }
 
-const badgeCache = { global: null }
+const badgeCache = { global: null, channels: {} }
 
-async function getBadgeUrl(setName, version) {
+function findBadgeUrl(badgeUrls, set, version) {
+  if (!badgeUrls || !set) return null
+  if (badgeUrls[`${set}/${version}`]) return badgeUrls[`${set}/${version}`]
+  if (badgeUrls[`${set}/0`]) return badgeUrls[`${set}/0`]
+  if (badgeUrls[`${set}/1`]) return badgeUrls[`${set}/1`]
+  const prefix = `${set}/`
+  for (const k of Object.keys(badgeUrls)) {
+    if (k.startsWith(prefix)) return badgeUrls[k]
+  }
+  return null
+}
+
+async function fetchBadgesForChannel(channel) {
+  const dict = {}
+
   try {
-    if (!badgeCache.global) {
-      const res = await fetch('https://badges.twitch.tv/v1/badges/global/display', { signal: AbortSignal.timeout(5000) })
-      if (res.ok) {
-        const data = await res.json()
-        badgeCache.global = data.badge_sets || {}
+    const headers = await getHeaders()
+    const resGlobal = await fetch('https://api.twitch.tv/helix/chat/badges/global', {
+      headers,
+      signal: AbortSignal.timeout(5000)
+    })
+    if (resGlobal.ok) {
+      const data = await resGlobal.json()
+      if (Array.isArray(data?.data)) {
+        for (const set of data.data) {
+          const setName = set.set_id
+          if (Array.isArray(set.versions)) {
+            for (const ver of set.versions) {
+              const url = ver.image_url_2x || ver.image_url_1x || ver.image_url_4x
+              if (url) dict[`${setName}/${ver.id}`] = url
+            }
+          }
+        }
       }
     }
-    const setData = badgeCache.global?.[setName]
-    return setData?.versions?.[version]?.image_url_1x || null
-  } catch {
-    return null
+  } catch (err) {
+    console.warn('[Badges] Error en llamada Helix Global:', err)
   }
+
+  if (channel) {
+    const ch = channel.toLowerCase()
+    try {
+      const userId = await gqlGetUserIdByLogin(ch)
+      if (userId) {
+        const headers = await getHeaders()
+        const resChannel = await fetch(`https://api.twitch.tv/helix/chat/badges?broadcaster_id=${encodeURIComponent(userId)}`, {
+          headers,
+          signal: AbortSignal.timeout(5000)
+        })
+        if (resChannel.ok) {
+          const data = await resChannel.json()
+          if (Array.isArray(data?.data)) {
+            for (const set of data.data) {
+              const setName = set.set_id
+              if (Array.isArray(set.versions)) {
+                for (const ver of set.versions) {
+                  const url = ver.image_url_2x || ver.image_url_1x || ver.image_url_4x
+                  if (url) dict[`${setName}/${ver.id}`] = url
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Badges] Error en llamada Helix Channel:', err)
+    }
+
+    try {
+      const gqlRes = await fetch('https://gql.twitch.tv/gql', {
+        method: 'POST',
+        headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `query($login: String!) {
+            user(login: $login) {
+              broadcastBadges { id version imageURL(size: DOUBLE) }
+            }
+            badges { id version imageURL(size: DOUBLE) }
+          }`,
+          variables: { login: ch }
+        }),
+        signal: AbortSignal.timeout(5000)
+      })
+      if (gqlRes.ok) {
+        const gqlData = await gqlRes.json()
+        const globalList = gqlData?.data?.badges || []
+        const channelList = gqlData?.data?.user?.broadcastBadges || []
+        for (const b of globalList) {
+          if (b?.id && b?.version && b?.imageURL && !dict[`${b.id}/${b.version}`]) {
+            dict[`${b.id}/${b.version}`] = b.imageURL
+          }
+        }
+        for (const b of channelList) {
+          if (b?.id && b?.version && b?.imageURL && !dict[`${b.id}/${b.version}`]) {
+            dict[`${b.id}/${b.version}`] = b.imageURL
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Badges] Error en llamada GQL Fallback:', err)
+    }
+  }
+
+  return dict
 }
 
 
@@ -212,48 +354,103 @@ function UserCardPopup({ username, position, onClose }) {
 let msgIdCounter = 0
 
 const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage, onContextMenu, isGridMode }) => {
+  const isSpecial = Boolean(msg.eventType || msg.isNotice || msg.isReward)
+
+  if (isSpecial) {
+    const colorStyle = msg.eventColorClass || 'from-purple-950/70 to-slate-900/30 border-purple-500/50 border-l-purple-400 text-purple-300'
+    return (
+      <div
+        className={`flex flex-col gap-1 my-2 mx-1 p-2.5 rounded-xl bg-gradient-to-r border border-l-4 shadow-lg backdrop-blur-sm transition-all group/msg animate-fade-in ${colorStyle}`}
+        onContextMenu={onContextMenu ? (e) => onContextMenu(e, msg) : undefined}
+      >
+        <div className="flex items-center gap-1.5 font-extrabold text-xs tracking-wide">
+          <span>{msg.eventHeader || (msg.message && !msg.user ? msg.message : 'Notificación del canal')}</span>
+        </div>
+
+        {(msg.message || !msg.isNotice || msg.eventType === 'reward' || msg.eventType === 'bits') && msg.user && msg.user !== 'unknown' && (
+          <div className="relative text-sm mt-1 leading-relaxed break-words text-white/95" style={{ fontSize: `${chatFontSize}px` }}>
+            {isGridMode && msg.channel && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded mr-1.5 bg-gradient-to-r from-twitch/40 to-fuchsia-600/40 border border-twitch/60 text-fuchsia-200 font-extrabold text-[10px] tracking-tight shadow-sm select-none align-middle uppercase">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse" />
+                {msg.channel}
+              </span>
+            )}
+            {msg.badges?.length > 0 && (
+              <span className="inline-flex items-center gap-0.5 mr-1 align-middle select-none">
+                {msg.badges.map((b, i) => {
+                  const url = findBadgeUrl(badgeUrls, b.set, b.version)
+                  return url ? <img key={i} src={url} alt={b.set} title={`${b.set}`} className="w-4 h-4 object-contain shrink-0 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]" loading="lazy" /> : null
+                })}
+              </span>
+            )}
+            <span
+              className="font-bold hover:underline cursor-pointer tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] transition-colors inline select-none"
+              style={{ color: adjustColorContrast(msg.color || '#adadb8') }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setUserCard(prev => prev?.username === msg.user ? null : { x: e.clientX, y: e.clientY, username: msg.user })
+              }}
+            >
+              {msg.user}
+            </span>
+            {msg.message && <span className="text-text-muted/50 font-bold ml-0.5 mr-1.5 inline select-none">:</span>}
+            {msg.message && (
+              <span className="inline font-normal tracking-wide">
+                {renderMessage(msg.message, msg.emotes)}
+              </span>
+            )}
+            {msg.timestamp && (
+              <span className="absolute top-0 right-0 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur text-[10px] text-white/70 opacity-0 group-hover/msg:opacity-100 tabular-nums font-mono transition-opacity pointer-events-none shadow-sm z-10">
+                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div
-      className={`flex items-baseline gap-1.5 text-sm leading-relaxed hover:bg-white/[0.04] px-2.5 py-1.5 my-0.5 rounded-xl border border-transparent hover:border-white/[0.05] transition-all group/msg animate-fade-in ${msg.isNotice ? 'bg-twitch/10 border-l-2 border-l-twitch/70 pl-3 my-1 rounded-l-none shadow-sm' : ''}`}
+      className="relative px-2.5 py-1 my-0.5 rounded-xl hover:bg-white/[0.04] border border-transparent hover:border-white/[0.05] transition-all group/msg animate-fade-in text-sm leading-relaxed break-words text-white/95"
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, msg) : undefined}
+      style={{ fontSize: `${chatFontSize}px` }}
     >
-      <div className="flex items-center gap-1 shrink-0 select-none self-center">
-        {isGridMode && msg.channel && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded mr-1 bg-gradient-to-r from-twitch/40 to-fuchsia-600/40 border border-twitch/60 text-fuchsia-200 font-extrabold text-[10px] tracking-tight shadow-sm select-none self-center uppercase">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse" />
-            {msg.channel}
-          </span>
-        )}
-        {msg.badges.length > 0 && (
-          <span className="inline-flex gap-0.5 items-center mr-0.5">
-            {msg.badges.map((b, i) => {
-              const url = badgeUrls[`${msg.id}-${b.set}`]
-              return url ? <img key={i} src={url} alt={b.set} className="w-4 h-4 object-contain" loading="lazy" /> : null
-            })}
-          </span>
-        )}
-        <span
-          className="font-bold hover:underline cursor-pointer tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] transition-colors"
-          style={{ fontSize: `${chatFontSize}px`, color: adjustColorContrast(msg.color || '#adadb8') }}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (!msg.isNotice) setUserCard(prev => prev?.username === msg.user ? null : { x: e.clientX, y: e.clientY, username: msg.user })
-          }}
-        >
-          {msg.user}
+      {isGridMode && msg.channel && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded mr-1.5 bg-gradient-to-r from-twitch/40 to-fuchsia-600/40 border border-twitch/60 text-fuchsia-200 font-extrabold text-[10px] tracking-tight shadow-sm select-none align-middle uppercase">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse" />
+          {msg.channel}
         </span>
-        <span className="text-text-muted/40 font-bold text-[11px] mr-1">:</span>
-      </div>
-      <span className="text-white/95 break-words min-w-0 font-normal leading-normal tracking-wide flex-1" style={{ fontSize: `${chatFontSize}px` }}>
+      )}
+      {msg.badges.length > 0 && (
+        <span className="inline-flex items-center gap-0.5 mr-1 align-middle select-none">
+          {msg.badges.map((b, i) => {
+            const url = findBadgeUrl(badgeUrls, b.set, b.version)
+            return url ? <img key={i} src={url} alt={b.set} title={`${b.set}`} className="w-4 h-4 object-contain shrink-0 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]" loading="lazy" /> : null
+          })}
+        </span>
+      )}
+      <span
+        className="font-bold hover:underline cursor-pointer tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] transition-colors inline select-none"
+        style={{ color: adjustColorContrast(msg.color || '#adadb8') }}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!msg.isNotice) setUserCard(prev => prev?.username === msg.user ? null : { x: e.clientX, y: e.clientY, username: msg.user })
+        }}
+      >
+        {msg.user}
+      </span>
+      <span className="text-text-muted/50 font-bold ml-0.5 mr-1.5 inline select-none">:</span>
+      <span className="inline font-normal tracking-wide">
         {renderMessage(msg.message, msg.emotes)}
         {msg.spamCount > 1 && (
-          <span className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-twitch/20 border border-twitch/60 text-fuchsia-300 shadow-sm shadow-twitch/30 tabular-nums animate-pulse">
+          <span className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-twitch/20 border border-twitch/60 text-fuchsia-300 shadow-sm shadow-twitch/30 tabular-nums animate-pulse align-middle">
             x{msg.spamCount}
           </span>
         )}
       </span>
       {msg.timestamp && (
-        <span className="text-[10px] text-text-muted/30 opacity-0 group-hover/msg:opacity-100 shrink-0 self-start ml-auto tabular-nums font-mono transition-opacity pl-1.5 pt-0.5">
+        <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur text-[10px] text-white/70 opacity-0 group-hover/msg:opacity-100 tabular-nums font-mono transition-opacity pointer-events-none shadow-sm z-10">
           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       )}
@@ -261,13 +458,13 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
   )
 })
 
-export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken, isGridMode }) {
+export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken, isGridMode, isOverlay, onCloseOverlay }) {
   const t = useT()
   const [messages, setMessages] = useState([])
   const [antiSpam, setAntiSpam] = useState(() => {
-    return localStorage.getItem('blinkstream_antispam') === 'true'
+    return getItem(STORAGE_KEYS.ANTISPAM, 'false') === 'true'
   })
-  const antiSpamRef = useRef(localStorage.getItem('blinkstream_antispam') === 'true')
+  const antiSpamRef = useRef(getItem(STORAGE_KEYS.ANTISPAM, 'false') === 'true')
   const [emotes, setEmotes] = useState({})
   const [badgeUrls, setBadgeUrls] = useState({})
   const [connected, setConnected] = useState(false)
@@ -448,7 +645,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
     const parts = matchEmotesInText(text, twitchEmotes, trieRef.current)
     const isOnlyEmotes = parts.every(p => p.type !== 'text' || p.text.trim() === '') && parts.filter(p => p.type !== 'text').length >= 1 && parts.filter(p => p.type !== 'text').length <= 5
     return parts.map((part, idx) => {
-      if (part.type === 'text') return part.text
+      if (part.type === 'text') return renderTextWithLinks(part.text, idx)
       const hideOnError = (e) => { e.target.style.display = 'none' }
       const emoteClass = isOnlyEmotes
         ? "inline-block w-9 h-9 sm:w-10 sm:h-10 align-middle mx-1 my-0.5 hover:scale-125 transition-transform duration-150 drop-shadow-md cursor-pointer select-none"
@@ -640,19 +837,15 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
   }, [channel, loadEmotes])
 
   useEffect(() => {
-    if (!messages.length) return
-    const lastMsg = messages[messages.length - 1]
-    const pendingBadges = lastMsg.badges.filter(b => !badgeUrls[`${lastMsg.id}-${b.set}`])
-    if (!pendingBadges.length) return
-
-    Promise.all(pendingBadges.map(b =>
-      getBadgeUrl(b.set, b.version).then(url => ({ key: `${lastMsg.id}-${b.set}`, url }))
-    )).then(results => {
-      const updates = {}
-      results.forEach(r => { if (r.url) updates[r.key] = r.url })
-      if (Object.keys(updates).length) setBadgeUrls(prev => ({ ...prev, ...updates }))
+    if (!channel) return
+    let cancelled = false
+    fetchBadgesForChannel(channel).then(dict => {
+      if (!cancelled && dict && Object.keys(dict).length > 0) {
+        setBadgeUrls(prev => ({ ...prev, ...dict }))
+      }
     })
-  }, [messages, badgeUrls])
+    return () => { cancelled = true }
+  }, [channel])
 
   const getClientId = useCallback(() => customClientId || DEFAULT_CLIENT_ID, [customClientId])
 
@@ -876,7 +1069,8 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
                 last.message &&
                 msg.message &&
                 last.message.trim().toLowerCase() === msg.message.trim().toLowerCase() &&
-                !last.isNotice
+                !last.isNotice && !last.eventType && !last.isReward &&
+                !msg.isNotice && !msg.eventType && !msg.isReward
               ) {
                 updated[updated.length - 1] = {
                   ...last,
@@ -944,28 +1138,68 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
 
           if (usernoticeIdx !== -1) {
               const parsed = parseMessageTags(tags)
+              const badgeList = parsed.badges
+                ? parsed.badges.split(',').map(b => {
+                    const [set, version] = b.split('/')
+                    return { set, version }
+                  })
+                : []
               const msgId = parsed['msg-id'] || ''
               const displayName = parsed['display-name'] || parts[0]?.split('!')[0]?.replace(':', '') || 'unknown'
               const sysMsg = parsed['system-msg'] || ''
               const channelIdx = parts.findIndex(p => p.startsWith('#'))
               const msgParts = channelIdx >= 0 ? parts.slice(channelIdx + 1) : parts.slice(3)
-              const userMsg = msgParts.join(' ').replace(/^:/, '')
+              const userMsg = msgParts.join(' ').replace(/^:/, '').trim()
 
-              let noticeText; let noticeIcon;
               const subPlan = parsed['msg-param-sub-plan'] || '1000'
               const tier = subPlan === '2000' ? 'T2' : subPlan === '3000' ? 'T3' : 'T1'
               const months = parsed['msg-param-cumulative-months'] || parsed['msg-param-streak-months'] || '1'
               const recipient = parsed['msg-param-recipient-display-name'] || parsed['msg-param-recipient-user-name'] || ''
               const giftCount = parsed['msg-param-mass-gift-count'] || ''
               const raiderCount = parsed['msg-param-viewerCount'] || ''
+              const streakVal = parsed['msg-param-value'] || ''
 
-              if (msgId === 'sub') { noticeIcon = '⭐'; noticeText = `${displayName} se ha suscrito (${tier})` }
-              else if (msgId === 'resub') { noticeIcon = '🌟'; noticeText = `${displayName} se ha suscrito (${tier}) ×${months} meses` }
-              else if (msgId === 'subgift') { noticeIcon = '🎁'; noticeText = `${displayName} ha regalado una sub (${tier}) a ${recipient}` }
-              else if (msgId === 'submysterygift') { noticeIcon = '🎁'; noticeText = `${displayName} ha regalado ${giftCount} subs` }
-              else if (msgId === 'raid') { noticeIcon = '🔴'; noticeText = `RAID: ${displayName} ha traído ${raiderCount} viewers` }
-              else if (msgId === 'ritual') { noticeIcon = '👋'; noticeText = `${displayName} está en el chat por primera vez` }
-              else { noticeIcon = '📢'; noticeText = sysMsg || userMsg || `${displayName}: evento (${msgId})` }
+              let eventType = msgId || 'notice'
+              let eventHeader = ''
+              let eventColorClass = ''
+
+              if (msgId === 'sub') {
+                eventType = 'sub'
+                eventHeader = `⭐ ${sysMsg || `${displayName} se ha suscrito (${tier})`}`
+                eventColorClass = 'from-emerald-950/80 to-teal-950/40 border-emerald-500/60 border-l-emerald-400 text-emerald-300 shadow-emerald-950/50'
+              } else if (msgId === 'resub') {
+                eventType = 'resub'
+                eventHeader = `🌟 ${sysMsg || `${displayName} se ha suscrito (${tier}) ×${months} meses`}`
+                eventColorClass = 'from-emerald-950/80 to-emerald-950/40 border-emerald-500/60 border-l-emerald-400 text-emerald-300 shadow-emerald-950/50'
+              } else if (msgId === 'subgift') {
+                eventType = 'subgift'
+                eventHeader = `🎁 ${sysMsg || `${displayName} ha regalado una sub (${tier}) a ${recipient}`}`
+                eventColorClass = 'from-pink-950/80 to-purple-950/40 border-pink-500/60 border-l-pink-400 text-pink-300 shadow-pink-950/50'
+              } else if (msgId === 'submysterygift') {
+                eventType = 'submysterygift'
+                eventHeader = `🎉 ${sysMsg || `${displayName} ha regalado ${giftCount} subs`}`
+                eventColorClass = 'from-pink-950/80 to-fuchsia-950/40 border-pink-500/60 border-l-fuchsia-400 text-pink-300 shadow-pink-950/50'
+              } else if (msgId === 'raid') {
+                eventType = 'raid'
+                eventHeader = `🔴 ${sysMsg || `RAID: ${displayName} ha traído ${raiderCount} viewers`}`
+                eventColorClass = 'from-rose-950/80 to-red-950/40 border-rose-500/60 border-l-rose-500 text-rose-300 shadow-red-950/50'
+              } else if (msgId === 'viewermilestone') {
+                eventType = 'streak'
+                eventHeader = `🔥 ${sysMsg || `Racha de espectador: ${displayName} ha visto ${streakVal} streams seguidos`}` // ALLOWED-REGRESSION: español
+                eventColorClass = 'from-amber-950/80 via-orange-950/60 to-neutral-900/40 border-amber-500/60 border-l-amber-400 text-amber-300 shadow-orange-950/40'
+              } else if (msgId === 'announcement') {
+                eventType = 'announcement'
+                eventHeader = `📢 ANUNCIO: ${sysMsg || displayName}`
+                eventColorClass = 'from-blue-950/80 to-indigo-950/40 border-blue-500/60 border-l-cyan-400 text-cyan-300 shadow-blue-950/50'
+              } else if (msgId === 'ritual') {
+                eventType = 'ritual'
+                eventHeader = `👋 ${sysMsg || `${displayName} está en el chat por primera vez`}`
+                eventColorClass = 'from-indigo-950/80 to-purple-950/40 border-indigo-500/60 border-l-indigo-400 text-indigo-300 shadow-indigo-950/50'
+              } else {
+                eventType = 'notice'
+                eventHeader = `📢 ${sysMsg || `${displayName}: evento del canal`}`
+                eventColorClass = 'from-purple-950/80 to-slate-900/40 border-purple-500/60 border-l-purple-400 text-purple-300 shadow-purple-950/50'
+              }
 
             msgBatch.push({
               id: ++msgIdCounter,
@@ -974,12 +1208,15 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
               user_id: parsed['user-id'] || '',
               user_login: displayName.toLowerCase(),
               user_name: displayName,
-              message_id: '',
+              message_id: parsed['id'] || '',
               color: parsed['color'] || '#b19cd9',
-              message: `${noticeIcon} ${noticeText}`,
-              emotes: '',
-              badges: [],
+              message: userMsg || '',
+              emotes: parsed['emotes'] || '',
+              badges: badgeList,
               isNotice: true,
+              eventType,
+              eventHeader,
+              eventColorClass,
               timestamp: Date.now(),
             })
             continue
@@ -1001,6 +1238,24 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
           const userId = parsed['user-id'] || ''
           const messageId = parsed['id'] || parsed['msg-id'] || ''
 
+          let isReward = false
+          let eventType = null
+          let eventHeader = null
+          let eventColorClass = null
+
+          if (parsed['custom-reward-id']) {
+            isReward = true
+            eventType = 'reward'
+            const rewardTitle = parsed['custom-reward-title'] || 'Canje de Puntos de Canal'
+            eventHeader = `🎁 Canje de Recompensa: ${rewardTitle}`
+            eventColorClass = 'from-purple-950/80 via-fuchsia-950/60 to-purple-900/40 border-purple-500/60 border-l-fuchsia-400 text-fuchsia-300 shadow-purple-950/50'
+          } else if (parsed['bits'] && parseInt(parsed['bits'], 10) > 0) {
+            eventType = 'bits'
+            const bitsVal = parsed['bits']
+            eventHeader = `💎 Donación de ${bitsVal} Bits` // ALLOWED-REGRESSION: español
+            eventColorClass = 'from-cyan-950/80 via-sky-950/60 to-blue-900/40 border-cyan-500/60 border-l-cyan-400 text-cyan-300 shadow-cyan-950/50'
+          }
+
           msgBatch.push({
             id: ++msgIdCounter,
             channel,
@@ -1013,6 +1268,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
             message,
             emotes: parsed['emotes'] || '',
             badges: badgeList,
+            isReward,
+            eventType,
+            eventHeader,
+            eventColorClass,
             timestamp: Date.now(),
           })
         }
@@ -1053,10 +1312,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
     }
   }, [messages])
 
-  function parseChatCommand(text) {
+  function parseChatCommand(text, targetCh = channel) {
     const meMatch = text.match(/^\/me\s+(.+)/i)
     if (meMatch) {
-      return `PRIVMSG #${channel} :\u0001ACTION ${meMatch[1]}\u0001`
+      return `PRIVMSG #${targetCh} :\u0001ACTION ${meMatch[1]}\u0001`
     }
 
     const cmdMatch = text.match(/^\/(\w+)\b\s*(.*)/)
@@ -1068,13 +1327,13 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         'emoteonly', 'emoteonlyoff', 'clear', 'host', 'unhost', 'raid', 'unraid',
         'color', 'commercial', 'delete', 'announce', 'shoutout']
       if (supported.includes(cmd)) {
-        return `PRIVMSG #${channel} :/${cmd} ${args}`.trimEnd()
+        return `PRIVMSG #${targetCh} :/${cmd} ${args}`.trimEnd()
       }
       setConnError(`Comando /${cmd} no reconocido`)
       return null
     }
 
-    return `PRIVMSG #${channel} :${text}`
+    return `PRIVMSG #${targetCh} :${text}`
   }
 
   const sendMessage = (e) => {
@@ -1103,16 +1362,62 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
     }
   }
 
+  // Mando a Distancia Wi-Fi (Fase 4): Recibir texto del teclado móvil y enviarlo al chat sin duplicaciones
+  const companionChatRef = useRef({ auth, channel, ws: wsRef.current });
+  companionChatRef.current = { auth, channel, ws: wsRef.current };
+
+  useEffect(() => {
+    // Si isOverlay está activo junto al chat normal, solo permitimos al chat principal procesar el mensaje del móvil
+    if (!isTauri() || isOverlay) return;
+    let unlistenFn = null;
+    let isCancelled = false;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      if (isCancelled) return;
+      listen('companion_send_chat', (e) => {
+        const text = e.payload?.text;
+        const { auth: curAuth, channel: curCh, ws: curWs } = companionChatRef.current || {};
+        if (!text || !curWs || curWs.readyState !== 1 || !curAuth?.token || !curAuth?.username) return;
+        const cmd = parseChatCommand(text, curCh);
+        if (cmd) {
+          setMessages(prev => [...prev, {
+            id: ++msgIdCounter,
+            channel: curCh,
+            user: curAuth.username,
+            color: '#bf94ff',
+            message: text,
+            emotes: '',
+            badges: [],
+          }]);
+          curWs.send(cmd + '\r\n');
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        }
+      }).then(fn => {
+        if (isCancelled) fn();
+        else unlistenFn = fn;
+      }).catch(() => {});
+    }).catch(() => {});
+    return () => {
+      isCancelled = true;
+      if (unlistenFn) unlistenFn();
+    };
+  }, [isOverlay]);
+
+
   return (
-    <div className="h-full flex flex-col bg-chat">
+    <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
       <div className="shrink-0 px-3 py-2 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center gap-2">
         <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
         <span className="text-xs text-text-secondary font-medium truncate">{channel}</span>
 
-        {/* WT-20260628-47: badge estilo Twitch nativo */}
-        <span className="text-[10px] text-text-muted/60 bg-bg-tertiary/40 px-1.5 py-0.5 rounded">
-          {t('chat.title', 'Chat')}
-        </span>
+        {isOverlay ? (
+          <span className="text-[10px] text-fuchsia-300 bg-fuchsia-500/20 border border-fuchsia-500/30 px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider">
+            {t('player.overlayTitle', 'Chat Superpuesto')}
+          </span>
+        ) : (
+          <span className="text-[10px] text-text-muted/60 bg-bg-tertiary/40 px-1.5 py-0.5 rounded">
+            {t('chat.title', 'Chat')}
+          </span>
+        )}
 
         <div className="flex-1" />
 
@@ -1120,7 +1425,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
           onClick={() => {
             setAntiSpam(p => {
               const n = !p
-              localStorage.setItem('blinkstream_antispam', String(n))
+              setItem(STORAGE_KEYS.ANTISPAM, n)
               antiSpamRef.current = n
               return n
             })
@@ -1254,6 +1559,17 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         )}
 
         <span className="text-[11px] text-text-muted/40 ml-1">{messages.length}</span>
+
+        {isOverlay && onCloseOverlay && (
+          <button
+            onClick={onCloseOverlay}
+            className="text-white/60 hover:text-white hover:bg-white/10 rounded-lg p-1 ml-1.5 cursor-pointer transition-colors"
+            title={t('player.closeOverlay', 'Cerrar chat superpuesto')}
+            aria-label="Cerrar chat superpuesto"
+          >
+            <PhosphorIcon name="X" size={16} weight="bold" />
+          </button>
+        )}
       </div>
 
       {authing && authCode && (

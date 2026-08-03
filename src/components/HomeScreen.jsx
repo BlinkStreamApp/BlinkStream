@@ -888,10 +888,13 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                   const status = liveStatus[key]
                   const logo = channelLogos[key]
                   return (
-                    <button
+                    <div
                       key={`rec-${name}`}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => onSelect(name)}
-                      className="flex flex-col items-center gap-1.5 shrink-0 w-[100px] group cursor-pointer card-hover rounded-lg p-2 hover:bg-hover transition-colors relative"
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onSelect(name) }}
+                      className="flex flex-col items-center gap-1.5 shrink-0 w-[100px] group cursor-pointer card-hover rounded-lg p-2 hover:bg-hover transition-colors relative focus:outline-none focus:ring-1 focus:ring-twitch/50"
                     >
                       {onRemoveRecent && (
                         <button
@@ -918,7 +921,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
                       ) : (
                         <span className="text-[11px] text-text-muted w-full text-center">Offline</span>
                       )}
-                    </button>
+                    </div>
                   )
                 })}
               </div>

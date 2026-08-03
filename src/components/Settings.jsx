@@ -22,7 +22,7 @@ function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> 
 
 const TABS = [
   { id: 'general', label: 'General' },
-  { id: 'hsl', label: 'Estudio HSL' },
+  { id: 'hsl', label: 'Personalización' },
   { id: 'account', label: 'Cuenta' },
   { id: 'moderation', label: 'Moderación' },
   { id: 'recording', label: 'Grabación' },
@@ -39,23 +39,33 @@ const LS_TAB_KEY = 'bs.settingsTab'
  */
 function Tabs({ tabs, active, onChange }) {
   return (
-    <div className="flex border-b border-bg-tertiary/50 bg-bg-secondary/80 backdrop-blur-md px-4 shrink-0 overflow-x-auto no-scrollbar">
-      {tabs.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          className={`relative px-3 py-2.5 text-[12px] font-medium cursor-pointer transition-colors ${
-            active === tab.id
-              ? 'text-twitch'
-              : 'text-text-muted hover:text-text-secondary'
-          }`}
-        >
-          {tab.label}
-          {active === tab.id && (
-            <span className="absolute left-2 right-2 bottom-0 h-0.5 bg-twitch rounded-t" />
-          )}
-        </button>
-      ))}
+    <div className="flex border-b border-white/[0.08] bg-[#14141d]/70 backdrop-blur-md px-6 shrink-0 overflow-x-auto no-scrollbar gap-2">
+      {tabs.map(tab => {
+        const isActive = active === tab.id
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onChange(tab.id)}
+            className={`relative px-4 py-3 text-[13px] font-semibold cursor-pointer transition-all duration-200 flex items-center gap-2 whitespace-nowrap rounded-t-xl ${
+              isActive
+                ? 'text-white font-extrabold bg-white/[0.04]'
+                : 'text-text-muted hover:text-white/80 hover:bg-white/[0.02]'
+            }`}
+          >
+            {tab.icon && (
+              <PhosphorIcon
+                name={tab.icon}
+                size={16}
+                className={`transition-transform duration-200 ${isActive ? 'text-twitch scale-110 drop-shadow-[0_0_8px_var(--color-twitch)]' : 'opacity-70'}`}
+              />
+            )}
+            <span>{tab.label}</span>
+            {isActive && (
+              <span className="absolute left-3 right-3 bottom-0 h-0.5 bg-twitch shadow-[0_0_10px_var(--color-twitch)] rounded-full" />
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -77,12 +87,12 @@ export default function Settings({ onClose }) {
 
   const t = useT()
   const currentTabs = [
-    { id: 'general', label: t('tab.general', 'General') },
-    { id: 'hsl', label: '🎨 ' + t('hsl.tab', 'Estudio HSL') },
-    { id: 'account', label: t('tab.account', 'Cuenta') },
-    { id: 'moderation', label: t('tab.moderation', 'Moderación') },
-    { id: 'recording', label: t('tab.recording', 'Grabación') },
-    { id: 'advanced', label: t('tab.advanced', 'Avanzado') },
+    { id: 'general', label: t('tab.general', 'General'), icon: 'Gear' },
+    { id: 'hsl', label: t('hsl.tab', 'Personalización & Temas'), icon: 'Palette' },
+    { id: 'account', label: t('tab.account', 'Cuenta'), icon: 'UserCircle' },
+    { id: 'moderation', label: t('tab.moderation', 'Moderación'), icon: 'ShieldCheck' },
+    { id: 'recording', label: t('tab.recording', 'Grabación'), icon: 'VideoCamera' },
+    { id: 'advanced', label: t('tab.advanced', 'Avanzado'), icon: 'Sliders' },
   ]
   const [activeTab, setActiveTab] = useState(() => {
     try {
@@ -98,7 +108,6 @@ export default function Settings({ onClose }) {
   const [autoTheatre, setAutoTheatre] = useState(() => localStorage.getItem('blinkstream_auto_theatre') === 'true')
   const [chatOnRight, setChatOnRight] = useState(() => localStorage.getItem('blinkstream_chat_side') !== 'left')
   const [compactMode, setCompactMode] = useState(() => localStorage.getItem('blinkstream_compact') === 'true')
-  const [accentColor, setAccentColor] = useState(() => localStorage.getItem('blinkstream_accent') || 'purple')
   const [lang, setLang] = useState(getLanguage)
 
   // Persistencia de la tab activa
@@ -112,10 +121,6 @@ export default function Settings({ onClose }) {
   useEffect(() => { localStorage.setItem('blinkstream_auto_theatre', String(autoTheatre)) }, [autoTheatre])
   useEffect(() => { localStorage.setItem('blinkstream_chat_side', chatOnRight ? 'right' : 'left') }, [chatOnRight])
   useEffect(() => { localStorage.setItem('blinkstream_compact', String(compactMode)) }, [compactMode])
-  useEffect(() => {
-    localStorage.setItem('blinkstream_accent', accentColor)
-    document.documentElement.setAttribute('data-accent', accentColor)
-  }, [accentColor])
 
   useEffect(() => {
     const handleKey = (e) => { if (e.code === 'Escape') onClose() }
@@ -124,9 +129,9 @@ export default function Settings({ onClose }) {
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
-      <div className="bg-bg-secondary/85 backdrop-blur-xl border border-bg-tertiary/50 rounded-2xl shadow-[0_15px_50px_rgba(0,0,0,0.75)] w-full max-w-md max-h-[calc(100vh-2.5rem)] flex flex-col overflow-hidden shrink-0" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-bg-tertiary/50 shrink-0">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/65 backdrop-blur-md animate-fade-in" onClick={onClose}>
+      <div className="bg-[#12121a]/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.85)] w-full max-w-[880px] max-h-[88vh] flex flex-col overflow-hidden shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] shrink-0">
           <div className="flex items-center gap-2">
             <BlinkStreamLogo size={20} />
             <h2 className="text-sm font-bold text-text-primary">{t('settings')}</h2>
@@ -176,33 +181,25 @@ export default function Settings({ onClose }) {
                 <ToggleSwitch active={compactMode} onClick={() => setCompactMode(p => !p)} />
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-text-secondary mb-2 block">{t('set.accentColor', 'Color de acento')}</label>
-                <div className="flex gap-2 flex-wrap">
-                  {[
-                    { id: 'purple', color: '#9146ff', label: t('color.purple', 'Púrpura') },
-                    { id: 'blue', color: '#3b82f6', label: t('color.blue', 'Azul') },
-                    { id: 'green', color: '#22c55e', label: t('color.green', 'Verde') },
-                    { id: 'orange', color: '#f97316', label: t('color.orange', 'Naranja') },
-                    { id: 'pink', color: '#ec4899', label: t('color.pink', 'Rosa') },
-                    { id: 'red', color: '#ef4444', label: t('color.red', 'Rojo') },
-                  ].map(({ id, color, label }) => (
-                    <button key={id} onClick={() => setAccentColor(id)}
-                      className="flex flex-col items-center gap-1 cursor-pointer"
-                      title={label}>
-                      <span className={`w-6 h-6 rounded-full transition-all ${accentColor === id ? 'ring-2 ring-white scale-110' : 'hover:scale-105'}`}
-                        style={{ backgroundColor: color }} />
-                      <span className={`text-[9px] ${accentColor === id ? 'text-text-primary' : 'text-text-muted'}`}>{label}</span>
-                    </button>
-                  ))}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#181824] via-[#101018] to-[#161622] border border-white/[0.08] shadow-lg relative overflow-hidden">
+                <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-twitch/20 rounded-full blur-2xl pointer-events-none" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>✨ {t('set.appearanceTitle', 'Personalización y Apariencia Avanzada')}</span>
+                    </h4>
+                    <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
+                      {t('set.appearanceDesc', 'Explora las 12 paletas HSL de alta gama, motores de tipografía y personalización de color en tiempo real sin reiniciar la aplicación.')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('hsl')}
+                    className="shrink-0 py-2.5 px-4 rounded-xl bg-gradient-to-r from-twitch to-fuchsia-600 hover:from-twitch-dark hover:to-fuchsia-700 text-white text-[12px] font-bold shadow-md shadow-twitch/30 flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.03] cursor-pointer"
+                  >
+                    <span>🎨 Abrir Estudio</span>
+                    <span className="text-[10px] bg-black/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-extrabold text-white/90">v2.2</span>
+                  </button>
                 </div>
-                <button
-                  onClick={() => setActiveTab('hsl')}
-                  className="mt-3 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-twitch/20 to-fuchsia-600/20 border border-twitch/40 hover:border-twitch text-[12px] font-bold text-twitch-light flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md hover:scale-[1.01] cursor-pointer"
-                >
-                  <span>🎨 {t('hsl.title', 'Estudio de Temas HSL (Personalización 100% en vivo)')}</span>
-                  <span className="text-[10px] bg-twitch px-1.5 py-0.5 rounded text-white uppercase font-black tracking-wide">Nuevo</span>
-                </button>
               </div>
 
               <div>

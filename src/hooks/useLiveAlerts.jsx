@@ -34,6 +34,7 @@ import { isTauri } from '../utils/tauriEnv'
  */
 export function useLiveAlerts(favorites, intervalMs = 30000) {
   const [alerts, setAlerts] = useState([])
+  const [liveFavorites, setLiveFavorites] = useState([])
   const prevLiveRef = useRef({})
   const timerRef = useRef(null)
 
@@ -86,12 +87,21 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
         if (json?.errors) return
 
         const current = {}
-        favorites.forEach((f) => {
+        const favsInfo = favorites.map((f) => {
           const aliasIdx = aliasByFav.get(f)
-          if (aliasIdx == null) { current[f] = false; return }
-          const user = json?.data?.[`a${aliasIdx}`]
-          current[f] = !!user?.stream
+          const user = aliasIdx != null ? json?.data?.[`a${aliasIdx}`] : null
+          const isLive = !!user?.stream
+          current[f] = isLive
+          return {
+            name: f,
+            live: isLive,
+            avatar: user?.profileImageURL || '',
+            game: user?.stream?.game?.displayName || '',
+          }
         })
+        // Ordenar para mostrar siempre los directos activos al frente
+        favsInfo.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0))
+        setLiveFavorites(favsInfo)
 
         const newlyLive = []
 
@@ -176,5 +186,5 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
     }
   }, [favorites, intervalMs])
 
-  return { alerts, dismissAlert }
+  return { alerts, dismissAlert, liveFavorites }
 }

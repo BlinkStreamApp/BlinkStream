@@ -15,14 +15,17 @@ import DiskSpaceIndicator from './components/recording/DiskSpaceIndicator'
 // paralelos cada 10s.
 import { RecordingProvider } from './components/recording/RecordingContext'
 import { BlinkStreamLogo } from './components/BlinkStreamLogo'
-import { getUserIdByLogin } from './utils/twitch'
-import { applyStoredHslTheme } from './utils/hslTheme'
+import { getUserIdByLogin, validateToken, clearStoredToken, getHeaders } from './utils/twitch'
+import { applyStoredHslTheme, applyStoredCustomFont, applyStoredCustomIconStyle } from './utils/hslTheme'
 
 const VideoPlayer = lazy(() => import('./components/VideoPlayer'))
 const Chat = lazy(() => import('./components/Chat'))
 const InstallerScreen = lazy(() => import('./components/installer/InstallerScreen'))
 const UninstallerScreen = lazy(() => import('./components/installer/UninstallerScreen'))
 const MultiStreamGrid = lazy(() => import('./components/multistream/MultiStreamGrid'))
+const CompanionModal = lazy(() => import('./components/CompanionModal'))
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 // M-8: DebugPanel solo en dev. Lazy + DEV guardean para que Vite
 // haga dead-code elimination en el build de produccion y el bundle
@@ -39,7 +42,6 @@ import { Toast } from './hooks/useLiveAlerts.Toast'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { validateToken, clearStoredToken } from './utils/twitch'
 import { logError } from './utils/errors'
 import { isTauri } from './utils/tauriEnv'
 import { useT } from './utils/i18n'
@@ -125,6 +127,8 @@ function MainApp() {
   const t = useT()
   useEffect(() => {
     applyStoredHslTheme()
+    applyStoredCustomFont()
+    applyStoredCustomIconStyle()
   }, [])
 
   useEffect(() => {
@@ -149,6 +153,7 @@ function MainApp() {
     catch { return true }
   })
   const [showSettings, setShowSettings] = useState(false)
+  const [showCompanionModal, setShowCompanionModal] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -240,7 +245,7 @@ function MainApp() {
     return () => { cancelled = true; clearTimeout(timer) }
   }, [])
 
-  const { alerts, dismissAlert } = useLiveAlerts(favorites)
+  const { alerts, dismissAlert, liveFavorites } = useLiveAlerts(favorites)
 
   useEffect(() => {
     const onResize = () => setWindowWidth(window.innerWidth)
@@ -268,7 +273,6 @@ function MainApp() {
   useEffect(() => {
     try { localStorage.setItem('bs.modPanel.open', showModPanel ? '1' : '0') } catch { /* ignore */ }
   }, [showModPanel])
-
   // WT-20260628-56: detectar rol del viewer en el canal actual para
   // gating del boton Shield. broadcasterId puede ser null (cargando o
   // sin canal seleccionado); userId puede ser null (no logueado). En
@@ -352,13 +356,11 @@ function MainApp() {
         setFavorites(allChannels)
       }
     }).catch(() => {
-      // Si algo fallo, fallback simple: solo subir los locales.
-      // PERO solo si la nube no respondio por circuit-breaker (osea,
-      // todavia hay locales sin subir). El propio favoritesSync ya
-      // se protege contra multiples POSTs.
-      mergeFavorites(favoritesRef.current, username).then(merged => {
-        if (merged.length > favoritesRef.current.length) setFavorites(merged)
-      })
+      // Si falla la sincronización por error CORS o de red, degradamos elegantemente
+      // a favoritos locales sin reintentar de forma indefinida ni saturar la consola.
+      if (import.meta.env.DEV) {
+        console.warn('[App] Sincronización con la nube no disponible. Usando favoritos en modo local.')
+      }
     })
     // Deps: solo re-sincronizar cuando cambian `username` (login/logout)
     // o `getTwitchToken` (token listo). NO incluimos `favorites`: el
@@ -373,6 +375,89 @@ function MainApp() {
       return [name, ...filtered].slice(0, MAX_RECENT)
     })
   }, [])
+
+  // Mando a Distancia Wi-Fi Móvil: Escuchar órdenes del móvil vía IPC y reflejar en la interfaz de BlinkStream
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten = null;
+    let isCancelled = false;
+    listen('companion_command', (e) => {
+      const { action, value, channel: targetChannel } = e.payload || {};
+      if (action === 'set_volume' && typeof value === 'number') {
+        setVolume(Math.max(0, Math.min(100, value)));
+      } else if (action === 'toggle_mute') {
+        window.dispatchEvent(new CustomEvent('companion_toggle_mute'));
+        setVolume(prev => prev > 0 ? 0 : 80);
+      } else if (action === 'toggle_theatre') {
+        setTheatreMode(prev => !prev);
+      } else if (action === 'toggle_multistream') {
+        setViewMode(prev => prev === 'multistream' ? 'normal' : 'multistream');
+      } else if (action === 'change_channel' && targetChannel) {
+        selectChannel(targetChannel);
+      } else if (action === 'toggle_pause') {
+        window.dispatchEvent(new CustomEvent('companion_toggle_pause'));
+      } else if (action === 'take_snapshot') {
+        window.dispatchEvent(new CustomEvent('companion_take_snapshot'));
+      }
+    }).then(fn => {
+      if (isCancelled) fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    return () => {
+      isCancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, [selectChannel]);
+
+  // Obtener avatar del canal actualmente reproduciéndose para mostrar su foto en el Mando Wi-Fi
+  const [companionAvatar, setCompanionAvatar] = useState('');
+
+  useEffect(() => {
+    if (!channel) {
+      setCompanionAvatar('');
+      return;
+    }
+    const controller = new AbortController();
+    const favObj = (liveFavorites || []).find(f => typeof f === 'object' && f.name?.toLowerCase() === channel.toLowerCase());
+    if (favObj?.avatar) {
+      setCompanionAvatar(favObj.avatar);
+      return;
+    }
+    getHeaders().then(async (headers) => {
+      try {
+        const res = await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(channel)}`, {
+          headers,
+          signal: controller.signal,
+        });
+        if (!res.ok || controller.signal.aborted) return;
+        const data = await res.json();
+        if (data?.data?.[0]?.profile_image_url && !controller.signal.aborted) {
+          setCompanionAvatar(data.data[0].profile_image_url);
+        }
+      } catch { /* ignore aborts and fetch errors */ }
+    });
+    return () => { controller.abort(); };
+  }, [channel, liveFavorites]);
+
+  // Sincronizar estado actual hacia el servidor local del Mando Wi-Fi para que el móvil muestre datos del directo
+  useEffect(() => {
+    if (!isTauri()) return;
+    try {
+      const favsToSend = (liveFavorites && liveFavorites.length > 0)
+        ? liveFavorites.slice(0, 15)
+        : favorites.slice(0, 15).map(name => (typeof name === 'object' ? name : { name, live: false, avatar: '' }));
+      invoke('update_companion_state', {
+        channel: channel || '',
+        title: channel ? `🔴 ${channel}` : 'Sin emisión activa',
+        volume: volume,
+        isMuted: volume === 0,
+        isLive: !!channel,
+        viewMode: viewMode,
+        favoritesLive: favsToSend,
+        avatar: companionAvatar,
+      }).catch(() => {});
+    } catch { /* ignore */ }
+  }, [channel, volume, viewMode, liveFavorites, favorites, companionAvatar]);
 
   const toggleFavorite = useCallback((name) => {
     setFavorites(prev => {
@@ -438,6 +523,15 @@ function MainApp() {
           >
             <PhosphorIcon name="SquaresFour" size={17} weight={viewMode === 'multistream' ? 'fill' : 'duotone'} />
             <span className="hidden md:inline">{t('nav.multistream', 'Grid Multi-Stream')}</span>
+          </button>
+
+          <button
+            onClick={() => setShowCompanionModal(true)}
+            title="Mando a Distancia Wi-Fi para Móvil y Tablet (Fase 4)"
+            className="flex items-center gap-2 px-3 py-1.5 ml-2 rounded-xl border bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 hover:from-cyan-500/25 hover:to-fuchsia-500/25 text-cyan-300 border-cyan-500/40 hover:border-cyan-400 shadow-sm hover:shadow-cyan-500/20 hover:scale-[1.02] transition-all cursor-pointer text-[12px] font-extrabold shrink-0"
+          >
+            <PhosphorIcon name="DeviceMobile" size={18} weight="fill" className="text-cyan-400 animate-bounce-short" />
+            <span className="hidden sm:inline">Mando Wi-Fi</span>
           </button>
 
           {/* WT-20260628-49: espacio flexible que empuja el avatar al extremo derecho */}
@@ -569,8 +663,16 @@ function MainApp() {
                     onToggleTheatre={() => setTheatreMode(p => !p)}
                     compact={compact}
                     onToggleCompact={() => setCompact(p => { const next = !p; localStorage.setItem('blinkstream_compact', String(next)); return next; })}
-                    showChat={showChat}
-                    onToggleChat={() => setShowChat(p => !p)}
+                    onOpenAppSettings={() => setShowSettings(true)}
+                    isLoggedIn={isLoggedIn}
+                    twitchToken={getTwitchToken()}
+                    twitchUsername={username || localStorage.getItem('blinkstream_twitch_username')}
+                    broadcasterId={broadcasterId}
+                    onOpenCPPanel={() => setShowCPPanel(p => !p)}
+                    isModerator={roleState.isModerator}
+                    isBroadcaster={roleState.isBroadcaster}
+                    viewerLogin={username}
+                    onLoginWithToken={loginWithToken}
                   />
                 </Suspense>
                 </div>
@@ -609,6 +711,7 @@ function MainApp() {
       )}
 
       {showSettings && <Settings onClose={handleCloseSettings} />}
+      {showCompanionModal && <Suspense fallback={null}><CompanionModal onClose={() => setShowCompanionModal(false)} /></Suspense>}
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
       {/* WT-20260628-14: Panel de Channel Points (P1 + P2) */}
       {channel && broadcasterId && (

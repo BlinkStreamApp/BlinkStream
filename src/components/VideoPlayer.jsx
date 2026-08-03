@@ -18,8 +18,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
-import { getStreamInfo } from '../utils/twitch'
-import { formatViewers } from '../utils/format'
 import { measureInvoke } from '../utils/perf'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
@@ -31,6 +29,8 @@ import VodPlayer from './VodPlayer'
 import LiveBadge from './LiveBadge'
 import ToggleSwitch from './ToggleSwitch'
 import PhosphorIcon from './icons/PhosphorIcon'
+import Chat from './Chat'
+import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 // FASE 4 / WT-20260628-45: Lordicon animado para el boton REC. Solo
 // se monta cuando `recording` es true; el resto del tiempo seguimos
 // con Phosphor (mas liviano, sin fetch de CDN).
@@ -53,29 +53,92 @@ function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="reg
 // del cuerpo del componente es seguro.
 const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '1080p60']
 
-function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
-  // El state local era una fuente duplicada de verdad que se desincronizaba
-  // cuando el padre cambiaba `compact` mientras el panel estaba abierto.
-  // Ahora derivamos directo de la prop (source-of-truth = App.jsx).
-  // El toggle dispatcha al padre vía `onToggleCompact`, que actualiza
-  // `compact` y vuelve a llegar por prop en el siguiente render.
-  // (Auditoría WT-20260628-01 / B-5)
+function PlayerSettingsPanel({
+  onClose,
+  compact,
+  onToggleCompact,
+  audioOnly,
+  onToggleAudioOnly,
+  showStats,
+  onToggleStats,
+  showOverlayChat,
+  onToggleOverlayChat,
+  onOpenAppSettings,
+}) {
   const compactValue = compact || false
 
   return (
-    <div className="absolute bottom-20 right-4 z-40 w-64 bg-bg-secondary/80 backdrop-blur-xl border border-bg-tertiary/60 rounded-xl p-4 text-text-primary shadow-2xl animate-fade-in">
-      <div className="flex items-center justify-between pb-3 border-b border-bg-tertiary/30">
-        <span className="text-xs font-bold tracking-wide">Ajustes</span>
-        <button onClick={onClose} className="text-text-muted hover:text-text-primary cursor-pointer">
+    <div className="absolute bottom-20 right-6 z-50 w-72 bg-[#14141d]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 text-text-primary shadow-[0_10px_40px_rgba(0,0,0,0.85)] animate-fade-in space-y-3.5">
+      <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+        <div className="flex items-center gap-2">
+          <PhosphorIcon name="SlidersHorizontal" size={18} weight="duotone" className="text-twitch" />
+          <span className="text-[13px] font-extrabold text-white tracking-wide">Ajustes de Reproducción</span>
+        </div>
+        <button onClick={onClose} className="text-text-muted hover:text-white cursor-pointer transition-colors" aria-label="Cerrar ajustes">
           <PhosphorIcon name="X" size={16} weight="bold" />
         </button>
       </div>
-      <div className="mt-3 space-y-3 text-sm">
-        <div className="flex items-center justify-between">
-          <span className="text-text-secondary">Modo compacto</span>
+
+      <div className="space-y-2.5 text-[12px]">
+        {/* Modo Solo Audio */}
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
+          <div className="flex items-center gap-2.5">
+            <PhosphorIcon name="Headphones" size={18} weight="duotone" className={audioOnly ? "text-twitch" : "text-text-muted"} />
+            <div>
+              <p className="font-bold text-white/95 leading-tight">Modo Solo Audio</p>
+              <p className="text-[10px] text-text-muted mt-0.5">Ahorro de datos y ancho de banda</p>
+            </div>
+          </div>
+          <ToggleSwitch active={audioOnly} onClick={onToggleAudioOnly} />
+        </div>
+
+        {/* Estadísticas en Vivo */}
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
+          <div className="flex items-center gap-2.5">
+            <PhosphorIcon name="ChartBar" size={18} weight="duotone" className={showStats ? "text-twitch" : "text-text-muted"} />
+            <div>
+              <p className="font-bold text-white/95 leading-tight">Estadísticas de Vídeo</p>
+              <p className="text-[10px] text-text-muted mt-0.5">Bitrate, FPS, Códec y Buffer en vivo</p>
+            </div>
+          </div>
+          <ToggleSwitch active={showStats} onClick={onToggleStats} />
+        </div>
+
+        {/* Chat Superpuesto */}
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
+          <div className="flex items-center gap-2.5">
+            <PhosphorIcon name="ChatsCircle" size={18} weight="duotone" className={showOverlayChat ? "text-twitch" : "text-text-muted"} />
+            <div>
+              <p className="font-bold text-white/95 leading-tight">Chat en Pantalla</p>
+              <p className="text-[10px] text-text-muted mt-0.5">Mensajes flotantes sobre el stream</p>
+            </div>
+          </div>
+          <ToggleSwitch active={showOverlayChat} onClick={onToggleOverlayChat} />
+        </div>
+
+        {/* Modo Compacto */}
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
+          <div className="flex items-center gap-2.5">
+            <PhosphorIcon name="ArrowsInSimple" size={18} weight="duotone" className={compactValue ? "text-twitch" : "text-text-muted"} />
+            <div>
+              <p className="font-bold text-white/95 leading-tight">Modo Compacto</p>
+              <p className="text-[10px] text-text-muted mt-0.5">Reduce márgenes de la interfaz</p>
+            </div>
+          </div>
           <ToggleSwitch active={compactValue} onClick={onToggleCompact} />
         </div>
       </div>
+
+      {onOpenAppSettings && (
+        <button
+          type="button"
+          onClick={() => { onClose(); onOpenAppSettings(); }}
+          className="w-full mt-1.5 py-2.5 px-3 bg-gradient-to-r from-twitch/25 to-fuchsia-600/25 hover:from-twitch/40 hover:to-fuchsia-600/40 border border-twitch/50 rounded-xl text-[12px] font-extrabold text-white transition-all duration-200 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(145,70,255,0.25)] cursor-pointer hover:scale-[1.01]"
+        >
+          <PhosphorIcon name="Palette" size={17} weight="duotone" />
+          <span>Personalizar App & Temas Neón</span>
+        </button>
+      )}
     </div>
   )
 }
@@ -88,13 +151,14 @@ function PlayerSettingsPanel({ onClose, compact, onToggleCompact }) {
  */
 export default function VideoPlayer({
   channel, quality, onQualityChange, volume, onVolumeChange,
-  theatreMode, onToggleTheatre, compact, onToggleCompact, showChat, onToggleChat,
+  theatreMode, onToggleTheatre, compact, onToggleCompact, onOpenAppSettings,
+  isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken,
 }) {
   const t = useT()
   // M-7: validamos props criticas (vienen de App.jsx). Solo loggea.
   const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
   validateProps(
-    { channel, quality, onQualityChange, volume, onVolumeChange, theatreMode, onToggleTheatre, compact, onToggleCompact, showChat, onToggleChat },
+    { channel, quality, onQualityChange, volume, onVolumeChange, theatreMode, onToggleTheatre, compact, onToggleCompact, onOpenAppSettings },
     {
       channel: isString,
       quality: isString,
@@ -105,8 +169,7 @@ export default function VideoPlayer({
       onToggleTheatre: isFunc,
       compact: isBoolean,
       onToggleCompact: isFunc,
-      showChat: optional(isBoolean),
-      onToggleChat: optional(isFunc),
+      onOpenAppSettings: optional(isFunc),
     },
     'VideoPlayer props',
   )
@@ -122,7 +185,6 @@ export default function VideoPlayer({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showControls, setShowControls] = useState(true)
-  const [streamInfo, setStreamInfo] = useState(null)
   const [usingFallback, setUsingFallback] = useState(false)
   const [availableQualities, setAvailableQualities] = useState(null)
   const [showClips, setShowClips] = useState(false)
@@ -148,10 +210,11 @@ export default function VideoPlayer({
     stopRecording: hookStopRecording,
   } = useRecording()
   const [showTheatreToast, setShowTheatreToast] = useState(false)
+  const [showOverlayChat, setShowOverlayChat] = useState(() => getItem(STORAGE_KEYS.OVERLAY_CHAT, 'false') === 'true')
+  const abortControllerRef = useRef(null)
   const containerRef = useRef(null)
   const controlsTimerRef = useRef(null)
   const [streamStartTime] = useState(Date.now)
-  const [showMacHelp, setShowMacHelp] = useState(false)
 
   useEffect(() => { volumeRef.current = volume }, [volume])
 
@@ -199,10 +262,6 @@ export default function VideoPlayer({
     setLoading(false); isFetchingRef.current = false
   }, [quality])
 
-  const fetchStreamInfo = useCallback(async (ch) => {
-    const info = await getStreamInfo(ch); setStreamInfo(info)
-  }, [])
-
   // ── fetchQualities: versión infalible (sin cambios) ──
   const fetchQualities = useCallback(async (ch) => {
     if (!ch) return
@@ -235,10 +294,15 @@ export default function VideoPlayer({
   // siempre la ultima `quality` accesible via closure + audioOnlyRef.
    
   useEffect(() => {
+    if (abortControllerRef.current) {
+      try { abortControllerRef.current.abort() } catch { /* ignore */ }
+    }
+    const abortCtrl = new AbortController()
+    abortControllerRef.current = abortCtrl
     // fetchStream*/fetchQualities disparan setState al resolver; es
     // el patron "fetch on mount/canal-change", no cascading render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    Promise.all([fetchStream(channel), fetchStreamInfo(channel), fetchQualities(channel)])
+    Promise.all([fetchStream(channel), fetchQualities(channel)])
     let cancelled = false
     let timer
     const reconnect = () => {
@@ -250,27 +314,13 @@ export default function VideoPlayer({
       }, 25 * 60 * 1000)
     }
     reconnect()
-    return () => { cancelled = true; clearTimeout(timer) }
+    return () => { cancelled = true; try { abortCtrl.abort() } catch {/* ignore */} clearTimeout(timer) }
     // `quality` se lee dentro del setTimeout (línea `fetchStream(channel, quality)`);
     // si la añadimos a deps, el effect se re-montaría cada vez que el
     // usuario cambia calidad y eso reiniciaría el reconnect de 25min.
     // Intencional: la regla exhaustive-deps no modela setTimeout largos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channel, fetchStream, fetchStreamInfo, fetchQualities])
-
-  useEffect(() => {
-    let cancelled = false
-    let timer
-    const fetchInfo = () => {
-      timer = setTimeout(() => {
-        if (cancelled) return
-        fetchStreamInfo(channel)
-        if (!cancelled) fetchInfo()
-      }, 120000)
-    }
-    fetchInfo()
-    return () => { cancelled = true; clearTimeout(timer) }
-  }, [channel, fetchStreamInfo])
+  }, [channel, fetchStream, fetchQualities])
 
   // ── Cleanup de grabacion ─────────────────────────────────
   // G1 / WT-20260628-16: el hook useRecording ya maneja el cleanup en
@@ -492,16 +542,37 @@ export default function VideoPlayer({
     let statsTimer
     const updateStats = () => {
       statsTimer = setTimeout(() => {
-        if (cancelled || !hlsRef.current) return
-        const level = hls.levels?.[0]
+        if (cancelled || !hlsRef.current || !videoRef.current) return
+        const v = videoRef.current
+        const level = hls.levels?.[hls.currentLevel >= 0 ? hls.currentLevel : 0] || hls.levels?.[0]
+
+        const bw = hls.bandwidthEstimate || level?.bitrate || 0
+        const bitrateStr = bw > 0 ? `${Math.round(bw / 1000)} kbps` : (quality ? `${quality} (Vivo)` : 'En vivo')
+
+        const w = v.videoWidth || level?.width || 0
+        const h = v.videoHeight || level?.height || 0
+        const fpsVal = level?.attrs?.FRAME_RATE || level?.attrs?.['FRAME-RATE'] || level?.frameRate || ''
+        const fpsStr = fpsVal ? `@${Math.round(fpsVal)}fps` : ''
+        const resolutionStr = (w && h) ? `${w}x${h}${fpsStr}` : (quality ? `${quality}` : 'N/A')
+
+        const pbQuality = typeof v.getVideoPlaybackQuality === 'function' ? v.getVideoPlaybackQuality() : null
+        const droppedVal = pbQuality ? pbQuality.droppedVideoFrames : (hls.stats?.droppedFrames || 0)
+
+        let bufferAhead = '0.0s'
+        if (v.buffered.length > 0) {
+          const end = v.buffered.end(v.buffered.length - 1)
+          const diff = Math.max(0, end - v.currentTime)
+          bufferAhead = `${diff.toFixed(1)}s`
+        }
+
         setStats({
-          bitrate: level ? `${Math.round(level.bitrate / 1000)} kbps` : 'N/A',
-          resolution: level ? `${level.width}x${level.height}@${level.attrs?.FRAME_RATE || '?'}` : 'N/A',
-          dropped: hls.stats?.droppedFrames || 0,
-          buffer: video.buffered.length ? `${video.buffered.end(video.buffered.length - 1).toFixed(1)}s` : '0s',
+          bitrate: bitrateStr,
+          resolution: resolutionStr,
+          dropped: droppedVal,
+          buffer: bufferAhead,
         })
         if (!cancelled) updateStats()
-      }, 2000)
+      }, 1000)
     }
     updateStats()
 
@@ -634,6 +705,21 @@ export default function VideoPlayer({
     }
   }, [channel])
 
+  // Mando a Distancia Wi-Fi (Fase 4): Conectar botones remotos de Play/Pausa, Silencio y Captura de Clip HD
+  useEffect(() => {
+    const handleRemotePause = () => togglePlay();
+    const handleRemoteMute = () => toggleMute();
+    const handleRemoteSnap = () => captureSnapshot();
+    window.addEventListener('companion_toggle_pause', handleRemotePause);
+    window.addEventListener('companion_toggle_mute', handleRemoteMute);
+    window.addEventListener('companion_take_snapshot', handleRemoteSnap);
+    return () => {
+      window.removeEventListener('companion_toggle_pause', handleRemotePause);
+      window.removeEventListener('companion_toggle_mute', handleRemoteMute);
+      window.removeEventListener('companion_take_snapshot', handleRemoteSnap);
+    };
+  }, [playing, muted, captureSnapshot]);
+
   useEffect(() => {
     const handleKey = (e) => {
       const tag = e.target.tagName
@@ -695,9 +781,20 @@ export default function VideoPlayer({
       )}
 
       {showStats && (
-        <div className="absolute top-3 left-3 z-20 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 text-[12px] font-mono text-white/80 space-y-0.5 select-none pointer-events-none">
-          <p>⚡ {stats.bitrate}  |  📐 {stats.resolution}</p>
-          <p>📉 Dropped: {stats.dropped}  |  🎞 Buffer: {stats.buffer}</p>
+        <div className="absolute top-4 left-4 z-40 bg-[#14141d]/90 backdrop-blur-md border border-white/10 rounded-xl p-3 text-[12px] font-mono text-white/90 shadow-2xl select-none space-y-1.5 min-w-[240px] animate-fade-in pointer-events-none">
+          <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-1.5 font-sans">
+            <span className="text-[11px] font-extrabold text-twitch tracking-wider uppercase flex items-center gap-1.5">
+              <PhosphorIcon name="ChartBar" size={14} weight="duotone" />
+              Estadísticas de Vídeo
+            </span>
+            <span className="text-[11px] font-bold text-white/70">{channel}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+            <div>⚡ <span className="text-white font-semibold">{stats.bitrate}</span></div>
+            <div>📐 <span className="text-white font-semibold">{stats.resolution}</span></div>
+            <div>📉 <span className="text-white font-semibold">{stats.dropped} drops</span></div>
+            <div>🎞️ <span className="text-white font-semibold">{stats.buffer} buffer</span></div>
+          </div>
         </div>
       )}
 
@@ -749,17 +846,7 @@ export default function VideoPlayer({
         </div>
       )}
 
-      <div className={`absolute top-0 left-0 right-0 z-30 flex items-center justify-end px-6 py-4 bg-gradient-to-b from-black/80 to-transparent transition-all duration-300 select-none ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}>
-        <div className="flex items-center gap-3">
-          {streamInfo?.viewer_count != null && (
-            <span className="text-[12px] text-white/70 font-medium">{formatViewers(streamInfo.viewer_count)} {t('player.viewers', 'viewers')}</span>
-          )}
-          <LiveBadge />
-          <button onClick={() => setShowMacHelp(true)} className="text-white/40 hover:text-white transition-colors cursor-pointer ml-1" title={t('player.help', 'Ayuda macOS')} aria-label="Ayuda">
-            <PhosphorIcon name="Question" size={15} weight="regular" />
-          </button>
-        </div>
-      </div>
+
 
       {/* Control Bar - Isla flotante premium */}
       <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
@@ -767,13 +854,6 @@ export default function VideoPlayer({
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
           <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? t('player.unmute', 'Activar sonido') : t('player.mute', 'Silenciar')}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
           <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={handleVolume} className="w-20 h-1 accent-twitch bg-white/20 rounded-lg appearance-none cursor-pointer" aria-label="Volumen" aria-valuemin="0" aria-valuemax="100" aria-valuenow={muted ? 0 : volume} />
-          <button onClick={toggleAudioOnly} className={`hover:text-white transition-colors cursor-pointer ${audioOnly ? 'text-twitch' : ''}`} title={audioOnly ? t('player.videoMode', 'Modo video') : t('player.audioOnly', 'Solo audio')} aria-label="Solo audio">
-            {audioOnly ? (
-              <PhosphorIcon name="Monitor" size={18} weight="regular" />
-            ) : (
-              <PhosphorIcon name="Headphones" size={18} weight="regular" />
-            )}
-          </button>
           <LiveBadge />
         </div>
 
@@ -821,18 +901,8 @@ export default function VideoPlayer({
           <div className="w-px h-5 bg-white/10 mx-1" />
 
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch' : ''}`} title={t('player.settings', 'Ajustes')} aria-label="Ajustes del reproductor"><SettingsIcon/></button>
+            <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch animate-pulse' : ''}`} title={t('player.settings', 'Ajustes')} aria-label="Ajustes del reproductor"><SettingsIcon/></button>
             <button onClick={onToggleTheatre} className={`hover:text-white transition-colors cursor-pointer ${theatreMode ? 'text-twitch' : ''}`} title={t('player.theatre', 'Teatro (T)')} aria-label="Modo teatro"><TheatreIcon/></button>
-            {onToggleChat && (
-              <button
-                onClick={onToggleChat}
-                className={`hover:text-white transition-colors cursor-pointer ${showChat ? 'text-twitch' : ''}`}
-                title={showChat ? t('player.hideChat', 'Ocultar chat (C)') : t('player.showChat', 'Mostrar chat (C)')}
-                aria-label="Alternar chat"
-              >
-                <PhosphorIcon name="ChatCircleDots" size={18} weight={showChat ? "fill" : "regular"} />
-              </button>
-            )}
             <button onClick={async () => {
               try { safeOpenUrl(`https://www.twitch.tv/${channel}`, true) } catch { /* ignore: el helper ya hace fallback */ }
             }} className="hover:text-white transition-colors cursor-pointer" title={t('player.browser', 'Abrir en navegador')} aria-label="Abrir en navegador">
@@ -852,39 +922,49 @@ export default function VideoPlayer({
         </div>
       </div>
 
-      {showSettingsPanel && <PlayerSettingsPanel onClose={() => setShowSettingsPanel(false)} compact={compact} onToggleCompact={onToggleCompact} />}
+      {showSettingsPanel && (
+        <PlayerSettingsPanel
+          onClose={() => setShowSettingsPanel(false)}
+          compact={compact}
+          onToggleCompact={onToggleCompact}
+          audioOnly={audioOnly}
+          onToggleAudioOnly={toggleAudioOnly}
+          showStats={showStats}
+          onToggleStats={() => setShowStats(p => !p)}
+          showOverlayChat={showOverlayChat}
+          onToggleOverlayChat={() => {
+            setShowOverlayChat(p => {
+              const n = !p
+              setItem(STORAGE_KEYS.OVERLAY_CHAT, n)
+              return n
+            })
+          }}
+          onOpenAppSettings={onOpenAppSettings}
+        />
+      )}
 
       {showClips && <ClipPlayer channel={channel} onClose={() => setShowClips(false)} />}
       {showVods && <VodPlayer channel={channel} onClose={() => setShowVods(false)} />}
 
-      {showMacHelp && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowMacHelp(false)}>
-          <div className="bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold text-sm tracking-wide">🖥️ macOS — Primeros pasos</h3>
-              <button onClick={() => setShowMacHelp(false)} className="text-text-muted hover:text-white cursor-pointer">
-                <PhosphorIcon name="X" size={16} weight="bold" />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-text-secondary">
-              <p><span className="text-white font-medium">Si la app no se abre</span> por la protección de macOS:</p>
-              <div className="bg-black/40 rounded-lg p-3 font-mono text-[12px] text-white/80 break-all select-all">
-                xattr -dr com.apple.quarantine /Applications/BlinkStream.app
-              </div>
-              <p className="text-[12px]">Pega esto en <strong className="text-white">Terminal</strong> y ya puedes abrir la app normal.</p>
-              <hr className="border-white/10" />
-              <p><span className="text-white font-medium">Streamlink</span> (más calidades):</p>
-              <div className="bg-black/40 rounded-lg p-3 font-mono text-[12px] text-white/80 break-all select-all">
-                brew install streamlink
-              </div>
-              <hr className="border-white/10" />
-              <p className="text-[12px] text-text-muted">
-                Atajos: <kbd className="px-1 py-0.5 bg-white/10 rounded text-[11px]">Espacio</kbd> Play/Pausa ·
-                <kbd className="px-1 py-0.5 bg-white/10 rounded text-[11px] ml-1">M</kbd> Silenciar ·
-                <kbd className="px-1 py-0.5 bg-white/10 rounded text-[11px] ml-1">F</kbd> Pantalla completa
-              </p>
-            </div>
-          </div>
+      {showOverlayChat && (
+        <div className="absolute top-6 right-6 z-40 w-[360px] h-[calc(100%-115px)] max-h-[660px] pointer-events-auto animate-fade-in shadow-2xl transition-all">
+          <Chat
+            channel={channel}
+            isOverlay={true}
+            onCloseOverlay={() => {
+              setShowOverlayChat(false)
+              setItem(STORAGE_KEYS.OVERLAY_CHAT, false)
+            }}
+            isLoggedIn={isLoggedIn}
+            twitchToken={twitchToken}
+            twitchUsername={twitchUsername}
+            broadcasterId={broadcasterId}
+            onOpenCPPanel={onOpenCPPanel}
+            isModerator={isModerator}
+            isBroadcaster={isBroadcaster}
+            viewerLogin={viewerLogin}
+            onLoginWithToken={onLoginWithToken}
+          />
         </div>
       )}
     </div>

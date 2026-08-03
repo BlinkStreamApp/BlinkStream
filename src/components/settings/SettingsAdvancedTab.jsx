@@ -54,7 +54,7 @@ export function SettingsAdvancedTab() {
 
       <div className="border-t border-bg-tertiary/50 pt-4">
         <p className="text-[11px] text-text-muted/50 leading-relaxed">
-          Versión: 1.1.0 — Suite completa con Moderación avanzada y Grabada HD.
+          Versión: 1.2.0 — Suite Pro con Estudio de Personalización, Estadísticas en Vivo y Grabador HD.
         </p>
       </div>
     </div>

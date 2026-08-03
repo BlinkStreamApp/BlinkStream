@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-e94560" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.2.0-e94560" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
 </p>
@@ -30,10 +30,11 @@
 | 🔐 **OAuth Authentication** | Secure Twitch login powered by Supabase Edge Functions with state-of-the-art token security |
 | ⭐ **Cloud Sync Favorites** | Synchronize favorite streamers and custom watchlists securely via cloud storage |
 | 🔍 **Smart Search** | Auto-complete channel discovery prioritizing online broadcasts with low-latency indicators |
-| 🎭 **Theater Mode** | Distraction-free full-window viewing layout engineered for maximum immersion |
-| 🌙 **Sleek Dark UI** | Responsive dark theme customized from 800px up to ultra-wide 4K displays |
+| 🎨 **Customization Studio** | Deep theme customization (AMOLED Black, Cyberpunk Gold, Emerald) with selectable Google Fonts |
+| 📊 **Pro Telemetry (Nerd Stats)** | Real-time live HUD measuring exact HTML5 frame rendering, FPS, network bitrate (Kbps), and buffer offset |
+| 🎮 **Glassmorphism Player** | Ergonomic quick-controls gear with centralized compact mode, audio-only toggles, and clean UI |
 | 🔒 **Hardened Security** | Strict Content Security Policy (CSP) with zero wildcards, rustls TLS, and secure keychain storage |
-| ⚡ **Zero Bloat & Lazy Load** | Optimized chunk splitting and TTL sessionStorage caching for instantaneous startup times |
+| ⚡ **Zero Bloat & Lazy Load** | Optimized chunk splitting and circuit-breaker network sync for instantaneous offline/online resiliency |
 | 🔄 **Over-The-Air Updates** | Automated background checking and seamless self-updating via official GitHub Releases |
 
 ---
@@ -42,9 +43,9 @@
 
 ### Windows
 Download the official installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases). Existing installations update automatically:
-- ⭐ **`BlinkStream-Setup_1.1.0_Custom.exe`** *(Recommended — 100% Custom Twitch-themed setup with path selection)*
-- `BlinkStream_1.1.0_Win_x64.exe` *(Standard NSIS installer)*
-- `BlinkStream_1.1.0_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream-Setup_1.2.0_Custom.exe`** *(Recommended — 100% Custom Twitch-themed setup with path selection)*
+- `BlinkStream_1.2.0_Win_x64.exe` *(Standard NSIS installer)*
+- `BlinkStream_1.2.0_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
 > **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
@@ -60,13 +61,13 @@ Download the official installer from [GitHub Releases](https://github.com/BlinkS
 ### macOS
 ```bash
 brew install streamlink
-# Download BlinkStream_1.1.0_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
+# Download BlinkStream_1.2.0_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
 ```
 
 ### Linux (Debian / Ubuntu)
 ```bash
 sudo apt install streamlink
-# Download BlinkStream_1.1.0_Linux_x86_64.deb or .AppImage from Releases
+# Download BlinkStream_1.2.0_Linux_x86_64.deb or .AppImage from Releases
 ```
 
 ---
@@ -153,7 +154,7 @@ blinkstream/
 | **Windows Installer Size** | ~3.8 MB (Ultra-lightweight footprint) |
 | **Initial Bundle Load** | ~280 KB minified & compressed |
 | **Security Auditing** | **0 Known Vulnerabilities** across Rust and npm dependency graphs |
-| **Automated Test Suite** | **287 Unit & Integration Tests** passing (Vitest 4) |
+| **Automated Test Suite** | **295 Unit & Integration Tests** passing (Vitest 4) |
 | **Content Security Policy** | 9 restrictive directives, **0 wildcards allowed** |
 | **Supported Platforms** | Windows 10/11, macOS 13+ (Silicon & Intel), Ubuntu/Debian Linux |
 

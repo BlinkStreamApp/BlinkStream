@@ -14,6 +14,7 @@ use wait_timeout::ChildExt;
 mod recorder;
 pub use recorder::{start_recording, stop_recording};
 pub mod installer;
+pub mod companion;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -1146,10 +1147,16 @@ pub fn run() {
             installer::install_blinkstream_custom,
             installer::launch_installed_app_and_exit,
             installer::uninstall_blinkstream_custom,
+            // Mando a Distancia Wi-Fi Móvil (Companion Remote)
+            companion::get_companion_status,
+            companion::start_companion_server_cmd,
+            companion::stop_companion_server_cmd,
+            companion::update_companion_state,
         ])
         .setup(|app| {
             let mut labels_to_close = Vec::new();
             warn_legacy_client_id_once();
+            companion::init_and_start_companion_server(app.handle().clone());
 
             // Configurar ventana modal de 768x580px en caso de arrancar en modo instalador o desinstalador
             if let Some(main_win) = app.get_webview_window("main") {

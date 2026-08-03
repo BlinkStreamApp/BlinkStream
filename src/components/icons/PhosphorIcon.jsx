@@ -20,6 +20,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react'
 import { IconContext } from '@phosphor-icons/react'
+import { subscribeToIconStyle, getIconWeight } from '../../utils/hslTheme'
 
 // Pre-descubre los 3k+ modulos de iconos en build time. Vite los trata
 // como chunks lazy: cada uno se carga bajo demanda y solo se incluye
@@ -90,23 +91,16 @@ export default function PhosphorIcon({
   weight = 'regular',
   color = 'currentColor',
   className = '',
+  fixedWeight = false,
   ...props
 }) {
-  // Snapshots memoizados para que la regla react-hooks/static-components
-  // no proteste. Cambian solo si cambia `name`.
   const getNameSnapshot = useCallback(() => getSnapshot(name), [name])
-
-  // useSyncExternalStore nos da suscripcion reactiva al cache externo
-  // SIN disparar re-renders innecesarios ni violar la regla
-  // react-hooks/set-state-in-effect. `subscribe` y `getServerSnapshot`
-  // son referencias de modulo estables.
-  // El nombre `IconComponent` (no `Icon`) es deliberado: la regla
-  // react-hooks/static-components confunde cualquier identificador
-  // capitalizado con un componente y se queja del call site.
   const IconComponent = useSyncExternalStore(subscribe, getNameSnapshot, getServerSnapshot)
 
-  // Si el snapshot es undefined, no sabemos del icono: arrancar carga.
-  // useSyncExternalStore ya re-renderizara cuando notify() se llame.
+  // Suscripción reactiva al estilo de iconos seleccionado en el estudio
+  const themeIconWeight = useSyncExternalStore(subscribeToIconStyle, getIconWeight, getIconWeight)
+  const resolvedWeight = fixedWeight ? weight : (weight === 'fill' ? 'fill' : themeIconWeight)
+
   if (IconComponent === undefined) {
     loadIcon(name)
     return null
@@ -115,12 +109,12 @@ export default function PhosphorIcon({
   if (IconComponent === null) return null
 
   return (
-    <IconContext.Provider value={{ size, weight, color }}>
+    <IconContext.Provider value={{ size, weight: resolvedWeight, color }}>
       <div
-        className={className}
+        className={`phosphor-icon-container transition-all duration-200 ${className}`}
         style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
       >
-        <IconComponent {...props} />
+        <IconComponent weight={resolvedWeight} size={size} color={color} {...props} />
       </div>
     </IconContext.Provider>
   )
