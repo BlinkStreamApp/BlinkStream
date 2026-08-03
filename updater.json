@@ -1,7 +1,7 @@
 {
   "version": "1.3.0",
   "notes": "Novedades de BlinkStream v1.3.0 (The Immersion & Command Center Update):\n- Lluvia de Emotes en Tiempo Real: los emotes de Twitch, 7TV, BTTV y FFZ flotan suavemente por el reproductor con 0 lag en juegos (máx 20 burbujas en RAM)\n- Medidor de Combos Neón: detección instantánea de ráfagas en chat (HYPERS, SUPER y GODLIKE COMBO)\n- Pestañas Inteligentes en Chat: navegación rápida (Todos | Menciones | Destacados) y contador de alertas no leídas\n- Rediseño Glassmorphic del reproductor: menú engranaje centralizado para control de telemetría (Nerd Stats), modo compacto y efectos",
-  "pub_date": "2026-08-04T00:00:00Z",
+  "pub_date": "2026-08-03T22:07:53.364Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "",
