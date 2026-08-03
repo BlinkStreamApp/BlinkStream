@@ -18,6 +18,7 @@ export const STORAGE_KEYS = {
   OVERLAY_CHAT: 'blinkstream_overlay_chat',
   OVERLAY_OPACITY: 'blinkstream_overlay_opacity',
   FAVORITE_CHANNELS: 'blinkstream_favorites',
+  EMOTE_EFFECTS: 'blinkstream_emote_effects',
 }
 
 /**

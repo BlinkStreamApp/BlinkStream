@@ -684,7 +684,7 @@
       </ul>
 
       <a href="https://github.com/BlinkStreamApp/BlinkStream/releases/latest" target="_blank" class="cta-button">
-        ⚡ Descargar v1.2.0
+        ⚡ Descargar v1.3.0
       </a>
     </div>
   </header>
@@ -692,7 +692,7 @@
   <!-- Hero Section -->
   <section class="hero container">
     <div class="release-pill">
-      <span>●</span> Nueva Versión 1.2.0 Disponible • 100% Libre y Open-Source
+      <span>●</span> Nueva Versión 1.3.0 Disponible • 100% Libre y Open-Source
     </div>
 
     <h1 class="hero-title">
@@ -705,12 +705,18 @@
     </p>
 
     <div class="hero-actions">
-      <a href="https://github.com/BlinkStreamApp/BlinkStream/releases/latest" target="_blank" class="cta-button btn-primary">
-        ⭐ Descargar para Windows
+      <a href="https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.0/BlinkStream-Setup_1.3.0_Custom.exe" class="cta-button btn-primary" title="Instalador Personalizado Estilo Twitch">
+        🎮 Windows (.exe)
       </a>
-      <a href="https://github.com/BlinkStreamApp/BlinkStream" target="_blank" class="btn-secondary">
-        Ver en GitHub 💻
+      <a href="https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.0/BlinkStream_1.3.0_macOS_arm64.dmg" class="btn-secondary" title="Para Apple Silicon & Intel">
+        🍏 macOS (.dmg)
       </a>
+      <a href="https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.0/BlinkStream_1.3.0_Linux_x86_64.deb" class="btn-secondary" title="Para Ubuntu, Debian y derivados">
+        🐧 Linux (.deb)
+      </a>
+    </div>
+    <div style="margin-top: 1.25rem; text-align: center; font-size: 0.88rem; color: #9a9ab5;">
+      ✨ Descarga directa con un solo click o <a href="https://github.com/BlinkStreamApp/BlinkStream/releases" target="_blank" style="color: #bf94ff; font-weight: 600; text-decoration: underline;">consulta todas las descargas (MSI, AppImage) en GitHub 💻</a>
     </div>
 
     <!-- Live Architectural Mockup -->
@@ -734,12 +740,12 @@
             </div>
           </div>
           <div class="chat-box">
-            <div class="chat-header">Chat del canal (7TV Integrado)</div>
+            <div class="chat-header">Chat del canal (7TV Integrado + Lluvia)</div>
             <div class="chat-messages" id="chat-feed">
               <div class="chat-line"><span class="user-badge user-1">NinjaStreamer:</span>¡La fluidez en esta app es una locura! <span class="emote">POGGERS</span></div>
               <div class="chat-line"><span class="user-badge user-2">albertplayxd:</span>Cero lag en dos monitores 2K 🔥</div>
               <div class="chat-line"><span class="user-badge user-3">TechGamer_99:</span>Por fin sin anuncios que corten las jugadas <span class="emote">EZ</span></div>
-              <div class="chat-line"><span class="user-badge user-4">Mod_Elena:</span>¡Bienvenidos a la versión 1.2.0 con Estudio de Temas y Nerd Stats! <span class="emote">HYPERS</span></div>
+              <div class="chat-line"><span class="user-badge user-4">Mod_Elena:</span>¡Bienvenidos a la v1.3.0 con Lluvia de Emotes, Combos y Pestañas Inteligentes! <span class="emote">HYPERS</span></div>
             </div>
           </div>
         </div>
@@ -803,55 +809,27 @@
     <div class="roadmap-container">
       <div class="timeline">
 
-        <!-- Phase 1 -->
+        <!-- Phase 1 & 2 -->
         <div class="timeline-item">
           <div class="timeline-dot dot-current"></div>
           <div class="timeline-header">
-            <div class="timeline-title">Fase 1: v1.1.x — Calidad, Estabilidad & Fluidez</div>
-            <span class="timeline-tag tag-pro">Completada ✔️</span>
+            <div class="timeline-title">Fase 1 & 2: v1.1.x - v1.2.x — Cimiento Core & Telemetría</div>
+            <span class="timeline-tag tag-pro">Completadas ✔️</span>
           </div>
           <div class="roadmap-cols">
             <div class="roadmap-col">
-              <h4>🎨 Mejoras UI / UX</h4>
+              <h4>🎨 Mejoras UI / UX & Pro</h4>
               <ul class="roadmap-list">
-                <li><strong>Modo Cine Minimalista:</strong> Interfaz autoprotegida que esconde bordes y controles en pantalla completa.</li>
-                <li><strong>Dock Lateral Plegable:</strong> Barra flotante ultrarrápida para alternar al instante entre canales seguidos en vivo.</li>
-                <li><strong>Notificaciones Acústicas & Toast:</strong> Avisos auditivos en tiempo real en el milisegundo exacto en que tus streamers inician directo.</li>
+                <li><strong>Modo Cine & PiP Flotante:</strong> Ventanas emergentes siempre activas sobre videojuegos o IDEs.</li>
+                <li><strong>Arquitecto de Temas HSL:</strong> Calibración de color personalizada (Cyan Neón, Cyberpunk Gold, OLED Puro) y Google Fonts.</li>
+                <li><strong>HUD de Telemetría ("Nerd Stats"):</strong> Medidor en tiempo real de FPS, bitrate de red y latencia HLS.</li>
               </ul>
             </div>
             <div class="roadmap-col">
               <h4>⚙️ Funcionalidades Core</h4>
               <ul class="roadmap-list">
-                <li><strong>Decodificación por Hardware AV1/H.265:</strong> Optimización avanzada para tarjetas gráficas de última generación.</li>
-                <li><strong>Filtros Anti-Spam Inteligentes:</strong> Compresión mediante expresiones regulares de inundaciones masivas en el chat en torneos.</li>
-                <li><strong>Capturador Instantáneo (Ctrl+Shift+S):</strong> Guardado de fotogramas HD sin pérdida directamente en el disco duro.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <!-- Phase 2 -->
-        <div class="timeline-item">
-          <div class="timeline-dot dot-current"></div>
-          <div class="timeline-header">
-            <div class="timeline-title">Fase 2: v1.2.x - v1.3.x — La Expansión "Pro Command Center" (Actual)</div>
-            <span class="timeline-tag tag-active">En Despliegue ⚡</span>
-          </div>
-          <div class="roadmap-cols">
-            <div class="roadmap-col">
-              <h4>🎨 Mejoras UI / UX</h4>
-              <ul class="roadmap-list">
-                <li><strong>Picture-in-Picture (PiP) Siempre Activo:</strong> Ventana flotante sin bordes ni fondo, ideal sobre videojuegos a pantalla completa.</li>
-                <li><strong>Arquitecto de Temas HSL:</strong> Calibración de color personalizada más allá del púrpura (Cyan Neón, Cyberpunk Gold, OLED Puro).</li>
-                <li><strong>Grid Multi-Stream:</strong> Visualización simultánea de hasta 4 canales en directo con mezclador de audio independiente.</li>
-              </ul>
-            </div>
-            <div class="roadmap-col">
-              <h4>⚙️ Funcionalidades Core</h4>
-              <ul class="roadmap-list">
-                <li><strong>Auto-Reclamador de Twitch Drops:</strong> Dashboard en segundo plano con progresión exacta y recolección automática de recompensas de videojuegos.</li>
-                <li><strong>Gestor de Descarga VOD & Clips:</strong> Motor integrado para descargar transmisiones pasadas en MP4 a máxima velocidad.</li>
-                <li><strong>Integración con Stream Deck & Macros:</strong> Atajos globales de teclado físicos para pronósticos y puntos de canal.</li>
+                <li><strong>Resiliencia HLS & Circuit Breaker:</strong> Reconstrucción inteligente de flujos sin caídas y compresión anti-spam de chat.</li>
+                <li><strong>Sincronización Supabase Cloud:</strong> Favoritos y ajustes locales en PC sin rastreos invasivos.</li>
               </ul>
             </div>
           </div>
@@ -859,51 +837,76 @@
 
         <!-- Phase 3 -->
         <div class="timeline-item">
-          <div class="timeline-dot dot-future"></div>
+          <div class="timeline-dot dot-current"></div>
           <div class="timeline-header">
-            <div class="timeline-title">Fase 3: v1.6.x — Analíticas & Inmersión de Comunidad (Q1 2027)</div>
-            <span class="timeline-tag tag-plan">En Planificación</span>
+            <div class="timeline-title">Fase 3: v1.3.0 — "The Immersion & Command Center Update" (Actual)</div>
+            <span class="timeline-tag tag-active">En Despliegue ⚡</span>
           </div>
           <div class="roadmap-cols">
             <div class="roadmap-col">
               <h4>🎨 Mejoras UI / UX</h4>
               <ul class="roadmap-list">
-                <li><strong>HUD de Telemetría ("Nerd Stats"):</strong> Medidor en tiempo real de FPS, bitrate de red (Kbps), latencia y uso real de memoria RAM.</li>
-                <li><strong>Widget de Encuestas & Pronósticos:</strong> Banners glassmorphic sobre el vídeo para votar con puntos de canal de forma ultrarrápida.</li>
-                <li><strong>Fuentes y Emblemas Custom:</strong> Control tipográfico y reemplazo local de emblemas del chat a tu gusto.</li>
+                <li><strong>Grid Multi-Stream:</strong> Visualización simultánea de hasta 4 canales en directo con mezclador de audio independiente para torneos de esports.</li>
+                <li><strong>Pestañas Inteligentes de Chat:</strong> Barra superior de navegación (Todos | Menciones con contador en vivo | Destacados).</li>
+                <li><strong>Menú de Ajustes Glassmorphic:</strong> Engranaje flotante ergonómico para activar modo compacto, telemetría y efectos con un clic.</li>
               </ul>
             </div>
             <div class="roadmap-col">
               <h4>⚙️ Funcionalidades Core</h4>
               <ul class="roadmap-list">
-                <li><strong>Repetición de Chat Sincronizada:</strong> Reproducción temporal exacta de las reacciones de la comunidad durante VODs grabados.</li>
-                <li><strong>Resumen con IA Local:</strong> Procesamiento ligero en dispositivo para resumir qué pasó en el stream si te fuiste unos minutos.</li>
-                <li><strong>Modo Ahorro de Ancho de Banda:</strong> Reducción inteligente de tasa de datos en ventanas secundarias minimizadas.</li>
+                <li><strong>Lluvia de Emotes en Vivo:</strong> Motor de burbujas en pantalla para emotes de 7TV/Twitch con límite en RAM (0% lag en juegos).</li>
+                <li><strong>Medidor de Combos Neón:</strong> Detección automática de ráfagas en chat (HYPERS COMBO, SUPER COMBO y GODLIKE COMBO).</li>
+                <li><strong>Resaltado Ámbar de Menciones:</strong> Detección al milisegundo de tu usuario con resplandor dorado y sombra cálida.</li>
               </ul>
             </div>
           </div>
         </div>
 
-        <!-- Phase 4 -->
+        <!-- Phase 4 & 5 -->
+        <div class="timeline-item">
+          <div class="timeline-dot dot-future"></div>
+          <div class="timeline-header">
+            <div class="timeline-title">Fase 4 & 5: v1.4.x - v1.5.x — Medios, Alergia Acústica & Recompensas</div>
+            <span class="timeline-tag tag-plan">Siguiente Hito 🎯</span>
+          </div>
+          <div class="roadmap-cols">
+            <div class="roadmap-col">
+              <h4>🎨 Mejoras UI / UX & Alertas</h4>
+              <ul class="roadmap-list">
+                <li><strong>Smart Streamers Tracker:</strong> Notificaciones Toast nativas de Windows el segundo exacto en que tu favorito abre directo.</li>
+                <li><strong>Banners Glassmorphism para Pronósticos:</strong> Widgets emergentes en el vídeo para apostar puntos de canal de forma instantánea sin abrir el chat.</li>
+              </ul>
+            </div>
+            <div class="roadmap-col">
+              <h4>⚙️ Funcionalidades Core</h4>
+              <ul class="roadmap-list">
+                <li><strong>Gestor de Descarga de VODs y Clips:</strong> Motor integrado para descargar transmisiones pasadas en MP4 a máxima velocidad al disco duro.</li>
+                <li><strong>Auto-Reclamador de Twitch Drops:</strong> Recolección automática de recompensas de videojuegos en segundo plano.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 6 & 7 -->
         <div class="timeline-item">
           <div class="timeline-dot dot-horizon"></div>
           <div class="timeline-header">
-            <div class="timeline-title">Fase 4: v2.0.0 — El Horizonte Open-Source (2027)</div>
+            <div class="timeline-title">Fase 6 & 7: v1.6.x - v2.0.0 — El Horizonte Open-Source (2027)</div>
             <span class="timeline-tag tag-horizon">Visión Larga</span>
           </div>
           <div class="roadmap-cols">
             <div class="roadmap-col">
-              <h4>🌐 Ecosystem & Ecosistema</h4>
+              <h4>🌐 Ecosistema & Replay Sincronizado</h4>
               <ul class="roadmap-list">
-                <li><strong>Soporte Linux Universal:</strong> Distribuciones certificadas en AppImage, Flatpak y Snap.</li>
-                <li><strong>Optimización Apple Silicon (macOS):</strong> Compilación nativa M1/M2/M3/M4 con soporte para Apple TouchBar y vídeo por hardware.</li>
-                <li><strong>Mando Remoto Móvil por Wi-Fi:</strong> Transforma tu teléfono en un control remoto táctil para tu BlinkStream de escritorio en el salón.</li>
+                <li><strong>Repetición de Chat Sincronizado:</strong> Reproducción temporal exacta del chat al mirar directos pasados offline.</li>
+                <li><strong>Soporte Universal:</strong> Distribuciones oficiales Linux (Flatpak/AppImage) y macOS Apple Silicon (ARM64).</li>
               </ul>
             </div>
             <div class="roadmap-col">
-              <h4>🔌 Extensibilidad & SDK</h4>
+              <h4>🔌 IA Next-Gen & SDK</h4>
               <ul class="roadmap-list">
-                <li><strong>SDK para Plugins y Widgets:</strong> API local segura en sandbox para que desarrolladores y streamers construyan extensiones y bots de chat directamente dentro de la app.</li>
+                <li><strong>Traducción de Subtítulos por IA en Vivo:</strong> Speech-to-text y traducción de baja latencia en pantalla (Inglés/Japonés ➔ Español).</li>
+                <li><strong>Resúmenes con IA Local (Ollama):</strong> Resumen de jugadas si estuviste AFK del directo unos minutos.</li>
               </ul>
             </div>
           </div>

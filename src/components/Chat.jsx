@@ -410,9 +410,13 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
     )
   }
 
+  const containerClass = msg.isMention
+    ? "relative px-2.5 py-1.5 my-1 rounded-xl bg-gradient-to-r from-amber-500/20 via-purple-500/10 to-transparent border border-l-4 border-amber-400/80 shadow-md shadow-amber-500/10 transition-all group/msg animate-fade-in text-sm leading-relaxed break-words text-white/95 font-medium"
+    : "relative px-2.5 py-1 my-0.5 rounded-xl hover:bg-white/[0.04] border border-transparent hover:border-white/[0.05] transition-all group/msg animate-fade-in text-sm leading-relaxed break-words text-white/95"
+
   return (
     <div
-      className="relative px-2.5 py-1 my-0.5 rounded-xl hover:bg-white/[0.04] border border-transparent hover:border-white/[0.05] transition-all group/msg animate-fade-in text-sm leading-relaxed break-words text-white/95"
+      className={containerClass}
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, msg) : undefined}
       style={{ fontSize: `${chatFontSize}px` }}
     >
@@ -471,6 +475,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
   const [connError, setConnError] = useState('')
   const [inputText, setInputText] = useState('')
   const [newMsgCount, setNewMsgCount] = useState(0)
+  const [activeTab, setActiveTab] = useState('all') // 'all' | 'mentions' | 'featured'
+  const [unreadMentions, setUnreadMentions] = useState(0)
+  const activeTabRef = useRef('all')
+  useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
   // WT-20260628-56: estado del menu contextual de moderacion.
   // Guarda coordenadas + el mensaje target para que
   // MessageContextMenu pueda renderizarse y resolver el usuario
@@ -1059,6 +1067,40 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
       if (msgBatch.length > 0) {
         const toFlush = msgBatch.slice()
         msgBatch.length = 0
+
+        const myUsername = (auth?.username || viewerLogin || '').toLowerCase()
+        let addedMentions = 0
+
+        for (const msg of toFlush) {
+          if (myUsername && msg.user_login !== myUsername && msg.message) {
+            const lowerMsg = msg.message.toLowerCase()
+            if (lowerMsg.includes(`@${myUsername}`) || lowerMsg.split(/\s+/).includes(myUsername)) {
+              msg.isMention = true
+              if (activeTabRef.current !== 'mentions') {
+                addedMentions++
+              }
+            }
+          }
+
+          if (msg.message && !isOverlay && !isGridMode) {
+            const parts = matchEmotesInText(msg.message, msg.emotes, trieRef.current)
+            for (const p of parts) {
+              if (p.type === 'twitch-emote') {
+                window.dispatchEvent(new CustomEvent('blinkstream:emote', { detail: { url: `https://static-cdn.jtvnw.net/emoticons/v2/${p.id}/default/dark/2.0`, name: p.text } }))
+                break
+              } else if (p.type === 'third-party-emote' && p.urls?.length) {
+                const url = p.urls[2] || p.urls[1] || p.urls[0]
+                window.dispatchEvent(new CustomEvent('blinkstream:emote', { detail: { url, name: p.name } }))
+                break
+              }
+            }
+          }
+        }
+
+        if (addedMentions > 0) {
+          setUnreadMentions(c => c + addedMentions)
+        }
+
         setMessages(prev => {
           let updated = [...prev]
           if (antiSpamRef.current && toFlush.length > 0) {
@@ -1572,6 +1614,55 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         )}
       </div>
 
+      {/* Selector de Pestañas de Chat (Todos | Menciones | Destacados) */}
+      <div className="shrink-0 px-2 py-1.5 bg-[#121218]/95 border-b border-white/[0.06] flex items-center justify-around gap-1.5 select-none text-[11px] font-bold">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap overflow-hidden border ${
+            activeTab === 'all'
+              ? 'bg-twitch/30 text-white shadow-[0_2px_10px_rgba(145,70,255,0.35)] border-twitch/60 font-bold'
+              : 'text-text-muted hover:text-white hover:bg-white/[0.04] border-transparent font-bold'
+          }`}
+        >
+          <span className="shrink-0">💬</span>
+          <span className="truncate">{t('chat.tab.all', 'Todos')}</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('mentions')
+            setUnreadMentions(0)
+          }}
+          className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-lg transition-all cursor-pointer relative whitespace-nowrap overflow-hidden border ${
+            activeTab === 'mentions'
+              ? 'bg-twitch/30 text-white shadow-[0_2px_10px_rgba(145,70,255,0.35)] border-twitch/60 font-bold'
+              : 'text-text-muted hover:text-white hover:bg-white/[0.04] border-transparent font-bold'
+          }`}
+          title="Mensajes donde te mencionan (@TuUsuario)"
+        >
+          <span className="shrink-0">🔔</span>
+          <span className="truncate">Menciones</span>
+          {unreadMentions > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-black animate-bounce shadow-sm leading-none shrink-0">
+              {unreadMentions}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('featured')}
+          className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap overflow-hidden border ${
+            activeTab === 'featured'
+              ? 'bg-twitch/30 text-white shadow-[0_2px_10px_rgba(145,70,255,0.35)] border-twitch/60 font-bold'
+              : 'text-text-muted hover:text-white hover:bg-white/[0.04] border-transparent font-bold'
+          }`}
+          title="Eventos del canal, Mods, VIPs y Recompensas"
+        >
+          <span className="shrink-0">⭐</span>
+          <span className="truncate">Destacados</span>
+        </button>
+      </div>
+
       {authing && authCode && (
         <div className="shrink-0 px-3 py-4 bg-bg-secondary/80 border-b border-twitch/20 text-center animate-fade-in">
           <p className="text-xs font-semibold text-twitch mb-2">Autorizar BlinkStream</p>
@@ -1612,9 +1703,37 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
           </div>
         ) : (
           <div className="space-y-0.5">
-            {messages
-              .filter(msg => !hideBots || !msg.user.toLowerCase().includes('bot'))
-              .map(msg => (
+            {(() => {
+              const filtered = messages
+                .filter(msg => !hideBots || !msg.user.toLowerCase().includes('bot'))
+                .filter(msg => {
+                  if (activeTab === 'mentions') return Boolean(msg.isMention)
+                  if (activeTab === 'featured') {
+                    const isModVip = msg.badges?.some(b => ['moderator', 'vip', 'broadcaster', 'staff', 'admin'].includes(b.set))
+                    return Boolean(msg.eventType || msg.isReward || isModVip)
+                  }
+                  return true
+                })
+
+              if (filtered.length === 0 && messages.length > 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-text-muted/60 select-none my-6">
+                    <span className="text-2xl mb-2">{activeTab === 'mentions' ? '🔔' : '⭐'}</span>
+                    <p className="text-xs font-bold text-white/80 mb-1">
+                      {activeTab === 'mentions'
+                        ? 'Sin menciones por ahora'
+                        : 'Sin mensajes destacados en vivo'}
+                    </p>
+                    <p className="text-[11px] text-text-muted/70">
+                      {activeTab === 'mentions'
+                        ? 'Aquí aparecerán los mensajes que nombren tu @usuario.'
+                        : 'Aquí aparecerán canjes de puntos, bits y mensajes de Mods o VIPs.'}
+                    </p>
+                  </div>
+                )
+              }
+
+              return filtered.map(msg => (
                 <ChatMessage
                   key={msg.id}
                   msg={msg}
@@ -1625,7 +1744,8 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
                   onContextMenu={isModerator ? handleContextMenu : undefined}
                   isGridMode={isGridMode}
                 />
-              ))}
+              ))
+            })()}
           </div>
         )}
 

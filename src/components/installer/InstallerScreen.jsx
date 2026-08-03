@@ -142,7 +142,7 @@ export default function InstallerScreen() {
         <div className="flex items-center gap-2.5 pointer-events-none">
           <BlinkStreamLogo size={22} />
           <span className="text-xs font-extrabold tracking-wider uppercase text-text-primary/90">
-            {t('inst.title')} <span className="text-[10px] text-twitch font-mono ml-1 px-1.5 py-0.5 bg-twitch/10 rounded border border-twitch/20">v1.2.0</span>
+            {t('inst.title')} <span className="text-[10px] text-twitch font-mono ml-1 px-1.5 py-0.5 bg-twitch/10 rounded border border-twitch/20">v1.3.0</span>
           </span>
         </div>
         <div className="flex items-center gap-1">

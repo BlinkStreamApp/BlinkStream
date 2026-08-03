@@ -30,6 +30,7 @@ import LiveBadge from './LiveBadge'
 import ToggleSwitch from './ToggleSwitch'
 import PhosphorIcon from './icons/PhosphorIcon'
 import Chat from './Chat'
+import EmoteRainOverlay from './EmoteRainOverlay'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 // FASE 4 / WT-20260628-45: Lordicon animado para el boton REC. Solo
 // se monta cuando `recording` es true; el resto del tiempo seguimos
@@ -63,6 +64,8 @@ function PlayerSettingsPanel({
   onToggleStats,
   showOverlayChat,
   onToggleOverlayChat,
+  showEmoteEffects,
+  onToggleEmoteEffects,
   onOpenAppSettings,
 }) {
   const compactValue = compact || false
@@ -114,6 +117,18 @@ function PlayerSettingsPanel({
             </div>
           </div>
           <ToggleSwitch active={showOverlayChat} onClick={onToggleOverlayChat} />
+        </div>
+
+        {/* Efectos y Combos de Emotes */}
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
+          <div className="flex items-center gap-2.5">
+            <PhosphorIcon name="Sparkle" size={18} weight="duotone" className={showEmoteEffects ? "text-twitch" : "text-text-muted"} />
+            <div>
+              <p className="font-bold text-white/95 leading-tight">Efectos & Combos de Emotes</p>
+              <p className="text-[10px] text-text-muted mt-0.5">Lluvia en pantalla y medidor de combos</p>
+            </div>
+          </div>
+          <ToggleSwitch active={showEmoteEffects} onClick={onToggleEmoteEffects} />
         </div>
 
         {/* Modo Compacto */}
@@ -211,6 +226,7 @@ export default function VideoPlayer({
   } = useRecording()
   const [showTheatreToast, setShowTheatreToast] = useState(false)
   const [showOverlayChat, setShowOverlayChat] = useState(() => getItem(STORAGE_KEYS.OVERLAY_CHAT, 'false') === 'true')
+  const [showEmoteEffects, setShowEmoteEffects] = useState(() => getItem(STORAGE_KEYS.EMOTE_EFFECTS, 'true') === 'true')
   const abortControllerRef = useRef(null)
   const containerRef = useRef(null)
   const controlsTimerRef = useRef(null)
@@ -939,9 +955,19 @@ export default function VideoPlayer({
               return n
             })
           }}
+          showEmoteEffects={showEmoteEffects}
+          onToggleEmoteEffects={() => {
+            setShowEmoteEffects(p => {
+              const n = !p
+              setItem(STORAGE_KEYS.EMOTE_EFFECTS, n)
+              return n
+            })
+          }}
           onOpenAppSettings={onOpenAppSettings}
         />
       )}
+
+      <EmoteRainOverlay active={showEmoteEffects} />
 
       {showClips && <ClipPlayer channel={channel} onClose={() => setShowClips(false)} />}
       {showVods && <VodPlayer channel={channel} onClose={() => setShowVods(false)} />}

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.2.0-e94560" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.3.0-e94560" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
 </p>
@@ -21,6 +21,8 @@
 | Feature | Description |
 |---------|-------------|
 | 🎯 **Custom Installer** | Immersive Twitch-themed installer with native custom installation directory selector |
+| 🌧️ **Emote Rain & Combos** | Floating real-time emote particle overlays and dynamic neon Combo meter (HYPERS, SUPER, GODLIKE) |
+| 🔔 **Smart Chat Tabs** | Quick navigation bar filtering between All messages, @Mentions with live notification counter, and ⭐ Featured events |
 | 📺 **Live Streams** | Smooth Twitch stream playback using integrated Streamlink + FFmpeg engine |
 | 🎬 **Clips & VODs** | Dedicated video-on-demand and clip player with selectable multi-quality tiers |
 | 💬 **Rich IRC Chat** | Real-time chat integration supporting third-party emotes (BTTV, 7TV, FFZ) and docking controls |
@@ -43,9 +45,9 @@
 
 ### Windows
 Download the official installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases). Existing installations update automatically:
-- ⭐ **`BlinkStream-Setup_1.2.0_Custom.exe`** *(Recommended — 100% Custom Twitch-themed setup with path selection)*
-- `BlinkStream_1.2.0_Win_x64.exe` *(Standard NSIS installer)*
-- `BlinkStream_1.2.0_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream-Setup_1.3.0_Custom.exe`** *(Recommended — 100% Custom Twitch-themed setup with path selection)*
+- `BlinkStream_1.3.0_Win_x64.exe` *(Standard NSIS installer)*
+- `BlinkStream_1.3.0_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
 > **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
@@ -61,13 +63,13 @@ Download the official installer from [GitHub Releases](https://github.com/BlinkS
 ### macOS
 ```bash
 brew install streamlink
-# Download BlinkStream_1.2.0_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
+# Download BlinkStream_1.3.0_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
 ```
 
 ### Linux (Debian / Ubuntu)
 ```bash
 sudo apt install streamlink
-# Download BlinkStream_1.2.0_Linux_x86_64.deb or .AppImage from Releases
+# Download BlinkStream_1.3.0_Linux_x86_64.deb or .AppImage from Releases
 ```
 
 ---
