@@ -197,7 +197,152 @@ const INSTALL_CMD: &str = "brew install streamlink";
 #[cfg(target_os = "linux")]
 const INSTALL_CMD: &str = "sudo apt install streamlink  # o pip install streamlink";
 
-fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
+/// Localiza ffmpeg y asegura que su directorio esté en el PATH del proceso actual
+/// para que streamlink pueda grabar y procesar flujos HLS sin errores.
+pub fn ensure_ffmpeg_path() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        let mut where_cmd = std::process::Command::new("where.exe");
+        where_cmd.arg("ffmpeg.exe").stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null());
+        where_cmd.creation_flags(CREATE_NO_WINDOW);
+        if let Ok(output) = where_cmd.output() {
+            if output.status.success() {
+                for line in String::from_utf8_lossy(&output.stdout).lines() {
+                    let p = PathBuf::from(line.trim());
+                    if p.exists() && p.extension().map_or(false, |ext| ext.eq_ignore_ascii_case("exe")) {
+                        if let Some(parent) = p.parent() {
+                            add_to_process_path(parent);
+                        }
+                        return Some(p);
+                    }
+                }
+            }
+        }
+
+        let mut candidate_paths = Vec::new();
+        if let Ok(pf) = std::env::var("ProgramFiles") {
+            candidate_paths.push(PathBuf::from(&pf).join("FFmpeg").join("bin").join("ffmpeg.exe"));
+            candidate_paths.push(PathBuf::from(&pf).join("Gyan").join("FFmpeg").join("bin").join("ffmpeg.exe"));
+        }
+        if let Ok(pf_x86) = std::env::var("ProgramFiles(x86)") {
+            candidate_paths.push(PathBuf::from(&pf_x86).join("FFmpeg").join("bin").join("ffmpeg.exe"));
+        }
+        candidate_paths.push(PathBuf::from(r"C:\Program Files\FFmpeg\bin\ffmpeg.exe"));
+        candidate_paths.push(PathBuf::from(r"C:\ProgramData\chocolatey\bin\ffmpeg.exe"));
+        if let Ok(up) = std::env::var("USERPROFILE") {
+            candidate_paths.push(PathBuf::from(&up).join("scoop").join("apps").join("ffmpeg").join("current").join("bin").join("ffmpeg.exe"));
+            candidate_paths.push(PathBuf::from(&up).join("AppData").join("Local").join("Microsoft").join("WinGet").join("Links").join("ffmpeg.exe"));
+        }
+
+        if let Ok(lad) = std::env::var("LOCALAPPDATA") {
+            let winget_pkgs = PathBuf::from(&lad).join("Microsoft").join("WinGet").join("Packages");
+            if let Ok(entries) = std::fs::read_dir(winget_pkgs) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_lowercase();
+                    if name.contains("ffmpeg") || name.contains("gyan") {
+                        if let Ok(sub) = std::fs::read_dir(entry.path()) {
+                            for s in sub.flatten() {
+                                let f = s.path().join("bin").join("ffmpeg.exe");
+                                if f.exists() { candidate_paths.push(f); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for p in candidate_paths {
+            if p.exists() {
+                if let Some(parent) = p.parent() {
+                    add_to_process_path(parent);
+                }
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
+fn add_to_process_path(new_dir: &std::path::Path) {
+    if let Ok(current_path) = std::env::var("PATH") {
+        let new_dir_str = new_dir.to_string_lossy();
+        if !current_path.split(';').any(|p| p.eq_ignore_ascii_case(&new_dir_str)) {
+            let updated_path = format!("{};{}", new_dir_str, current_path);
+            std::env::set_var("PATH", updated_path);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn check_streamlink_windows_locations() -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        candidates.push(PathBuf::from(&pf).join("Streamlink").join("bin").join("streamlink.exe"));
+        candidates.push(PathBuf::from(&pf).join("Streamlink").join("streamlink.exe"));
+    }
+    if let Ok(pf_x86) = std::env::var("ProgramFiles(x86)") {
+        candidates.push(PathBuf::from(&pf_x86).join("Streamlink").join("bin").join("streamlink.exe"));
+        candidates.push(PathBuf::from(&pf_x86).join("Streamlink").join("streamlink.exe"));
+    }
+    candidates.push(PathBuf::from(r"C:\Program Files\Streamlink\bin\streamlink.exe"));
+    candidates.push(PathBuf::from(r"C:\Program Files (x86)\Streamlink\bin\streamlink.exe"));
+
+    if let Ok(lad) = std::env::var("LOCALAPPDATA") {
+        candidates.push(PathBuf::from(&lad).join("Programs").join("Streamlink").join("bin").join("streamlink.exe"));
+        candidates.push(PathBuf::from(&lad).join("Microsoft").join("WinGet").join("Links").join("streamlink.exe"));
+
+        let py_progs = PathBuf::from(&lad).join("Programs").join("Python");
+        if let Ok(entries) = std::fs::read_dir(py_progs) {
+            for entry in entries.flatten() {
+                candidates.push(entry.path().join("Scripts").join("streamlink.exe"));
+            }
+        }
+    }
+
+    if let Ok(apd) = std::env::var("APPDATA") {
+        let py_roam = PathBuf::from(&apd).join("Python");
+        if let Ok(entries) = std::fs::read_dir(py_roam) {
+            for entry in entries.flatten() {
+                candidates.push(entry.path().join("Scripts").join("streamlink.exe"));
+            }
+        }
+    }
+
+    if let Ok(up) = std::env::var("USERPROFILE") {
+        candidates.push(PathBuf::from(&up).join("scoop").join("apps").join("streamlink").join("current").join("bin").join("streamlink.exe"));
+        candidates.push(PathBuf::from(&up).join("scoop").join("apps").join("streamlink").join("current").join("streamlink.exe"));
+    }
+    candidates.push(PathBuf::from(r"C:\ProgramData\chocolatey\bin\streamlink.exe"));
+
+    for p in candidates {
+        if p.exists() {
+            if let Some(parent) = p.parent() { add_to_process_path(parent); }
+            return Some(p);
+        }
+    }
+
+    let mut where_cmd = std::process::Command::new("where.exe");
+    where_cmd.arg("streamlink.exe").stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null());
+    where_cmd.creation_flags(CREATE_NO_WINDOW);
+    if let Ok(output) = where_cmd.output() {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let p = PathBuf::from(line.trim());
+                if p.exists() && p.extension().map_or(false, |ext| ext.eq_ignore_ascii_case("exe")) {
+                    if let Some(parent) = p.parent() { add_to_process_path(parent); }
+                    return Some(p);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+pub fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
+    ensure_ffmpeg_path(); // Asegurar siempre que ffmpeg esté en el PATH antes de ejecutar streamlink
+
     let target_triple = format!(
         "{}-{}-{}",
         std::env::consts::ARCH,
@@ -222,93 +367,39 @@ fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
 
     #[cfg(windows)]
     {
-        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-            let winget_path = PathBuf::from(local_app_data)
-                .join("Programs")
-                .join("Streamlink")
-                .join("bin")
-                .join("streamlink.exe");
-            if winget_path.exists() {
-                return Ok(winget_path);
-            }
+        if let Some(path) = check_streamlink_windows_locations() {
+            return Ok(path);
         }
 
-        if let Ok(user_profile) = std::env::var("USERPROFILE") {
-            let scoop_path = PathBuf::from(user_profile)
-                .join("scoop")
-                .join("apps")
-                .join("streamlink")
-                .join("current")
-                .join("streamlink.exe");
-            if scoop_path.exists() {
-                return Ok(scoop_path);
-            }
-        }
+        // Si no se encuentra, iniciamos instalación silenciosa de Streamlink y FFmpeg sin abrir consola
+        log::info!("Streamlink o FFmpeg ausentes. Ejecutando instalación silenciosa vía winget...");
+        let mut winget_sl = std::process::Command::new("winget");
+        winget_sl.args(["install", "Streamlink.Streamlink", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
+            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+        winget_sl.creation_flags(CREATE_NO_WINDOW);
+        let _ = winget_sl.status();
 
-        let choco_path = PathBuf::from(r"C:\ProgramData\chocolatey\bin\streamlink.exe");
-        if choco_path.exists() {
-            return Ok(choco_path);
+        let mut winget_ff = std::process::Command::new("winget");
+        winget_ff.args(["install", "Gyan.FFmpeg", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
+            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+        winget_ff.creation_flags(CREATE_NO_WINDOW);
+        let _ = winget_ff.status();
+
+        ensure_ffmpeg_path();
+        if let Some(path) = check_streamlink_windows_locations() {
+            return Ok(path);
         }
     }
 
     #[cfg(target_os = "macos")]
     {
         let brew_path = PathBuf::from("/usr/local/bin/streamlink");
-        if brew_path.exists() {
-            return Ok(brew_path);
-        }
+        if brew_path.exists() { return Ok(brew_path); }
         let brew_arm_path = PathBuf::from("/opt/homebrew/bin/streamlink");
-        if brew_arm_path.exists() {
-            return Ok(brew_arm_path);
-        }
+        if brew_arm_path.exists() { return Ok(brew_arm_path); }
         let macports_path = PathBuf::from("/opt/local/bin/streamlink");
-        if macports_path.exists() {
-            return Ok(macports_path);
-        }
-    }
+        if macports_path.exists() { return Ok(macports_path); }
 
-    #[cfg(target_os = "linux")]
-    {
-        let linux_paths = [
-            "/usr/bin/streamlink",
-            "/usr/local/bin/streamlink",
-            "/opt/streamlink/bin/streamlink",
-        ];
-        for p in &linux_paths {
-            let path = PathBuf::from(p);
-            if path.exists() {
-                return Ok(path);
-            }
-        }
-    }
-
-    #[cfg(windows)]
-    {
-        let mut winget_cmd = std::process::Command::new("winget");
-        winget_cmd.args(&["install", "Streamlink.Streamlink", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
-        #[cfg(windows)]
-        { winget_cmd.creation_flags(CREATE_NO_WINDOW); }
-        if let Ok(output) = winget_cmd.status()
-        {
-            if output.success() {
-                if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-                    let winget_path = PathBuf::from(local_app_data)
-                        .join("Programs")
-                        .join("Streamlink")
-                        .join("bin")
-                        .join("streamlink.exe");
-                    if winget_path.exists() {
-                        return Ok(winget_path);
-                    }
-                }
-            }
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
         let status = std::process::Command::new("brew")
             .args(["install", "streamlink"])
             .stdout(std::process::Stdio::null())
@@ -316,13 +407,17 @@ fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
             .status();
         if let Ok(s) = status {
             if s.success() {
-                let mac_paths = ["/opt/homebrew/bin/streamlink", "/usr/local/bin/streamlink"];
-                for p in &mac_paths {
-                    if std::path::PathBuf::from(p).exists() {
-                        return Ok(std::path::PathBuf::from(p));
-                    }
+                for p in ["/opt/homebrew/bin/streamlink", "/usr/local/bin/streamlink"] {
+                    if PathBuf::from(p).exists() { return Ok(PathBuf::from(p)); }
                 }
             }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        for p in ["/usr/bin/streamlink", "/usr/local/bin/streamlink", "/opt/streamlink/bin/streamlink"] {
+            if PathBuf::from(p).exists() { return Ok(PathBuf::from(p)); }
         }
     }
 
@@ -341,7 +436,14 @@ fn run_streamlink_with_timeout(
     let binary = find_streamlink(app)?;
 
     let mut cmd = Command::new(&binary);
-    cmd.args(args)
+    let mut full_args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+    if let Some(ff_path) = ensure_ffmpeg_path() {
+        if !full_args.iter().any(|arg| arg == "--ffmpeg-ffmpeg") {
+            full_args.push("--ffmpeg-ffmpeg".to_string());
+            full_args.push(ff_path.to_string_lossy().to_string());
+        }
+    }
+    cmd.args(&full_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -434,7 +536,7 @@ async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Res
     //   3) Sin token (ultimo recurso): streamlink usara su propio
     //      client_id de terceros; el 403 puede volver, pero no rompemos
     //      el flujo ni lanzamos panic.
-    let mut args: Vec<String> = vec![
+    let args: Vec<String> = vec![
         format!("twitch.tv/{}", channel),
         quality.clone(),
         "--stream-url".to_string(),
@@ -473,31 +575,24 @@ async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Res
         }
     }
 
-    let mut used_auth = false;
+    // Intentar primero SIN token de autenticaicón (acceso público limpio) para que Streamlink utilice su cliente web nativo.
+    // Esto evita que Twitch Usher restrinja la playlist m3u8 con cabeceras que provocan errores HTTP 403 al cargarse desde WebView2/HLS.
+    let mut clean_args = args.clone();
+    let arg_refs_clean: Vec<&str> = clean_args.iter().map(String::as_str).collect();
+    let mut res_sl = run_streamlink(&app, &arg_refs_clean);
+
+    // Si el acceso público falla (por ejemplo, streams exclusivos para suscriptores), intentamos con el token Bearer
     if let Some(token) = resolved_token {
-        args.push("--twitch-api-header".to_string());
-        args.push(format!("Authorization=Bearer {}", token));
-        used_auth = true;
-    }
-
-    let mut arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-    let mut res_sl = run_streamlink(&app, &arg_refs);
-
-    // Si falló y estábamos usando un token (p.ej. token caducado o rechazo por scopes), reintentamos SIN token (acceso público limpio)
-    if used_auth {
-        let should_retry = match &res_sl {
+        let should_try_auth = match &res_sl {
             Err(_) => true,
-            Ok((stdout, _)) => stdout.trim().starts_with("error:"),
+            Ok((stdout, _)) => stdout.trim().starts_with("error:") || stdout.trim().is_empty(),
         };
-        if should_retry {
-            log::warn!("get_stream_url: Falló con token de autenticación. Reintentando sin cabeceras de Twitch...");
-            let clean_args: Vec<String> = vec![
-                format!("twitch.tv/{}", channel),
-                quality.clone(),
-                "--stream-url".to_string(),
-            ];
-            arg_refs = clean_args.iter().map(String::as_str).collect();
-            res_sl = run_streamlink(&app, &arg_refs);
+        if should_try_auth {
+            log::info!("get_stream_url: Acceso público fallido o exclusivo. Reintentando con token de Twitch...");
+            clean_args.push("--twitch-api-header".to_string());
+            clean_args.push(format!("Authorization=Bearer {}", token));
+            let arg_refs_auth: Vec<&str> = clean_args.iter().map(String::as_str).collect();
+            res_sl = run_streamlink(&app, &arg_refs_auth);
         }
     }
 

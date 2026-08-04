@@ -413,7 +413,7 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
  *
  * @param {HomeScreenProps} props
  */
-export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, favorites, recentChannels = [], onRemoveRecent }) {
+export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onShowAbout, favorites, recentChannels = [], onRemoveRecent }) {
   const t = useT()
   // M-7: validamos las props criticas que vienen del padre. No bloqueamos
   // la UI; solo loggeamos fallos para detectar drift de contrato temprano.
@@ -584,18 +584,22 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
 
   useEffect(() => {
     let c = false
-    ;(async () => {
+    const fetchTopGames = async () => {
       const headers = await getHeaders()
-      const r = await fetch(`https://api.twitch.tv/helix/games/top?first=12`, { headers, signal: AbortSignal.timeout(8000) })
-      if (!c) {
-        const d = r.ok ? await r.json() : null
-        if (d?.data) setTopGames(d.data.map(g => ({
-          id: g.id, name: g.name, boxArt: g.box_art_url?.replace('{width}','285').replace('{height}','380') || '',
-        })))
-      }
-    })()
-    return () => { c = true }
-  }, [])
+      try {
+        const r = await fetch(`https://api.twitch.tv/helix/games/top?first=12`, { headers, signal: AbortSignal.timeout(8000) })
+        if (!c && r.ok) {
+          const d = await r.json()
+          if (d?.data) setTopGames(d.data.map(g => ({
+            id: g.id, name: g.name, boxArt: g.box_art_url?.replace('{width}','285').replace('{height}','380') || '',
+          })))
+        }
+      } catch { /* ignore error o timeout de red */ }
+    }
+    fetchTopGames()
+    window.addEventListener('blinkstream_auth_updated', fetchTopGames)
+    return () => { c = true; window.removeEventListener('blinkstream_auth_updated', fetchTopGames) }
+  }, [isLoggedIn])
 
   const sortedFavorites = useMemo(() => {
     return [...favorites].sort((a, b) => {
@@ -768,7 +772,7 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
         <div className="w-full min-w-0 px-4 sm:px-6 lg:px-8 pt-5 pb-16">
 
-          {favorites.length === 0 && recentChannels.length === 0 ? (
+          {!isLoggedIn && favorites.length === 0 && recentChannels.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center animate-fade-in">
               <div className="w-20 h-20 rounded-2xl bg-twitch/10 flex items-center justify-center mb-6">
                 <svg width="42" height="42" viewBox="0 0 24 24" fill="currentColor" className="text-twitch"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
@@ -790,7 +794,15 @@ export default function HomeScreen({ onSelect, onToggleFavorite, onShowAbout, fa
             </div>
           ) : (
             <>
-          <HeroCarousel streams={heroStreams} onSelect={onSelect} logos={channelLogos} currentIndex={heroIndex} onIndexChange={setHeroIndex} previewEnabled={true} />
+              {isLoggedIn && favorites.length === 0 && recentChannels.length === 0 && (
+                <div className="mb-6 bg-twitch/10 border border-twitch/30 rounded-xl p-4 flex items-center gap-3.5 text-white text-[13px] animate-fade-in shadow-lg shadow-twitch/5">
+                  <span className="text-xl shrink-0">✨</span>
+                  <div>
+                    <strong className="font-semibold text-twitch-light">Sesión conectada correctamente.</strong> Aún no sigues o tienes canales recientes. ¡Explora las transmisiones recomendadas a continuación o busca tu streamer preferido para empezar!
+                  </div>
+                </div>
+              )}
+              <HeroCarousel streams={heroStreams} onSelect={onSelect} logos={channelLogos} currentIndex={heroIndex} onIndexChange={setHeroIndex} previewEnabled={true} />
 
           {topGames.length > 0 && (
             <section className="mb-6 animate-fade-in">

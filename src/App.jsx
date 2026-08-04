@@ -338,33 +338,37 @@ function MainApp() {
   useEffect(() => { favoritesRef.current = favorites }, [favorites])
 
   useEffect(() => {
-    if (!username) return
-    const token = getTwitchToken()
-    if (!token) return
-    // Capturamos el valor actual via ref para que el closure del .then
-    // vea la lista más reciente sin necesidad de re-disparar el effect.
-    const localFavs = favoritesRef.current
+    let cancelled = false
+    const runSync = () => {
+      if (cancelled) return
+      const u = username || localStorage.getItem('blinkstream_twitch_username')
+      if (!u) return
+      const token = getTwitchToken()
+      if (!token) return
+      const localFavs = favoritesRef.current
 
-    Promise.all([
-      mergeFavorites(localFavs, username),
-      fetchFollowedChannels(token),
-    ]).then(([merged, follows]) => {
-      const allChannels = [...new Set([...merged, ...follows])]
-      // Comparamos contra el ref para no re-setear favorites si no
-      // hay nada nuevo (eso seria el origen del loop).
-      if (allChannels.length > favoritesRef.current.length) {
-        setFavorites(allChannels)
-      }
-    }).catch(() => {
-      // Si falla la sincronización por error CORS o de red, degradamos elegantemente
-      // a favoritos locales sin reintentar de forma indefinida ni saturar la consola.
-      if (import.meta.env.DEV) {
-        console.warn('[App] Sincronización con la nube no disponible. Usando favoritos en modo local.')
-      }
-    })
-    // Deps: solo re-sincronizar cuando cambian `username` (login/logout)
-    // o `getTwitchToken` (token listo). NO incluimos `favorites`: el
-    // toggle individual ya llama addCloudFavorite/removeCloudFavorite.
+      Promise.all([
+        mergeFavorites(localFavs, u),
+        fetchFollowedChannels(token),
+      ]).then(([merged, follows]) => {
+        if (cancelled) return
+        const allChannels = [...new Set([...merged, ...follows])]
+        if (JSON.stringify(allChannels) !== JSON.stringify(favoritesRef.current)) {
+          setFavorites(allChannels)
+        }
+      }).catch(() => {
+        if (import.meta.env.DEV) {
+          console.warn('[App] Sincronización con la nube no disponible. Usando favoritos en modo local.')
+        }
+      })
+    }
+
+    runSync()
+    window.addEventListener('blinkstream_auth_updated', runSync)
+    return () => {
+      cancelled = true
+      window.removeEventListener('blinkstream_auth_updated', runSync)
+    }
   }, [username, getTwitchToken])
 
   const selectChannel = useCallback((name) => {
@@ -679,6 +683,7 @@ function MainApp() {
               </>
             ) : (
               <HomeScreen
+                isLoggedIn={isLoggedIn}
                 onSelect={selectChannel}
                 onToggleFavorite={toggleFavorite}
                 favorites={favorites}

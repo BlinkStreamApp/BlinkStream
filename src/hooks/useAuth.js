@@ -153,34 +153,32 @@ export function useAuth() {
 
         if (token) {
           setCachedToken(token)
-          const username = localStorage.getItem(LS_USERNAME) || 'twitch_user'
+          const storedUser = localStorage.getItem(LS_USERNAME) || 'twitch_user'
+          const storedAvatar = localStorage.getItem(LS_AVATAR) || null
+          if (storedAvatar) setAvatar(storedAvatar)
           setUser({
-            username,
-            identities: username ? [{ provider: 'twitch', identity_data: { login: username } }] : [],
+            username: storedUser,
+            identities: storedUser ? [{ provider: 'twitch', identity_data: { login: storedUser } }] : [],
           })
-          logEvent('auth', 'session.restored', { username })
+          logEvent('auth', 'session.restored', { username: storedUser })
+          setLoading(false)
+          setKeychainReady(true)
 
-          // WT-20260628-FIX: Consultar siempre a Twitch al inicializar para erradicar el placeholder 'twitch_user'
-          // reemplazándolo por tu cuenta real de Twitch, o limpiando automáticamente el keychain de Windows
-          // si el token que quedó persistido era de una versión de prueba o ha expirado (401).
-          fetchUserInfo(token).then(userInfo => {
-            if (userInfo && userInfo.username && userInfo.username !== 'twitch_user') {
+          // En segundo plano tras montar la sesión al momento, refrescamos el Client-ID oficial del token y el perfil de usuario.
+          fetchUserInfo(token).then((userInfo) => {
+            if (userInfo && !userInfo.invalid && userInfo.username && userInfo.username !== 'twitch_user') {
               if (userInfo.avatar) setAvatar(userInfo.avatar)
               setUser({
                 username: userInfo.username,
                 identities: [{ provider: 'twitch', identity_data: { login: userInfo.username } }],
               })
               localStorage.setItem(LS_USERNAME, userInfo.username)
-            } else if (userInfo && userInfo.invalid) {
-              measureInvoke('delete_secret', { key: 'twitch_token' }).catch(() => {})
-              localStorage.removeItem(LS_TOKEN)
-              localStorage.removeItem(LS_USERNAME)
-              localStorage.removeItem(LS_AVATAR)
-              localStorage.removeItem(LS_CLIENT_ID)
-              setCachedToken(null)
-              setUser(null)
+              window.dispatchEvent(new CustomEvent('blinkstream_auth_updated', { detail: { token, username: userInfo.username } }))
+            } else if (userInfo && !userInfo.invalid && !localStorage.getItem(LS_CLIENT_ID)) {
+              window.dispatchEvent(new CustomEvent('blinkstream_auth_updated', { detail: { token, username: storedUser } }))
             }
           }).catch(() => {})
+          return
         }
       } catch (err) { /* fallback a localStorage */
         logEvent('auth', 'session.restore.failed', { err: err?.message || String(err) })
@@ -232,27 +230,18 @@ export function useAuth() {
         setCachedToken(result.access_token)
         logEvent('auth', 'login.success', { username: result.username || 'unknown' })
 
-        const tempUsername = result.username || 'twitch_user'
-        localStorage.setItem(LS_USERNAME, tempUsername)
+        // Validar el token para recuperar el Client-ID auténtico ANTES de disparar los useEffect de la app
+        const userInfo = await fetchUserInfo(result.access_token).catch(() => null)
+        const finalUsername = userInfo?.username && userInfo.username !== 'twitch_user' ? userInfo.username : (result.username || 'twitch_user')
+        if (userInfo?.avatar) setAvatar(userInfo.avatar)
+        
+        localStorage.setItem(LS_USERNAME, finalUsername)
         setUser({
-          username: tempUsername,
-          identities: [{ provider: 'twitch', identity_data: { login: tempUsername } }],
+          username: finalUsername,
+          identities: [{ provider: 'twitch', identity_data: { login: finalUsername } }],
         })
 
-        fetchUserInfo(result.access_token).then(userInfo => {
-          if (userInfo?.avatar) setAvatar(userInfo.avatar)
-          if (userInfo?.username && userInfo.username !== tempUsername) {
-            localStorage.setItem(LS_USERNAME, userInfo.username)
-            setUser({
-              username: userInfo.username,
-              identities: [{ provider: 'twitch', identity_data: { login: userInfo.username } }],
-            })
-          }
-          // Caso contrario: ya tenemos el username de tempUsername o
-          // el avatar solo — nada mas que hacer. (Anteriormente habia
-          // un `else if` vacio que ESLint marcaba como empty block.)
-        })
-
+        window.dispatchEvent(new CustomEvent('blinkstream_auth_updated', { detail: { token: result.access_token, username: finalUsername } }))
         setAuthing(false)
         setError(null)
       }
