@@ -16,12 +16,17 @@ vi.mock('./supabase', async () => {
 })
 
 // Importamos DESPUES del mock para que el mock quede registrado.
-const { mergeFavorites, fetchCloudFavorites, addCloudFavorite, removeCloudFavorite } =
+const { mergeFavorites, fetchCloudFavorites, addCloudFavorite, removeCloudFavorite, clearAuthBrokenFlag } =
   await import('./favoritesSync')
+
+beforeEach(() => {
+  clearAuthBrokenFlag()
+})
 
 describe('fetchCloudFavorites', () => {
   beforeEach(() => {
     localStorage.clear()
+    clearAuthBrokenFlag()
     vi.restoreAllMocks()
   })
 

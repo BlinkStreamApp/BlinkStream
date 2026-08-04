@@ -22,6 +22,9 @@ export default function EmoteRainOverlay({ active = true }) {
 
       const now = Date.now()
 
+      const currentId = ++particleId
+      const duration = Math.random() * 1.2 + 2.5 // 2.5s a 3.7s de ascenso
+
       // 1. Añadir partícula a la lluvia (máx 20 para cero lag en juegos)
       setParticles(prev => {
         const next = [...prev]
@@ -29,20 +32,20 @@ export default function EmoteRainOverlay({ active = true }) {
           next.shift() // eliminar el más antiguo
         }
         const newParticle = {
-          id: ++particleId,
+          id: currentId,
           url,
           name: name || 'emote',
           x: Math.floor(Math.random() * 80) + 10, // entre 10% y 90%
           size: Math.floor(Math.random() * 16) + 36, // 36px a 52px
-          duration: Math.random() * 1.2 + 2.5, // 2.5s a 3.7s de ascenso
+          duration,
         }
         return [...next, newParticle]
       })
 
       // Eliminar partícula del DOM automáticamente al completar animación
       setTimeout(() => {
-        setParticles(prev => prev.filter(p => p.id !== particleId))
-      }, 3600)
+        setParticles(prev => prev.filter(p => p.id !== currentId))
+      }, (duration * 1000) + 100)
 
       // 2. Medidor de Combos (en ventana de 5 segundos)
       const tracker = comboTrackerRef.current
@@ -106,20 +109,25 @@ export default function EmoteRainOverlay({ active = true }) {
       {particles.map(p => (
         <div
           key={p.id}
-          className="absolute bottom-6 transform -translate-x-1/2 transition-opacity duration-300 pointer-events-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)] animate-fade-in"
+          className="absolute bottom-12 pointer-events-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)] transition-opacity duration-300"
           style={{
             left: `${p.x}%`,
             width: `${p.size}px`,
             height: `${p.size}px`,
-            animation: `floatUp ${p.duration}s ease-out forwards`,
+            transform: 'translateX(-50%)',
           }}
         >
-          <img
-            src={p.url}
-            alt={p.name}
-            className="w-full h-full object-contain pointer-events-none"
-            loading="lazy"
-          />
+          <div
+            style={{ animation: `emoteFloatUp ${p.duration}s ease-out forwards` }}
+            className="w-full h-full"
+          >
+            <img
+              src={p.url}
+              alt={p.name}
+              className="w-full h-full object-contain pointer-events-none"
+              loading="lazy"
+            />
+          </div>
         </div>
       ))}
 
@@ -152,26 +160,6 @@ export default function EmoteRainOverlay({ active = true }) {
           </div>
         </div>
       )}
-      <style>{`
-        @keyframes floatUp {
-          0% {
-            transform: translate(-50%, 0) scale(0.6);
-            opacity: 0;
-          }
-          15% {
-            transform: translate(-50%, -40px) scale(1.15);
-            opacity: 1;
-          }
-          80% {
-            transform: translate(-50%, -240px) scale(1);
-            opacity: 0.85;
-          }
-          100% {
-            transform: translate(-50%, -320px) scale(0.8);
-            opacity: 0;
-          }
-        }
-      `}</style>
     </div>
   )
 }

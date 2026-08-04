@@ -154,7 +154,7 @@ pub async fn install_blinkstream_custom(desktop_shortcut: bool, start_menu_short
             "$RegPath = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\BlinkStream'; \
              New-Item -Path $RegPath -Force | Out-Null; \
              New-ItemProperty -Path $RegPath -Name 'DisplayName' -Value 'BlinkStream' -PropertyType String -Force | Out-Null; \
-             New-ItemProperty -Path $RegPath -Name 'DisplayVersion' -Value '1.3.0' -PropertyType String -Force | Out-Null; \
+             New-ItemProperty -Path $RegPath -Name 'DisplayVersion' -Value '1.3.1' -PropertyType String -Force | Out-Null; \
              New-ItemProperty -Path $RegPath -Name 'Publisher' -Value 'BlinkStream Team' -PropertyType String -Force | Out-Null; \
              New-ItemProperty -Path $RegPath -Name 'InstallLocation' -Value '\"{}\"' -PropertyType String -Force | Out-Null; \
              New-ItemProperty -Path $RegPath -Name 'UninstallString' -Value '\"{}\"' -PropertyType String -Force | Out-Null; \

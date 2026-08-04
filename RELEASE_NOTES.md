@@ -1,6 +1,13 @@
-## 🚀 What's New in Version 1.3.0 (The Immersion & Command Center Update)
+## 🚀 What's New in Version 1.3.1 (Hotfix & The Immersion Update)
 
-A monumental milestone in desktop streaming immersion! Version 1.3.0 introduces real-time visual FX, intelligent chat filtering, dynamic combo tracking, and an ergonomic Command Center redesign.
+A targeted Hotfix release addressing UI/UX improvements, resolution selector additions, and critical component fixes, building on top of our monumental Immersion & Command Center Update!
+
+### 🔧 v1.3.1 Hotfix & Bug Fixes
+- **Channel Points Redeem Modal Z-Index Fix:** Resolved an issue where reward redemption modals appeared blurred or behind side panels by elevating modal layer stacking (`z-[999999]`) across `RedeemModal.jsx`, `RewardForm.jsx`, and `ActionModal.jsx`.
+- **Expanded Pro Resolution Support:** Added official native dropdown support for modern high-bitrate streaming resolutions including **1440p60 (2K)**, **963p60**, and **936p60**. Relocated and integrated the Quality Selector directly inside the Player Settings menu.
+- **Ultra-Compact eSports Player Settings Menu:** Complete UI overhaul of the video player settings gear panel (`w-64`, single-line rows, scrollable max-height) to prevent oversized layouts or cropped headers on smaller player windows.
+- **WiFi LAN Remote Responsive Alignment:** Fixed window wrapping and responsive layout clipping in the WiFi Remote Control pairing screen.
+- **Emote Rain & Metadata Correction:** Fixed bottom static positioning of floating emotes and restored robust Stream Live Metadata parsing across Twitch GQL endpoints.
 
 ### 🌧️ Real-Time Emote Rain & Dynamic Combo Meters
 - **Live Emote Floating FX:** Emotes from Twitch, 7TV, BTTV, and FFZ magically bubble up across your video player in real-time. Engineered with strict RAM cap protections (max 20 active particles) to ensure **0% FPS drop or latency while gaming**.
@@ -10,17 +17,16 @@ A monumental milestone in desktop streaming immersion! Version 1.3.0 introduces 
 ### 🔔 Smart Chat Tabs & Multi-Stream Command Grid
 - **Intelligent Chat Navigation Bar:** Seamlessly filter and switch between **All Messages**, **@Mentions** (featuring a live unread badges counter), and **⭐ Featured Events** with a single click.
 - **Multi-Stream Grid:** Monitor up to 4 simultaneous live broadcasts with independent audio mixer controls—the ultimate layout for esports tournaments and speedrun restreaming.
-- **Glassmorphic Settings Hub:** A centralized, sleek floating gear menu giving you immediate 1-click control over Compact Mode, live Nerd Stats telemetry, audio-only toggles, and visual effects.
 
 ### 🛡️ Verified Stability & Automated Update System
 - **100% Passing Test Suite:** Fully verified against our rigorous automated test harness (**296 tests passing** across moderation, encryption, recording, and chat engines).
 - **OTA Auto-Updater Ready:** Configured with secure cryptographic signature verification via `updater.json` for background over-the-air updates.
 
 ### 💾 Available Downloads
-- ⭐ **`BlinkStream-Setup_1.3.0_Custom.exe`** *(Recommended — 100% Custom Twitch-themed bootstrapper setup with Custom Directory Selector)*
-- **`BlinkStream_1.3.0_Win_x64.exe`** *(Standard silent NSIS setup)*
-- **`BlinkStream_1.3.0_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
-- **`BlinkStream_1.3.0_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
-- **`BlinkStream_1.3.0_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
-- **`BlinkStream_1.3.0_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
-- **`BlinkStream_1.3.0_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*
+- ⭐ **`BlinkStream-Setup_1.3.1_Custom.exe`** *(Recommended — 100% Custom Twitch-themed bootstrapper setup with Custom Directory Selector)*
+- **`BlinkStream_1.3.1_Win_x64.exe`** *(Standard silent NSIS setup)*
+- **`BlinkStream_1.3.1_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
+- **`BlinkStream_1.3.1_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
+- **`BlinkStream_1.3.1_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
+- **`BlinkStream_1.3.1_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
+- **`BlinkStream_1.3.1_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*

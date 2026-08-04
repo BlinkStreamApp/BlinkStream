@@ -132,7 +132,7 @@ export function ActionModal({ open, onClose, onConfirm, action, targetUser, defa
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/65 backdrop-blur-md animate-fade-in" onClick={onClose}>
       <div
         className="bg-bg-secondary border border-bg-tertiary/60 rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
         onClick={e => e.stopPropagation()}

@@ -235,7 +235,7 @@ export default function GridCell({
             className="bg-black/60 border border-white/20 rounded-lg px-1.5 py-0.5 text-[10px] font-mono text-twitch-light focus:outline-none focus:border-twitch cursor-pointer hover:bg-black/80 transition-colors hidden sm:inline"
             title={t('set.streamQuality', 'Calidad de stream')}
           >
-            {['best', '1080p60', '720p60', '480p30', '360p30', 'audio_only'].map(q => (
+            {['best', '1440p60', '1080p60', '963p60', '936p60', '720p60', '480p30', '360p30', 'audio_only'].map(q => (
               <option key={q} value={q} className="bg-bg-secondary text-text-primary">{q}</option>
             ))}
           </select>

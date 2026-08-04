@@ -1,23 +1,23 @@
 {
-  "version": "1.3.0",
-  "notes": "Novedades de BlinkStream v1.3.0 (The Immersion & Command Center Update):\n- Lluvia de Emotes en Tiempo Real: los emotes de Twitch, 7TV, BTTV y FFZ flotan suavemente por el reproductor con 0 lag en juegos (máx 20 burbujas en RAM)\n- Medidor de Combos Neón: detección instantánea de ráfagas en chat (HYPERS, SUPER y GODLIKE COMBO)\n- Pestañas Inteligentes en Chat: navegación rápida (Todos | Menciones | Destacados) y contador de alertas no leídas\n- Rediseño Glassmorphic del reproductor: menú engranaje centralizado para control de telemetría (Nerd Stats), modo compacto y efectos",
-  "pub_date": "2026-08-03T22:07:53.364Z",
+  "version": "1.3.1",
+  "notes": "Novedades de BlinkStream v1.3.1 (Hotfix & The Immersion Update):\n- Hotfix Z-Index Puntos de Canal: ventana de canje en primer plano sin desenfoque\n- Soporte Pro Resoluciones: añadido 1440p60 (2K), 963p60 y 936p60\n- Rediseño Menú Ajustes de Vídeo: interfaz ultraligera eSports en 1 fila (w-64) y selector de calidad centralizado\n- Corrección Lluvia Emotes & Mando WiFi: animaciones fluidas y ventana responsive\n- Lluvia de Emotes & Medidor de Combos Neón en Tiempo Real (máx 20 burbujas en RAM)",
+  "pub_date": "2026-08-04T00:30:00.000Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.0/BlinkStream_1.3.0_Win_x64.exe"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.1/BlinkStream_1.3.1_Win_x64.exe"
     },
     "darwin-aarch64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.0/BlinkStream_1.3.0_macOS_arm64.dmg"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.1/BlinkStream_1.3.1_macOS_arm64.dmg"
     },
     "darwin-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.0/BlinkStream_1.3.0_macOS_x64.dmg"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.1/BlinkStream_1.3.1_macOS_x64.dmg"
     },
     "linux-x86_64": {
       "signature": "",
-      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.0/BlinkStream_1.3.0_Linux_x86_64.deb"
+      "url": "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.3.1/BlinkStream_1.3.1_Linux_x86_64.deb"
     }
   }
 }

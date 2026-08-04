@@ -122,7 +122,7 @@ export default function RewardForm({ initial, saving, onSave, onCancel }) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-fade-in p-4"
+      className="fixed inset-0 z-[100000] bg-black/65 backdrop-blur-md flex items-center justify-center animate-fade-in p-4"
       onClick={onCancel}
     >
       <form

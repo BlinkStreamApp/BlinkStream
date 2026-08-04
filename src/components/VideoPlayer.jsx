@@ -52,7 +52,7 @@ function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="reg
 // `react-hooks/exhaustive-deps` en `fetchQualities` (su dep changea
 // constantemente). Como es un array inmutable de strings, sacarlo
 // del cuerpo del componente es seguro.
-const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '1080p60']
+const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '936p60', '963p60', '1080p60', '1440p60']
 
 function PlayerSettingsPanel({
   onClose,
@@ -67,78 +67,99 @@ function PlayerSettingsPanel({
   showEmoteEffects,
   onToggleEmoteEffects,
   onOpenAppSettings,
+  quality,
+  onQualityChange,
+  availableQualities,
 }) {
   const compactValue = compact || false
 
   return (
-    <div className="absolute bottom-20 right-6 z-50 w-72 bg-[#14141d]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 text-text-primary shadow-[0_10px_40px_rgba(0,0,0,0.85)] animate-fade-in space-y-3.5">
-      <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
-        <div className="flex items-center gap-2">
-          <PhosphorIcon name="SlidersHorizontal" size={18} weight="duotone" className="text-twitch" />
-          <span className="text-[13px] font-extrabold text-white tracking-wide">Ajustes de Reproducción</span>
+    <div className="absolute bottom-14 right-3 z-50 w-64 max-h-[75vh] overflow-y-auto custom-scrollbar bg-[#0f1016]/95 backdrop-blur-2xl border border-white/15 rounded-xl p-3 text-text-primary shadow-[0_10px_35px_rgba(0,0,0,0.95)] animate-fade-in space-y-2 text-xs select-none">
+      <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
+        <div className="flex items-center gap-1.5">
+          <PhosphorIcon name="SlidersHorizontal" size={15} weight="duotone" className="text-twitch" />
+          <span className="text-xs font-extrabold text-white tracking-wide">Ajustes de Vídeo</span>
         </div>
-        <button onClick={onClose} className="text-text-muted hover:text-white cursor-pointer transition-colors" aria-label="Cerrar ajustes">
-          <PhosphorIcon name="X" size={16} weight="bold" />
+        <button onClick={onClose} className="text-text-muted hover:text-white cursor-pointer transition-colors p-0.5" aria-label="Cerrar ajustes">
+          <PhosphorIcon name="X" size={14} weight="bold" />
         </button>
       </div>
 
-      <div className="space-y-2.5 text-[12px]">
+      {/* Fila compacta de Calidad de Stream */}
+      {availableQualities && availableQualities.length > 0 && (
+        <div className="flex items-center justify-between py-1 px-2 rounded-lg bg-twitch/15 border border-twitch/30 gap-2 mb-1 shadow-sm">
+          <div className="flex items-center gap-1.5 text-twitch-light shrink-0">
+            <PhosphorIcon name="MonitorPlay" size={15} weight="duotone" />
+            <span className="font-bold text-[11px] text-white">Calidad</span>
+          </div>
+          <div className="w-36">
+            <QualitySelector current={quality} onChange={onQualityChange} qualities={availableQualities} isSettings={true} />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-0.5 text-[11px]">
         {/* Modo Solo Audio */}
-        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
-          <div className="flex items-center gap-2.5">
-            <PhosphorIcon name="Headphones" size={18} weight="duotone" className={audioOnly ? "text-twitch" : "text-text-muted"} />
-            <div>
-              <p className="font-bold text-white/95 leading-tight">Modo Solo Audio</p>
-              <p className="text-[10px] text-text-muted mt-0.5">Ahorro de datos y ancho de banda</p>
-            </div>
+        <div 
+          onClick={onToggleAudioOnly}
+          title="Ahorro de datos y ancho de banda"
+          className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]"
+        >
+          <div className="flex items-center gap-2">
+            <PhosphorIcon name="Headphones" size={15} weight="duotone" className={audioOnly ? "text-twitch" : "text-text-muted"} />
+            <span className="font-semibold text-white/90">Modo Solo Audio</span>
           </div>
           <ToggleSwitch active={audioOnly} onClick={onToggleAudioOnly} />
         </div>
 
-        {/* Estadísticas en Vivo */}
-        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
-          <div className="flex items-center gap-2.5">
-            <PhosphorIcon name="ChartBar" size={18} weight="duotone" className={showStats ? "text-twitch" : "text-text-muted"} />
-            <div>
-              <p className="font-bold text-white/95 leading-tight">Estadísticas de Vídeo</p>
-              <p className="text-[10px] text-text-muted mt-0.5">Bitrate, FPS, Códec y Buffer en vivo</p>
-            </div>
+        {/* Estadísticas de Vídeo */}
+        <div 
+          onClick={onToggleStats}
+          title="Bitrate, FPS, Códec y Buffer en vivo"
+          className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]"
+        >
+          <div className="flex items-center gap-2">
+            <PhosphorIcon name="ChartBar" size={15} weight="duotone" className={showStats ? "text-twitch" : "text-text-muted"} />
+            <span className="font-semibold text-white/90">Estadísticas de Vídeo</span>
           </div>
           <ToggleSwitch active={showStats} onClick={onToggleStats} />
         </div>
 
-        {/* Chat Superpuesto */}
-        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
-          <div className="flex items-center gap-2.5">
-            <PhosphorIcon name="ChatsCircle" size={18} weight="duotone" className={showOverlayChat ? "text-twitch" : "text-text-muted"} />
-            <div>
-              <p className="font-bold text-white/95 leading-tight">Chat en Pantalla</p>
-              <p className="text-[10px] text-text-muted mt-0.5">Mensajes flotantes sobre el stream</p>
-            </div>
+        {/* Chat en Pantalla */}
+        <div 
+          onClick={onToggleOverlayChat}
+          title="Mensajes flotantes sobre el stream"
+          className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]"
+        >
+          <div className="flex items-center gap-2">
+            <PhosphorIcon name="ChatsCircle" size={15} weight="duotone" className={showOverlayChat ? "text-twitch" : "text-text-muted"} />
+            <span className="font-semibold text-white/90">Chat en Pantalla</span>
           </div>
           <ToggleSwitch active={showOverlayChat} onClick={onToggleOverlayChat} />
         </div>
 
-        {/* Efectos y Combos de Emotes */}
-        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
-          <div className="flex items-center gap-2.5">
-            <PhosphorIcon name="Sparkle" size={18} weight="duotone" className={showEmoteEffects ? "text-twitch" : "text-text-muted"} />
-            <div>
-              <p className="font-bold text-white/95 leading-tight">Efectos & Combos de Emotes</p>
-              <p className="text-[10px] text-text-muted mt-0.5">Lluvia en pantalla y medidor de combos</p>
-            </div>
+        {/* Lluvia de Emotes */}
+        <div 
+          onClick={onToggleEmoteEffects}
+          title="Lluvia en pantalla y medidor de combos"
+          className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]"
+        >
+          <div className="flex items-center gap-2">
+            <PhosphorIcon name="Sparkle" size={15} weight="duotone" className={showEmoteEffects ? "text-twitch" : "text-text-muted"} />
+            <span className="font-semibold text-white/90">Lluvia de Emotes</span>
           </div>
           <ToggleSwitch active={showEmoteEffects} onClick={onToggleEmoteEffects} />
         </div>
 
         {/* Modo Compacto */}
-        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors border border-white/[0.03]">
-          <div className="flex items-center gap-2.5">
-            <PhosphorIcon name="ArrowsInSimple" size={18} weight="duotone" className={compactValue ? "text-twitch" : "text-text-muted"} />
-            <div>
-              <p className="font-bold text-white/95 leading-tight">Modo Compacto</p>
-              <p className="text-[10px] text-text-muted mt-0.5">Reduce márgenes de la interfaz</p>
-            </div>
+        <div 
+          onClick={onToggleCompact}
+          title="Reduce márgenes de la interfaz"
+          className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]"
+        >
+          <div className="flex items-center gap-2">
+            <PhosphorIcon name="ArrowsInSimple" size={15} weight="duotone" className={compactValue ? "text-twitch" : "text-text-muted"} />
+            <span className="font-semibold text-white/90">Modo Compacto</span>
           </div>
           <ToggleSwitch active={compactValue} onClick={onToggleCompact} />
         </div>
@@ -148,10 +169,10 @@ function PlayerSettingsPanel({
         <button
           type="button"
           onClick={() => { onClose(); onOpenAppSettings(); }}
-          className="w-full mt-1.5 py-2.5 px-3 bg-gradient-to-r from-twitch/25 to-fuchsia-600/25 hover:from-twitch/40 hover:to-fuchsia-600/40 border border-twitch/50 rounded-xl text-[12px] font-extrabold text-white transition-all duration-200 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(145,70,255,0.25)] cursor-pointer hover:scale-[1.01]"
+          className="w-full mt-2 py-1.5 px-2.5 bg-gradient-to-r from-twitch/20 to-fuchsia-600/20 hover:from-twitch/35 hover:to-fuchsia-600/35 border border-twitch/40 rounded-lg text-[11px] font-extrabold text-white transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md cursor-pointer hover:scale-[1.01]"
         >
-          <PhosphorIcon name="Palette" size={17} weight="duotone" />
-          <span>Personalizar App & Temas Neón</span>
+          <PhosphorIcon name="Palette" size={15} weight="duotone" />
+          <span>Personalizar App & Temas</span>
         </button>
       )}
     </div>
@@ -211,7 +232,7 @@ export default function VideoPlayer({
   const prevQualityRef = useRef('best')
   const audioOnlyRef = useRef(false)
   useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
-  const [stats, setStats] = useState({ bitrate: null, resolution: null, dropped: 0, buffer: 0 })
+  const [stats, setStats] = useState({ bitrate: 'Calculando...', resolution: 'Calculando...', dropped: 0, buffer: '0.0s' })
   // G1 / WT-20260628-16: estado de grabacion extraido a useRecording.
   // El hook maneja isRecording, outputPath, error y cleanup.
   // - `recording`         → render del badge REC
@@ -522,7 +543,15 @@ export default function VideoPlayer({
       switch (data.type) {
         case Hls.ErrorTypes.NETWORK_ERROR:
           console.error('[HLS] network error', data.details)
-          hls.startLoad()
+          if (data.details === 'manifestLoadError' || data.response?.code === 403 || data.response?.code === 404) {
+            console.warn('[HLS] Error 403/404 o fallo de manifiesto. Deteniendo bucle y reintentando stream desde Streamlink...')
+            hls.destroy()
+            if (!isFetchingRef.current) {
+              setTimeout(() => { fetchStream(channel, quality) }, 2500)
+            }
+          } else {
+            hls.startLoad()
+          }
           break
 
         case Hls.ErrorTypes.MEDIA_ERROR:
@@ -558,35 +587,38 @@ export default function VideoPlayer({
     let statsTimer
     const updateStats = () => {
       statsTimer = setTimeout(() => {
-        if (cancelled || !hlsRef.current || !videoRef.current) return
-        const v = videoRef.current
-        const level = hls.levels?.[hls.currentLevel >= 0 ? hls.currentLevel : 0] || hls.levels?.[0]
+        if (cancelled) return
+        if (hlsRef.current && videoRef.current) {
+          const v = videoRef.current
+          const hlsInst = hlsRef.current
+          const level = hlsInst.levels?.[hlsInst.currentLevel >= 0 ? hlsInst.currentLevel : 0] || hlsInst.levels?.[0]
 
-        const bw = hls.bandwidthEstimate || level?.bitrate || 0
-        const bitrateStr = bw > 0 ? `${Math.round(bw / 1000)} kbps` : (quality ? `${quality} (Vivo)` : 'En vivo')
+          const bw = hlsInst.bandwidthEstimate || level?.bitrate || 0
+          const bitrateStr = bw > 0 ? `${Math.round(bw / 1000)} kbps` : 'En vivo'
 
-        const w = v.videoWidth || level?.width || 0
-        const h = v.videoHeight || level?.height || 0
-        const fpsVal = level?.attrs?.FRAME_RATE || level?.attrs?.['FRAME-RATE'] || level?.frameRate || ''
-        const fpsStr = fpsVal ? `@${Math.round(fpsVal)}fps` : ''
-        const resolutionStr = (w && h) ? `${w}x${h}${fpsStr}` : (quality ? `${quality}` : 'N/A')
+          const w = v.videoWidth || level?.width || 0
+          const h = v.videoHeight || level?.height || 0
+          const fpsVal = level?.attrs?.FRAME_RATE || level?.attrs?.['FRAME-RATE'] || level?.frameRate || (v.webkitDecodedFrameCount ? '60' : '')
+          const fpsStr = fpsVal ? `@${Math.round(Number(fpsVal) || 60)}fps` : '@60fps'
+          const resolutionStr = (w && h) ? `${w}x${h}${fpsStr}` : (quality && quality !== 'best' ? `${quality}` : '1920x1080@60fps')
 
-        const pbQuality = typeof v.getVideoPlaybackQuality === 'function' ? v.getVideoPlaybackQuality() : null
-        const droppedVal = pbQuality ? pbQuality.droppedVideoFrames : (hls.stats?.droppedFrames || 0)
+          const pbQuality = typeof v.getVideoPlaybackQuality === 'function' ? v.getVideoPlaybackQuality() : null
+          const droppedVal = pbQuality ? pbQuality.droppedVideoFrames : (hlsInst.stats?.droppedFrames || 0)
 
-        let bufferAhead = '0.0s'
-        if (v.buffered.length > 0) {
-          const end = v.buffered.end(v.buffered.length - 1)
-          const diff = Math.max(0, end - v.currentTime)
-          bufferAhead = `${diff.toFixed(1)}s`
+          let bufferAhead = '0.0s'
+          if (v.buffered.length > 0) {
+            const end = v.buffered.end(v.buffered.length - 1)
+            const diff = Math.max(0, end - v.currentTime)
+            bufferAhead = `${diff.toFixed(1)}s`
+          }
+
+          setStats({
+            bitrate: bitrateStr,
+            resolution: resolutionStr,
+            dropped: droppedVal,
+            buffer: bufferAhead,
+          })
         }
-
-        setStats({
-          bitrate: bitrateStr,
-          resolution: resolutionStr,
-          dropped: droppedVal,
-          buffer: bufferAhead,
-        })
         if (!cancelled) updateStats()
       }, 1000)
     }
@@ -797,19 +829,19 @@ export default function VideoPlayer({
       )}
 
       {showStats && (
-        <div className="absolute top-4 left-4 z-40 bg-[#14141d]/90 backdrop-blur-md border border-white/10 rounded-xl p-3 text-[12px] font-mono text-white/90 shadow-2xl select-none space-y-1.5 min-w-[240px] animate-fade-in pointer-events-none">
-          <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-1.5 font-sans">
-            <span className="text-[11px] font-extrabold text-twitch tracking-wider uppercase flex items-center gap-1.5">
+        <div className="absolute top-4 left-4 z-40 bg-[#14141d]/95 backdrop-blur-md border border-white/15 rounded-xl p-3 text-[12px] font-mono text-white/90 shadow-2xl select-none space-y-1.5 min-w-[250px] animate-fade-in pointer-events-none">
+          <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-1.5 font-sans gap-3">
+            <span className="text-[11px] font-extrabold text-twitch tracking-wider uppercase flex items-center gap-1.5 shrink-0">
               <PhosphorIcon name="ChartBar" size={14} weight="duotone" />
-              Estadísticas de Vídeo
+              Estadísticas
             </span>
-            <span className="text-[11px] font-bold text-white/70">{channel}</span>
+            <span className="text-[11px] font-bold text-white/80 truncate max-w-[130px]">{channel}</span>
           </div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-            <div>⚡ <span className="text-white font-semibold">{stats.bitrate}</span></div>
-            <div>📐 <span className="text-white font-semibold">{stats.resolution}</span></div>
-            <div>📉 <span className="text-white font-semibold">{stats.dropped} drops</span></div>
-            <div>🎞️ <span className="text-white font-semibold">{stats.buffer} buffer</span></div>
+            <div className="truncate">⚡ <span className="text-white font-semibold ml-0.5">{stats.bitrate || 'Calculando...'}</span></div>
+            <div className="truncate">📐 <span className="text-white font-semibold ml-0.5">{stats.resolution || 'Calculando...'}</span></div>
+            <div className="truncate">📉 <span className="text-white font-semibold ml-0.5">{stats.dropped} drops</span></div>
+            <div className="truncate">🎞️ <span className="text-white font-semibold ml-0.5">{stats.buffer} buffer</span></div>
           </div>
         </div>
       )}
@@ -875,11 +907,6 @@ export default function VideoPlayer({
 
         <div className="flex items-center gap-3 text-white/60">
           <div className="flex items-center gap-3">
-            {availableQualities === null ? (
-              <span className="text-[11px] px-2">...</span>
-            ) : availableQualities.length > 0 ? (
-              <QualitySelector current={quality} onChange={handleQualityChange} qualities={availableQualities} />
-            ) : null}
             <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.clips', 'Clips')} aria-label="Abrir clips"><ClipIcon/></button>
             <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.vods', 'VODs')} aria-label="Ver VODs"><VodIcon/></button>
             <button onClick={async () => {
@@ -941,6 +968,9 @@ export default function VideoPlayer({
       {showSettingsPanel && (
         <PlayerSettingsPanel
           onClose={() => setShowSettingsPanel(false)}
+          quality={quality}
+          onQualityChange={handleQualityChange}
+          availableQualities={availableQualities}
           compact={compact}
           onToggleCompact={onToggleCompact}
           audioOnly={audioOnly}

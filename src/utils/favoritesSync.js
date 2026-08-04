@@ -61,21 +61,19 @@ async function authedFetch(url, options = {}) {
   try {
     let res = await fetch(url, { ...options, headers: buildHeaders(token) })
 
-    if (res.status === 401) {
-      if (token) {
+    if (!res.ok) {
+      if (res.status === 401 && token) {
         const fresh = await refreshBlinkstreamToken()
         if (fresh) {
           res = await fetch(url, { ...options, headers: buildHeaders(fresh) })
-          if (res.status === 401 || !res.ok) {
-            authBroken = true
-            if (res.status === 401) clearBlinkstreamToken()
-          }
-        } else {
-          authBroken = true
-          clearBlinkstreamToken()
         }
-      } else {
+      }
+      if (!res.ok) {
         authBroken = true
+        if (res.status === 401) clearBlinkstreamToken()
+        if (import.meta.env.DEV) {
+          console.warn(`[authedFetch] Servidor respondió HTTP ${res.status} en ${url}. Sincronización cambiada a modo local/offline (circuit-breaker activo).`)
+        }
       }
     }
     return res
@@ -101,7 +99,7 @@ async function authedFetch(url, options = {}) {
  * @returns {Promise<string[]>}
  */
 export async function fetchCloudFavorites(username) {
-  if (!username) return []
+  if (!username || isAuthBroken()) return []
   try {
     const res = await authedFetch(`${DATA_FN}?action=list&username=${encodeURIComponent(username)}`)
     if (!res.ok) return []
@@ -120,7 +118,7 @@ export async function fetchCloudFavorites(username) {
  * @returns {Promise<void>}
  */
 export async function addCloudFavorite(username, channel) {
-  if (!username) return
+  if (!username || isAuthBroken()) return
   try {
     await authedFetch(DATA_FN, {
       method: 'POST',
@@ -136,7 +134,7 @@ export async function addCloudFavorite(username, channel) {
  * @returns {Promise<void>}
  */
 export async function removeCloudFavorite(username, channel) {
-  if (!username) return
+  if (!username || isAuthBroken()) return
   try {
     await authedFetch(DATA_FN, {
       method: 'POST',
@@ -155,8 +153,9 @@ export async function removeCloudFavorite(username, channel) {
  * @returns {Promise<string[]>}
  */
 export async function mergeFavorites(localFavorites, username) {
-  if (!username) return localFavorites
+  if (!username || isAuthBroken()) return localFavorites
   const cloud = await fetchCloudFavorites(username)
+  if (!cloud || isAuthBroken()) return localFavorites
   const merged = [...new Set([...localFavorites, ...cloud])]
 
   // S-5 fix: throttling. Antes se lanzaban N requests simultaneas a la edge
@@ -170,6 +169,7 @@ export async function mergeFavorites(localFavorites, username) {
 
   const CHUNK_SIZE = 10
   for (let i = 0; i < toAdd.length; i += CHUNK_SIZE) {
+    if (isAuthBroken()) break
     const chunk = toAdd.slice(i, i + CHUNK_SIZE)
     try {
       const results = await Promise.allSettled(

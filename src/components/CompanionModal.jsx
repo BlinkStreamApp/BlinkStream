@@ -56,13 +56,15 @@ const CompanionModal = ({ onClose }) => {
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-[440px] max-h-[calc(100vh-2.5rem)] overflow-y-auto bg-gradient-to-b from-[#181b24] via-[#13151c] to-[#0f1117] rounded-3xl border border-cyan-500/30 shadow-2xl shadow-cyan-500/20 text-white p-5 sm:p-6 transition-all animate-scale-up shrink-0"
+        className="relative w-full max-w-[440px] max-h-[calc(100vh-2.5rem)] overflow-y-auto overflow-x-hidden bg-gradient-to-b from-[#181b24] via-[#13151c] to-[#0f1117] rounded-3xl border border-cyan-500/30 shadow-2xl shadow-cyan-500/20 text-white p-5 sm:p-6 transition-all animate-scale-up shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         
-        {/* Luces decorativas de fondo */}
-        <div className="absolute -top-24 -right-24 w-52 h-52 bg-fuchsia-600/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-52 h-52 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+        {/* Luces decorativas de fondo envueltas en overflow-hidden para evitar scrollbars horizontales */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-3xl">
+          <div className="absolute -top-24 -right-24 w-52 h-52 bg-fuchsia-600/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-52 h-52 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+        </div>
 
         {/* Botón de cerrar */}
         <button
@@ -116,12 +118,12 @@ const CompanionModal = ({ onClose }) => {
                 <>
                   <QRCodeSvg value={status.url} size={155} className="mb-3" />
                   
-                  <div className="flex items-center gap-2.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 text-[11px] text-white/80 font-mono">
-                    <span className="flex items-center gap-1 text-cyan-400 font-bold">
+                  <div className="flex items-center justify-center flex-wrap gap-x-2.5 gap-y-1 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 text-[11px] text-white/80 font-mono w-full max-w-full">
+                    <span className="flex items-center gap-1 text-cyan-400 font-bold truncate">
                       <WifiHigh size={14} weight="bold" /> {status.ip}:{status.port}
                     </span>
-                    <span className="text-white/30">|</span>
-                    <span className="flex items-center gap-1 text-fuchsia-400 font-bold" title="Código PIN para evitar accesos no autorizados en redes compartidas">
+                    <span className="text-white/30 hidden sm:inline">|</span>
+                    <span className="flex items-center gap-1 text-fuchsia-400 font-bold truncate" title="Código PIN para evitar accesos no autorizados en redes compartidas">
                       <ShieldCheck size={15} weight="bold" /> PIN: {status.pin}
                     </span>
                   </div>

@@ -143,7 +143,7 @@ export function formatUserMessage(err) {
     case ErrorCode.CHANNEL_POINTS_DELETE_FAILED:
       return 'No se pudo eliminar la recompensa. Intentalo de nuevo.'
     case ErrorCode.CHANNEL_POINTS_REDEEM_FAILED:
-      return 'No se pudo canjear la recompensa. Comprueba tu saldo e intentalo de nuevo.'
+      return 'No se pudo canjear esta recompensa. Por políticas de Twitch, las recompensas del streamer solo pueden canjearse en su web oficial.'
     case ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED:
       return 'No se pudo aprobar/rechazar la redencion. Intentalo de nuevo.'
     case ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED:

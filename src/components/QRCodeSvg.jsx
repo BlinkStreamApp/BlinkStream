@@ -78,8 +78,8 @@ const QRCodeSvg = ({ value, size = 220, fgColor = "#ffffff", bgColor = "#0b0c10"
   const openExternalQr = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value)}&color=${fgColor.replace('#', '')}&bgcolor=${bgColor.replace('#', '')}`;
 
   return (
-    <div className={`flex flex-col items-center gap-2 ${className}`}>
-      <div className="relative p-2.5 rounded-2xl bg-[#0b0c10] border border-cyan-500/30 shadow-2xl shadow-cyan-500/10 flex items-center justify-center">
+    <div className={`flex flex-col items-center gap-2 w-full max-w-full overflow-hidden ${className}`}>
+      <div className="relative p-2.5 rounded-2xl bg-[#0b0c10] border border-cyan-500/30 shadow-2xl shadow-cyan-500/10 flex items-center justify-center shrink-0">
         {/* Usamos imagen del estándar internacional de QR por alta precisión óptica con fallback local */}
         <img 
           src={openExternalQr} 
@@ -104,13 +104,13 @@ const QRCodeSvg = ({ value, size = 220, fgColor = "#ffffff", bgColor = "#0b0c10"
           <path d={path} fill={fgColor} />
         </svg>
       </div>
-      <div className="text-center w-full max-w-full px-2">
+      <div className="text-center w-full max-w-full px-2 overflow-hidden">
         <span className="text-[11px] text-white/50 block mb-0.5">Enlace del servidor local LAN:</span>
         <a 
           href={value} 
           target="_blank" 
           rel="noreferrer" 
-          className="text-xs text-cyan-400 hover:text-cyan-300 underline font-mono select-all break-all transition-colors inline-block max-w-full truncate"
+          className="text-xs text-cyan-400 hover:text-cyan-300 underline font-mono select-all block w-full truncate transition-colors"
           title="Haz click o cópialo en tu navegador si estás en el mismo PC o LAN"
         >
           {value}

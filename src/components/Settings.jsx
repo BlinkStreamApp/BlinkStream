@@ -149,13 +149,16 @@ export default function Settings({ onClose }) {
               <div>
                 <label className="text-xs font-medium text-text-secondary mb-1.5 block">{t('set.streamQuality', 'Calidad de stream')}</label>
                 <select value={prefQuality} onChange={e => setPrefQuality(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary text-sm border border-bg-tertiary focus:border-twitch focus:outline-none transition-colors">
-                  <option value="1080p60">1080p60</option>
-                  <option value="720p60">720p60</option>
+                  className="w-full px-3 py-2.5 rounded-xl bg-[#13151c] text-white font-mono text-xs border border-white/10 focus:border-twitch focus:outline-none transition-all shadow-inner cursor-pointer">
+                  <option value="1440p60">1440p60 (2K 💎)</option>
+                  <option value="1080p60">1080p60 (Full HD ⚡)</option>
+                  <option value="963p60">963p60 (Pro Bitrate 🚀)</option>
+                  <option value="936p60">936p60 (Pro Bitrate 🚀)</option>
+                  <option value="720p60">720p60 (HD)</option>
                   <option value="480p30">480p30</option>
                   <option value="360p30">360p30</option>
-                  <option value="160p30">160p30</option>
-                  <option value="audio_only">{t('set.audioOnly', 'Solo audio')}</option>
+                  <option value="160p30">160p30 (Mínimo)</option>
+                  <option value="audio_only">{t('set.audioOnly', 'Solo audio 🎧')}</option>
                 </select>
               </div>
 

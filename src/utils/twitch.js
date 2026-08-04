@@ -1120,8 +1120,8 @@ export async function deleteCustomReward(broadcasterId, rewardId, manageToken) {
  */
 export async function getRedemptions(broadcasterId, rewardId, status = 'UNFULFILLED', manageToken, userId, first = 50, after) {
   if (!broadcasterId || !rewardId) return _cpResult(false, undefined, 'broadcasterId y rewardId requeridos', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
-  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
-  if (!tokenRes.ok) return _cpResult(true, { data: [], cursor: null }) // Si el visor no tiene token administrativo, retornar vacío amigably
+  if (!manageToken || manageToken === 'viewer') return _cpResult(true, { data: [], cursor: null }) // Si el usuario es 'viewer' o no tiene token de gestión real
+  const tokenRes = _cpResult(true, manageToken)
 
   const params = new URLSearchParams()
   params.set('broadcaster_id', broadcasterId)
@@ -1273,11 +1273,30 @@ export async function redeemCustomReward(broadcasterId, rewardId, userInput, use
       },
     )
     if (!res.ok) {
-      // Twitch devuelve 400 con mensaje cuando no hay saldo suficiente.
-      const code = res.status === 400 ? ErrorCode.CHANNEL_POINTS_INSUFFICIENT_BALANCE : ErrorCode.CHANNEL_POINTS_REDEEM_FAILED
-      const err = new AppError(code, `Twitch HTTP ${res.status}`, { action: 'redeem' })
-      logError(err, { context: 'channel-points', action: 'redeem' })
-      return _cpResult(false, undefined, formatUserMessage(err), code)
+      let bodyMsg = ''
+      try {
+        const body = await res.json()
+        bodyMsg = body?.message || ''
+      } catch { /* ignore */ }
+
+      let code = ErrorCode.CHANNEL_POINTS_REDEEM_FAILED
+      let customMsg = null
+
+      const lower = bodyMsg.toLowerCase()
+      if (lower.includes('created by the broadcaster') || lower.includes('another app') || lower.includes('not created by your app')) {
+        customMsg = 'Por políticas de seguridad y privacidad de la API de Twitch, las recompensas creadas por el streamer solo se pueden canjear en la web o aplicación oficial de Twitch.'
+      } else if (lower.includes('insufficient') || (lower.includes('points') && lower.includes('enough'))) {
+        code = ErrorCode.CHANNEL_POINTS_INSUFFICIENT_BALANCE
+      } else if (lower.includes('cooldown') || lower.includes('paused') || lower.includes('limit') || lower.includes('stock')) {
+        customMsg = 'Esta recompensa está temporalmente en enfriamiento o ha alcanzado su límite de canjes por stream.'
+      } else if (res.status === 400) {
+        // En cualquier otro error 400 que no especifique saldo insuficiente, explicamos la política de privacidad de la API
+        customMsg = `Por políticas de la API de Twitch, el canje de esta recompensa está reservado a su web oficial${bodyMsg ? ` (${bodyMsg})` : ''}.`
+      }
+
+      const err = new AppError(code, `Twitch HTTP ${res.status}: ${bodyMsg}`, { action: 'redeem' })
+      logError(err, { context: 'channel-points', action: 'redeem', bodyMsg })
+      return _cpResult(false, undefined, customMsg || formatUserMessage(err), code)
     }
     const data = await res.json()
     return _cpResult(true, data?.data?.[0] || null)
@@ -1359,6 +1378,10 @@ export async function getChannelRole(broadcasterId, userId, signal) {
   if (modRes.success && modRes.value?.data?.length > 0) {
     return ok('mod')
   }
+  // Si modRes dio 401 o 403 (token caducado o sin permisos de moderación/dueño), no llamar a checkVip innecesariamente
+  if (!modRes.success && (modRes.error?.context?.status === 401 || modRes.error?.context?.status === 403)) {
+    return ok(modRes.error?.context?.status === 401 ? 'unknown' : 'viewer')
+  }
   // Despues VIP
   const vipRes = await helixFetch(
     `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
@@ -1368,12 +1391,6 @@ export async function getChannelRole(broadcasterId, userId, signal) {
   )
   if (vipRes.success && vipRes.value?.data?.length > 0) {
     return ok('vip')
-  }
-  // Si la API fallo de forma no silenciosa (token caducado etc) devolvemos
-  // 'viewer' como fallback conservador: la UI asumira que el user no es mod
-  // y no expondra acciones peligrosas.
-  if (!modRes.success && modRes.error?.context?.status === 401) {
-    return ok('unknown')
   }
   return ok('viewer')
 }

@@ -312,3 +312,22 @@ input[type="range"]::-moz-range-thumb {
 .compact-mode .min-w-\[280px\] {
   min-width: 220px !important;
 }
+
+@keyframes emoteFloatUp {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    transform: translateY(-40px) scale(1.15);
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(-260px) scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-340px) scale(0.8);
+    opacity: 0;
+  }
+}

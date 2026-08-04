@@ -436,7 +436,7 @@ async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Res
     //      el flujo ni lanzamos panic.
     let mut args: Vec<String> = vec![
         format!("twitch.tv/{}", channel),
-        quality,
+        quality.clone(),
         "--stream-url".to_string(),
     ];
 
@@ -473,13 +473,35 @@ async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Res
         }
     }
 
+    let mut used_auth = false;
     if let Some(token) = resolved_token {
         args.push("--twitch-api-header".to_string());
         args.push(format!("Authorization=Bearer {}", token));
+        used_auth = true;
     }
 
-    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-    let (stdout, stderr) = run_streamlink(&app, &arg_refs)?;
+    let mut arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let mut res_sl = run_streamlink(&app, &arg_refs);
+
+    // Si falló y estábamos usando un token (p.ej. token caducado o rechazo por scopes), reintentamos SIN token (acceso público limpio)
+    if used_auth {
+        let should_retry = match &res_sl {
+            Err(_) => true,
+            Ok((stdout, _)) => stdout.trim().starts_with("error:"),
+        };
+        if should_retry {
+            log::warn!("get_stream_url: Falló con token de autenticación. Reintentando sin cabeceras de Twitch...");
+            let clean_args: Vec<String> = vec![
+                format!("twitch.tv/{}", channel),
+                quality.clone(),
+                "--stream-url".to_string(),
+            ];
+            arg_refs = clean_args.iter().map(String::as_str).collect();
+            res_sl = run_streamlink(&app, &arg_refs);
+        }
+    }
+
+    let (stdout, stderr) = res_sl?;
     let url = stdout.trim().to_string();
 
     // FIX WT-20260628-86: si streamlink falla (quality no disponible,
@@ -594,7 +616,7 @@ async fn fetch_m3u8_content(url: String) -> Result<String, String> {
 }
 
 const DEFAULT_QUALITIES: &[&str] = &[
-    "audio_only", "160p", "360p", "480p", "720p", "720p60", "1080p60",
+    "audio_only", "160p", "360p", "480p", "720p", "720p60", "936p60", "963p60", "1080p60", "1440p60",
 ];
 
 /// Devuelve las calidades disponibles para un canal.

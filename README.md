@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.0-e94560" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.3.1-e94560" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
 </p>
@@ -45,9 +45,9 @@
 
 ### Windows
 Download the official installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases). Existing installations update automatically:
-- ⭐ **`BlinkStream-Setup_1.3.0_Custom.exe`** *(Recommended — 100% Custom Twitch-themed setup with path selection)*
-- `BlinkStream_1.3.0_Win_x64.exe` *(Standard NSIS installer)*
-- `BlinkStream_1.3.0_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream-Setup_1.3.1_Custom.exe`** *(Recommended — 100% Custom Twitch-themed setup with path selection)*
+- `BlinkStream_1.3.1_Win_x64.exe` *(Standard NSIS installer)*
+- `BlinkStream_1.3.1_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
 > **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
@@ -63,13 +63,13 @@ Download the official installer from [GitHub Releases](https://github.com/BlinkS
 ### macOS
 ```bash
 brew install streamlink
-# Download BlinkStream_1.3.0_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
+# Download BlinkStream_1.3.1_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
 ```
 
 ### Linux (Debian / Ubuntu)
 ```bash
 sudo apt install streamlink
-# Download BlinkStream_1.3.0_Linux_x86_64.deb or .AppImage from Releases
+# Download BlinkStream_1.3.1_Linux_x86_64.deb or .AppImage from Releases
 ```
 
 ---
