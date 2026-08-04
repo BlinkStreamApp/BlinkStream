@@ -3,6 +3,7 @@
 A targeted Hotfix release addressing UI/UX improvements, resolution selector additions, and critical component fixes, building on top of our monumental Immersion & Command Center Update!
 
 ### 🔧 v1.3.1 Hotfix & Bug Fixes
+- **OAuth & Helix Authentication Loop Fix:** Engineered a robust dynamic OAuth Client ID auto-discovery mechanism (`getHelixClientId`) utilizing Twitch's official token validation endpoint. This eliminates false-positive HTTP 401 errors during session validation and permanently prevents automatic session logouts when launching standalone build binaries.
 - **Channel Points Redeem Modal Z-Index Fix:** Resolved an issue where reward redemption modals appeared blurred or behind side panels by elevating modal layer stacking (`z-[999999]`) across `RedeemModal.jsx`, `RewardForm.jsx`, and `ActionModal.jsx`.
 - **Expanded Pro Resolution Support:** Added official native dropdown support for modern high-bitrate streaming resolutions including **1440p60 (2K)**, **963p60**, and **936p60**. Relocated and integrated the Quality Selector directly inside the Player Settings menu.
 - **Ultra-Compact eSports Player Settings Menu:** Complete UI overhaul of the video player settings gear panel (`w-64`, single-line rows, scrollable max-height) to prevent oversized layouts or cropped headers on smaller player windows.

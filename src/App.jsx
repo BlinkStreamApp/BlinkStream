@@ -15,7 +15,7 @@ import DiskSpaceIndicator from './components/recording/DiskSpaceIndicator'
 // paralelos cada 10s.
 import { RecordingProvider } from './components/recording/RecordingContext'
 import { BlinkStreamLogo } from './components/BlinkStreamLogo'
-import { getUserIdByLogin, validateToken, clearStoredToken, getHeaders } from './utils/twitch'
+import { getUserIdByLogin, validateToken, clearStoredToken, getHeaders, getHelixClientId } from './utils/twitch'
 import { applyStoredHslTheme, applyStoredCustomFont, applyStoredCustomIconStyle } from './utils/hslTheme'
 
 const VideoPlayer = lazy(() => import('./components/VideoPlayer'))
@@ -307,7 +307,7 @@ function MainApp() {
     if (!token) return
     let cancelled = false
     fetch('https://api.twitch.tv/helix/users', {
-      headers: { 'Client-ID': import.meta.env.VITE_TWITCH_APP_CLIENT_ID || '', Authorization: `Bearer ${token}` },
+      headers: { 'Client-ID': getHelixClientId(), Authorization: `Bearer ${token}` },
     })
       .then(r => r.ok ? r.json() : null)
       .then(data => {

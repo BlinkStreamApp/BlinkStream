@@ -1,4 +1,4 @@
-import { APP_CLIENT_ID } from './twitch'
+import { getHelixClientId } from './twitch'
 import { SUPABASE_URL } from './supabase'
 import { getBlinkstreamToken, refreshBlinkstreamToken, clearBlinkstreamToken } from './supabase'
 
@@ -205,7 +205,7 @@ export async function fetchFollowedChannels(token) {
   try {
     const userRes = await fetch('https://api.twitch.tv/helix/users', {
       headers: {
-        'Client-ID': APP_CLIENT_ID,
+        'Client-ID': getHelixClientId(),
         'Authorization': `Bearer ${token}`,
       },
     })
@@ -220,7 +220,7 @@ export async function fetchFollowedChannels(token) {
       const url = `https://api.twitch.tv/helix/channels/followed?user_id=${userId}&first=100${cursor ? `&after=${cursor}` : ''}`
       const followRes = await fetch(url, {
         headers: {
-          'Client-ID': APP_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `Bearer ${token}`,
         },
       })

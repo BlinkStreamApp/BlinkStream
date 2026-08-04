@@ -29,7 +29,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { SUPABASE_URL, pollAuthToken, clearBlinkstreamToken } from '../utils/supabase'
-import { APP_CLIENT_ID } from '../utils/twitch'
+import { APP_CLIENT_ID, getHelixClientId } from '../utils/twitch'
 import { measureInvoke } from '../utils/perf'
 import { logEvent } from '../utils/eventLog'
 
@@ -37,6 +37,7 @@ const EDGE_FN_URL = `${SUPABASE_URL}/functions/v1/twitch-auth`
 const LS_TOKEN = 'blinkstream_twitch_token'
 const LS_USERNAME = 'blinkstream_twitch_username'
 const LS_AVATAR = 'blinkstream_twitch_avatar'
+const LS_CLIENT_ID = 'blinkstream_oauth_client_id'
 
 /**
  * Pide a Twitch los datos del usuario asociado a un token.
@@ -47,36 +48,33 @@ const LS_AVATAR = 'blinkstream_twitch_avatar'
  */
 async function fetchUserInfo(token) {
   try {
-    let clientId = APP_CLIENT_ID
+    let clientId = getHelixClientId()
     let username = null
+    const cleanToken = token.replace(/^oauth:/i, '')
 
-    let res = await fetch('https://api.twitch.tv/helix/users', {
+    // Consultar primero al validador oficial OAuth de Twitch, que no requiere cabecero Client-ID
+    // y nos revela el client_id exacto asociado al token del usuario.
+    try {
+      const valRes = await fetch('https://id.twitch.tv/oauth2/validate', {
+        headers: { 'Authorization': `OAuth ${cleanToken}` },
+      })
+      if (valRes.status === 401) return { invalid: true }
+      if (valRes.ok) {
+        const valData = await valRes.json()
+        if (valData?.client_id) {
+          clientId = valData.client_id
+          try { localStorage.setItem(LS_CLIENT_ID, clientId) } catch { /* ignore */ }
+        }
+        if (valData?.login) username = valData.login
+      }
+    } catch { /* ignore error del validador */ }
+
+    const res = await fetch('https://api.twitch.tv/helix/users', {
       headers: {
-        'Client-ID': clientId,
-        'Authorization': `Bearer ${token}`,
+        'Client-ID': clientId || getHelixClientId(),
+        'Authorization': `Bearer ${cleanToken}`,
       },
     })
-
-    if (!res.ok) {
-      // Consultar al validador oficial OAuth por si hay disparidad entre APP_CLIENT_ID y el Client-ID que emitió el token
-      try {
-        const valRes = await fetch('https://id.twitch.tv/oauth2/validate', {
-          headers: { 'Authorization': `OAuth ${token}` },
-        })
-        if (valRes.status === 401) return { invalid: true }
-        if (valRes.ok) {
-          const valData = await valRes.json()
-          if (valData?.client_id) clientId = valData.client_id
-          if (valData?.login) username = valData.login
-          res = await fetch('https://api.twitch.tv/helix/users', {
-            headers: {
-              'Client-ID': clientId,
-              'Authorization': `Bearer ${token}`,
-            },
-          })
-        }
-      } catch { /* ignore error del validador */ }
-    }
 
     if (res.ok) {
       const data = await res.json()
@@ -178,6 +176,7 @@ export function useAuth() {
               localStorage.removeItem(LS_TOKEN)
               localStorage.removeItem(LS_USERNAME)
               localStorage.removeItem(LS_AVATAR)
+              localStorage.removeItem(LS_CLIENT_ID)
               setCachedToken(null)
               setUser(null)
             }
@@ -307,6 +306,7 @@ export function useAuth() {
     } catch { /* ignore */ }
     localStorage.removeItem(LS_TOKEN)
     localStorage.removeItem(LS_USERNAME)
+    localStorage.removeItem(LS_CLIENT_ID)
     logEvent('auth', 'logout', null)
     // S-2 fix: limpiar tambien el avatar cacheado para que no se filtre
     // PII (URL firmada de Twitch) al siguiente usuario de la misma sesion

@@ -254,9 +254,24 @@ export const APP_CLIENT_ID = _APP_FROM_ENV || _PUBLIC_FROM_ENV || ''
 // ALLOWED-REGRESSION: Twitch GQL solo acepta first-party Client ID (kimne78...); APP token NO funciona en gql.twitch.tv
 export const PUBLIC_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko' // ALLOWED-REGRESSION: Twitch GQL first-party Client ID
 
+/**
+ * Obtiene de forma dinámica el Client ID real asociado al token OAuth en uso.
+ * Twitch requiere que en peticiones Helix a api.twitch.tv el cabecero Client-ID sea
+ * exactamente el mismo que emitió el token OAuth (descubierto vía id.twitch.tv/oauth2/validate).
+ * Esto erradica el deslogueo automático y los errores 401 si VITE_TWITCH_APP_CLIENT_ID está vacío o es incorrecto.
+ *
+ * @returns {string}
+ */
+export function getHelixClientId() {
+  const oauthClientId = typeof localStorage !== 'undefined' ? localStorage.getItem('blinkstream_oauth_client_id') : null
+  if (oauthClientId && oauthClientId.trim() !== '') return oauthClientId.trim()
+  if (APP_CLIENT_ID && APP_CLIENT_ID.trim() !== '') return APP_CLIENT_ID.trim()
+  return PUBLIC_CLIENT_ID
+}
+
 if (!_APP_FROM_ENV && !_PUBLIC_FROM_ENV) {
   console.warn(
-    '%c[BlinkStream] VITE_TWITCH_CLIENT_ID no configurado — Helix dara 400 (GQL sigue funcionando via Client ID first-party). Configura .env con tu propio App Client ID.',
+    '%c[BlinkStream] VITE_TWITCH_CLIENT_ID no configurado — Helix usará el Client-ID descubierto del token OAuth o el de respaldo.',
     'color:#f59e0b;font-weight:bold',
     '\n  https://dev.twitch.tv/console/apps',
   )
@@ -292,7 +307,7 @@ export async function getStoredToken() {
 }
 
 /**
- * Borra el token de Twitch de keychain y localStorage. No lanza.
+ * Borra el token de Twitch y caché del Client ID de keychain y localStorage. No lanza.
  * @returns {Promise<void>}
  */
 export async function clearStoredToken() {
@@ -305,23 +320,41 @@ export async function clearStoredToken() {
   try {
     localStorage.removeItem('blinkstream_twitch_token')
     localStorage.removeItem('blinkstream_twitch_username')
+    localStorage.removeItem('blinkstream_oauth_client_id')
   } catch { /* ignore */ }
 }
 
 /**
- * Verifica contra Helix que un token sigue siendo valido. Timeout 5s.
+ * Verifica que un token sigue siendo válido usando primero el endpoint oficial
+ * OAuth de Twitch (que no requiere Client-ID y nos devuelve el Client-ID auténtico del token).
  * @param {string|null|undefined} token
  * @returns {Promise<boolean>}
  */
 export async function validateToken(token) {
   if (!token) return false
+  const cleanToken = token.replace(/^oauth:/i, '')
+  try {
+    const valRes = await measureFetch('https://id.twitch.tv/oauth2/validate', {
+      headers: { 'Authorization': `OAuth ${cleanToken}` },
+      signal: safeTimeout(5000),
+    })
+    if (valRes.status === 401) return false
+    if (valRes.ok) {
+      const data = await valRes.json()
+      if (data?.client_id) {
+        try { localStorage.setItem('blinkstream_oauth_client_id', data.client_id) } catch { /* ignore */ }
+      }
+      return true
+    }
+  } catch { /* Si el validador falla por red, caer al intento en Helix */ }
+
   try {
     const res = await measureFetch('https://api.twitch.tv/helix/users', {
       headers: {
-        'Client-ID': APP_CLIENT_ID,
-        'Authorization': `Bearer ${token}`,
+        'Client-ID': getHelixClientId(),
+        'Authorization': `Bearer ${cleanToken}`,
       },
-      signal: AbortSignal.timeout(5000),
+      signal: safeTimeout(5000),
     })
     return res.ok
   } catch { return false }
@@ -329,15 +362,14 @@ export async function validateToken(token) {
 
 /**
  * Construye las cabeceras para llamadas Helix. Si hay token persistido
- * lo anade como Authorization Bearer; usa APP_CLIENT_ID en ese caso, si
- * no, cae al PUBLIC_CLIENT_ID.
+ * lo añade como Authorization Bearer y usa getHelixClientId() en ese caso.
  *
  * @returns {Promise<Record<string, string>>}
  */
 export async function getHeaders() {
   const token = await getStoredToken()
   const headers = {
-    'Client-ID': token ? APP_CLIENT_ID : PUBLIC_CLIENT_ID,
+    'Client-ID': token ? getHelixClientId() : PUBLIC_CLIENT_ID,
   }
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
@@ -759,7 +791,7 @@ export async function getCustomRewards(broadcasterId, manageToken) {
       `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${encodeURIComponent(broadcasterId)}`,
       {
         headers: {
-          'Client-ID': APP_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `Bearer ${tokenRes.data}`,
         },
         signal: safeTimeout(CP_TIMEOUT_MS),
@@ -902,7 +934,7 @@ export async function getCustomReward(broadcasterId, rewardId, manageToken) {
       `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${encodeURIComponent(broadcasterId)}&id=${encodeURIComponent(rewardId)}`,
       {
         headers: {
-          'Client-ID': APP_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `Bearer ${tokenRes.data}`,
         },
         signal: safeTimeout(CP_TIMEOUT_MS),
@@ -967,7 +999,7 @@ export async function createCustomReward(broadcasterId, rewardData, manageToken)
       {
         method: 'POST',
         headers: {
-          'Client-ID': APP_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `Bearer ${tokenRes.data}`,
         },
         signal: safeTimeout(CP_TIMEOUT_MS),
@@ -1025,7 +1057,7 @@ export async function updateCustomReward(broadcasterId, rewardId, rewardData, ma
       {
         method: 'PATCH',
         headers: {
-          'Client-ID': APP_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `Bearer ${tokenRes.data}`,
         },
         signal: safeTimeout(CP_TIMEOUT_MS),
@@ -1079,7 +1111,7 @@ export async function deleteCustomReward(broadcasterId, rewardId, manageToken) {
       {
         method: 'DELETE',
         headers: {
-          'Client-ID': APP_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `Bearer ${tokenRes.data}`,
         },
         signal: safeTimeout(CP_TIMEOUT_MS),
@@ -1136,7 +1168,7 @@ export async function getRedemptions(broadcasterId, rewardId, status = 'UNFULFIL
       `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?${params.toString()}`,
       {
         headers: {
-          'Client-ID': APP_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `Bearer ${tokenRes.data}`,
         },
         signal: safeTimeout(CP_TIMEOUT_MS),
@@ -1205,7 +1237,7 @@ export async function updateRedemptionStatus(broadcasterId, rewardId, redemption
         {
           method: 'PATCH',
           headers: {
-            'Client-ID': APP_CLIENT_ID,
+            'Client-ID': getHelixClientId(),
             'Authorization': `Bearer ${tokenRes.data}`,
           },
           signal: safeTimeout(CP_TIMEOUT_MS),
@@ -1266,7 +1298,7 @@ export async function redeemCustomReward(broadcasterId, rewardId, userInput, use
       {
         method: 'POST',
         headers: {
-          'Client-ID': APP_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `Bearer ${userToken}`,
         },
         signal: safeTimeout(CP_TIMEOUT_MS),
