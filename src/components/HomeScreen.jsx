@@ -798,7 +798,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
                 <div className="mb-6 bg-twitch/10 border border-twitch/30 rounded-xl p-4 flex items-center gap-3.5 text-white text-[13px] animate-fade-in shadow-lg shadow-twitch/5">
                   <span className="text-xl shrink-0">✨</span>
                   <div>
-                    <strong className="font-semibold text-twitch-light">Sesión conectada correctamente.</strong> Aún no sigues o tienes canales recientes. ¡Explora las transmisiones recomendadas a continuación o busca tu streamer preferido para empezar!
+                    <strong className="font-semibold text-twitch-light">Sesión conectada correctamente.</strong> Aún no sigues o tienes canales recientes. ¡Explora las transmisiones recomendadas a continuación o busca tu streamer preferido para empezar! {/* ALLOWED-REGRESSION: Spanish inverted exclamation mark is valid UTF-8 */}
                   </div>
                 </div>
               )}
