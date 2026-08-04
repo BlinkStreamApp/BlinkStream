@@ -154,7 +154,7 @@ pub async fn install_blinkstream_custom(desktop_shortcut: bool, start_menu_short
             "$RegPath = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\BlinkStream'; \
              New-Item -Path $RegPath -Force | Out-Null; \
              New-ItemProperty -Path $RegPath -Name 'DisplayName' -Value 'BlinkStream' -PropertyType String -Force | Out-Null; \
-             New-ItemProperty -Path $RegPath -Name 'DisplayVersion' -Value '1.3.1' -PropertyType String -Force | Out-Null; \
+             New-ItemProperty -Path $RegPath -Name 'DisplayVersion' -Value '1.3.1-a' -PropertyType String -Force | Out-Null; \
              New-ItemProperty -Path $RegPath -Name 'Publisher' -Value 'BlinkStream Team' -PropertyType String -Force | Out-Null; \
              New-ItemProperty -Path $RegPath -Name 'InstallLocation' -Value '\"{}\"' -PropertyType String -Force | Out-Null; \
              New-ItemProperty -Path $RegPath -Name 'UninstallString' -Value '\"{}\"' -PropertyType String -Force | Out-Null; \
@@ -165,6 +165,23 @@ pub async fn install_blinkstream_custom(desktop_shortcut: bool, start_menu_short
         ));
 
         run_powershell_script(&ps_script)?;
+
+        // Iniciar en segundo plano (sin ventana) la instalación silenciosa de Streamlink y FFmpeg para ordenadores nuevos
+        #[cfg(windows)]
+        {
+            let mut w_sl = Command::new("winget");
+            w_sl.args(["install", "Streamlink.Streamlink", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
+                .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+            w_sl.creation_flags(CREATE_NO_WINDOW);
+            let _ = w_sl.spawn();
+
+            let mut w_ff = Command::new("winget");
+            w_ff.args(["install", "Gyan.FFmpeg", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
+                .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+            w_ff.creation_flags(CREATE_NO_WINDOW);
+            let _ = w_ff.spawn();
+        }
+
         Ok(())
     }).await.map_err(|e| format!("Error en hilo de ejecución de instalación: {}", e))?
 }

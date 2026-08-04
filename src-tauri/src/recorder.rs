@@ -159,83 +159,7 @@ fn validate_channel(name: &str) -> Result<(), String> {
 /// una copia minima (no la exportamos de lib.rs para no crear ciclos
 /// de modulos; en G2 moveremos find_streamlink a su propio modulo).
 fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
-    // Buscamos primero en el sidecar (resource_dir/binaries/...)
-    let target_triple = format!(
-        "{}-{}-{}",
-        std::env::consts::ARCH,
-        std::env::consts::OS,
-        if cfg!(target_os = "windows") { "windows-msvc" }
-        else if cfg!(target_os = "macos") { "apple-darwin" }
-        else { "linux-gnu" }
-    );
-    let sidecar_name = format!("streamlink-{}", target_triple);
-    let sidecar_exe = if cfg!(windows) { format!("{}.exe", sidecar_name) } else { sidecar_name };
-
-    if let Ok(resource_dir) = app.path().resource_dir() {
-        let sidecar_path = resource_dir.join("binaries").join(&sidecar_exe);
-        if sidecar_path.exists() {
-            return Ok(sidecar_path);
-        }
-    }
-
-    // Fallback por plataforma (mismo orden que en lib.rs)
-    #[cfg(windows)]
-    {
-        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-            let winget_path = PathBuf::from(local_app_data)
-                .join("Programs")
-                .join("Streamlink")
-                .join("bin")
-                .join("streamlink.exe");
-            if winget_path.exists() {
-                return Ok(winget_path);
-            }
-        }
-        if let Ok(user_profile) = std::env::var("USERPROFILE") {
-            let scoop_path = PathBuf::from(user_profile)
-                .join("scoop")
-                .join("apps")
-                .join("streamlink")
-                .join("current")
-                .join("bin")
-                .join("streamlink.exe");
-            if scoop_path.exists() {
-                return Ok(scoop_path);
-            }
-        }
-        let choco_path = PathBuf::from(r"C:\ProgramData\chocolatey\bin\streamlink.exe");
-        if choco_path.exists() {
-            return Ok(choco_path);
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let paths = ["/opt/homebrew/bin/streamlink", "/usr/local/bin/streamlink", "/opt/local/bin/streamlink"];
-        for p in &paths {
-            let pp = PathBuf::from(p);
-            if pp.exists() {
-                return Ok(pp);
-            }
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let linux_paths = [
-            "/usr/bin/streamlink",
-            "/usr/local/bin/streamlink",
-            "/opt/streamlink/bin/streamlink",
-        ];
-        for p in &linux_paths {
-            let pp = PathBuf::from(p);
-            if pp.exists() {
-                return Ok(pp);
-            }
-        }
-    }
-
-    Err("Streamlink no está instalado. Visita https://streamlink.github.io para instalarlo.".into())
+    crate::find_streamlink(app)
 }
 
 /// Helper PRIVADO: devuelve (espacio_libre_gb, espacio_total_gb) del dir
@@ -372,7 +296,12 @@ pub fn start_recording(app: AppHandle, channel: String, output_path: String) -> 
     }
 
     let mut cmd = Command::new(&binary);
-    cmd.args(&[&url, "best", "-o", &output_path])
+    let mut args: Vec<String> = vec![url.clone(), "best".to_string(), "-o".to_string(), output_path.to_string()];
+    if let Some(ff_path) = crate::ensure_ffmpeg_path() {
+        args.push("--ffmpeg-ffmpeg".to_string());
+        args.push(ff_path.to_string_lossy().to_string());
+    }
+    cmd.args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 

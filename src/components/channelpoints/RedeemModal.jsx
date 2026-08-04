@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { t } from '../../utils/i18n'
 import PhosphorIcon from '../icons/PhosphorIcon'
 
@@ -80,9 +81,9 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
     }
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100000] bg-black/65 backdrop-blur-md flex items-center justify-center animate-fade-in p-4"
+      className="fixed inset-0 z-[200000] bg-black/70 backdrop-blur-md flex items-center justify-center animate-fade-in p-4 pointer-events-auto"
       onClick={onClose}
     >
       <div
@@ -101,48 +102,52 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
               className="w-full h-full object-cover"
             />
           ) : (
-            <span>{(reward.title || '?').charAt(0).toUpperCase()}</span>
+            <PhosphorIcon name="Gift" className="w-20 h-20 opacity-40 text-white" />
           )}
         </div>
 
+        {/* Info */}
         <div className="p-5 space-y-4">
-          <div>
-            <h3 className="text-base font-bold text-text-primary leading-tight">{reward.title}</h3>
-            {reward.prompt && (
-              <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">{reward.prompt}</p>
-            )}
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-[17px] font-semibold text-text-primary">
+              {reward.title || 'Recompensa'}
+            </h3>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-medium text-white bg-twitch/20 border border-twitch/40 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-twitch" />
+              {cost.toLocaleString()}
+            </span>
           </div>
 
-          {/* Costo + balance */}
-          <div className="flex items-center gap-4 text-[12px]">
-            <div className="flex items-center gap-1.5 text-yellow-400 font-bold">
-              <PhosphorIcon name="Coins" size={14} weight="duotone" />
-              {t('cp.redeem.cost')}: {cost.toLocaleString('es-ES')}
-            </div>
-            {userBalance != null && (
-              <div className="text-text-muted">
-                {t('cp.redeem.balance')}: {userBalance.toLocaleString('es-ES')}
-              </div>
-            )}
-          </div>
+          {reward.prompt && (
+            <p className="text-[13px] text-text-secondary leading-relaxed">
+              {reward.prompt}
+            </p>
+          )}
 
-          {/* Cooldown */}
-          {hasCooldown && cooldownRemainingSec > 0 && (
-            <div className="text-[11px] text-text-muted">
-              ⏱ {t('cp.redeem.cooldown.remaining').replace('{time}', fmtCooldown(cooldownRemainingSec))}
+          {/* User balance info */}
+          {userBalance != null && (
+            <div className="flex items-center justify-between text-[12px] text-text-secondary border-t border-bg-tertiary/40 pt-3">
+              <span>{t('cp.redeem.balance')}:</span>
+              <span className={`font-medium ${noBalance ? 'text-red-400 font-semibold' : 'text-text-primary'}`}>
+                {userBalance.toLocaleString()} {t('cp.points')}
+              </span>
             </div>
           )}
 
-          {/* FIX 2 (WT-20260628-29): banner si el broadcaster deshabilito
-              el reward mid-flow. El submit queda deshabilitado por
-              canSubmit arriba. */}
+          {/* Warnings */}
           {!isRewardEnabled && (
-            <div className="text-[12px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
-              {t('cp.redeem.disabled') || 'Esta recompensa ya no esta disponible.'}
+            <div className="text-[12px] text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 text-center">
+              {t('cp.redeem.disabled_by_broadcaster')}
             </div>
           )}
 
-          {/* User input */}
+          {hasCooldown && (
+            <div className="text-[12px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-center">
+              {t('cp.redeem.in_cooldown_prefix')} {fmtCooldown(cooldownRemainingSec)}
+            </div>
+          )}
+
+          {/* User input si aplica */}
           {inputRequired && (
             <div>
               <textarea
@@ -189,6 +194,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

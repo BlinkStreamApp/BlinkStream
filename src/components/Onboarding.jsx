@@ -18,7 +18,7 @@ import {
 
 const SLIDES = [
   {
-    badge: '✨ v1.3.1 EDICIÓN DEFINITIVA',
+    badge: '✨ v1.3.1-a EDICIÓN DEFINITIVA',
     badgeClass: 'from-fuchsia-500/20 to-purple-500/20 text-fuchsia-300 border-fuchsia-500/30',
     glowClass: 'from-fuchsia-600/20 via-purple-600/20 to-transparent',
     accentColor: 'text-fuchsia-400',
@@ -33,7 +33,7 @@ const SLIDES = [
       </div>
     ),
     title: 'Bienvenido a la Nueva Era',
-    subtitle: 'BlinkStream v1.3.1 redefine tu forma de vivir los directos de Twitch con un rendimiento nativo fulminante y sin publicidad.',
+    subtitle: 'BlinkStream v1.3.1-a redefine tu forma de vivir los directos de Twitch con un rendimiento nativo fulminante y sin publicidad.',
     features: [
       'Reproducción en Alta Definición (1080p60 / 2K) fluida y sin anuncios ni cortes',
       'Motor nativo en Rust & React optimizado para mínimo consumo de RAM',
@@ -41,7 +41,7 @@ const SLIDES = [
     ],
   },
   {
-    badge: '📱 NOVEDAD V1.3.1: CONTROL LAN & FX',
+    badge: '📱 NOVEDAD V1.3.1-a: CONTROL LAN & FX',
     badgeClass: 'from-cyan-500/20 to-teal-500/20 text-cyan-300 border-cyan-500/30',
     glowClass: 'from-cyan-500/20 via-teal-500/20 to-transparent',
     accentColor: 'text-cyan-400',
@@ -170,7 +170,7 @@ export default function Onboarding({ onFinish }) {
                 BlinkStream
               </span>
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30">
-                v1.3.1
+                v1.3.1-a
               </span>
             </div>
             <p className="text-xs font-semibold text-text-muted">Cliente Nativo Ultra Fluido & Open-Source</p>
