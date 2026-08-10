@@ -215,6 +215,7 @@ export default function VideoPlayer({
     startRecording,
     stopRecording: hookStopRecording,
   } = useRecording()
+  const [showTheatreToast, setShowTheatreToast] = useState(false)
   const [showOverlayChat, setShowOverlayChat] = useState(() => getItem(STORAGE_KEYS.OVERLAY_CHAT, 'false') === 'true')
   const [showEmoteEffects, setShowEmoteEffects] = useState(() => getItem(STORAGE_KEYS.EMOTE_EFFECTS, 'true') === 'true')
   const abortControllerRef = useRef(null)
