@@ -78,7 +78,7 @@ export interface SuspiciousEvent {
   extra?: Record<string, unknown>;
 }
 
-const SECRET_KEY_REGEX = /token|secret|password|^key$|auth|^code$|state/i;
+const SECRET_KEY_REGEX = /token|secret|password|key|auth|code|state/i;
 
 export function logSuspicious(event: SuspiciousEvent): void {
   const sanitized: Record<string, unknown> = {

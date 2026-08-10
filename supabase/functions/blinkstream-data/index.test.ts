@@ -67,7 +67,7 @@ Deno.test("validation: channel regex acepta twitch validos", () => {
 Deno.test("validation: FavActionBodySchema rechaza payload SQLi classico", () => {
   const payload = {
     action: "fav_add",
-    username: "alice'; DROP TABLE favorites; --",
+    username: "admin' OR 1=1;--",
     channel: "xqc",
   };
   const r = parseOrReject(FavActionBodySchema, payload);

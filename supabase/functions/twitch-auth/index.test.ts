@@ -50,7 +50,7 @@ Deno.test("Issue #1: isDebugEnabled retorna true solo si ENABLE_DEBUG=true", () 
 
 // ============= Test #2: Issue #2 - verify_jwt=false en config =============
 Deno.test("Issue #2: supabase/config.toml tiene verify_jwt = false para twitch-auth", async () => {
-  const configPath = new URL("../../../config.toml", import.meta.url);
+  const configPath = new URL("../../config.toml", import.meta.url);
   const text = await Deno.readTextFile(configPath);
   assert(text.includes("[functions.twitch-auth]"), "Debe existir [functions.twitch-auth]");
   const section = text.split("[functions.twitch-auth]")[1]?.split("[")[0] ?? "";
