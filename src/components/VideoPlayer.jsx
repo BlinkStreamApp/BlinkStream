@@ -468,14 +468,16 @@ export default function VideoPlayer({
         4: 'MEDIA_ERR_SRC_NOT_SUPPORTED',
       }[errCode] || `code ${errCode}`
       console.error(`[VideoPlayer] video.error: ${errMsg} (channel=${channel}, quality=${quality})`)
-      if (errCode === 3 && quality !== 'best') {
-        // Decode error en una calidad especifica -> caer a 'best' que
-        // suele ser la fuente mas estable.
-        console.warn(`[VideoPlayer] decode error at ${quality}, falling back to best`)
-        onQualityChange('best')
-        fetchStream(channel, 'best')
+      if (errCode === 3) {
+        if (quality !== 'best') {
+          console.warn(`[VideoPlayer] decode error at ${quality}, falling back to best`)
+          onQualityChange('best')
+          fetchStream(channel, 'best')
+        } else {
+          setError(`Fallo de decodificación de vídeo (Hardware/Codec). Intenta actualizar tus drivers o instalar el Media Feature Pack si usas Windows N.`)
+        }
       } else if (errCode === 4) {
-        setError(`Codec no soportado: ${errMsg}`)
+        setError(`Formato de vídeo no soportado por tu sistema: ${errMsg}`)
       }
     }
     video.addEventListener('error', handleVideoError)

@@ -974,6 +974,8 @@ async fn get_stream_url(
         format!("twitch.tv/{}", channel),
         quality.clone(),
         "--stream-url".to_string(),
+        "--twitch-supported-codecs".to_string(),
+        "h264".to_string(),
     ];
 
     let mut resolved_token: Option<String> = None;
