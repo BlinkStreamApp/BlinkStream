@@ -1,4 +1,4 @@
-﻿// _security.ts compatible con Node (shim para Deno.env)
+// _security.ts compatible con Node (shim para Deno.env)
 // Tests de P0-3 hardening para twitch-auth
 //
 // Cubre los 10 issues de ERR-WT-20260624-008 con tests minimos (1 por issue).
@@ -179,8 +179,9 @@ await test("Issue #2: verify_jwt=false en config.toml para twitch-auth", async (
   const { createRequire } = await import("module");
   const require = createRequire(import.meta.url);
   const fs = require("fs");
-  // Hardcoded absolute path because ESM does not have __dirname
-  const altPath = "C:/Users/alber/Desktop/IA Project/BlinkStream/blinkstream/supabase/config.toml";
+  const path = require("path");
+  const url = require("url");
+  const altPath = path.join(path.dirname(url.fileURLToPath(import.meta.url)), "..", "..", "config.toml");
   const content = fs.readFileSync(altPath, "utf8");
   assert(content.includes("[functions.twitch-auth]"), "Debe existir [functions.twitch-auth]");
   // Find the section
