@@ -610,6 +610,9 @@ fn is_usable_streamlink(path: &Path) -> bool {
     #[cfg(windows)]
     {
         let mut command = std::process::Command::new(path);
+        if let Some(parent) = path.parent() {
+            command.current_dir(parent);
+        }
         command
             .arg("--version")
             .stdout(std::process::Stdio::piped())
@@ -617,18 +620,26 @@ fn is_usable_streamlink(path: &Path) -> bool {
             .creation_flags(CREATE_NO_WINDOW);
 
         let Ok(output) = command.output() else {
+            log::error!("is_usable_streamlink: No se pudo ejecutar {:?}", path);
             return false;
         };
-        if !output.status.success() {
-            return false;
-        }
-
+        
         let version = format!(
             "{}{}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        version.to_lowercase().contains("streamlink")
+
+        if !output.status.success() {
+            log::error!("is_usable_streamlink: {:?} falló con código {:?}. Output: {}", path, output.status.code(), version);
+            return false;
+        }
+
+        let is_valid = version.to_lowercase().contains("streamlink");
+        if !is_valid {
+            log::error!("is_usable_streamlink: {:?} devolvió output inválido: {}", path, version);
+        }
+        is_valid
     }
 
     #[cfg(not(windows))]
@@ -679,6 +690,11 @@ pub fn find_bundled_streamlink(app: &AppHandle) -> Option<PathBuf> {
     })
 }
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static STREAMLINK_INSTALL_ATTEMPTED: AtomicBool = AtomicBool::new(false);
+static FFMPEG_INSTALL_ATTEMPTED: AtomicBool = AtomicBool::new(false);
+
 pub fn ensure_runtime_dependencies(app: &AppHandle) -> Result<(), String> {
     let bundled_streamlink = find_bundled_streamlink(app);
     let system_streamlink = {
@@ -719,12 +735,22 @@ pub fn ensure_runtime_dependencies(app: &AppHandle) -> Result<(), String> {
     {
         let ffmpeg_ready = ensure_ffmpeg_path().is_some();
         if !streamlink_ready {
-            log::info!("Streamlink no encontrado; instalando Streamlink.Streamlink con winget");
-            run_winget_install("Streamlink.Streamlink")?;
+            if !STREAMLINK_INSTALL_ATTEMPTED.load(Ordering::SeqCst) {
+                log::info!("Streamlink no encontrado; instalando Streamlink.Streamlink con winget");
+                STREAMLINK_INSTALL_ATTEMPTED.store(true, Ordering::SeqCst);
+                run_winget_install("Streamlink.Streamlink")?;
+            } else {
+                log::warn!("Instalación de Streamlink ya fue intentada. Saltando winget...");
+            }
         }
         if !ffmpeg_ready {
-            log::info!("FFmpeg no encontrado; instalando Gyan.FFmpeg con winget");
-            run_winget_install("Gyan.FFmpeg")?;
+            if !FFMPEG_INSTALL_ATTEMPTED.load(Ordering::SeqCst) {
+                log::info!("FFmpeg no encontrado; instalando Gyan.FFmpeg con winget");
+                FFMPEG_INSTALL_ATTEMPTED.store(true, Ordering::SeqCst);
+                run_winget_install("Gyan.FFmpeg")?;
+            } else {
+                log::warn!("Instalación de FFmpeg ya fue intentada. Saltando winget...");
+            }
         }
 
         let streamlink_path =
