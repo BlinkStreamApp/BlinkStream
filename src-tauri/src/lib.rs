@@ -681,11 +681,11 @@ pub fn find_bundled_streamlink(app: &AppHandle) -> Option<PathBuf> {
         let entries = std::fs::read_dir(dir).ok()?;
         entries.flatten().map(|entry| entry.path()).find(|path| {
             path.is_file()
-                && is_usable_streamlink(path)
                 && path.file_name().is_some_and(|name| {
                     let value = name.to_string_lossy().to_lowercase();
                     value.starts_with("streamlink") && value.ends_with(".exe")
                 })
+                && is_usable_streamlink(path)
         })
     })
 }
