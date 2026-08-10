@@ -1,5 +1,3 @@
-
-
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use tauri::AppHandle;
@@ -15,7 +13,7 @@ static RECORDING: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mut
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GlobalRecordingState {
-    pub state: String, 
+    pub state: String,
 }
 
 static GLOBAL_STATE: std::sync::OnceLock<std::sync::Mutex<GlobalRecordingState>> =
@@ -516,7 +514,6 @@ mod tests {
 
     #[test]
     fn active_recordings_count_initially_zero() {
-
         let n = active_recordings_count();
 
         let _ = n;
@@ -524,7 +521,6 @@ mod tests {
 
     #[test]
     fn global_state_default_is_off() {
-
         let s = get_global_state_from_memory();
         assert!(matches!(s.state.as_str(), "OFF" | "ARMED" | "ON"));
     }
@@ -544,7 +540,6 @@ mod tests {
 
     #[test]
     fn save_global_state_writes_atomically() {
-
         let tmp_dir = std::env::temp_dir().join("bs_recorder_atomic_test");
         let _ = std::fs::create_dir_all(&tmp_dir);
         let path = tmp_dir.join("state.json");
@@ -571,7 +566,6 @@ mod tests {
 
     #[test]
     fn recording_mutex_detects_already_active() {
-
         {
             let mut rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
             *rec = None;
@@ -657,7 +651,6 @@ mod tests {
 
     #[test]
     fn fix4_rejects_path_traversal_via_dotdot() {
-
         let allowed = vec![make_temp_dir("dotdot_allowed")];
 
         #[cfg(unix)]
@@ -676,12 +669,10 @@ mod tests {
                 "path traversal via .. debe ser rechazado (probado con: {traversal})"
             );
         }
-
     }
 
     #[test]
     fn fix4_accepts_path_when_any_allowed_dir_matches() {
-
         let allowed_a = make_temp_dir("multi_a");
         let allowed_b = make_temp_dir("multi_b");
         let output = allowed_b.join("rec.mp4");
@@ -696,25 +687,21 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn fix1_unix_statvfs_returns_some_for_valid_path() {
-
         let tmp = std::env::temp_dir();
 
         let res = std::panic::catch_unwind(|| {
-
             if std::env::var("HOME").is_ok() || std::env::var("USERPROFILE").is_ok() {
                 get_disk_space().is_some()
             } else {
-
                 get_disk_space().is_none()
             }
         });
-        let _ = tmp; 
+        let _ = tmp;
         let _ = res;
     }
 
     #[test]
     fn fix1_returns_none_when_no_home_env() {
-
         let res = get_disk_space();
 
         if let Some((f, t)) = res {
@@ -722,6 +709,5 @@ mod tests {
             assert!(t >= 0.0, "total_gb debe ser >= 0, recibio {t}");
             assert!(f <= t, "free_gb ({f}) no puede superar total_gb ({t})");
         }
-
     }
 }

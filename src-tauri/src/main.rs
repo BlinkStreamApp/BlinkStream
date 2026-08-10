@@ -1,7 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-
     if !blinkstream_lib::try_lock_single_instance("BlinkStream_App") {
         #[cfg(windows)]
         {

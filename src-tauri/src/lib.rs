@@ -95,7 +95,6 @@ fn is_pid_alive(pid: u32) -> bool {
     }
     #[cfg(not(windows))]
     {
-
         unsafe { libc::kill(pid as i32, 0) == 0 }
     }
 }
@@ -586,13 +585,22 @@ fn is_usable_streamlink(path: &Path) -> bool {
         );
 
         if !output.status.success() {
-            log::error!("is_usable_streamlink: {:?} falló con código {:?}. Output: {}", path, output.status.code(), version);
+            log::error!(
+                "is_usable_streamlink: {:?} falló con código {:?}. Output: {}",
+                path,
+                output.status.code(),
+                version
+            );
             return false;
         }
 
         let is_valid = version.to_lowercase().contains("streamlink");
         if !is_valid {
-            log::error!("is_usable_streamlink: {:?} devolvió output inválido: {}", path, version);
+            log::error!(
+                "is_usable_streamlink: {:?} devolvió output inválido: {}",
+                path,
+                version
+            );
         }
         is_valid
     }
@@ -926,7 +934,6 @@ async fn get_stream_url(
                 }
             }
             Err(e) => {
-
                 log::warn!("get_stream_url: get_app_token fallo: {e}");
             }
         }
@@ -939,7 +946,6 @@ async fn get_stream_url(
         let arg_refs_auth: Vec<&str> = auth_args.iter().map(String::as_str).collect();
         run_streamlink(&app, &arg_refs_auth)
     } else {
-
         Err("No hay token disponible".to_string())
     };
 
@@ -1009,7 +1015,6 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
 
 #[tauri::command]
 async fn fetch_m3u8_content(url: String) -> Result<String, String> {
-
     if !url.starts_with("https://")
         || (!url.contains("ttvnw.net")
             && !url.contains("twitch.tv")
@@ -1069,7 +1074,6 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
 
     let channel_for_blocking = channel.clone();
     let join_result = tokio::task::spawn_blocking(move || {
-
         run_streamlink_with_timeout(
             &app,
             &[&format!("twitch.tv/{channel_for_blocking}"), "--stream-url"],
@@ -1129,7 +1133,6 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
 
 #[tauri::command]
 async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
-
     validate_slug(&slug)?;
 
     let client = reqwest::Client::builder()
@@ -1158,7 +1161,6 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
         .map_err(|e| format!("Read error: {e}"))?;
 
     if !status.is_success() {
-
         log::error!(
             "Twitch clip GQL failed: status={} body_len={} preview={}",
             status.as_u16(),
@@ -1169,7 +1171,6 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
     }
 
     let data: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
-
         log::error!(
             "Twitch clip JSON parse error: err={} body_len={} preview={}",
             e,
@@ -1180,7 +1181,6 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
     })?;
 
     let Some(clip) = data.get("data").and_then(|d| d.get("clip")) else {
-
         log::error!(
             "Twitch clip missing in response: body_len={} preview={}",
             text.len(),
@@ -1228,7 +1228,6 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
-
     validate_vod_id(&vod_id)?;
 
     let client = reqwest::Client::builder()
@@ -1266,7 +1265,6 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         .get("data")
         .and_then(|d| d.get("video"))
         .ok_or_else(|| {
-
             log::error!(
                 "Twitch VOD missing in response: body_len={} preview={}",
                 text.len(),
@@ -1450,7 +1448,6 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
             .map_err(|e| format!("Lock poisoned: {e}"))?;
         if let Some((token, expires_at)) = cache.as_ref() {
             if *expires_at > Instant::now() {
-
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
@@ -1490,7 +1487,6 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
         .map_err(|e| format!("Error leyendo respuesta: {e}"))?;
 
     if !status.is_success() {
-
         log::error!(
             "Twitch OAuth client_credentials fallo: status={} body_len={}",
             status.as_u16(),
@@ -1564,12 +1560,10 @@ pub fn run() {
             start_recording,
             stop_recording,
             get_app_token,
-
             recorder::recorder_set_global_enabled,
             recorder::recorder_get_global_state,
             recorder::recorder_list_active,
             recorder::recorder_get_full_state,
-
             companion::get_companion_status,
             companion::start_companion_server_cmd,
             companion::stop_companion_server_cmd,
@@ -1617,7 +1611,6 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_injection_payload() {
-
         assert!(validate_slug(r#""; DROP TABLE--"#).is_err());
     }
 
@@ -1629,7 +1622,6 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_backslash() {
-
         assert!(validate_slug(r"ab\cd").is_err());
     }
 
@@ -1640,7 +1632,6 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_too_long() {
-
         let s = "a".repeat(101);
         assert!(validate_slug(&s).is_err());
     }
@@ -1652,7 +1643,6 @@ mod tests {
 
     #[test]
     fn validate_slug_accepts_double_dash() {
-
         assert!(validate_slug("valid--slug--").is_ok());
     }
 
@@ -1668,7 +1658,6 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_slash() {
-
         assert!(validate_slug("../etc/passwd").is_err());
     }
 
@@ -1684,13 +1673,11 @@ mod tests {
 
     #[test]
     fn validate_vod_id_rejects_negative() {
-
         assert!(validate_vod_id("-123").is_err());
     }
 
     #[test]
     fn validate_vod_id_rejects_too_long() {
-
         let s = "1".repeat(21);
         assert!(validate_vod_id(&s).is_err());
     }
@@ -1712,7 +1699,6 @@ mod tests {
 
     #[test]
     fn validate_channel_rejects_injection_payload() {
-
         assert!(validate_channel(r#""; DROP TABLE--"#).is_err());
     }
 
@@ -1744,6 +1730,5 @@ mod tests {
                 "el error debe mencionar la variable faltante, got: {err}"
             );
         }
-
     }
 }
