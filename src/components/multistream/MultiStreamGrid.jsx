@@ -23,15 +23,13 @@ export default function MultiStreamGrid({
   onExit
 }) {
   const t = useT()
-  
-  // Lista de hasta 4 canales simultáneos
+
   const [channels, setChannels] = useState(() => {
     const list = ['', '', '', '']
     if (initialChannel) list[0] = initialChannel
     return list
   })
-  
-  // Número de celdas visibles por defecto (2 = Dual, 3 = Triple, 4 = Quad)
+
   const [gridCount, setGridCount] = useState(2)
   const [focusedAudioIdx, setFocusedAudioIdx] = useState(0)
   const [activeChatIdx, setActiveChatIdx] = useState(0)
@@ -43,7 +41,7 @@ export default function MultiStreamGrid({
       copy[index] = newChannel
       return copy
     })
-    // Si es el primer canal, activarle automáticamente el chat
+
     if (!channels[activeChatIdx]) {
       setActiveChatIdx(index)
     }
@@ -59,7 +57,6 @@ export default function MultiStreamGrid({
 
   const activeChatChannel = channels[activeChatIdx] || channels.find(c => c !== '') || ''
 
-  // Disposiciones de clase grid según la cantidad de celdas
   const getGridClasses = () => {
     if (gridCount === 2) return 'grid-cols-1 md:grid-cols-2 grid-rows-2 md:grid-rows-1'
     if (gridCount === 3) return 'grid-cols-1 md:grid-cols-2 grid-rows-2'
@@ -68,9 +65,9 @@ export default function MultiStreamGrid({
 
   return (
     <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-bg-primary overflow-hidden">
-      {/* Zona principal del Grid Multi-Stream */}
+      {}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 p-3 sm:p-4 gap-3">
-        {/* Cabecera superior del Grid */}
+        {}
         <div className="flex items-center justify-between gap-3 px-4 py-2 rounded-2xl bg-bg-secondary/80 border border-white/[0.06] backdrop-blur-md shrink-0 shadow-lg">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-twitch to-fuchsia-500 flex items-center justify-center text-white shadow-md shadow-twitch/30">
@@ -82,7 +79,7 @@ export default function MultiStreamGrid({
             </div>
           </div>
 
-          {/* Selector de Layout y Controles de Vista */}
+          {}
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex p-1 rounded-xl bg-bg-tertiary border border-white/10 gap-1">
               {[
@@ -127,7 +124,7 @@ export default function MultiStreamGrid({
           </div>
         </div>
 
-        {/* Cuadrícula de transmisiones en directo */}
+        {}
         <div className={`flex-1 grid gap-3 min-h-0 min-w-0 ${getGridClasses()}`}>
           {Array.from({ length: gridCount }).map((_, i) => (
             <div
@@ -153,13 +150,13 @@ export default function MultiStreamGrid({
         </div>
       </div>
 
-      {/* Panel de Chat Lateral Multistop */}
+      {}
       {showChatPanel && (
         <div className={`w-full md:w-80 lg:w-96 shrink-0 flex flex-col bg-bg-secondary/90 border-t md:border-t-0 ${
           chatOnRight ? 'md:border-l' : 'md:border-r'
         } border-white/[0.06] backdrop-blur-xl transition-all duration-300`}>
-          
-          {/* Pestañas de Conmutación Rápida de Chat entre Canales Activos */}
+
+          {}
           <div className="flex items-center gap-1 p-2 border-b border-white/[0.06] bg-bg-tertiary/70 overflow-x-auto no-scrollbar">
             <span className="text-[11px] font-bold uppercase text-text-muted tracking-wider px-2 shrink-0 flex items-center gap-1">
               <PhosphorIcon name="Chats" size={14} className="text-twitch" weight="duotone" />
@@ -188,7 +185,7 @@ export default function MultiStreamGrid({
             )}
           </div>
 
-          {/* Renderizado de Chat Activo */}
+          {}
           <div className="flex-1 min-h-[300px] flex flex-col overflow-hidden">
             {activeChatChannel ? (
               <Suspense fallback={<ChatFallback />}>

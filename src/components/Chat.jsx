@@ -2,20 +2,13 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL, getHeaders } from '../utils/twitch'
 import PhosphorIcon from './icons/PhosphorIcon'
 import { adjustColorContrast } from '../utils/format'
-// WT-20260628-56: menu contextual estilo Twitch + provider de
-// moderacion. El Provider se monta en App.jsx; aqui solo consumimos.
-// NOTA: useChannelRole NO se usa aqui para evitar una llamada extra a
-// Helix por cada Chat montado — App.jsx ya hace esa llamada y la
-// propagamos como prop `isModerator` abajo.
+
 import { MessageContextMenu } from './moderation/MessageContextMenu'
 import { useModerationDialogSafe } from './moderation/moderationContextValue'
 import { useT } from '../utils/i18n'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { safeOpenUrl, isTauri } from '../utils/tauriEnv'
 
-// FIX-5 (Hank / P0): helper para pedir `user(login: $login) { id }`
-// usando variables GraphQL (no interpolacion) + validacion previa
-// (sanitizeChannelForGraphQL). Devuelve el id o null si falla.
 async function gqlGetUserIdByLogin(channel) {
   const login = sanitizeChannelForGraphQL(channel)
   if (!login) return null
@@ -45,7 +38,7 @@ function loadCustomClientId() {
   try { return localStorage.getItem('blinkstream_custom_client_id') || '' } catch { return '' }
 }
 function saveCustomClientId(id) {
-  try { localStorage.setItem('blinkstream_custom_client_id', id || '') } catch { /* ignore */ }
+  try { localStorage.setItem('blinkstream_custom_client_id', id || '') } catch {  }
 }
 
 const EMOTE_RE = /^[\w-]+$/
@@ -299,7 +292,6 @@ async function fetchBadgesForChannel(channel) {
 
   return dict
 }
-
 
 function UserCardPopup({ username, position, onClose }) {
   const [info, setInfo] = useState(null)
@@ -1058,7 +1050,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
     setConnError('')
     setMessages([])
     lineBufferRef.current = ''
-    
+
     // Búfer por lotes (Batching Buffer) para evitar tormentas de re-renders
     const msgBatch = []
     const batchInterval = setInterval(() => {
@@ -1444,7 +1436,6 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
       if (unlistenFn) unlistenFn();
     };
   }, [isOverlay, parseChatCommand]);
-
 
   return (
     <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>

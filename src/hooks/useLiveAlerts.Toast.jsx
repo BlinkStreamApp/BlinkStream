@@ -1,22 +1,6 @@
-/**
- * @file Toast UI para alertas de canales en vivo (componente puro).
- * Se separa del hook `useLiveAlerts` para que el fast-refresh de Vite
- * funcione correctamente: si el archivo mezcla componentes + hooks
- * + constantes, HMR se rompe.
- */
+
 import { useEffect } from 'react'
 
-/**
- * Toast individual que aparece en la esquina inferior derecha. Se
- * auto-dismiss a los 8s y permite click para ir al canal.
- *
- * @param {object} props
- * @param {string} props.message
- * @param {string} props.channel
- * @param {string} [props.logo]
- * @param {() => void} props.onClick
- * @param {() => void} props.onDismiss
- */
 export function Toast({ message, channel, logo, onClick, onDismiss }) {
   useEffect(() => {
     const timer = setTimeout(onDismiss, 8000)

@@ -40,7 +40,6 @@ export default function QualitySelector({ current, onChange, qualities = [], isS
   const rawItems = (qualities && qualities.length > 0 ? qualities : FALLBACK_QUALITIES.map(q => q.value))
     .filter(q => q && q.toLowerCase() !== 'best')
 
-  // Aseguramos que el valor actual o las resoluciones clave como 1440p/963p estén accesibles en el desplegable de respaldo
   const items = Array.from(new Set([...rawItems]))
   const effective = items.includes(current) ? current : (items[items.length - 1] || '1080p60')
 

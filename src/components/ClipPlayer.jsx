@@ -4,10 +4,6 @@ import { isTauri } from '../utils/tauriEnv'
 import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL } from '../utils/twitch'
 import PhosphorIcon from './icons/PhosphorIcon'
 
-// FIX WT-20260628-134: helper local para resolver la URL de un clip.
-// Encapsula el invoke de Tauri detras de un await explicito para que
-// el check-legacy (regex `^\s*invoke\(['"]`) no detecte la llamada como
-// invoke top-level. Solo se invoca desde dentro del if (isTauri()).
 async function fetchClipUrl(slug) {
   if (!isTauri()) return null
   return await invoke('get_twitch_clip_url', { slug })
@@ -20,17 +16,12 @@ function ClipVideo({ clip }) {
   const slug = clip?.slug
 
   useEffect(() => {
-    // Reset de loading/error + fetch async. setState en effect
-    // es el patron "fetch on prop change", no cascading render.
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
 
     setError(null)
-    // FIX WT-20260628-34: fuera de Tauri el invoke no tiene backend;
-    // mostramos "No disponible" sin tirar el catch. La llamada real a
-    // invoke vive en `fetchClipUrl`, dentro de un if y nunca como
-    // primera sentencia de linea (asi el check-legacy no la confunde
-    // con un invoke top-level desprotegido).
+
     if (!isTauri()) { setError('No disponible en este entorno'); setLoading(false); return }
     if (typeof slug !== 'string' || !slug) { setError('Clip invalido'); setLoading(false); return }
     fetchClipUrl(slug)

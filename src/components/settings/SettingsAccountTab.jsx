@@ -1,12 +1,4 @@
-/**
- * @file Tab "Cuenta" del modal de Settings (M-1 / WT-20260628-13).
- * Muestra info de la cuenta Twitch del viewer y un boton de logout.
- *
- * FIX WT-20260628-52 (P1): antes recibia `twitchUsername`, `twitchAvatar`
- * y `onLogout` como props desde Settings.jsx, pero nadie las pasaba
- * desde App.jsx. Ahora consume el hook `useAuth` directamente — el
- * tab sigue funcionando sin prop-drilling desde el callsite.
- */
+
 
 import { useT } from '../../utils/i18n'
 import { useAuth } from '../../hooks/useAuth'
@@ -14,9 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 export function SettingsAccountTab() {
   const t = useT()
   const { user, avatar, logout } = useAuth()
-  // El username vive en user.username (legacy) o en
-  // user.identities[0].identity_data.login (shape Supabase). Caemos
-  // al primero que exista, con fallback al primer caracter.
+
   const twitchUsername = user?.username
     || user?.identities?.[0]?.identity_data?.login
     || null

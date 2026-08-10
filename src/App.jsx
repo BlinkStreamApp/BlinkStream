@@ -4,10 +4,7 @@ import StreamInfo from './components/StreamInfo'
 import ConfirmDialog from './components/ConfirmDialog'
 import PhosphorIcon from './components/icons/PhosphorIcon'
 import DiskSpaceIndicator from './components/recording/DiskSpaceIndicator'
-// FIX P1-4: Provider que monta useGlobalRecording UNA sola vez. Los
-// 3 componentes de recording (toggle, drawer, disk indicator) leen
-// del context en vez de tener su propio polling. Evita 2-3 pollees
-// paralelos cada 10s.
+
 import { RecordingProvider } from './components/recording/RecordingContext'
 import { BlinkStreamLogo } from './components/BlinkStreamLogo'
 import { getUserIdByLogin, validateToken, clearStoredToken, getHeaders, getHelixClientId } from './utils/twitch'
@@ -26,9 +23,6 @@ const ModPanel = lazy(() => import('./components/moderation/ModPanel'))
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
-// M-8: DebugPanel solo en dev. Lazy + DEV guardean para que Vite
-// haga dead-code elimination en el build de produccion y el bundle
-// ni siquiera incluya DebugPanel.jsx.
 const DebugPanel = import.meta.env.DEV
   ? lazy(() => import('./components/DebugPanel'))
   : null
@@ -44,11 +38,7 @@ import { relaunch } from '@tauri-apps/plugin-process'
 import { logError } from './utils/errors'
 import { isTauri } from './utils/tauriEnv'
 import { useT } from './utils/i18n'
-// WT-20260628-56: sistema de moderacion cableado estilo Twitch.
-// ModerationProvider expone openAction/closeAction para que el click
-// derecho en Chat.jsx pueda disparar el ActionModal sin acoplarse a
-// App. ModPanel es el drawer lateral con los 6 tabs (VIEWERS / MODS /
-// VIPS / BANS / TIMEOUTS / SETTINGS).
+
 import { ModerationProvider } from './components/moderation/ModerationContext'
 
 function PlayerFallback() {
@@ -71,15 +61,12 @@ function ChatFallback() {
 }
 
 function TitleBar() {
-  // FIX WT-20260628-34: getCurrentWindow() falla fuera de Tauri porque
-  // internamente accede a `window.__TAURI_INTERNALS__.metadata`, que no
-  // existe en el browser. Solo construimos `win` si el runtime de Tauri
-  // esta presente.
+
   const win = isTauri() ? getCurrentWindow() : null
 
-  const handleMinimize = () => { try { win?.minimize() } catch { try { getCurrentWindow().minimize() } catch { /* no-op: Tauri no listo */ } } }
-  const handleMaximize = () => { try { win?.toggleMaximize() } catch { try { getCurrentWindow().toggleMaximize() } catch { /* no-op: Tauri no listo */ } } }
-  const handleClose = () => { try { win?.close() } catch { try { getCurrentWindow().close() } catch { /* no-op: Tauri no listo */ } } }
+  const handleMinimize = () => { try { win?.minimize() } catch { try { getCurrentWindow().minimize() } catch {  } } }
+  const handleMaximize = () => { try { win?.toggleMaximize() } catch { try { getCurrentWindow().toggleMaximize() } catch {  } } }
+  const handleClose = () => { try { win?.close() } catch { try { getCurrentWindow().close() } catch {  } } }
 
   return (
     <div data-tauri-drag-region className="flex items-center h-8 bg-bg-primary border-b border-bg-tertiary/20 select-none shrink-0 relative z-[100000]">
@@ -113,7 +100,7 @@ function loadFrom(key, fallback) {
 }
 
 function saveTo(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* ignore */ }
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch {  }
 }
 
 function loadFavorites() { return loadFrom('blinkstream_favorites', []).filter(f => typeof f === 'string') }
@@ -132,7 +119,7 @@ function MainApp() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('popout')) {
-      try { window.close() } catch { /* ignore */ }
+      try { window.close() } catch {  }
     }
   }, [])
 
@@ -158,24 +145,20 @@ function MainApp() {
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('blinkstream_onboarded')
   })
-  // WT-20260628-14: estado del panel de Channel Points
+
   const [showCPPanel, setShowCPPanel] = useState(() => {
     try { return localStorage.getItem('bs.cpPanel.open') === '1' } catch { return false }
   })
-  // WT-20260628-56: estado del panel de moderacion (M1). Toggle desde
-  // el boton Shield de la topbar; solo visible si el viewer es mod/broadcaster.
+
   const [showModPanel, setShowModPanel] = useState(() => {
     try { return localStorage.getItem('bs.modPanel.open') === '1' } catch { return false }
   })
-  // WT-20260628-56: toast efimero disparado por ModerationContext cuando
-  // una accion directa (copy, delete, whisper) o modal (ban/timeout)
-  // termina. Vive aqui porque ya tenemos la infraestructura de
-  // useLiveAlerts.Toast y queremos reusar el mismo look.
+
   const [modToast, setModToast] = useState(null)
   const showModToast = useCallback((toast) => {
     if (!toast) return
     setModToast(toast)
-    // auto-dismiss
+
     setTimeout(() => { setModToast(curr => (curr === toast ? null : curr)) }, 3000)
   }, [])
   const [broadcasterId, setBroadcasterId] = useState(null)
@@ -253,8 +236,7 @@ function MainApp() {
   }, [])
 
   useEffect(() => {
-    // setShowChat en effect: estado UI derivado del ancho de ventana
-    // (debajo del breakpoint ocultamos el chat). No es cascading render.
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (windowWidth < CHAT_BREAKPOINT) setShowChat(false)
   }, [windowWidth])
@@ -264,42 +246,32 @@ function MainApp() {
   useEffect(() => { localStorage.setItem('blinkstream_quality', quality) }, [quality])
   useEffect(() => { localStorage.setItem('blinkstream_volume', String(volume)) }, [volume])
   useEffect(() => { localStorage.setItem('blinkstream_theatre', String(theatreMode)) }, [theatreMode])
-  // WT-20260628-14: persistencia del panel de Channel Points
+
   useEffect(() => {
-    try { localStorage.setItem('bs.cpPanel.open', showCPPanel ? '1' : '0') } catch { /* ignore */ }
+    try { localStorage.setItem('bs.cpPanel.open', showCPPanel ? '1' : '0') } catch {  }
   }, [showCPPanel])
-  // WT-20260628-56: persistencia del panel de moderacion
+
   useEffect(() => {
-    try { localStorage.setItem('bs.modPanel.open', showModPanel ? '1' : '0') } catch { /* ignore */ }
+    try { localStorage.setItem('bs.modPanel.open', showModPanel ? '1' : '0') } catch {  }
   }, [showModPanel])
-  // WT-20260628-56: detectar rol del viewer en el canal actual para
-  // gating del boton Shield. broadcasterId puede ser null (cargando o
-  // sin canal seleccionado); userId puede ser null (no logueado). En
-  // ambos casos isModerator es false y el boton no se renderiza.
+
   const roleState = useChannelRole({ broadcasterId, userId: viewerUserId, channel })
 
-  // WT-20260628-14: resolver broadcaster_id del canal actual.
-  // Lo necesitamos para Channel Points y para detect isBroadcaster.
   useEffect(() => {
     let cancelled = false
-    // Reset + fetch: patron de "estado desde fuente externa".
-    // El setState sincrono al inicio es para evitar UI stale; el .then
-    // resuelve el broadcasterId real. No es cascading render.
+
     if (!channel) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setBroadcasterId(null); return
     }
-     
-    setBroadcasterId(null) // limpiamos para no mostrar UI stale
+
+    setBroadcasterId(null) 
     getUserIdByLogin(channel).then(id => {
       if (!cancelled) setBroadcasterId(id)
     })
     return () => { cancelled = true }
   }, [channel])
 
-  // WT-20260628-14: resolver user_id del viewer logueado.
-  // Si no estamos logueados, queda null. Usamos cache local para
-  // no pegarle a Twitch en cada mount.
   useEffect(() => {
     if (!isLoggedIn || viewerUserId) return
     const token = getTwitchToken()
@@ -313,7 +285,7 @@ function MainApp() {
         const id = data?.data?.[0]?.id
         if (!cancelled && id) {
           setViewerUserId(id)
-          try { localStorage.setItem('bs.twitch.viewer_userid', id) } catch { /* ignore */ }
+          try { localStorage.setItem('bs.twitch.viewer_userid', id) } catch {  }
         }
       })
       .catch(() => {})
@@ -322,17 +294,6 @@ function MainApp() {
 
   const username = user?.username || user?.identities?.[0]?.identity_data?.login || null
 
-  // FIX WT-20260628-82 (Bug A): guardamos `favorites` en un ref para que
-  // el effect de merge NO se re-dispare cuando toggleFavorite modifica
-  // el array. Antes `favorites` estaba en las deps, lo que provocaba
-  // un loop: toggle -> setFavorites -> effect re-corre -> mergeFavorites
-  // hace GET a blinkstream-data -> si 401, limpia token pero el effect
-  // se vuelve a disparar porque favorites cambio -> 500+ requests.
-  //
-  // El merge ahora se ejecuta UNA vez por (username, getTwitchToken).
-  // Los toggles individuales (addCloudFavorite/removeCloudFavorite)
-  // se llaman directamente desde toggleFavorite, asi que no necesitan
-  // re-merge.
   const favoritesRef = useRef(favorites)
   useEffect(() => { favoritesRef.current = favorites }, [favorites])
 
@@ -379,7 +340,6 @@ function MainApp() {
     })
   }, [])
 
-  // Mando a Distancia Wi-Fi Móvil: Escuchar órdenes del móvil vía IPC y reflejar en la interfaz de BlinkStream
   useEffect(() => {
     if (!isTauri()) return;
     let unlisten = null;
@@ -412,7 +372,6 @@ function MainApp() {
     };
   }, [selectChannel]);
 
-  // Obtener avatar del canal actualmente reproduciéndose para mostrar su foto en el Mando Wi-Fi
   const [fetchedCompanionAvatar, setFetchedCompanionAvatar] = useState({ channel: '', url: '' });
   const favoriteCompanionAvatar = channel
     ? (liveFavorites || []).find(f => typeof f === 'object' && f.name?.toLowerCase() === channel.toLowerCase())?.avatar || ''
@@ -434,12 +393,11 @@ function MainApp() {
         if (data?.data?.[0]?.profile_image_url && !controller.signal.aborted) {
           setFetchedCompanionAvatar({ channel, url: data.data[0].profile_image_url });
         }
-      } catch { /* ignore aborts and fetch errors */ }
+      } catch {  }
     });
     return () => { controller.abort(); };
   }, [channel, favoriteCompanionAvatar]);
 
-  // Sincronizar estado actual hacia el servidor local del Mando Wi-Fi para que el móvil muestre datos del directo
   useEffect(() => {
     if (!isTauri()) return;
     try {
@@ -456,7 +414,7 @@ function MainApp() {
         favoritesLive: favsToSend,
         avatar: companionAvatar,
       }).catch(() => {});
-    } catch { /* ignore */ }
+    } catch {  }
   }, [channel, volume, viewMode, liveFavorites, favorites, companionAvatar]);
 
   const toggleFavorite = useCallback((name) => {
@@ -481,13 +439,7 @@ function MainApp() {
   }, [])
 
   return (
-    // FIX P1-4: RecordingProvider envuelve toda la app para que los 3
-    // componentes de recording compartan un solo polling. El Provider
-    // monta useGlobalRecording() una vez; useRecordingContext() lo lee.
-    // WT-20260628-56: ModerationProvider da acceso a openAction/
-    // closeAction desde cualquier hijo (Chat.jsx lo usa para el menu
-    // contextual del click derecho). El Provider monta el ActionModal
-    // una sola vez y lo asocia a la accion actual del context.
+
     <RecordingProvider>
     <ModerationProvider
       broadcasterId={broadcasterId}
@@ -534,20 +486,12 @@ function MainApp() {
             <span className="hidden sm:inline">Mando Wi-Fi</span>
           </button>
 
-          {/* WT-20260628-49: espacio flexible que empuja el avatar al extremo derecho */}
+          {}
           <div className="flex-1" />
 
-          {/* WT-20260628-49: grupo centro-derecha — Settings (gear) + Ocultar chat.
-              Ambos botones viven siempre visibles, independientes del canal
-              seleccionado. El chat toggle ya no esta gateado por `channel` para
-              permitir ocultar/mostrar la barra de chat en cualquier momento. */}
+          {}
           <div className="flex items-center gap-1">
-            {/* WT-20260628-56: boton Shield para abrir el panel de
-                moderacion. Solo visible si el viewer es broadcaster o
-                mod en el canal actual Y hay un canal seleccionado.
-                roleState.loading puede ser true durante la primera
-                consulta a Helix; mientras tanto el boton no se muestra
-                (mejor que mostrarlo y ocultarlo a los pocos ms). */}
+            {}
             {channel && roleState.isModerator && !roleState.loading && (
               <button
                 onClick={() => setShowModPanel(p => !p)}
@@ -581,8 +525,7 @@ function MainApp() {
             </button>
           </div>
 
-          {/* WT-20260628-49: grupo derecho — avatar del usuario con borde izquierdo visible
-              que lo separa claramente del grupo de controles */}
+          {}
           {isLoggedIn ? (
             <div className="relative z-[9998] flex items-center gap-2 pl-3 ml-2 border-l border-bg-tertiary/50">
               <button
@@ -716,7 +659,7 @@ function MainApp() {
       {showSettings && <Suspense fallback={null}><Settings onClose={handleCloseSettings} /></Suspense>}
       {showCompanionModal && <Suspense fallback={null}><CompanionModal onClose={() => setShowCompanionModal(false)} /></Suspense>}
       {showAbout && <Suspense fallback={null}><AboutDialog onClose={() => setShowAbout(false)} /></Suspense>}
-      {/* WT-20260628-14: Panel de Channel Points (P1 + P2) */}
+      {}
       {channel && broadcasterId && (
         <Suspense fallback={null}><CPPanel
           open={showCPPanel}
@@ -728,13 +671,7 @@ function MainApp() {
           isBroadcaster={!!viewerUserId && viewerUserId === broadcasterId}
         /></Suspense>
       )}
-      {/* WT-20260628-56: Panel de moderacion lateral. Misma firma
-          que CPPanel: open + onClose + broadcasterId/userId. El
-          ModPanel tiene su propio `useModeration` y `useChannelRole`
-          internos; aqui solo le pasamos las props. Se monta aunque
-          el viewer no sea mod para que el componente pueda mostrar
-          el empty-state "no tienes permisos" en vez de un null
-          silencioso. */}
+      {}
       {channel && (
         <Suspense fallback={null}><ModPanel
           open={showModPanel && roleState.isModerator}
@@ -769,21 +706,17 @@ function MainApp() {
         </div>
       )}
 
-      {/* M-8: DebugPanel solo visible en dev. Ver guard arriba. */}
+      {}
       {DebugPanel && (
         <Suspense fallback={null}>
           <DebugPanel />
         </Suspense>
       )}
 
-      {/* G1 / WT-20260628-16: indicador de espacio en disco (bottom bar) */}
+      {}
       <DiskSpaceIndicator />
 
-      {/* WT-20260628-56: toast efimero de feedback de moderacion.
-          Renderizado fuera del Provider para que sea visible incluso
-          si la accion cierra el modal. Posicion: esquina inferior
-          derecha, encima del DiskSpaceIndicator (que vive en su
-          propio slot). Auto-dismiss via showModToast. */}
+      {}
       {modToast && (
         <div
           role="status"

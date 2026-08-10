@@ -1,8 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    // El nombre global evita que instalaciones antiguas y actuales puedan
-    // ejecutarse simultaneamente desde rutas distintas.
+
     if !blinkstream_lib::try_lock_single_instance("BlinkStream_App") {
         #[cfg(windows)]
         {

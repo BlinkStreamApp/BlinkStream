@@ -1,16 +1,4 @@
-/**
- * @file Tabla de gestion de recompensas para el broadcaster (P2 / WT-20260628-14).
- *
- * @typedef {object} ManageRewardsProps
- * @property {Array<object>} rewards
- * @property {boolean} loading
- * @property {string|null} error
- * @property {() => void} onRefresh
- * @property {() => void} onNewReward
- * @property {(reward: object) => void} onEdit
- * @property {(id: string, isEnabled: boolean) => void} onToggle
- * @property {(id: string) => void} onArchive
- */
+
 
 import { useState, useMemo } from 'react'
 import { t } from '../../utils/i18n'
@@ -52,7 +40,7 @@ export default function ManageRewards({ rewards, loading, error, onRefresh, onNe
 
   return (
     <div className="space-y-3">
-      {/* Header: filtros + sort + new */}
+      {}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex gap-1">
           {FILTERS.map(f => (
@@ -109,7 +97,7 @@ export default function ManageRewards({ rewards, loading, error, onRefresh, onNe
               key={r.id}
               className="flex items-center gap-3 p-2.5 rounded-lg border border-bg-tertiary/40 bg-bg-tertiary/20 hover:bg-bg-tertiary/40 transition-colors"
             >
-              {/* Mini imagen */}
+              {}
               <div
                 className="w-10 h-10 rounded-md shrink-0 flex items-center justify-center text-white/80 text-sm font-bold overflow-hidden"
                 style={{ backgroundColor: r.background_color || '#9146ff' }}
@@ -121,7 +109,7 @@ export default function ManageRewards({ rewards, loading, error, onRefresh, onNe
                 )}
               </div>
 
-              {/* Info */}
+              {}
               <div className="flex-1 min-w-0">
                 <p className="text-[12px] font-medium text-text-primary truncate">{r.title}</p>
                 <div className="flex items-center gap-2 text-[10px] text-text-muted mt-0.5">
@@ -135,7 +123,7 @@ export default function ManageRewards({ rewards, loading, error, onRefresh, onNe
                 </div>
               </div>
 
-              {/* Toggle */}
+              {}
               <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
                 <span className="text-[10px] text-text-muted">{t('cp.manage.enabled')}</span>
                 <button
@@ -155,7 +143,7 @@ export default function ManageRewards({ rewards, loading, error, onRefresh, onNe
                 </button>
               </label>
 
-              {/* Actions */}
+              {}
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => onEdit(r)}

@@ -23,13 +23,12 @@ export default function GridCell({
   const [streamUrl, setStreamUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  
-  // Controles de Reproductor integrado
+
   const [isPlaying, setIsPlaying] = useState(true)
   const [quality, setQuality] = useState(gridCount >= 3 ? '720p60' : '1080p60')
   const [volume, setVolume] = useState(() => {
     const v = Number(localStorage.getItem('blinkstream_volume'))
-    return !isNaN(v) && v > 0 ? v : 40 // Default seguro al 40% para evitar daños de audición
+    return !isNaN(v) && v > 0 ? v : 40 
   })
 
   const videoRef = useRef(null)
@@ -94,13 +93,12 @@ export default function GridCell({
       hls.loadSource(streamUrl)
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().then(() => setIsPlaying(true)).catch(() => {/* ignore play policy error */})
+        video.play().then(() => setIsPlaying(true)).catch(() => {})
       })
       hlsRef.current = hls
     }
   }, [streamUrl])
 
-  // Ajuste preciso y seguro de volumen
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.muted = !isAudioFocused || volume === 0
@@ -115,7 +113,7 @@ export default function GridCell({
     setVolume(v)
     try {
       localStorage.setItem('blinkstream_volume', String(v))
-    } catch { /* ignore */ }
+    } catch {  }
   }
 
   const togglePlayPause = () => {
@@ -124,12 +122,12 @@ export default function GridCell({
     if (!video.paused) {
       video.pause()
       if (hlsRef.current) {
-        try { hlsRef.current.stopLoad() } catch { /* ignore */ }
+        try { hlsRef.current.stopLoad() } catch {  }
       }
       setIsPlaying(false)
     } else {
       if (hlsRef.current) {
-        try { hlsRef.current.startLoad() } catch { /* ignore */ }
+        try { hlsRef.current.startLoad() } catch {  }
       }
       video.play().then(() => setIsPlaying(true)).catch(() => {})
       setIsPlaying(true)
@@ -144,7 +142,6 @@ export default function GridCell({
     }
   }
 
-  // Celda vacía para añadir nuevo canal
   if (!channel) {
     return (
       <div className="w-full h-full min-h-[200px] bg-bg-secondary/70 border border-dashed border-white/15 rounded-2xl flex flex-col items-center justify-center p-6 text-center hover:border-twitch/60 transition-all group">
@@ -153,7 +150,7 @@ export default function GridCell({
         </div>
         <h4 className="text-[14px] font-bold text-text-primary mb-1">{t('grid.emptyCell', 'Celda de directo vacía')}</h4>
         <p className="text-[12px] text-text-muted mb-4">{t('grid.addChannel', 'Añadir canal en vivo...')}</p>
-        
+
         <form onSubmit={handleFormSubmit} className="flex gap-2 w-full max-w-[240px]">
           <input
             type="text"
@@ -173,10 +170,9 @@ export default function GridCell({
     )
   }
 
-  // Celda con canal reproduciendo y controles de Mini-Reproductor Pro
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl group flex flex-col justify-between">
-      {/* Contenedor del video */}
+      {}
       <div className="absolute inset-0 z-0 flex items-center justify-center bg-bg-primary">
         {loading && (
           <div className="flex flex-col items-center gap-2 z-10">
@@ -215,7 +211,7 @@ export default function GridCell({
         )}
       </div>
 
-      {/* Cabecera flotante con controles de reproductor en tiempo real */}
+      {}
       <div className="relative z-20 flex items-center justify-between p-2.5 bg-gradient-to-b from-black/90 via-black/50 to-transparent opacity-95 group-hover:opacity-100 transition-opacity gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -228,7 +224,7 @@ export default function GridCell({
           <LiveBadge />
           <span className="font-extrabold text-[13px] text-white tracking-tight truncate shadow-sm">{channel}</span>
 
-          {/* Selector de Calidad Dinámico del Grid */}
+          {}
           <select
             value={quality}
             onChange={(e) => setQuality(e.target.value)}
@@ -242,7 +238,7 @@ export default function GridCell({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Foco de Audio + Slider Anti-Sordera */}
+          {}
           <div className={`flex items-center gap-1.5 px-1.5 py-1 rounded-lg border transition-all ${
             isAudioFocused
               ? 'bg-twitch/30 border-twitch shadow-[0_0_15px_rgba(145,70,255,0.4)]'
@@ -271,7 +267,7 @@ export default function GridCell({
             )}
           </div>
 
-          {/* Seleccionar como Chat activo */}
+          {}
           <button
             onClick={() => onSelectChat(index, channel)}
             title={`${t('grid.chatSelector', 'Chat Activo:')} ${channel}`}
@@ -284,7 +280,7 @@ export default function GridCell({
             <PhosphorIcon name="ChatCircleDots" size={17} weight={isChatActive ? "fill" : "regular"} />
           </button>
 
-          {/* Salir a modo reproductor individual en grande */}
+          {}
           {onSelectSingleChannel && (
             <button
               onClick={() => onSelectSingleChannel(channel)}
@@ -295,7 +291,7 @@ export default function GridCell({
             </button>
           )}
 
-          {/* Eliminar celda */}
+          {}
           <button
             onClick={() => onRemove(index)}
             title={t('grid.remove', 'Quitar stream de la celda')}
@@ -306,7 +302,7 @@ export default function GridCell({
         </div>
       </div>
 
-      {/* Borde interactivo si el audio está enfocado */}
+      {}
       {isAudioFocused && (
         <div className="absolute inset-0 z-10 pointer-events-none border-2 border-twitch/80 rounded-2xl shadow-[inset_0_0_20px_rgba(145,70,255,0.3)]" />
       )}

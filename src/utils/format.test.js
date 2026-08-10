@@ -1,6 +1,5 @@
-// Tests de funciones puras de formato.
-// Cobertura: formatViewers, formatDuration y formatDurationHMS
-// (ver WT-20260628-01 / M-4 y WT-20260628-52 / FIX P1 deduplicacion).
+
+
 import { describe, it, expect } from 'vitest'
 import { formatViewers, formatDuration, formatDurationHMS, adjustColorContrast } from './format'
 

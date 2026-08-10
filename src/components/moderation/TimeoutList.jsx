@@ -1,20 +1,4 @@
-/**
- * @file Lista de timeouts activos con countdown live (M-1 / WT-20260628-13).
- * Cada entrada actualiza HH:MM:SS cada segundo hasta expirar.
- *
- * @typedef {object} TimeoutEntry
- * @property {string} user_id
- * @property {string} user_login
- * @property {string} user_name
- * @property {string} [reason]
- * @property {string} expires_at     - ISO timestamp
- * @property {string} [created_at]
- *
- * @typedef {object} TimeoutListProps
- * @property {TimeoutEntry[]} timeouts
- * @property {(timeout: TimeoutEntry) => void} [onUntimeout]
- * @property {boolean} [loading]
- */
+
 
 import { useEffect, useState } from 'react'
 import { formatRemaining } from '../../hooks/useModeration'
@@ -28,7 +12,7 @@ function useTick(intervalMs = 1000) {
 }
 
 export function TimeoutList({ timeouts, onUntimeout, loading }) {
-  // Re-render cada segundo para refrescar los countdowns
+
   useTick(1000)
 
   return (
@@ -50,13 +34,7 @@ export function TimeoutList({ timeouts, onUntimeout, loading }) {
         {!loading && timeouts.length > 0 && (
           <ul className="divide-y divide-bg-tertiary/30">
             {timeouts.map(t => {
-              // `useTick` re-renderiza cada segundo, asi que el componente
-              // ya se re-renderiza con un `now` fresco. `Date.now()` aqui
-              // es un snapshot por render que se descarta en el proximo
-              // tick — coincide con la semantica de "contador regresivo
-              // hacia expires_at". La regla `react-hooks/purity` exige
-              // que esto sea explicito: lo justificamos porque el render
-              // esta sincronizado con el tick externo.
+
               // eslint-disable-next-line react-hooks/purity
               const now = Date.now()
               const remaining = t.expires_at ? Math.max(0, Math.floor((new Date(t.expires_at).getTime() - now) / 1000)) : 0

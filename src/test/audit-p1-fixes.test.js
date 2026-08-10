@@ -10,10 +10,6 @@ import { fileURLToPath } from 'node:url'
 
 const readSrc = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
 
-// ============================================================
-// FIX 1 (Hank / P1): tests de regresion para secureRandomInt.
-// CWE-330: Use of Insufficiently Random Values.
-// ============================================================
 describe('FIX 1: secureRandomInt', () => {
   it('devuelve un entero en [0, max)', () => {
     for (let i = 0; i < 100; i++) {
@@ -51,20 +47,6 @@ describe('FIX 1: secureRandomInt', () => {
   })
 })
 
-// ============================================================
-// FIX 2 (Hank / P1): abrir URLs externas con noopener,noreferrer
-// ============================================================
-// WT-20260628-134: refactor. Antes se validaba que useAuth.js tuviera
-// `window.open(url, '_blank', 'noopener,noreferrer')`. Ahora la politica
-// es MAS estricta: NINGUN archivo debe llamar `window.open(` directo
-// (pre-build hook lo bloquea, CWE-1022 anti-tabnabbing). Toda apertura
-// externa pasa por el helper `safeOpenUrl` en utils/tauriEnv, que
-// garantiza noopener,noreferrer en el path web y usa plugin-opener en
-// Tauri. El test verifica ambas cosas:
-//   1) safeOpenUrl esta exportado desde utils/tauriEnv
-//   2) useAuth.js usa safeOpenUrl en vez de window.open
-//   3) El helper incluye la flag 'noopener,noreferrer'
-// ============================================================
 describe('FIX 2: abrir URLs externas con noopener,noreferrer', () => {
   it('utils/tauriEnv exporta el helper safeOpenUrl', () => {
     const src = readSrc('../utils/tauriEnv.js')
@@ -84,16 +66,13 @@ describe('FIX 2: abrir URLs externas con noopener,noreferrer', () => {
   })
 })
 
-// ============================================================
-// FIX 3 (Hank / P1): console.log de PII gateado a DEV
-// ============================================================
 describe('FIX 3: console.log de PII gateado a DEV', () => {
   it('Chat.jsx declara un guard DEV para el log de Client-ID', () => {
     const src = readSrc('../components/Chat.jsx')
-    // El comentario FIX 3 y el log de Client-ID estan bajo el mismo guard
+
     const idx1 = src.indexOf("'[Auth] Solicitando device code con Client-ID:'")
     expect(idx1).toBeGreaterThan(-1)
-    // Miramos 600 chars hacia atras para encontrar el guard
+
     const ctx = src.substring(Math.max(0, idx1 - 600), idx1)
     expect(ctx).toContain('import.meta.env.DEV')
   })
@@ -107,9 +86,6 @@ describe('FIX 3: console.log de PII gateado a DEV', () => {
   })
 })
 
-// ============================================================
-// FIX 4 (Hank / P1): App Access Token en memoria, no localStorage
-// ============================================================
 describe('FIX 4: App Access Token en memoria, no localStorage', () => {
   it('twitch.js no contiene la key "bs_app_token_cache"', () => {
     const src = readSrc('../utils/twitch.js')
@@ -130,9 +106,6 @@ describe('FIX 4: App Access Token en memoria, no localStorage', () => {
   })
 })
 
-// ============================================================
-// FIX 5 (Hank / P1): eventLog console.log gateado a DEV/error
-// ============================================================
 describe('FIX 5: eventLog console.log gateado a DEV/error', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -165,9 +138,6 @@ describe('FIX 5: eventLog console.log gateado a DEV/error', () => {
   })
 })
 
-// ============================================================
-// FIX 6 (Hank / P1): DebugPanel tree-shakeable via DEV guard
-// ============================================================
 describe('FIX 6: DebugPanel tree-shakeable via DEV guard', () => {
   it('el modulo declara wrapper con guard DEV', () => {
     const src = readSrc('../components/DebugPanel.jsx')
@@ -178,11 +148,9 @@ describe('FIX 6: DebugPanel tree-shakeable via DEV guard', () => {
   })
 
   it('el wrapper retorna null cuando no estamos en DEV', () => {
-    // En Vitest import.meta.env.DEV es true por defecto. Para simular
-    // produccion sin tocar el global (readonly en algunos bundlers),
-    // testeamos via fs que el wrapper existe y tiene la rama null.
+
     const src = readSrc('../components/DebugPanel.jsx')
-    // El wrapper debe tener la forma: if (!import.meta.env.DEV) return null
+
     expect(src).toMatch(/if \(!import\.meta\.env\.DEV\)[\s\S]*?return null/)
   })
 })

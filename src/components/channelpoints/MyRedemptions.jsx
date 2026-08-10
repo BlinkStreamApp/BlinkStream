@@ -1,12 +1,4 @@
-/**
- * @file Lista de redenciones recientes del viewer (P1 / WT-20260628-14).
- *
- * @typedef {object} MyRedemptionsProps
- * @property {Array<object>} redemptions
- * @property {boolean} loading
- * @property {string|null} error
- * @property {() => void} onRefresh
- */
+
 
 import { t } from '../../utils/i18n'
 

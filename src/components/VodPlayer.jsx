@@ -12,8 +12,7 @@ function parseDuration(dur) {
 }
 
 async function getVodM3u8(vodId) {
-  // FIX WT-20260628-34: fuera de Tauri el invoke no tiene backend;
-  // devolvemos null y el componente muestra "No se pudo obtener el VOD".
+
   if (!isTauri()) return null
   try {
     return await invoke('get_vod_manifest_url', { vodId: String(vodId) })
@@ -22,11 +21,7 @@ async function getVodM3u8(vodId) {
 
 async function fetchVods(channel) {
   let userId = null
-  // FIX WT-20260628-124: usar SIEMPRE variables GraphQL para el canal
-  // (defense-in-depth contra CWE-94 Code Injection). Validamos el canal
-  // con sanitizeChannelForGraphQL (regex login Twitch) antes de meterlo
-  // en el payload; ademas, el body es JSON literal sin template strings,
-  // por lo que un canal con comillas o llaves no puede romper la query.
+
   const login = sanitizeChannelForGraphQL(channel)
   if (!login) return []
   try {
@@ -40,7 +35,7 @@ async function fetchVods(channel) {
       signal: AbortSignal.timeout(5000),
     })
     if (gqlRes.ok) { const d = await gqlRes.json(); userId = d?.data?.user?.id }
-  } catch { /* ignore: si falla la query GQL seguimos sin userId */ }
+  } catch {  }
 
   if (!userId) return []
   try {
@@ -72,8 +67,7 @@ function VodVideo({ video }) {
       const hls = new Hls(); hlsRef.current = hls
       hls.loadSource(url); hls.attachMedia(v)
     } else {
-      // HLS no soportado: setError en effect es el patron "estado UI
-      // derivado de la disponibilidad del codec en el browser".
+
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('HLS no soportado')
     }
@@ -99,8 +93,7 @@ export default function VodPlayer({ channel, onClose }) {
   const [activeVod, setActiveVod] = useState(null)
 
   useEffect(() => {
-    // Reset de loading + fetch. setState en effect es el patron
-    // canonico "fetch on mount/channel-change".
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     let c = false; setLoading(true)
     fetchVods(channel).then(v => { if (!c) { setVods(v); setLoading(false) } }).catch(() => { if (!c) setLoading(false) })

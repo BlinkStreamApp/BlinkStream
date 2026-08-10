@@ -1,17 +1,4 @@
-// ============================================================
-// DebugPanel.jsx — Panel de observabilidad en dev (M-8)
-// ============================================================
-// SOLO visible en dev (import.meta.env.DEV). El bundler lo strip-ea
-// en producción porque las refs estáticas se eliminan con dead-code
-// elimination. Aún así, todo el árbol está dentro de una guarda DEV.
-//
-// Muestra:
-//   - FPS estimado (frames en 1s)
-//   - RAM usada (performance.memory, Chrome/Edge only)
-//   - Último invoke latencia
-//   - Event log filtrable por categoría
-//   - Top 10 invokes más lentos
-// ============================================================
+
 
 import { useState, useEffect, useMemo } from 'react'
 import {
@@ -79,38 +66,26 @@ function MetricRow({ label, value, color }) {
   )
 }
 
-// FIX 6 (Hank / P1): cambio 'export default function DebugPanel()'
-// por un wrapper con DEV guard. La implementacion se llama
-// DebugPanelImpl y solo se monta cuando import.meta.env.DEV es true.
-// En produccion, el componente retorna null (early exit), lo que
-// permite al bundler (Vite/Rollup) tree-shakear el modulo entero
-// via el import estatico del wrapper condicional.
-// Sin este guard, todo el modulo (que importa useFps, useMemory,
-// getInvokeStats, etc) terminaba en el bundle de prod aunque el
-// shortcut Ctrl+Shift+D no funcionara.
 function DebugPanelImpl() {
   const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState('metrics') // metrics | events | invokes
+  const [tab, setTab] = useState('metrics') 
   const [category, setCategory] = useState('all')
   const [events, setEvents] = useState(() => getEventLog())
-  const [tick, setTick] = useState(0) // para refrescar stats cada segundo
+  const [tick, setTick] = useState(0) 
   const fps = useFps()
   const mem = useMemory()
 
-  // Suscribirse a nuevos eventos
   useEffect(() => {
     return subscribeEvents(() => {
       setEvents(getEventLog())
     })
   }, [])
 
-  // Refrescar buffers cada 1s
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(id)
   }, [])
 
-  // Hotkey Ctrl+Shift+D
   useEffect(() => {
     const onKey = (e) => {
       if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
@@ -122,11 +97,6 @@ function DebugPanelImpl() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // `tick` solo se usa para forzar re-render cada segundo; las funciones
-  // getInvokeStats/getFetchStats/getSlowestInvokes leen del buffer
-  // compartido, asi que la dep es necesaria (es nuestra forma de polling
-  // manual desde React). Mantenemos `tick` aunque la regla diga
-  // "unnecessary" — es nuestro disparador.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const invokeStats = useMemo(() => getInvokeStats(), [tick])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,7 +114,7 @@ function DebugPanelImpl() {
 
   return (
     <>
-      {/* Botón flotante */}
+      {}
       <button
         onClick={() => setOpen(o => !o)}
         title="Debug panel (Ctrl+Shift+D)"
@@ -187,7 +157,7 @@ function DebugPanelImpl() {
             fontSize: 12,
           }}
         >
-          {/* Header */}
+          {}
           <div
             style={{
               padding: '8px 12px',
@@ -209,7 +179,7 @@ function DebugPanelImpl() {
             </button>
           </div>
 
-          {/* Tabs */}
+          {}
           <div style={{ display: 'flex', borderBottom: '1px solid #334155' }}>
             {[
               ['metrics', 'Metrics'],
@@ -235,7 +205,7 @@ function DebugPanelImpl() {
             ))}
           </div>
 
-          {/* Content */}
+          {}
           <div style={{ overflow: 'auto', flex: 1, padding: 12 }}>
             {tab === 'metrics' && (
               <div>
@@ -379,12 +349,6 @@ function DebugPanelImpl() {
   )
 }
 
-// FIX 6 (Hank / P1): wrapper con DEV guard. En produccion, el modulo
-// retorna un componente no-op (null) y todas sus dependencias (useFps,
-// useMemory, getInvokeStats, getEventLog, etc.) son tree-shakeadas
-// por Vite/Rollup porque el import de DebugPanelImpl nunca se evalua
-// cuando la rama 'false' se compila (Vite sustituye import.meta.env
-// en build time, lo que permite al bundler descartar codigo muerto).
 export default function DebugPanel() {
   if (!import.meta.env.DEV) {
     return null

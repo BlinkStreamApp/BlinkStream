@@ -1,18 +1,10 @@
-// ============================================================
-// i18n.js — Traducciones es/en (M1 / WT-20260628-13)
-// ============================================================
-// Antes: solo 40 keys inline.
-// Ahora: ~70 keys con namespace `mod.*` para M1, `chat.*` para
-// refinamientos futuros, y resto de keys legacy preservadas.
-//
-// Uso: `import { useT } from '../utils/i18n'; const t = useT(); t('mod.tab.viewers')`
-// Si una key no existe en el idioma actual, cae a `es` y finalmente
-// al string de la key (mismo patron que antes).
+
+
 import { useState, useEffect, useCallback } from 'react'
 
 const translations = {
   es: {
-    // Legacy (no tocar para no romper traducciones existentes)
+
     search: 'Buscar canal...',
     settings: 'Configuración',
     about: 'Acerca de BlinkStream',
@@ -54,7 +46,6 @@ const translations = {
     emoteChannel: 'Del canal',
     emoteGlobal: 'Globales',
 
-    // Moderation (M1)
     'mod.tab.viewers': 'Viewers',
     'mod.tab.mods': 'Mods',
     'mod.tab.vips': 'VIPs',
@@ -86,7 +77,6 @@ const translations = {
     'mod.role.viewer': 'VIEWER',
     'mod.unauthorized': 'No tienes permisos de moderador en este canal.',
 
-    // Channel Points (P1 + P2 / WT-20260628-14, fix keys WT-20260628-61)
     'cp.balance.estimated': 'Tu balance de puntos',
     'cp.balance.disclaimer': 'Saldo sincronizado con tu cuenta de Twitch',
     'cp.balance.catalog': 'Catálogo de Recompensas',
@@ -144,7 +134,6 @@ const translations = {
     'cp.manage.sort.title': 'Título',
     'cp.manage.sort.cost': 'Costo',
 
-    // Grabacion global (G1 / WT-20260628-16)
     'rec.global.off': 'Grabacion: OFF',
     'rec.global.armed': 'Grabacion: ARMED',
     'rec.global.on': 'Grabando',
@@ -163,7 +152,6 @@ const translations = {
     'rec.list.unknown': 'Canal en grabacion',
     'rec.list.stop': 'Stop',
 
-    // Instalador y Desinstalador Custom (Bootstrapper)
     'inst.title': 'BlinkStream Setup',
     'inst.subtitle': 'El cliente de Twitch ultralight de nueva generación',
     'inst.feat1.title': 'Rendimiento Extremo & 60 FPS',
@@ -195,7 +183,7 @@ const translations = {
     'uninst.btn.uninstalling': 'Limpiando archivos...',
     'uninst.success.title': 'BlinkStream se ha desinstalado',
     'uninst.success.desc': 'Gracias por haber usado nuestra aplicación. ¡Esperamos verte pronto!', // ALLOWED-REGRESSION: exclamacion espanol
-    // Interfaz UI general y Ajustes
+
     'tab.general': 'General',
     'tab.account': 'Cuenta',
     'tab.moderation': 'Moderación',
@@ -229,7 +217,7 @@ const translations = {
     'aboutMadeWith': 'Hecho con ♥ para la comunidad',
   },
   en: {
-    // Legacy
+
     search: 'Search channel...',
     settings: 'Settings',
     about: 'About BlinkStream',
@@ -271,7 +259,6 @@ const translations = {
     emoteChannel: 'Channel',
     emoteGlobal: 'Global',
 
-    // Moderation (M1)
     'mod.tab.viewers': 'Viewers',
     'mod.tab.mods': 'Mods',
     'mod.tab.vips': 'VIPs',
@@ -303,7 +290,6 @@ const translations = {
     'mod.role.viewer': 'VIEWER',
     'mod.unauthorized': 'You do not have moderator permissions on this channel.',
 
-    // Channel Points (P1 + P2 / WT-20260628-14, fix keys WT-20260628-61)
     'cp.balance.estimated': 'Your points balance',
     'cp.balance.disclaimer': 'Balance synchronized from your Twitch account',
     'cp.balance.catalog': 'Rewards Catalog',
@@ -361,7 +347,6 @@ const translations = {
     'cp.manage.sort.title': 'Title',
     'cp.manage.sort.cost': 'Cost',
 
-    // Global recording (G1 / WT-20260628-16)
     'rec.global.off': 'Recording: OFF',
     'rec.global.armed': 'Recording: ARMED',
     'rec.global.on': 'Recording',
@@ -380,7 +365,6 @@ const translations = {
     'rec.list.unknown': 'Channel being recorded',
     'rec.list.stop': 'Stop',
 
-    // Custom Installer and Uninstaller (Bootstrapper)
     'inst.title': 'BlinkStream Setup',
     'inst.subtitle': 'The ultralight next-gen Twitch desktop client',
     'inst.feat1.title': 'Extreme Performance & 60 FPS',
@@ -412,7 +396,7 @@ const translations = {
     'uninst.btn.uninstalling': 'Cleaning up files...',
     'uninst.success.title': 'BlinkStream has been uninstalled',
     'uninst.success.desc': 'Thank you for using our app. We hope to see you again soon!',
-    // General UI and Settings
+
     'tab.general': 'General',
     'tab.account': 'Account',
     'tab.moderation': 'Moderation',
@@ -885,7 +869,6 @@ const translations = {
   },
 }
 
-// ── INYECCIÓN DE DICCIONARIOS EXTENSOS PARA INTERFAZ, CHAT, REPRODUCTOR Y RECOMPENSAS ──
 const extendedKeys = {
   es: {
     'nav.searchPlaceholder': 'Buscar canal…',
@@ -1698,7 +1681,7 @@ const listeners = new Set()
 
 export function setLanguage(lang) {
   currentLang = lang
-  try { localStorage.setItem('blinkstream_lang', lang) } catch { /* ignore */ }
+  try { localStorage.setItem('blinkstream_lang', lang) } catch {  }
   listeners.forEach((cb) => cb(lang))
 }
 
@@ -1706,21 +1689,10 @@ export function getLanguage() {
   return currentLang
 }
 
-/**
- * Traductor. Si la key no existe en el idioma actual, cae a es y
- * finalmente al string de la key o valor de respaldo (no rompe UI).
- * @param {string} key
- * @param {string} [fallback]
- * @returns {string}
- */
 export function t(key, fallback) {
   return translations[currentLang]?.[key] || translations.es[key] || fallback || key
 }
 
-/**
- * Hook reactivo: suscribe el componente a cambios en el idioma actual
- * para que toda la interfaz re-renderice al instante al pulsar un botón de idioma.
- */
 export function useT() {
   const [lang, setLang] = useState(currentLang)
 

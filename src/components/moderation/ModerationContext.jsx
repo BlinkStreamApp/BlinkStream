@@ -1,31 +1,4 @@
-/**
- * @file ModerationProvider — provider del sistema de moderacion
- * (WT-20260628-56). Solo exporta el componente Provider para
- * satisfacer `react-refresh/only-export-components`. El objeto
- * Context y los hooks viven en `moderationContextValue.js`.
- *
- * Por que hace falta el provider: el boton derecho sobre un mensaje
- * vive en Chat.jsx (capa profunda del arbol). El ActionModal quiere
- * vivir en App.jsx para tener acceso al broadcasterId/userId via
- * context y para que solo exista UN modal a la vez (UX consistente
- * con el resto de overlays de la app: Settings, About, CPPanel, etc.).
- *
- * Patron: cualquier hijo puede llamar `openAction(action, target)`. El
- * Provider monta el ActionModal una sola vez y resuelve la accion
- * final contra `useModeration` (Helix API). Para acciones que NO
- * pasan por el modal (whisper, copy username, delete message),
- * las manejamos inline con feedback al usuario.
- *
- * Acciones soportadas:
- *   - 'ban' | 'unban'         -> openAction -> ActionModal -> useModeration.ban/unban
- *   - 'timeout' | 'untimeout' -> openAction -> ActionModal -> useModeration.timeout/untimeout
- *   - 'mod' | 'unmod'         -> openAction -> prefill /mod en chat (sin WS directo)
- *   - 'vip' | 'unvip'         -> openAction -> prefill /vip en chat (sin WS directo)
- *   - 'whisper'               -> executeAction -> abre popout de Twitch
- *   - 'profile'               -> executeAction -> toast informativo
- *   - 'copy'                  -> executeAction -> clipboard
- *   - 'delete'                -> executeAction -> useModeration.deleteMessage
- */
+
 
 import { useState, useCallback, useMemo } from 'react'
 import { ActionModal } from './ActionModal'
@@ -33,19 +6,6 @@ import { useModeration } from '../../hooks/useModeration'
 import { ModerationContext } from './moderationContextValue'
 import { safeOpenUrl } from '../../utils/tauriEnv'
 
-/**
- * Provider que mantiene el estado del modal de moderacion y expone
- * helpers para que cualquier hijo dispare acciones de mod.
- *
- * Props:
- *   - broadcasterId, userId: id del canal + viewer (para que useModeration
- *     sepa a quien actuar y aplique rate limit per-canal).
- *   - onPromoteAction: callback para mod/unmod/vip/unvip cuando la
- *     accion pasa por el modal (no usado por el flujo actual, pero
- *     se mantiene para compatibilidad con el ModPanel).
- *   - onToast: callback opcional para mostrar feedback al usuario
- *     (p.ej. "Username copiado"). Si no se provee, no se muestra nada.
- */
 export function ModerationProvider({
   children,
   broadcasterId,
@@ -58,11 +18,7 @@ export function ModerationProvider({
 
   const openAction = useCallback((action, target) => {
     if (!action || !target) return
-    // Para acciones de promocion (mod/unmod/vip/unvip) desde fuera del
-    // ModPanel no tenemos acceso al WS de chat aqui. En vez de bloquear,
-    // pre-llenamos la caja de input del chat con el comando IRC y
-    // dejamos que el usuario lo envie (un Enter). Esto evita acoplar el
-    // contexto al WS privado de Chat.jsx.
+
     if ((action === 'mod' || action === 'unmod' || action === 'vip' || action === 'unvip') && target?.user_login) {
       try {
         window.dispatchEvent(new CustomEvent('bs:chat:prefill', {
@@ -81,10 +37,6 @@ export function ModerationProvider({
     setActionModal(null)
   }, [])
 
-  /**
-   * Ejecuta una accion que NO requiere el modal (whisper/copy/delete/profile).
-   * Devuelve true si se completo (o si no aplica error).
-   */
   const executeAction = useCallback(async (action, target) => {
     if (!action || !target) return false
     switch (action) {
@@ -102,12 +54,10 @@ export function ModerationProvider({
         return false
       }
       case 'whisper': {
-        // Twitch no expone DM publico sin scopes especiales; el workaround
-        // mas simple y estable es abrir la pagina de chat del usuario con
-        // un query param `?whisper=USERNAME`. Twitch lo interpreta nativo.
+
         if (target.user_login) {
           const url = `https://www.twitch.tv/popout/${target.user_login}/chat?whisper=${encodeURIComponent(target.user_login)}`
-          try { safeOpenUrl(url, false) } catch { /* no-op: popup bloqueado */ }
+          try { safeOpenUrl(url, false) } catch {  }
           return true
         }
         return false
@@ -123,8 +73,7 @@ export function ModerationProvider({
         return ok
       }
       case 'profile': {
-        // El popcard ya lo maneja Chat.jsx via setUserCard; aqui solo
-        // delegamos devolviendo true para que el caller no haga nada raro.
+
         onToast?.({ type: 'info', message: 'Abre la tarjeta del usuario (click en el nombre)' })
         return true
       }
@@ -138,17 +87,10 @@ export function ModerationProvider({
     openAction,
     closeAction,
     executeAction,
-    // expongo `mod` por si algun consumidor quiere `remainingActions` o
-    // `auditLog` sin re-instanciar el hook.
+
     mod,
   }), [actionModal, openAction, closeAction, executeAction, mod])
 
-  /**
-   * Handler de confirm del ActionModal. Despacha a useModeration para
-   * ban/unban/timeout/untimeout y a onPromoteAction para mod/vip.
-   * Devuelve true si la accion se ejecuto OK; el ActionModal cierra
-   * su overlay automaticamente al hacer onClose (lo invoca el padre).
-   */
   const handleConfirm = useCallback(async ({ reason, duration }) => {
     if (!actionModal) return
     const { action, target } = actionModal

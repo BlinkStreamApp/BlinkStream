@@ -7,10 +7,6 @@ use tauri::AppHandle;
 use tauri::Manager;
 use wait_timeout::ChildExt;
 
-// G1 / WT-20260628-16: modulo dedicado de grabacion.
-// Re-exporta start_recording / stop_recording para que la API publica
-// no cambie. Las funciones nuevas (recorder_set_global_enabled, etc.)
-// se referencian directamente desde recorder::*.
 mod recorder;
 pub use recorder::{start_recording, stop_recording};
 pub mod companion;
@@ -25,34 +21,12 @@ use keyring::Entry;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 
-// ============================================================
-// Twitch API Client ID (backend Rust)
-// ============================================================
-// S-1 fix: el Client ID hardcodeado (kimne78...) era de TERCEROS
-// (cliente web de Twitch / apps de chat no oficiales), lo cual viola
-// los ToS de Twitch. AHORA lo leemos de la variable de entorno
-// TWITCH_CLIENT_ID (configurable en .env, sin prefijo VITE_ porque
-// es build-time). docs/TWITCH_APP_SETUP.md explica como registrar
-// tu propia app Twitch.
-//
-// AVISO: eliminar el fallback legacy cuando el usuario haya
-// migrado a su propia app Twitch registrada.
-// ============================================================
-
-// Importante: el bloque const NO usa lazy_static/once_cell. option_env!()
-// se evalua en tiempo de compilacion; el fallback legacy tambien es
-// una constante. Asi evitamos coste en runtime y garantizamos que el
-// binario siempre tiene un Client ID valido (no devuelve Option).
 const TWITCH_APP_CLIENT_ID: &str = match option_env!("TWITCH_CLIENT_ID") {
     Some(id) if !id.is_empty() => id,
     _ => LEGACY_FALLBACK_CLIENT_ID,
 };
 const TWITCH_WEB_CLIENT_ID: &str = "kimne78kx3ncx6brgo4mv6wki5h1ko"; // ALLOWED-REGRESSION: Twitch GQL exige este Client ID para tokens de reproducción y VODs
 
-// El warning se imprime UNA SOLA VEZ por sesion del proceso (no por request).
-// Usamos std::sync::Once para no spammear logs en cada clip/VOD resuelto.
-// Solo se dispara si el Client ID final coincide con el legacy hardcoded,
-// lo que indica que TWITCH_CLIENT_ID no se definio en build-time.
 static LEGACY_CLIENT_ID_WARN: std::sync::Once = std::sync::Once::new();
 
 fn warn_legacy_client_id_once() {
@@ -66,10 +40,6 @@ fn warn_legacy_client_id_once() {
     });
 }
 
-// FIX WT-20260628-134: fallback a BlinkStream App Client ID del .env
-// (z8bat49d2evj5nkmg5kmkge24sa7z9) en vez de un Client ID first-party
-// de terceros que Twitch puede revocar en cualquier momento. Si
-// TWITCH_CLIENT_ID esta configurado, este const nunca se usa.
 const LEGACY_FALLBACK_CLIENT_ID: &str = "z8bat49d2evj5nkmg5kmkge24sa7z9";
 
 pub fn try_lock_single_instance(name: &str) -> bool {
@@ -125,7 +95,7 @@ fn is_pid_alive(pid: u32) -> bool {
     }
     #[cfg(not(windows))]
     {
-        // SAFETY: kill(pid, 0) only checks existence, doesn't send a signal
+
         unsafe { libc::kill(pid as i32, 0) == 0 }
     }
 }
@@ -146,13 +116,9 @@ fn single_instance_lock_dir() -> std::path::PathBuf {
 }
 
 const CHANNEL_RE: &str = r"^[a-zA-Z0-9][a-zA-Z0-9_]{2,24}$";
-// Los slugs de clips de Twitch son tokens opacos: alfanuméricos, guiones y
-// guiones bajos, típicamente 10-50 chars pero aceptamos 1-100 por margen.
-// NO permitimos comillas, barras, espacios ni caracteres de control — eso
-// cierra la inyección GraphQL en el cuerpo de la query.
+
 const SLUG_RE: &str = r"^[a-zA-Z0-9_-]{1,100}$";
-// Los VOD IDs de Twitch son enteros sin signo (generalmente < 2^31).
-// Solo dígitos, 1-20 caracteres de margen.
+
 const VOD_ID_RE: &str = r"^[0-9]{1,20}$";
 
 static CHANNEL_REGEX: std::sync::LazyLock<regex_lite::Regex> =
@@ -171,8 +137,6 @@ fn validate_channel(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Valida un slug de clip de Twitch. Devuelve Ok solo si cumple
-/// `^[a-zA-Z0-9_-]{1,100}$`. Esto blinda contra inyección GraphQL.
 fn validate_slug(slug: &str) -> Result<(), String> {
     if !SLUG_REGEX.is_match(slug) {
         return Err(
@@ -183,7 +147,6 @@ fn validate_slug(slug: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Valida un VOD ID de Twitch. Debe ser numérico (1-20 dígitos).
 fn validate_vod_id(vod_id: &str) -> Result<(), String> {
     if !VOD_ID_REGEX.is_match(vod_id) {
         return Err("VOD ID inválido. Debe ser numérico (1-20 dígitos).".into());
@@ -264,8 +227,6 @@ fn run_winget_install(package_id: &str) -> Result<(), String> {
         return Ok(());
     }
 
-    // Algunos manifiestos no admiten --scope user (ej: Streamlink). Reintentamos sin esa
-    // opción antes de devolver el error al instalador.
     let mut fallback = new_winget_command();
     fallback.args([
         "install",
@@ -275,7 +236,7 @@ fn run_winget_install(package_id: &str) -> Result<(), String> {
         "--accept-package-agreements",
         "--accept-source-agreements",
     ]);
-    // Sin CREATE_NO_WINDOW ni --silent para que el usuario pueda ver prompts de origen o UAC
+
     let fallback_out = fallback
         .output()
         .map_err(|e| format!("Fallback winget falló: {e}"))?;
@@ -297,8 +258,6 @@ fn run_winget_install(package_id: &str) -> Result<(), String> {
     }
 }
 
-/// Localiza ffmpeg y asegura que su directorio esté en el PATH del proceso actual
-/// para que streamlink pueda grabar y procesar flujos HLS sin errores.
 pub fn ensure_ffmpeg_path() -> Option<PathBuf> {
     #[cfg(windows)]
     {
@@ -598,10 +557,6 @@ fn check_streamlink_windows_locations() -> Option<PathBuf> {
     None
 }
 
-/// Los launchers de Streamlink para Windows dependen de `Python\` y `pkgs\`
-/// junto a ellos. El sidecar histórico contiene únicamente el launcher, por
-/// lo que en una máquina limpia termina con stdout vacío. Validamos el
-/// ejecutable antes de usarlo.
 fn is_usable_streamlink(path: &Path) -> bool {
     if !path.is_file() {
         return false;
@@ -623,7 +578,7 @@ fn is_usable_streamlink(path: &Path) -> bool {
             log::error!("is_usable_streamlink: No se pudo ejecutar {:?}", path);
             return false;
         };
-        
+
         let version = format!(
             "{}{}",
             String::from_utf8_lossy(&output.stdout),
@@ -676,7 +631,6 @@ pub fn find_bundled_streamlink(app: &AppHandle) -> Option<PathBuf> {
         }
     }
 
-    // El bundler NSIS coloca externalBin junto al ejecutable instalado.
     search_dirs.into_iter().find_map(|dir| {
         let entries = std::fs::read_dir(dir).ok()?;
         entries.flatten().map(|entry| entry.path()).find(|path| {
@@ -854,10 +808,6 @@ pub fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
     ))
 }
 
-/// Ejecuta streamlink con un timeout configurable (en segundos).
-/// Es síncrona: usa `Command::spawn` + `wait_timeout`. Para no bloquear
-/// el event loop de Tauri, los llamadores async deben envolverla en
-/// `tokio::task::spawn_blocking`.
 fn run_streamlink_with_timeout(
     app: &AppHandle,
     args: &[&str],
@@ -888,9 +838,6 @@ fn run_streamlink_with_timeout(
         }
     })?;
 
-    // Leer pipes en hilos paralelos MIENTRAS el hijo se ejecuta
-    // Esto evita el deadlock cuando streamlink produce mucha salida
-    // y el buffer del pipe (típicamente 64KB) se llena.
     let stdout_handle = child.stdout.take();
     let stderr_handle = child.stderr.take();
 
@@ -923,14 +870,13 @@ fn run_streamlink_with_timeout(
         None => {
             let _ = child.kill();
             let _ = child.wait();
-            // Unir hilos pendientes para evitar thread leak
+
             let _ = stdout_thread.join();
             let _ = stderr_thread.join();
             return Err(format!("Streamlink tardó más de {timeout_secs} segundos."));
         }
     };
 
-    // Recoger resultados de los hilos
     let stdout = stdout_thread
         .join()
         .map_err(|_| "Error interno leyendo stdout de streamlink".to_string())?;
@@ -941,15 +887,9 @@ fn run_streamlink_with_timeout(
     Ok((stdout, stderr))
 }
 
-/// Wrapper con el timeout histórico (60s). Mantiene la firma que ya usan
-/// `get_stream_url` y `get_master_playlist` sin cambiar su semántica.
 fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<(String, String), String> {
     run_streamlink_with_timeout(app, args, 60)
 }
-
-// ── start_recording / stop_recording movidos a recorder.rs (G1 / WT-20260628-16)
-// Se re-exportan arriba via `pub use recorder::{start_recording, stop_recording}`.
-// El Mutex RECORDING tambien vive ahora en recorder.rs (single source of truth).
 
 #[tauri::command]
 async fn get_stream_url(
@@ -958,18 +898,7 @@ async fn get_stream_url(
     quality: String,
 ) -> Result<String, String> {
     validate_channel(&channel)?;
-    // FIX WT-20260628-88: Twitch HLS playlists devuelven 403 si la request
-    // no lleva un token valido (puede ser de usuario o app). Orden de
-    // resolucion:
-    //   1) `twitch_token` del keychain (usuario logueado) — mas permisos
-    //      (subscriber-only, prime, etc.) y priorizado por el frontend.
-    //   2) App Access Token via `get_app_token()` (client_credentials).
-    //      Autentica la request al playlist endpoint sin necesitar user.
-    //      Es el camino que resuelve el 403 cuando el usuario esta en
-    //      modo guest pero el stream no es totalmente publico.
-    //   3) Sin token (ultimo recurso): streamlink usara su propio
-    //      client_id de terceros; el 403 puede volver, pero no rompemos
-    //      el flujo ni lanzamos panic.
+
     let args: Vec<String> = vec![
         format!("twitch.tv/{}", channel),
         quality.clone(),
@@ -980,16 +909,12 @@ async fn get_stream_url(
 
     let mut resolved_token: Option<String> = None;
 
-    // 1) Token de usuario (keychain).
     if let Ok(token) = get_secret("twitch_token".to_string()).await {
         if !token.is_empty() {
             resolved_token = Some(token);
         }
     }
 
-    // 2) Fallback a app token si no hay user token. get_app_token ya
-    //    cachea en memoria con TTL, asi que esto NO agrega un round-trip
-    //    a Twitch en cada preview.
     if resolved_token.is_none() {
         match get_app_token().await {
             Ok(v) => {
@@ -1001,15 +926,12 @@ async fn get_stream_url(
                 }
             }
             Err(e) => {
-                // No es fatal: streamlink probara sin token. Logueamos
-                // para que el operador sepa por que volvio el 403 si
-                // vuelve.
+
                 log::warn!("get_stream_url: get_app_token fallo: {e}");
             }
         }
     }
 
-    // Intentar primero CON el token de autenticación (si existe) para que Twitch reconozca la suscripción y evite enviar anuncios (que Streamlink bloquea dejando la pantalla en negro).
     let mut auth_args = args.clone();
     let mut res_sl = if let Some(token) = resolved_token {
         auth_args.push("--twitch-api-header".to_string());
@@ -1017,11 +939,10 @@ async fn get_stream_url(
         let arg_refs_auth: Vec<&str> = auth_args.iter().map(String::as_str).collect();
         run_streamlink(&app, &arg_refs_auth)
     } else {
-        // Fallback forzado para inicializar un Err sintético si no hay token
+
         Err("No hay token disponible".to_string())
     };
 
-    // Si el acceso autenticado falla (por token expirado o 403), o si no había token, intentamos de forma anónima
     let should_try_clean = match &res_sl {
         Err(_) => true,
         Ok((stdout, _)) => stdout.trim().starts_with("error:") || stdout.trim().is_empty(),
@@ -1040,11 +961,6 @@ async fn get_stream_url(
     let (stdout, stderr) = res_sl?;
     let url = stdout.trim().to_string();
 
-    // FIX WT-20260628-86: si streamlink falla (quality no disponible,
-    // canal offline, etc.) stdout arranca con "error: ..." en vez de
-    // una URL. Antes el codigo lo trataba como URL valida, se la pasaba
-    // a HLS.js y reventaba con un error opaco de CSP. Detectar y
-    // retornar un error explicito con sugerencia accionable.
     if url.starts_with("error:") {
         return Err(format!(
             "Streamlink fallo: {url}. Usa 'worst' o 'best' como quality para evitar este error (las qualities exactas como '480p' o '480p30' dependen del canal)."
@@ -1059,13 +975,10 @@ async fn get_stream_url(
     Ok(url)
 }
 
-/// Devuelve la URL del MASTER PLAYLIST (contiene todas las calidades).
-/// hls.js puede cargar esta URL y el usuario cambia calidad via level API,
-/// sin recargar el stream. Así evitamos pantallas negras con variantes raras.
 #[tauri::command]
 fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String> {
     validate_channel(&channel)?;
-    // Primero obtenemos cualquier variante con best
+
     let (stdout, stderr) = run_streamlink(
         &app,
         &[&format!("twitch.tv/{channel}"), "best", "--stream-url"],
@@ -1079,12 +992,6 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
         ));
     }
 
-    // La URL de Twitch tiene formato:
-    //   .../playlist/{TOKEN}/{resolucion}.m3u8   (variante)
-    //   .../playlist/{TOKEN}.m3u8                (master)
-    //
-    // Eliminamos el último segmento (/{resolucion}.m3u8) para obtener el master.
-    // Solo aplicamos la transformación si la URL contiene el segmento /playlist/.
     if variant_url.contains("/playlist/") {
         if let Some(last_slash) = variant_url.rfind('/') {
             let prefix = &variant_url[..last_slash];
@@ -1096,25 +1003,13 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
         }
     }
 
-    // Si no podemos extraer el master, devolvemos la URL de la variante
     log::warn!("get_master_playlist: formato inesperado, devolviendo variante: {variant_url}");
     Ok(variant_url.to_string())
 }
 
-/// Trae el contenido de un M3U8 desde una URL externa sin restricciones CORS.
-/// Lo usa el frontend `StreamPreview.jsx` para evitar el error CORS al cargar
-/// el m3u8 directamente desde el webview.
-///
-/// Patron de Lecs/2026-06-23-fixes-cors-quality-loop.md: el webview del Tauri
-/// no puede hacer fetch a `*.ttvnw.net` por CSP, pero el backend Rust SI
-/// puede (sin CSP). Devolvemos el contenido del m3u8 al frontend, que lo
-/// envuelve en un Blob URL same-origin para que hls.js lo consuma sin CORS.
-///
-/// Whitelist explicita: solo permitimos hosts de Twitch / CDN de Twitch.
-/// Asi evitamos que esta command se use como proxy abierto a Internet.
 #[tauri::command]
 async fn fetch_m3u8_content(url: String) -> Result<String, String> {
-    // Sanity check de seguridad: solo URLs HTTPS hacia hosts conocidos.
+
     if !url.starts_with("https://")
         || (!url.contains("ttvnw.net")
             && !url.contains("twitch.tv")
@@ -1163,16 +1058,6 @@ const DEFAULT_QUALITIES: &[&str] = &[
     "1440p60",
 ];
 
-/// Devuelve las calidades disponibles para un canal.
-///
-/// Esta función NUNCA debe fallar. Si algo sale mal, devuelve defaults
-/// para que el frontend pueda mostrar el selector de calidad siempre.
-///
-/// Notas de rendimiento (M-3 de la auditoría WT-20260628-01):
-/// - Usa `run_streamlink_with_timeout` con 15s (no 60s) para que el
-///   selector de calidad no quede colgado si Twitch/streamlink no responden.
-/// - Envuelve la llamada síncrona en `tokio::task::spawn_blocking` para
-///   no bloquear el event loop de Tauri (la función es `async`).
 #[tauri::command]
 async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String> {
     let defaults: Vec<String> = DEFAULT_QUALITIES.iter().map(|&s| s.to_string()).collect();
@@ -1182,14 +1067,9 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
         return defaults;
     }
 
-    // `run_streamlink_with_timeout` es síncrona (usa `Command::spawn` +
-    // `wait_timeout`). La movemos a un thread bloqueante para no
-    // congelar el runtime de tokio que Tauri usa para los comandos.
     let channel_for_blocking = channel.clone();
     let join_result = tokio::task::spawn_blocking(move || {
-        // 15s es suficiente: streamlink responde en <2s en condiciones
-        // normales, y 15s cubre redes lentas sin hacer esperar al usuario
-        // un minuto entero si algo está mal.
+
         run_streamlink_with_timeout(
             &app,
             &[&format!("twitch.tv/{channel_for_blocking}"), "--stream-url"],
@@ -1249,7 +1129,7 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
 
 #[tauri::command]
 async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
-    // ── Validar slug antes de tocar la red. Cierra inyección GraphQL. ──
+
     validate_slug(&slug)?;
 
     let client = reqwest::Client::builder()
@@ -1258,8 +1138,6 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
         .build()
         .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
 
-    // El slug viaja como variable GraphQL ($slug), nunca como string
-    // interpolado. Así un slug con `"` o `\` no puede romper la query.
     let body = serde_json::json!({
         "query": "query($slug: ID!) { clip(slug: $slug) { videoQualities { sourceURL quality } playbackAccessToken(params: { platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }) { value signature } } }",
         "variables": { "slug": slug }
@@ -1280,8 +1158,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
         .map_err(|e| format!("Read error: {e}"))?;
 
     if !status.is_success() {
-        // S-6: NO exponer el cuerpo HTTP al frontend. Log internamente
-        // para debugging y devolver mensaje genérico con el código de estado.
+
         log::error!(
             "Twitch clip GQL failed: status={} body_len={} preview={}",
             status.as_u16(),
@@ -1292,7 +1169,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
     }
 
     let data: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
-        // S-6: log interno con detalle, mensaje genérico al frontend.
+
         log::error!(
             "Twitch clip JSON parse error: err={} body_len={} preview={}",
             e,
@@ -1303,8 +1180,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
     })?;
 
     let Some(clip) = data.get("data").and_then(|d| d.get("clip")) else {
-        // S-6: el cuerpo puede contener HTML/JSON de error con info sensible;
-        // nunca se lo devolvemos al frontend.
+
         log::error!(
             "Twitch clip missing in response: body_len={} preview={}",
             text.len(),
@@ -1352,7 +1228,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
-    // ── Validar vod_id antes de tocar la red. Cierra inyección GraphQL. ──
+
     validate_vod_id(&vod_id)?;
 
     let client = reqwest::Client::builder()
@@ -1361,8 +1237,6 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         .build()
         .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
 
-    // El VOD ID viaja como variable GraphQL ($id), nunca como string
-    // interpolado. Validamos formato numérico en validate_vod_id().
     let body = serde_json::json!({
         "query": "query($id: ID!) { video(id: $id) { playbackAccessToken(params: { platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }) { value signature } } }",
         "variables": { "id": vod_id }
@@ -1377,7 +1251,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         .map_err(|e| format!("HTTP: {e}"))?;
 
     let text = response.text().await.map_err(|e| format!("Read: {e}"))?;
-    // S-6: log interno con detalle, mensaje genérico al frontend.
+
     let json_res: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
         log::error!(
             "Twitch VOD JSON parse error: err={} body_len={} preview={}",
@@ -1392,8 +1266,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         .get("data")
         .and_then(|d| d.get("video"))
         .ok_or_else(|| {
-            // S-6: cuerpo puede contener HTML de error o info sensible;
-            // nunca exponer al frontend.
+
             log::error!(
                 "Twitch VOD missing in response: body_len={} preview={}",
                 text.len(),
@@ -1424,8 +1297,6 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
     ))
 }
 
-/// Obtiene la URL del stream directamente desde la API de Twitch (GQL + Usher).
-/// Esto evita las restricciones CORS del WebView al usar reqwest desde el backend Rust.
 #[tauri::command]
 async fn get_direct_stream_url(channel: String) -> Result<String, String> {
     validate_channel(&channel)?;
@@ -1437,9 +1308,6 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .build()
         .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
 
-    // ── Step 1: Obtener access token vía GraphQL de Twitch ──
-    // El channel viaja como variable GraphQL ($channelName) — ya validado
-    // arriba con validate_channel(&channel)? — así cerramos la inyección.
     let gql_body = serde_json::json!({
         "query": "query($channelName: String!) { streamPlaybackAccessToken(channelName: $channelName, params: { platform: \"web\", playerBackend: \"mediaplayer\", playerType: \"site\" }) { value signature } }",
         "variables": { "channelName": channel }
@@ -1475,7 +1343,6 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .ok_or_else(|| "No se pudo obtener signature de Twitch".to_string())?
         .to_string();
 
-    // ── Step 2: Obtener playlist HLS de Usher ──
     let p = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -1503,12 +1370,9 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         ));
     }
 
-    // Devolver la URL final (después de redirecciones)
     Ok(usher_res.url().to_string())
 }
 
-/// Almacena un secreto en el keychain del SO.
-/// Servicio: "blinkstream", cuenta: el key proporcionado.
 #[tauri::command]
 async fn store_secret(key: String, value: String) -> Result<(), String> {
     let entry = Entry::new("blinkstream", &key)
@@ -1518,8 +1382,6 @@ async fn store_secret(key: String, value: String) -> Result<(), String> {
         .map_err(|e| format!("Error guardando en keychain: {e}"))
 }
 
-/// Recupera un secreto del keychain del SO.
-/// Devuelve vacío si no existe.
 #[tauri::command]
 async fn get_secret(key: String) -> Result<String, String> {
     let entry = Entry::new("blinkstream", &key)
@@ -1531,7 +1393,6 @@ async fn get_secret(key: String) -> Result<String, String> {
     }
 }
 
-/// Elimina un secreto del keychain del SO.
 #[tauri::command]
 async fn delete_secret(key: String) -> Result<(), String> {
     let entry = Entry::new("blinkstream", &key)
@@ -1542,27 +1403,6 @@ async fn delete_secret(key: String) -> Result<(), String> {
         Err(e) => Err(format!("Error eliminando del keychain: {e}")),
     }
 }
-
-// ============================================================
-// App Access Token (client_credentials) — Channel Points
-// ============================================================
-// WT-20260628-14: el endpoint /helix/channel_points/custom_rewards
-// requiere un App Access Token (client_credentials flow), NO un
-// token de usuario. Twitch rota el client_secret por app, asi que
-// aqui lo leemos de env (build-time, igual que TWITCH_CLIENT_ID).
-//
-// El token se cachea en memoria con TTL = expires_in - 60s para
-// evitar edge cases de expiracion. NUNCA loggeamos el secret ni
-// el access_token (sensitive material).
-//
-// Fallback legacy: si no se define TWITCH_APP_CLIENT_SECRET en
-// build-time, no podemos obtener tokens de app. Devolvemos error
-// explicito en vez de fallar silenciosamente. Asi el operador
-// sabe que tiene que provisionar el secret. Esto es diferente
-// del comportamiento de TWITCH_CLIENT_ID (que tiene fallback
-// legacy de un Client ID publico de terceros): el SECRET no
-// tiene fallback posible por seguridad.
-// ============================================================
 
 fn twitch_app_client_secret() -> Option<&'static str> {
     option_env!("TWITCH_APP_CLIENT_SECRET").filter(|secret| !secret.is_empty())
@@ -1595,9 +1435,6 @@ fn app_token_cache() -> &'static AppTokenCache {
     APP_TOKEN_CACHE.get_or_init(|| Arc::new(Mutex::new(None)))
 }
 
-/// Devuelve un App Access Token de Twitch para los endpoints de
-/// Channel Points. Cache en memoria con TTL = expires_in - 60s.
-/// NUNCA loggea el secret ni el access_token.
 #[tauri::command]
 async fn get_app_token() -> Result<serde_json::Value, String> {
     warn_missing_app_secret_once();
@@ -1607,15 +1444,13 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
             .to_string()
     })?;
 
-    // 1) Cache: si tenemos uno valido, lo devolvemos sin red.
     {
         let cache = app_token_cache()
             .lock()
             .map_err(|e| format!("Lock poisoned: {e}"))?;
         if let Some((token, expires_at)) = cache.as_ref() {
             if *expires_at > Instant::now() {
-                // Devolvemos el token + expiresAt en ms epoch para
-                // que el frontend pueda cachearlo en localStorage.
+
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
@@ -1631,7 +1466,6 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
         }
     }
 
-    // 2) Llamada a Twitch id.twitch.tv.
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
         .connect_timeout(Duration::from_secs(5))
@@ -1656,9 +1490,7 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
         .map_err(|e| format!("Error leyendo respuesta: {e}"))?;
 
     if !status.is_success() {
-        // S-6: log interno con codigo de estado, mensaje generico al
-        // frontend. NO loggeamos el body porque Twitch a veces lo
-        // devuelve con info del grant.
+
         log::error!(
             "Twitch OAuth client_credentials fallo: status={} body_len={}",
             status.as_u16(),
@@ -1686,8 +1518,6 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
         .and_then(|v| v.as_u64())
         .ok_or("Twitch OAuth: sin expires_in")?;
 
-    // Cache: TTL = expires_in - 60s para evitar edge cases. Si
-    // expires_in es 0 o absurdo, no cacheamos (pedimos de nuevo).
     let safe_ttl = expires_in_secs.saturating_sub(60);
     if safe_ttl > 0 {
         let mut cache = app_token_cache()
@@ -1699,9 +1529,6 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
         ));
     }
 
-    // Devolvemos expiresAt como ms epoch (mismo formato que el
-    // frontend cachea en localStorage). Asi JS puede reusar la
-    // cache entre reloads sin un segundo round-trip a Tauri.
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -1737,12 +1564,12 @@ pub fn run() {
             start_recording,
             stop_recording,
             get_app_token,
-            // G1 / WT-20260628-16: comandos nuevos de grabacion global
+
             recorder::recorder_set_global_enabled,
             recorder::recorder_get_global_state,
             recorder::recorder_list_active,
             recorder::recorder_get_full_state,
-            // Mando a Distancia Wi-Fi Móvil (Companion Remote)
+
             companion::get_companion_status,
             companion::start_companion_server_cmd,
             companion::stop_companion_server_cmd,
@@ -1755,9 +1582,6 @@ pub fn run() {
                 log::error!("[Companion] No se pudo iniciar el servidor: {error}");
             }
 
-            // G1 / WT-20260628-16: carga el estado global de grabacion
-            // desde disco al Mutex en memoria. Si el archivo no existe
-            // (primera ejecucion), queda en OFF.
             recorder::init_global_state(app.handle());
 
             for (label, _) in app.webview_windows().iter() {
@@ -1788,18 +1612,12 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    // B-2: tests de validación contra inyección GraphQL.
-    // Las queries GQL de twitch viajan como variables, no como strings
-    // interpolados, pero igualmente validamos el input con regex
-    // ANTES de cualquier I/O como segunda línea de defensa.
 
     use super::*;
 
-    // ── validate_slug ──────────────────────────────────────────────
-
     #[test]
     fn validate_slug_rejects_injection_payload() {
-        // Intento clásico de inyección SQL/GQL: cierra string, mete payload.
+
         assert!(validate_slug(r#""; DROP TABLE--"#).is_err());
     }
 
@@ -1811,7 +1629,7 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_backslash() {
-        // Un backslash suelto (escape de string) debe ser rechazado.
+
         assert!(validate_slug(r"ab\cd").is_err());
     }
 
@@ -1822,7 +1640,7 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_too_long() {
-        // 101 chars excede el límite.
+
         let s = "a".repeat(101);
         assert!(validate_slug(&s).is_err());
     }
@@ -1834,7 +1652,7 @@ mod tests {
 
     #[test]
     fn validate_slug_accepts_double_dash() {
-        // Los slugs reales de Twitch pueden tener "--" o "__" en medio.
+
         assert!(validate_slug("valid--slug--").is_ok());
     }
 
@@ -1850,11 +1668,9 @@ mod tests {
 
     #[test]
     fn validate_slug_rejects_slash() {
-        // Slash = path traversal smell, también cierra query.
+
         assert!(validate_slug("../etc/passwd").is_err());
     }
-
-    // ── validate_vod_id ────────────────────────────────────────────
 
     #[test]
     fn validate_vod_id_rejects_non_numeric() {
@@ -1868,13 +1684,13 @@ mod tests {
 
     #[test]
     fn validate_vod_id_rejects_negative() {
-        // El regex no permite signo, así que "-123" cae fuera.
+
         assert!(validate_vod_id("-123").is_err());
     }
 
     #[test]
     fn validate_vod_id_rejects_too_long() {
-        // 21 dígitos excede el límite.
+
         let s = "1".repeat(21);
         assert!(validate_vod_id(&s).is_err());
     }
@@ -1889,8 +1705,6 @@ mod tests {
         assert!(validate_vod_id("0").is_ok());
     }
 
-    // ── validate_channel (cobertura adicional) ─────────────────────
-
     #[test]
     fn validate_channel_rejects_path_traversal() {
         assert!(validate_channel("../etc/passwd").is_err());
@@ -1898,8 +1712,7 @@ mod tests {
 
     #[test]
     fn validate_channel_rejects_injection_payload() {
-        // Mismo payload que el caso de slug — debe caer por la regex
-        // de canal (solo letras, números y `_`).
+
         assert!(validate_channel(r#""; DROP TABLE--"#).is_err());
     }
 
@@ -1931,8 +1744,6 @@ mod tests {
                 "el error debe mencionar la variable faltante, got: {err}"
             );
         }
-        // Si el secret SI esta configurado (build local con .env),
-        // no podemos testear nada sin pegarle a Twitch real, asi
-        // que este test se convierte en no-op. Aun asi, no panic.
+
     }
 }

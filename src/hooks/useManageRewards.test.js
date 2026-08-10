@@ -1,5 +1,5 @@
-// Tests del hook useManageRewards (broadcaster side).
-// Valida: fetch, create/update/toggle/archive, fulfill/cancel, bulk, polling.
+
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 
@@ -188,11 +188,10 @@ describe('useManageRewards', () => {
       await result.current.bulkFulfill(['rd-1', 'rd-3'])
     })
 
-    // Dos llamadas (una por reward_id)
     expect(cpMocks.updateRedemptionStatus).toHaveBeenCalledTimes(2)
     expect(cpMocks.updateRedemptionStatus).toHaveBeenCalledWith('123', 'r1', ['rd-1'], 'FULFILLED')
     expect(cpMocks.updateRedemptionStatus).toHaveBeenCalledWith('123', 'r2', ['rd-3'], 'FULFILLED')
-    expect(result.current.pendingRedemptions.length).toBe(1) // solo queda rd-2
+    expect(result.current.pendingRedemptions.length).toBe(1) 
   })
 
   it('refresh() refetchea rewards y pending', async () => {
@@ -213,20 +212,16 @@ describe('useManageRewards', () => {
   })
 
   it('FIX P0-2: una reward que falla (404 archivada) no rompe el poll de las demas', async () => {
-    // FIX P0-2: antes con Promise.all, si una sola reward fallaba, el
-    // poll completo rebentaba y se perdian TODAS las redenciones de las
-    // otras N-1 rewards. Ahora con Promise.allSettled, las redenciones
-    // de las rewards validas se cargan aunque una falle.
+
     cpMocks.getCustomRewards.mockResolvedValue({
       ok: true,
       data: [
         { id: 'r-ok-1', title: 'Reward OK 1' },
-        { id: 'r-bad', title: 'Reward Archived' },  // 404
+        { id: 'r-bad', title: 'Reward Archived' },  
         { id: 'r-ok-2', title: 'Reward OK 2' },
       ],
     })
-    // r-bad devuelve ok:false (Twitch 404 al pedir redenciones de una
-    // reward archivada). Las otras dos devuelven redenciones validas.
+
     cpMocks.getRedemptions.mockImplementation(async (_bId, rewardId) => {
       if (rewardId === 'r-bad') {
         return { ok: false, error: 'Twitch HTTP 404', code: 'CHANNEL_POINTS_LIST_FAILED' }
@@ -242,22 +237,18 @@ describe('useManageRewards', () => {
       }
     })
     const { result } = renderHook(() => useManageRewards({ broadcasterId: '123', pollIntervalMs: 0 }))
-    // Las 2 redenciones validas deben estar en el state, no solo una ni
-    // tampoco ninguna (que seria el comportamiento bugueado de Promise.all).
+
     await waitFor(() => expect(result.current.pendingRedemptions.length).toBe(2))
     const rewardIds = result.current.pendingRedemptions.map(p => p.reward_id)
     expect(rewardIds).toContain('r-ok-1')
     expect(rewardIds).toContain('r-ok-2')
     expect(rewardIds).not.toContain('r-bad')
-    // El error NO debe estar expuesto: al menos una succeedio, asi que
-    // el poll se considera exitoso. (Si ninguna succeed, ahi si el
-    // caller vera el error del ultimo failure — pero eso es otra rama.)
+
     expect(result.current.error).toBeNull()
   })
 
   it('FIX P0-2: si TODAS las rewards fallan, el state queda vacio y NO crashea', async () => {
-    // Edge case del allSettled: si todos los fetchs fallan, el state
-    // debe quedar vacio (sin datos parciales) y el hook no debe romper.
+
     cpMocks.getCustomRewards.mockResolvedValue({
       ok: true,
       data: [{ id: 'r1' }, { id: 'r2' }],
@@ -268,27 +259,15 @@ describe('useManageRewards', () => {
       code: 'CHANNEL_POINTS_LIST_FAILED',
     })
     const { result } = renderHook(() => useManageRewards({ broadcasterId: '123', pollIntervalMs: 0 }))
-    // El primer fetch (de rewards) si pasa, pero el de pending falla
-    // en ambas. El state debe quedar con rewards cargadas pero pending
-    // vacio (no hay redenciones que mostrar, y el error tampoco se
-    // expone porque el caller asume "no hay pending" como estado valido).
+
     await waitFor(() => expect(result.current.rewards.length).toBe(2))
-    // Damos tiempo al segundo fetch a fallar
+
     await new Promise(r => setTimeout(r, 20))
     expect(result.current.pendingRedemptions).toEqual([])
   })
 
   it('FIX P1-3: rewardsRef se sincroniza en useEffect (NO mutacion durante render)', async () => {
-    // FIX P1-3: antes `rewardsRef.current = rewards` se asignaba durante
-    // el render, lo cual es anti-patron en React strict mode. Ahora
-    // se hace en useEffect (commit phase). El comportamiento externo
-    // (las acciones que dependen de rewardsRef) debe seguir igual.
-    //
-    // Verificamos que tras un createReward, la reward nueva aparece en
-    // el state y, si una accion async necesita el rewardsRef, lo
-    // encuentra. Aqui lo testeamos indirectamente: tras el create,
-    // archiveReward puede filtrarla (lo cual requiere leer el state
-    // actual — y por tanto la ref sincronizada).
+
     cpMocks.getCustomRewards.mockResolvedValue({ ok: true, data: [] })
     cpMocks.getRedemptions.mockResolvedValue({ ok: true, data: { data: [], cursor: null } })
     cpMocks.createCustomReward.mockResolvedValue({
@@ -298,15 +277,12 @@ describe('useManageRewards', () => {
     cpMocks.deleteCustomReward.mockResolvedValue({ ok: true, data: { id: 'r-1' } })
     const { result } = renderHook(() => useManageRewards({ broadcasterId: '123', pollIntervalMs: 0 }))
     await waitFor(() => expect(result.current.loading).toBe(false))
-    // create
+
     await act(async () => {
       await result.current.createReward({ title: 'R1' })
     })
     expect(result.current.rewards.length).toBe(1)
-    // archive — depende de que el state se haya commiteado (y por
-    // tanto la ref sincronizada en useEffect). Si la ref estuviera
-    // stale (mutada en render), este archive podria no encontrar
-    // la reward en su callback.
+
     await act(async () => {
       await result.current.archiveReward('r-1')
     })

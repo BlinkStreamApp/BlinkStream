@@ -1,18 +1,13 @@
-// Tests del hook useRecording (G1 / WT-20260628-16).
-// Mockeamos measureInvoke (perf.js) y el dialogo save de Tauri.
-// Validamos: estado inicial, start con dialogo cancelado, start OK,
-// start con error, stop OK, stop con "no hay grabacion activa"
-// (idempotente), cleanup al desmontar.
+
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 
-// Mock del modulo de performance para capturar measureInvoke
 const measureInvokeMock = vi.fn()
 vi.mock('../utils/perf', () => ({
   measureInvoke: (...args) => measureInvokeMock(...args),
 }))
 
-// Mock del dialog save de Tauri (plugin-dialog)
 const saveMock = vi.fn()
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   save: (...args) => saveMock(...args),
@@ -25,8 +20,7 @@ describe('useRecording', () => {
     localStorage.clear()
     measureInvokeMock.mockReset()
     saveMock.mockReset()
-    // Default: backend OK para start_recording/stop_recording.
-    // Tests que quieran fallar usan mockRejectedValueOnce.
+
     measureInvokeMock.mockResolvedValue('OK')
   })
 
@@ -52,7 +46,7 @@ describe('useRecording', () => {
   })
 
   it('startRecording: usuario cancela dialogo → no llama al backend', async () => {
-    saveMock.mockResolvedValue(null) // cancel
+    saveMock.mockResolvedValue(null) 
     const { result } = renderHook(() => useRecording())
     await act(async () => {
       await result.current.startRecording('ninja')
@@ -110,9 +104,7 @@ describe('useRecording', () => {
       await result.current.startRecording('ninja', '/tmp/a.ts')
     })
     expect(result.current.isRecording).toBe(true)
-    // Limpiamos el mock para poder verificar "no se llamo" abajo.
-    // Re-establecemos un default para que el cleanup del unmount
-    // (que SI va a llamar measureInvoke) reciba una Promise valida.
+
     measureInvokeMock.mockClear()
     measureInvokeMock.mockResolvedValue('OK')
     await act(async () => {
@@ -173,7 +165,7 @@ describe('useRecording', () => {
     })
     measureInvokeMock.mockClear()
     unmount()
-    // Esperar un tick para que el cleanup se ejecute
+
     await waitFor(() => {
       expect(measureInvokeMock).toHaveBeenCalledWith('stop_recording')
     })
@@ -183,7 +175,7 @@ describe('useRecording', () => {
     const { unmount } = renderHook(() => useRecording())
     measureInvokeMock.mockClear()
     unmount()
-    // Esperamos un tick y comprobamos que no se llamo
+
     await new Promise(r => setTimeout(r, 10))
     expect(measureInvokeMock).not.toHaveBeenCalled()
   })

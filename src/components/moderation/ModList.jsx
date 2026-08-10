@@ -1,21 +1,4 @@
-/**
- * @file Lista de moderadores del canal (M-1 / WT-20260628-13).
- * Lista simple con avatar + username + fecha de promocion.
- * Accion rapida: Unmod (solo si viewer es broadcaster).
- *
- * @typedef {object} ModEntry
- * @property {string} user_id
- * @property {string} user_login
- * @property {string} user_name
- * @property {string} [avatar]
- * @property {string} [created_at]   - ISO date
- *
- * @typedef {object} ModListProps
- * @property {ModEntry[]} mods
- * @property {(mod: ModEntry) => void} [onUnmod]   - solo si viewer es broadcaster
- * @property {boolean} [isBroadcaster]
- * @property {boolean} [loading]
- */
+
 
 export function ModList({ mods, onUnmod, isBroadcaster, loading }) {
   return (

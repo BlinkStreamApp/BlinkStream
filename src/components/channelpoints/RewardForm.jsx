@@ -1,12 +1,4 @@
-/**
- * @file Form para crear/editar una recompensa (P2 / WT-20260628-14).
- *
- * @typedef {object} RewardFormProps
- * @property {object|null} initial     - reward existente (edicion) o null (crear)
- * @property {boolean} saving
- * @property {(data: object) => Promise<{ok: boolean, error?: string}>} onSave
- * @property {() => void} onCancel
- */
+
 
 import { useState, useEffect } from 'react'
 import { t } from '../../utils/i18n'
@@ -22,8 +14,8 @@ const TWITCH_COLORS = [
 
 const MAX_TITLE_LEN = 45
 const MAX_PROMPT_LEN = 200
-const MAX_IMAGE_BYTES = 1024 * 1024 // 1MB
-const MAX_COOLDOWN_SEC = 604800 // 7 dias (limite de Twitch)
+const MAX_IMAGE_BYTES = 1024 * 1024 
+const MAX_COOLDOWN_SEC = 604800 
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -36,9 +28,7 @@ function fileToDataUrl(file) {
 
 export default function RewardForm({ initial, saving, onSave, onCancel }) {
   const [title, setTitle] = useState(initial?.title || '')
-  // FIX 3 (WT-20260628-29): distinguir `initial.cost === 0` (reward
-  // gratis) de "sin initial". Antes `initial?.cost || 50` pisaba un
-  // cost=0 con el default de 50. Usamos nullish coalescing.
+
   const [cost, setCost] = useState(
     initial != null && Number.isFinite(initial.cost) ? initial.cost : 50
   )
@@ -58,8 +48,7 @@ export default function RewardForm({ initial, saving, onSave, onCancel }) {
 
   const titleOk = title.trim().length > 0 && title.length <= MAX_TITLE_LEN
   const promptOk = prompt.length <= MAX_PROMPT_LEN
-  // FIX 3 (WT-20260628-29): Twitch permite cost=0 (rewards gratis).
-  // Antes el form bloqueaba 0 con `cost >= 1`. Cambiamos a `>= 0`.
+
   const costOk = Number.isFinite(cost) && cost >= 0 && cost <= 10_000_000
   const cooldownOk = cooldown >= 0 && cooldown <= MAX_COOLDOWN_SEC
   const canSubmit = titleOk && promptOk && costOk && cooldownOk && !saving
@@ -103,9 +92,7 @@ export default function RewardForm({ initial, saving, onSave, onCancel }) {
       ...(maxPerUserEnabled ? { max_per_user_per_stream: Number(maxPerUser) } : {}),
       ...(cooldownEnabled ? { is_global_cooldown_enabled: true, global_cooldown_seconds: Number(cooldown) } : { is_global_cooldown_enabled: false }),
     }
-    // NOTA: la imagen se sube a Twitch aparte via endpoint upload; por
-    // ahora solo guardamos el base64 en local para preview. La API
-    // de create_custom_rewards NO acepta imagen en el body.
+
     const res = await onSave(data)
     if (!res.ok) {
       setSubmitError(res.error || 'Error al guardar')
@@ -144,7 +131,7 @@ export default function RewardForm({ initial, saving, onSave, onCancel }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5">
-          {/* ── Columna izquierda: form ── */}
+          {}
           <div className="space-y-3">
             <div>
               <label className="text-[11px] font-medium text-text-secondary mb-1 flex justify-between">
@@ -305,7 +292,7 @@ export default function RewardForm({ initial, saving, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* ── Columna derecha: live preview ── */}
+          {}
           <div className="space-y-2">
             <p className="text-[10px] text-text-muted uppercase tracking-wide">Preview</p>
             <div

@@ -1,17 +1,4 @@
-/**
- * @file HomeScreen (M-7 / Auditoria WT-20260628-01).
- * Pantalla principal sin canal seleccionado: sidebar de favoritos,
- * carrusel hero, top juegos, recientes. Toda la data llega del padre
- * (App.jsx) y se valida via runtime en los puntos sensibles.
- *
- * @typedef {object} HomeScreenProps
- * @property {(name: string) => void}    onSelect
- * @property {(name: string) => void}    onToggleFavorite
- * @property {() => void}                onShowAbout
- * @property {string[]}                  favorites
- * @property {string[]}                  [recentChannels]
- * @property {(name: string) => void}    [onRemoveRecent]
- */
+
 
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import { PUBLIC_CLIENT_ID, getHeaders, sanitizeChannelForGraphQL } from '../utils/twitch'
@@ -47,23 +34,18 @@ function cacheGet(key, ttlMs) {
 function cacheSet(key, data) {
   try {
     sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
-  } catch { /* quota exceeded — silencio */ }
+  } catch {  }
 }
 
 async function fetchAvatarsViaGQL(logins) {
   if (!logins.length) return null
-  // FIX-5 (Hank / P0): defense-in-depth GQL injection.
-  // 1) Validamos cada canal con regex (^[a-z0-9_]{3,25}$).
-  // 2) Usamos GraphQL variables (NO interpolacion) para que el input
-  //    sea SIEMPRE tratado como dato, no como sintaxis.
-  // CWE-94: Code Injection. CWE-20: Improper Input Validation.
+
   const validLogins = logins
     .map(l => sanitizeChannelForGraphQL(l))
     .filter(Boolean)
   if (!validLogins.length) return null
   try {
-    // Construimos el alias de cada login y la query usando concatenacion
-    // (no template literal anidado) para evitar problemas de escape.
+
     const varDecls = validLogins.map((_, i) => '$login' + i + ': String!').join(', ')
     const aliases = validLogins
       .map((_, i) => 'a' + i + ': user(login: $login' + i + ') { profileImageURL(width: 300) }')
@@ -92,8 +74,7 @@ async function fetchAvatarsViaGQL(logins) {
 
 async function fetchStreamsViaGQL(logins) {
   if (!logins.length) return null
-  // FIX-5 (Hank / P0): defense-in-depth GQL injection (mismo patron
-  // que fetchAvatarsViaGQL). Validamos canales y usamos variables.
+
   const validLogins = logins
     .map(l => sanitizeChannelForGraphQL(l))
     .filter(Boolean)
@@ -318,13 +299,7 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
       className="relative w-full min-w-0 rounded-xl overflow-hidden cursor-pointer group mb-6 shadow-2xl shadow-black/30 ring-1 ring-white/5 aspect-[16/7] sm:aspect-[16/6] lg:aspect-[16/5] max-w-[1400px] mx-auto"
       onClick={() => onSelect(stream.user_login)}
     >
-      {/* B02 fix (WT-20260628-96): invertir orden del DOM.
-          Antes: <img> estaba DEBAJO de cualquier <StreamPreview>, pero
-          como el <img> tenia opacity-30 + un futuro <StreamPreview>
-          iria despues (encima), el thumbnail se pintaba arriba del
-          video y el usuario veia solo el thumb semitransparente.
-          Ahora: <img> (z-0, opacity-30 si preview) ABAJO, <StreamPreview>
-          (z-10) ARRIBA. Asi el video es visible. */}
+      {}
       {previewEnabled && (
         <StreamPreview
           key={`preview-${stream.id}`}
@@ -408,15 +383,9 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
   )
 })
 
-/**
- * Pantalla principal del app (vista sin reproduccion activa).
- *
- * @param {HomeScreenProps} props
- */
 export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onShowAbout, favorites, recentChannels = [], onRemoveRecent }) {
   const t = useT()
-  // M-7: validamos las props criticas que vienen del padre. No bloqueamos
-  // la UI; solo loggeamos fallos para detectar drift de contrato temprano.
+
   const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
   validateProps(
     { onSelect, onToggleFavorite, onShowAbout, favorites, recentChannels, onRemoveRecent },
@@ -476,7 +445,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
             const data = await res.json()
             return data.data || []
           }
-        } catch { /* ignore */ }
+        } catch {  }
         return []
       })),
       Promise.all(batches.map(async (batch) => {
@@ -489,7 +458,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
             const data = await res.json()
             return data.data || []
           }
-        } catch { /* ignore */ }
+        } catch {  }
         return []
       })),
     ])
@@ -556,14 +525,13 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
     const cachedStatus = cacheGet(CACHE_KEY_STATUS, STATUS_TTL_MS)
     const cachedLogos = cacheGet(CACHE_KEY_LOGOS, LOGOS_TTL_MS)
     if (cachedStatus && Object.keys(cachedStatus).length) {
-      // Hidratar cache en el primer mount: setState en effect es
-      // el patron "estado desde fuente externa".
+
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLiveStatus(cachedStatus)
       cachedStatusRef.current = cachedStatus
     }
     if (cachedLogos && Object.keys(cachedLogos).length) {
-       
+
       setChannelLogos(cachedLogos)
       cachedLogosRef.current = cachedLogos
     }
@@ -599,7 +567,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
             id: g.id, name: g.name, boxArt: g.box_art_url?.replace('{width}','285').replace('{height}','380') || '',
           })))
         }
-      } catch { /* ignore error o timeout de red */ }
+      } catch {  }
     }
     fetchTopGames()
     window.addEventListener('blinkstream_auth_updated', fetchTopGames)
@@ -821,7 +789,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
                       const h = await getHeaders()
                       const res = await fetch(`https://api.twitch.tv/helix/streams?game_id=${game.id}&first=8`, { headers: h, signal: AbortSignal.timeout(8000) })
                       if (res.ok) { const d = await res.json(); setGameStreams(d.data || []) }
-                    } catch { /* ignore: error de red o timeout, dejamos el estado anterior */ }
+                    } catch {  }
                     setGameLoading(false)
                   }} className="flex flex-col items-center gap-1.5 shrink-0 w-[110px] group cursor-pointer card-hover rounded-lg p-2 hover:bg-hover transition-colors">
                     {game.boxArt ? (

@@ -1,18 +1,4 @@
-/**
- * @file Panel lateral de Channel Points (P1 + P2 / WT-20260628-14).
- * Drawer derecho 360px, animacion slide-in 240ms, tabs segun broadcaster/viewer.
- *
- * @typedef {object} CPPanelProps
- * @property {boolean} open
- * @property {() => void} onClose
- * @property {string|null} channel              - login del canal
- * @property {string|null} broadcasterId        - broadcaster_id (para manage tab)
- * @property {string|null} userId               - user_id del viewer (para myRedemptions)
- * @property {string|null} userToken            - OAuth token del viewer
- * @property {boolean} isBroadcaster            - el viewer es el broadcaster del canal actual
- * @property {() => Promise<object>} useRewardsHook    - factory de useChannelPoints
- * @property {() => object} useManageHook              - factory de useManageRewards
- */
+
 
 import { useState, useEffect, useMemo } from 'react'
 import { useT } from '../../utils/i18n'
@@ -38,10 +24,9 @@ function CoinsIcon() {
 
 export default function CPPanel({ open, onClose, channel, broadcasterId, userId, userToken, isBroadcaster }) {
   const t = useT()
-  // ── Hooks (siempre se llaman en el mismo orden, incluso si no
-  //    hay canal: asi evitamos violation of rules of hooks).
+
   const viewer = useChannelPoints({
-    broadcasterId: isBroadcaster ? null : broadcasterId, // si es broadcaster, NO usamos viewer hook (lo gestiona el manage)
+    broadcasterId: isBroadcaster ? null : broadcasterId, 
     userToken,
     userId,
     channel,
@@ -52,22 +37,18 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
     token: userToken,
   })
 
-  // Tab activa. Si no es broadcaster, no puede ir a manage.
   const [tab, setTab] = useState(isBroadcaster ? 'manage' : 'rewards')
   useEffect(() => {
-    // Corregir tab si el usuario pierde permisos de broadcaster.
-    // setState en effect: estado UI derivado de isBroadcaster.
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isBroadcaster && tab === 'manage') setTab('rewards')
   }, [isBroadcaster, tab])
 
-  // Modal states
   const [selectedReward, setSelectedReward] = useState(null)
   const [redeemStatus, setRedeemStatus] = useState({ submitting: false, error: null, success: false })
   const [showRewardForm, setShowRewardForm] = useState(false)
   const [editingReward, setEditingReward] = useState(null)
 
-  // Persistencia: si reabre el panel, restaura el tab.
   useEffect(() => {
     if (open) {
       try {
@@ -76,15 +57,14 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
           // eslint-disable-next-line react-hooks/set-state-in-effect
           setTab(saved)
         }
-      } catch { /* ignore */ }
+      } catch {  }
     }
   }, [open, isBroadcaster])
 
   useEffect(() => {
-    try { localStorage.setItem('bs.cpPanel.tab', tab) } catch { /* ignore */ }
+    try { localStorage.setItem('bs.cpPanel.tab', tab) } catch {  }
   }, [tab])
 
-  // Escape cierra el panel
   useEffect(() => {
     if (!open) return
     const onKey = (e) => { if (e.code === 'Escape') onClose() }
@@ -92,7 +72,6 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // ── Handlers ──
   const handleRedeem = async (rewardId, userInput) => {
     setRedeemStatus({ submitting: true, error: null, success: false })
     const res = await viewer.redeem(rewardId, userInput)
@@ -126,10 +105,9 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
     return await manage.createReward(data)
   }
 
-  // Lista de rewards a mostrar (la fuente depende del tab)
   const rewardsList = useMemo(() => {
     if (isBroadcaster) {
-      // Para manage tab, mostramos los del broadcaster
+
       if (tab === 'rewards') return viewer.rewards
       return manage.rewards
     }
@@ -140,7 +118,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
 
   return (
     <>
-      {/* Backdrop clickeable */}
+      {}
       {open && (
         <div
           className="fixed inset-0 z-[99998] bg-black/30 backdrop-blur-sm animate-fade-in"
@@ -148,14 +126,14 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
         />
       )}
 
-      {/* Panel */}
+      {}
       <aside
         className={`fixed top-0 right-0 h-full z-[99999] bg-bg-secondary border-l border-bg-tertiary/40 shadow-2xl flex flex-col
           transition-transform duration-240 ${open ? 'translate-x-0' : 'translate-x-full'}`}
         style={{ width: PANEL_WIDTH, transitionDuration: '240ms' }}
         aria-hidden={!open}
       >
-        {/* Header */}
+        {}
         <div className="flex items-center justify-between px-4 py-3 border-b border-bg-tertiary/40 shrink-0">
           <div className="flex items-center gap-2">
             <CoinsIcon />
@@ -177,7 +155,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
           </button>
         </div>
 
-        {/* Balance / Catálogo Informativo (solo viewer) */}
+        {}
         {!isBroadcaster && (
           <div className="px-4 py-3 bg-gradient-to-r from-twitch/15 via-purple-500/10 to-transparent border-b border-twitch/20">
             <div className="flex items-center justify-between">
@@ -211,7 +189,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
           </div>
         )}
 
-        {/* Tabs */}
+        {}
         <div className="flex border-b border-bg-tertiary/40 shrink-0">
           <button
             onClick={() => setTab('rewards')}
@@ -246,7 +224,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
           )}
         </div>
 
-        {/* Body */}
+        {}
         <div className="flex-1 overflow-y-auto p-4">
           {tab === 'rewards' && (
             <div className="space-y-3">
@@ -289,7 +267,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
 
           {tab === 'manage' && isBroadcaster && (
             <div className="space-y-5">
-              {/* Pending redemptions (top) */}
+              {}
               {manage.pendingRedemptions.length > 0 && (
                 <section>
                   <h3 className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide mb-2">
@@ -308,7 +286,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
                 </section>
               )}
 
-              {/* Rewards table */}
+              {}
               <section>
                 <h3 className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide mb-2">
                   Recompensas
@@ -329,7 +307,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
         </div>
       </aside>
 
-      {/* Modals */}
+      {}
       {selectedReward && (
         <RedeemModal
           reward={selectedReward}

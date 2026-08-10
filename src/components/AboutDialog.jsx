@@ -1,10 +1,4 @@
-/**
- * @file AboutDialog (M-7 / Auditoria WT-20260628-01).
- * Modal "acerca de": logo, version (via Tauri), link de donacion.
- *
- * @typedef {object} AboutDialogProps
- * @property {() => void} onClose
- */
+
 
 import { useEffect, useState } from 'react'
 import { BlinkStreamLogo } from './BlinkStreamLogo'
@@ -25,13 +19,8 @@ function PayPalIcon() {
   )
 }
 
-/**
- * Modal de informacion de la app.
- *
- * @param {AboutDialogProps} props
- */
 export default function AboutDialog({ onClose }) {
-  // M-7: prop validation
+
   validateProps(
     { onClose },
     { onClose: { name: 'function', check: (v) => typeof v === 'function' } },
@@ -103,7 +92,7 @@ export default function AboutDialog({ onClose }) {
             <span className="text-twitch/70">{t('aboutMadeWith', 'Hecho con ♥ para la comunidad')}</span>
           </div>
 
-          {/* FASE 4 / WT-20260628-45: Lordicon requiere atribucion visible. */}
+          {}
           <p className="text-text-muted/60 text-[10px] mt-4">
             Animated icons by{' '}
             <a

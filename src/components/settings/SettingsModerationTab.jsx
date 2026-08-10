@@ -1,9 +1,4 @@
-/**
- * @file Tab "Moderación" del modal de Settings (M-1 / WT-20260628-13).
- * Configuraciones del panel de mod: mostrar/ocultar al inicio, alertas
- * toast, rate limit local, etc. No incluye el panel en si (eso vive
- * en ModPanel.jsx, anclado a la topbar).
- */
+
 
 import { useState, useEffect } from 'react'
 import ToggleSwitch from '../ToggleSwitch'
@@ -12,11 +7,6 @@ const LS_AUTOSHOW = 'bs.modPanel.autoShow'
 const LS_RATE_MAX = 'bs.modPanel.rateMax'
 const LS_RATE_WINDOW = 'bs.modPanel.rateWindowSec'
 
-/**
- * Tab de configuracion de moderacion. Las prefs se persisten en
- * localStorage con prefijo `bs.modPanel.*` para que ModPanel las
- * consuma al montar.
- */
 export function SettingsModerationTab() {
   const [autoShow, setAutoShow] = useState(() => {
     try { return localStorage.getItem(LS_AUTOSHOW) === '1' } catch { return false }
@@ -35,15 +25,15 @@ export function SettingsModerationTab() {
   })
 
   useEffect(() => {
-    try { localStorage.setItem(LS_AUTOSHOW, autoShow ? '1' : '0') } catch { /* ignore */ }
+    try { localStorage.setItem(LS_AUTOSHOW, autoShow ? '1' : '0') } catch {  }
   }, [autoShow])
 
   useEffect(() => {
-    try { localStorage.setItem(LS_RATE_MAX, String(rateMax)) } catch { /* ignore */ }
+    try { localStorage.setItem(LS_RATE_MAX, String(rateMax)) } catch {  }
   }, [rateMax])
 
   useEffect(() => {
-    try { localStorage.setItem(LS_RATE_WINDOW, String(rateWindow)) } catch { /* ignore */ }
+    try { localStorage.setItem(LS_RATE_WINDOW, String(rateWindow)) } catch {  }
   }, [rateWindow])
 
   return (

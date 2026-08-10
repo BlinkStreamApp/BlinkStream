@@ -1,26 +1,4 @@
-/**
- * @file ModPanel — drawer lateral derecho de moderacion (M-1 / WT-20260628-13).
- * Visible solo si useChannelRole().isModerator === true. Toggle desde
- * el icono Shield en la topbar. Tabs internos: VIEWERS | MODS | VIPS |
- * BANS | TIMEOUTS | SETTINGS. Animacion slide-in 240ms.
- *
- * Persistencia: localStorage.bs.modPanel.open con estado expandido/colapsado.
- *
- * NOTA: este componente NO ejecuta las acciones por si mismo; consume
- * `useModeration()` y `useChannelRole()` y delega en `ActionModal` +
- * sub-componentes de lista.
- *
- * @typedef {object} ModPanelProps
- * @property {boolean} open
- * @property {() => void} onClose
- * @property {string|null} broadcasterId
- * @property {string|null} userId
- * @property {string} channel
- * @property {string|null} viewerLogin
- * @property {{ user_id: string, user_login: string, user_name: string } | null} [initialTarget]
- * @property {(target, action) => void} [onExecuteAction]   - callback para acciones que requieren WS (clear, chat modes)
- * @property {(action: 'mod'|'unmod'|'vip'|'unvip', target) => Promise<boolean>} [onPromoteAction]
- */
+
 
 import { useState, useEffect, useCallback } from 'react'
 import { useChannelRole } from '../../hooks/useChannelRole'
@@ -45,9 +23,6 @@ const TABS = [
 ]
 const LS_TAB = 'bs.modPanel.tab'
 
-/**
- * @param {ModPanelProps} props
- */
 export function ModPanel({ open, onClose, broadcasterId, userId, channel, initialTarget, onExecuteAction, onPromoteAction }) {
   const [activeTab, setActiveTab] = useState(() => {
     try { return localStorage.getItem(LS_TAB) || 'viewers' } catch { return 'viewers' }
@@ -56,31 +31,26 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
   const roleState = useChannelRole({ broadcasterId, userId, channel })
   const modState = useModeration({ broadcasterId, userId })
 
-  // Lists state
   const [mods, setMods] = useState([])
   const [vips, setVips] = useState([])
   const [bans, setBans] = useState([])
   const [timeouts, setTimeouts] = useState([])
   const [loadingList, setLoadingList] = useState({ viewers: false, mods: false, vips: false, bans: false, timeouts: false })
 
-  // Action modal state
-  const [modal, setModal] = useState(null) // { action, target }
+  const [modal, setModal] = useState(null) 
 
-  // Persist tab
   useEffect(() => {
-    try { localStorage.setItem(LS_TAB, activeTab) } catch { /* ignore */ }
+    try { localStorage.setItem(LS_TAB, activeTab) } catch {  }
   }, [activeTab])
 
-  // Load initial target if provided
   useEffect(() => {
     if (initialTarget && open) {
-      // setState en effect: estado UI derivado de initialTarget.
+
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setModal({ action: 'ban', target: initialTarget })
     }
   }, [initialTarget, open])
 
-  // Load lists on demand
   const loadMods = useCallback(async () => {
     if (!broadcasterId) return
     setLoadingList(s => ({ ...s, mods: true }))
@@ -113,32 +83,28 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
     setLoadingList(s => ({ ...s, timeouts: false }))
   }, [broadcasterId])
 
-  // Trigger list load on tab change
   useEffect(() => {
     if (!open) return
-    // loadMods/Vips/Bans/Timeouts disparan setLoadingList + setMods/etc
-    // al resolver. setState en effect es el patron "lazy fetch on
-    // tab change", no cascading render.
+
     if (activeTab === 'mods') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       loadMods()
     }
     else if (activeTab === 'vips') {
-       
+
       loadVips()
     }
     else if (activeTab === 'bans') {
-       
+
       loadBans()
     }
     else if (activeTab === 'timeouts') {
-       
+
       loadTimeouts()
     }
-    // viewers: no se carga (requiere chatters list, fuera de M1)
+
   }, [activeTab, open, loadMods, loadVips, loadBans, loadTimeouts])
 
-  // Reload lists after a successful action
   const refreshLists = useCallback(() => {
     if (activeTab === 'mods') loadMods()
     else if (activeTab === 'vips') loadVips()
@@ -146,7 +112,6 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
     else if (activeTab === 'timeouts') loadTimeouts()
   }, [activeTab, loadMods, loadVips, loadBans, loadTimeouts])
 
-  // Action handlers
   const handleConfirm = useCallback(async ({ reason, duration }) => {
     if (!modal) return
     const { action, target } = modal
@@ -166,9 +131,7 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
     }
   }, [modal, modState, onPromoteAction, refreshLists])
 
-  // Mock viewers (placeholder - requiere endpoint Helix chatters que no
-  // estamos cargando en M1). Mostramos un empty-state honesto.
-  const mockViewers = [] // TODO: cargar de /helix/chat/chatters en iter. futura
+  const mockViewers = [] 
 
   if (!open) return null
   if (!roleState.isModerator) {
@@ -199,7 +162,7 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
   return (
     <>
       <div className="fixed right-0 top-0 bottom-0 z-[99999] w-80 bg-bg-secondary/95 backdrop-blur-md border-l border-bg-tertiary/60 shadow-2xl flex flex-col animate-slide-in-right" style={{ animationDuration: '240ms' }}>
-        {/* Header */}
+        {}
         <div className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-bg-tertiary/50">
           <div className="w-8 h-8 rounded-full bg-twitch/20 flex items-center justify-center overflow-hidden shrink-0">
             <span className="text-twitch text-[12px] font-bold">{channel?.charAt(0).toUpperCase() || '?'}</span>
@@ -216,7 +179,7 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
           </button>
         </div>
 
-        {/* Tabs internos */}
+        {}
         <div className="shrink-0 flex border-b border-bg-tertiary/40 px-1 overflow-x-auto">
           {TABS.map(t => (
             <button
@@ -232,14 +195,14 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
           ))}
         </div>
 
-        {/* Rate limit banner */}
+        {}
         {modState.isRateLimited && (
           <div className="shrink-0 px-3 py-1.5 bg-orange-500/10 border-b border-orange-500/20 text-[10px] text-orange-400">
             ⏸ Rate limit: demasiadas acciones. Espera unos segundos.
           </div>
         )}
 
-        {/* Tab content */}
+        {}
         <div className="flex-1 min-h-0">
           {activeTab === 'viewers' && (
             <ViewerList viewers={mockViewers} onAction={(v) => setModal({ action: 'ban', target: v })} loading={false} />
@@ -272,7 +235,7 @@ export function ModPanel({ open, onClose, broadcasterId, userId, channel, initia
           )}
         </div>
 
-        {/* Footer con rate limit status */}
+        {}
         <div className="shrink-0 px-3 py-1.5 border-t border-bg-tertiary/40 text-[9px] text-text-muted/60 flex items-center justify-between">
           <span>Acciones restantes: {modState.remainingActions}</span>
           {modState.auditLog.length > 0 && <span>Audit: {modState.auditLog.length}</span>}

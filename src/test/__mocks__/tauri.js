@@ -1,10 +1,7 @@
-// Mock global de @tauri-apps/api/* y @tauri-apps/plugin-*.
-// Vitest resuelve el alias `~tauri` automaticamente (ver vitest.config.js).
-// Esto evita que los modulos reales intenten acceder al bridge IPC de Tauri
-// (que no existe en jsdom) durante los tests.
+
 
 export const invoke = vi.fn(async (cmd) => {
-  // Respuestas realistas por defecto para los comandos que el proyecto usa.
+
   switch (cmd) {
     case 'get_secret':
       return null

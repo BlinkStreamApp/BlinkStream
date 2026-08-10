@@ -1,21 +1,4 @@
-/**
- * @file Hook que vigila una lista de favoritos y emite un toast + notificacion
- * nativa cuando uno se pone en vivo (M-2 / Auditoria WT-20260628-01).
- *
- * El componente Toast se movio a useLiveAlerts.Toast.jsx para evitar el
- * warning de fast-refresh (un archivo no debe mezclar componentes con
- * hooks/constantes).
- *
- * @typedef {object} LiveAlert
- * @property {number} id        - timestamp + random, para key de React
- * @property {string} channel   - login del canal
- * @property {string} message   - categoria/juego o fallback
- * @property {string} logo      - URL del logo del canal
- *
- * @typedef {object} UseLiveAlertsReturn
- * @property {LiveAlert[]} alerts
- * @property {(channel: string) => void} dismissAlert
- */
+
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
@@ -24,14 +7,6 @@ import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL } from '../utils/twitch'
 import { logError } from '../utils/errors'
 import { isTauri } from '../utils/tauriEnv'
 
-/**
- * Polling de estado en vivo de los canales favoritos. Solo notifica
- * cuando un canal PASA de offline a live (no spam al iniciar la app).
- *
- * @param {string[]} favorites  - logins de Twitch
- * @param {number}   [intervalMs=30000]  - periodo entre checks
- * @returns {UseLiveAlertsReturn}
- */
 export function useLiveAlerts(favorites, intervalMs = 30000) {
   const [alerts, setAlerts] = useState([])
   const [liveFavorites, setLiveFavorites] = useState([])
@@ -46,17 +21,7 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
     if (!favorites.length) return
 
     const checkLive = async () => {
-      // FIX WT-20260628-124: la query GQL anterior interpolaba los
-      // logins de favoritos directamente en el string de query, lo
-      // cual es CWE-94 (Code Injection). Migramos a variables GQL +
-      // sanitizeChannelForGraphQL (regex ^[a-z0-9_]{3,25}$). Si un
-      // favorito no pasa la validacion, lo descartamos del batch.
-      // Importante: el alias GQL usa `a${originalIndex}` (indice en
-      // `favorites`, no en el array filtrado) para que los consumers
-      // de abajo puedan resolver `json.data.aN` con N = position del
-      // favorito en el array ORIGINAL. Esto preserva la compatibilidad
-      // con la logica de prevLiveRef.current y con el setAlerts que
-      // espera `json.data.a${favorites.indexOf(f)}`.
+
       const validPairs = favorites
         .map((f, originalIndex) => {
           const login = sanitizeChannelForGraphQL(f)
@@ -64,8 +29,7 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
         })
         .filter(Boolean)
       if (!validPairs.length) return
-      // Map de favoritos validos -> originalIndex, para resolver el
-      // alias GQL correcto al consumir la respuesta.
+
       const aliasByFav = new Map(validPairs.map(p => [p.f, p.originalIndex]))
       try {
         const varDecls = validPairs.map((_, i) => '$login' + i + ': String!').join(', ')
@@ -99,7 +63,7 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
             game: user?.stream?.game?.displayName || '',
           }
         })
-        // Ordenar para mostrar siempre los directos activos al frente
+
         favsInfo.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0))
         setLiveFavorites(favsInfo)
 
@@ -129,12 +93,9 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
           return newAlerts
         })
 
-        // Notificación nativa SOLO si la ventana no está enfocada
         if (newlyLive.length > 0) {
           try {
-            // FIX WT-20260628-34: getCurrentWindow() falla fuera de Tauri
-            // porque accede a `window.__TAURI_INTERNALS__.metadata`. Saltamos
-            // el bloque nativo completo si no hay runtime Tauri.
+
             if (!isTauri()) return
             const win = getCurrentWindow()
             const focused = await win.isFocused()
@@ -160,14 +121,9 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
         }
 
         prevLiveRef.current = current
-      } catch { /* ignore */ }
+      } catch {  }
     }
 
-    // Primera verificación: establece prevLiveRef con el estado actual.
-    // NO se hace un segundo check a los 2s con el ref vacío: eso provocaba
-    // que CADA canal en vivo disparase una alerta al iniciar la app, porque
-    // `wasLive` era undefined para todos y la condición `!wasLive && isLive`
-    // se cumplía siempre. (Auditoría WT-20260628-01 / B-1)
     checkLive()
 
     let cancelled = false

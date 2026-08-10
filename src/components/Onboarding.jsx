@@ -118,7 +118,6 @@ export default function Onboarding({ onFinish }) {
     if (slide > 0) setSlide(s => s - 1)
   }, [slide])
 
-  // Soporte para navegación con teclado (Flechas, Enter, Escape)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowRight' || e.key === 'Enter') {
@@ -138,15 +137,15 @@ export default function Onboarding({ onFinish }) {
 
   return (
     <div className="fixed inset-0 z-[99999] bg-[#090a0f]/95 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6 animate-fade-in font-sans select-none overflow-y-auto">
-      {/* Orbes de luz atmosféricos de fondo */}
+      {}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className={`absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-[120px] transition-all duration-700 opacity-25 bg-gradient-to-r ${current.glowClass}`} />
         <div className={`absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-[120px] transition-all duration-700 opacity-20 bg-gradient-to-l ${current.glowClass}`} />
       </div>
 
       <div className="relative z-10 w-full max-w-2xl mx-auto my-auto flex flex-col items-center">
-        
-        {/* Cabecera superior: Logo & Nombre */}
+
+        {}
         <div className="flex items-center justify-center gap-3 mb-6 sm:mb-8 animate-fade-in">
           <div className="p-2 rounded-2xl bg-gradient-to-tr from-purple-600 to-fuchsia-600 shadow-xl shadow-purple-500/20">
             <BlinkStreamLogo size={36} />
@@ -164,7 +163,7 @@ export default function Onboarding({ onFinish }) {
           </div>
         </div>
 
-        {/* Indicadores de Paso (Pills interactivas) */}
+        {}
         <div className="flex items-center justify-center gap-2 mb-6 w-full max-w-xs">
           {SLIDES.map((_, i) => (
             <button
@@ -178,26 +177,26 @@ export default function Onboarding({ onFinish }) {
           ))}
         </div>
 
-        {/* Tarjeta Glassmorfica Principal */}
+        {}
         <div className="w-full bg-gradient-to-b from-[#141622]/90 via-[#10121a]/95 to-[#0b0c12]/95 backdrop-blur-3xl border border-white/15 rounded-3xl p-6 sm:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.8)] relative overflow-hidden transition-all duration-300">
-          
-          {/* Brillo superior en la tarjeta */}
+
+          {}
           <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-3/4 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-          
-          {/* Contenido dinámico de la diapositiva */}
+
+          {}
           <div key={`slide-content-${slide}`} className="flex flex-col items-center text-center animate-fade-in">
-            
-            {/* Insignia superior del slide */}
+
+            {}
             <span className={`inline-flex items-center gap-1.5 text-[11px] font-extrabold px-3.5 py-1 rounded-full border mb-6 uppercase tracking-wider shadow-inner ${current.badgeClass}`}>
               {current.badge}
             </span>
 
-            {/* Icono central con efecto glow */}
+            {}
             <div className="mb-6 flex justify-center">
               {current.icon}
             </div>
 
-            {/* Título y Subtítulo */}
+            {}
             <h2 className="text-white text-2xl sm:text-3xl font-black mb-3 tracking-tight">
               {current.title}
             </h2>
@@ -205,7 +204,7 @@ export default function Onboarding({ onFinish }) {
               {current.subtitle}
             </p>
 
-            {/* Lista de características y ventajas de la versión */}
+            {}
             <div className="w-full max-w-md space-y-3.5 bg-white/[0.03] border border-white/5 p-4 sm:p-5 rounded-2xl text-left shadow-inner mb-2">
               {current.features.map((f, i) => (
                 <div key={i} className="flex items-center gap-3 text-xs sm:text-[14px] text-white/90 font-medium">
@@ -218,7 +217,7 @@ export default function Onboarding({ onFinish }) {
             </div>
           </div>
 
-          {/* Botones de Navegación y Acción al pie de la tarjeta */}
+          {}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-white/10">
             <div className="flex items-center gap-3 order-2 sm:order-1">
               <button 
@@ -251,7 +250,7 @@ export default function Onboarding({ onFinish }) {
 
         </div>
 
-        {/* Pie de página sutil con atajos de teclado */}
+        {}
         <p className="mt-5 text-[11px] font-medium text-white/40 text-center flex items-center justify-center gap-2">
           <span>💡 <strong className="text-white/60">Atajos de teclado:</strong> Flechas para navegar | Enter para siguiente | Esc para salir</span>
         </p>

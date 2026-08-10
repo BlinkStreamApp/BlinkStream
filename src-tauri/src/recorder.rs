@@ -1,23 +1,4 @@
-// ============================================================
-// recorder.rs — Modulo de grabacion de streams (G1 / WT-20260628-16)
-// ============================================================
-// Antes: la logica de grabacion vivia suelta en lib.rs (start_recording,
-// stop_recording, RECORDING mutex). Esto la hacia dificil de encontrar
-// y mezclaba responsabilidades.
-//
-// AHORA: modulo dedicado que expone:
-//   - start_recording / stop_recording (single recording, mismo mutex)
-//   - recorder_set_global_enabled / recorder_get_global_state
-//   - recorder_list_active
-//   - get_disk_space (helper privado, no command publico aun)
-//
-// El estado global (OFF/ARMED/ON) se persiste en un JSON en el config
-// dir de la app: bs.recording.global_enabled. Asi sobrevive a reinicios
-// sin tener que tocar la DB de Supabase.
-//
-// El MVP (G1) mantiene una sola grabacion activa (single Child).
-// La migracion a multi-channel vendra en G2 (Sprint posterior).
-// ============================================================
+
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -30,23 +11,13 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-// ── Estado del modulo ──────────────────────────────────────
-
-// Single-recording MVP: un solo Child a la vez. Cuando migremos a
-// multi-channel (G2) esto se convertira en HashMap<ChannelId, Child>.
 static RECORDING: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
 
-// Estado global persistido (OFF/ARMED/ON). Cached en memoria para no
-// pegarle al disco en cada get. Mutex protege lecturas/escrituras.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GlobalRecordingState {
-    pub state: String, // "OFF" | "ARMED" | "ON"
+    pub state: String, 
 }
 
-// Default: "OFF" como &str estatico, luego convertido a String.
-// No podemos construir un String en static directamente (no const fn
-// estable para eso), asi que usamos un Option<GlobalRecordingState> y
-// lo inicializamos perezosamente via OnceLock.
 static GLOBAL_STATE: std::sync::OnceLock<std::sync::Mutex<GlobalRecordingState>> =
     std::sync::OnceLock::new();
 
@@ -545,53 +516,35 @@ mod tests {
 
     #[test]
     fn active_recordings_count_initially_zero() {
-        // G1 MVP: single recording. Tras los tests previos que no
-        // spawnean streamlink, deberia ser 0. (Si un test spawnea
-        // streamlink, este test puede fallar — eso es OK, documenta
-        // el estado.)
+
         let n = active_recordings_count();
-        // No assertamos == 0 porque el Mutex es estatico entre tests;
-        // solo validamos que la funcion corre sin panicar.
+
         let _ = n;
     }
 
     #[test]
     fn global_state_default_is_off() {
-        // El Mutex GLOBAL_STATE arranca en OFF. Si un test anterior lo
-        // cambio, este test refleja el estado actual (no asume OFF).
-        // Solo validamos que la lectura no panica.
+
         let s = get_global_state_from_memory();
         assert!(matches!(s.state.as_str(), "OFF" | "ARMED" | "ON"));
     }
 
-    // ── Tests de regresion WT-20260628-24 ───────────────────
-
-    /// FIX 2: la regex se compila una sola vez. `CHANNEL_REGEX` debe
-    /// conservar siempre la MISMA referencia estatica.
     #[test]
     fn channel_regex_is_cached_once() {
         let r1: *const regex_lite::Regex = &*CHANNEL_REGEX;
         let r2: *const regex_lite::Regex = &*CHANNEL_REGEX;
-        // OnceLock garantiza misma direccion → mismo objeto.
+
         assert_eq!(
             r1, r2,
             "CHANNEL_REGEX debe devolver siempre la misma instancia"
         );
-        // Y obviamente matchea un canal valido.
+
         assert!(CHANNEL_REGEX.is_match("ninja"));
     }
 
-    /// FIX 3: `save_global_state_to_disk` debe dejar el archivo destino
-    /// escrito, y NUNCA dejar un .tmp colgado en el directorio si el
-    /// rename fue atomico. (No podemos simular facilmente un fallo de
-    /// rename, pero validamos el happy path: que el archivo final
-    /// existe y que no hay .tmp huérfano.)
     #[test]
     fn save_global_state_writes_atomically() {
-        // Usamos un AppHandle dummy no es viable aqui sin tauri::test,
-        // asi que testeamos la logica de write+rename contra un dir
-        // temporal real, replicando el patron de save_global_state_to_disk
-        // para asegurar el invariante "no queda .tmp tras exito".
+
         let tmp_dir = std::env::temp_dir().join("bs_recorder_atomic_test");
         let _ = std::fs::create_dir_all(&tmp_dir);
         let path = tmp_dir.join("state.json");
@@ -599,45 +552,31 @@ mod tests {
         let temp_path = path.with_extension("tmp");
         let _ = std::fs::remove_file(&temp_path);
 
-        // Replica del patron de save_global_state_to_disk.
         let body = r#"{"state":"ARMED"}"#;
         std::fs::write(&temp_path, body).expect("write tmp");
         std::fs::rename(&temp_path, &path).expect("rename");
 
-        // Invariante 1: el archivo final existe con el contenido correcto.
         assert!(path.exists());
         let read_back = std::fs::read_to_string(&path).expect("read back");
         assert_eq!(read_back, body);
 
-        // Invariante 2: NO hay .tmp huérfano.
         assert!(
             !temp_path.exists(),
             "no debe quedar .tmp tras rename exitoso"
         );
 
-        // Cleanup.
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_dir(&tmp_dir);
     }
 
-    /// FIX 1: simulamos la condicion de carrera haciendo un "doble
-    /// start". Como `start_recording` requiere un AppHandle real
-    /// (que dispara Tauri internals), no podemos llamarla directamente
-    /// desde un test de unidad puro. En su lugar, validamos el
-    /// INVARIANTE del mutex: el guard serializa check + set, por lo
-    /// que si un test pone `rec = Some(child)` primero, el segundo
-    /// intento de check `is_some()` debe detectarlo y rechazar.
     #[test]
     fn recording_mutex_detects_already_active() {
-        // Limpiamos cualquier estado previo de tests anteriores.
+
         {
             let mut rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
             *rec = None;
         }
 
-        // Simulamos "ya hay grabacion" poniendo un child "fantasma".
-        // No podemos crear un std::process::Child real sin spawnear,
-        // asi que usamos uno ya spawneado de un proceso real.
         let dummy = std::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
             .arg(if cfg!(windows) { "/C" } else { "-c" })
             .arg("exit 0")
@@ -651,13 +590,11 @@ mod tests {
             *rec = Some(dummy);
         }
 
-        // Ahora validamos que la condicion de "ya activo" se detecta.
         {
             let rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
             assert!(rec.is_some(), "el mutex debe reflejar la grabacion activa");
         }
 
-        // Limpiamos para no contaminar otros tests.
         {
             let mut rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(mut child) = rec.take() {
@@ -666,12 +603,7 @@ mod tests {
             }
         }
     }
-    // ============================================================
-    // FIX-4 (Hank / P0): tests del helper `validate_output_path`.
-    // Cubre path traversal (CWE-22) y poltica de sandbox.
-    // ============================================================
 
-    /// Helper: crea un dir temporal unico para cada test.
     fn make_temp_dir(label: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!(
             "bs_fix4_{}_{}",
@@ -704,10 +636,7 @@ mod tests {
     fn fix4_accepts_path_inside_allowed_dir() {
         let allowed_dir = make_temp_dir("ok_allowed");
         let output = allowed_dir.join("stream.mp4");
-        // El parent debe existir para que canonicalize funcione.
-        // Como `output` aun no existe, canonicalizamos el parent.
-        // El helper canonicaliza `parent` internamente, asi que
-        // basta con que `allowed_dir` exista.
+
         let allowed = vec![allowed_dir.clone()];
         let res = validate_output_path(output.to_str().unwrap(), &allowed);
         assert!(res.is_ok(), "path dentro de allowed debe pasar: {res:?}");
@@ -728,20 +657,14 @@ mod tests {
 
     #[test]
     fn fix4_rejects_path_traversal_via_dotdot() {
-        // El parent existe (/tmp) pero apunta a una zona que no esta
-        // dentro de allowed. Usamos un `allowed` completamente
-        // distinto del parent real.
+
         let allowed = vec![make_temp_dir("dotdot_allowed")];
-        // /tmp/../etc/passwd -> canonicalize a /etc/passwd (parent: /etc)
-        // /etc NO esta dentro de allowed -> debe ser rechazado.
-        // Ojo: en Windows `/etc` no existe; usamos un parent
-        // comun que SI exista.
+
         #[cfg(unix)]
         let traversal = "/tmp/../etc/passwd";
         #[cfg(windows)]
         let traversal = "C:\\Windows\\..\\Windows\\System32\\drivers\\etc\\hosts";
-        // Sanity: el parent debe existir para que la validacion
-        // llegue al chequeo de sandbox.
+
         if std::path::Path::new(traversal)
             .parent()
             .map(|p| p.exists())
@@ -753,13 +676,12 @@ mod tests {
                 "path traversal via .. debe ser rechazado (probado con: {traversal})"
             );
         }
-        // Si el parent no existe en esta plataforma, el test es
-        // no-op (cubierto por fix4_rejects_nonexistent_parent).
+
     }
 
     #[test]
     fn fix4_accepts_path_when_any_allowed_dir_matches() {
-        // Si hay varios allowed_dirs, basta con que uno matchee.
+
         let allowed_a = make_temp_dir("multi_a");
         let allowed_b = make_temp_dir("multi_b");
         let output = allowed_b.join("rec.mp4");
@@ -771,61 +693,35 @@ mod tests {
         );
     }
 
-    // ============================================================
-    // WT-20260628-27 / FIX 1: tests del helper `get_disk_space`.
-    // Cubre el calculo de statvfs (Unix) y la ausencia de regresion
-    // en Windows. En Unix validamos que NO devuelve `None` cuando
-    // el path es valido (era el bug: siempre devolvia None).
-    // ============================================================
-
-    /// FIX 1 (Unix): `get_disk_space` ya no debe devolver `None` para
-    /// un directorio real (antes el bloque Unix era un placeholder que
-    /// retornaba `None` siempre). El path de prueba es el dir temporal
-    /// del sistema, que siempre existe.
     #[cfg(unix)]
     #[test]
     fn fix1_unix_statvfs_returns_some_for_valid_path() {
-        // Forzamos HOME/USERPROFILE al tmp dir para no depender del env
-        // del runner. Asi el test es determinista.
+
         let tmp = std::env::temp_dir();
-        // statvfs opera sobre el FS donde vive el path. `/tmp` existe
-        // en macOS y en la mayoria de Linux; en Windows el test ni
-        // se compila (gated por `cfg(unix)`).
+
         let res = std::panic::catch_unwind(|| {
-            // No podemos cambiar HOME globalmente sin races con otros
-            // tests, asi que validamos la funcion interna `get_disk_space`
-            // con el path que la funcion ya resuelve (HOME/USERPROFILE).
-            // Si HOME no esta seteado, el test es no-op via early return.
+
             if std::env::var("HOME").is_ok() || std::env::var("USERPROFILE").is_ok() {
                 get_disk_space().is_some()
             } else {
-                // Sin HOME ni USERPROFILE la funcion devuelve None por
-                // diseno; eso NO es regresion.
+
                 get_disk_space().is_none()
             }
         });
-        let _ = tmp; // silence unused
+        let _ = tmp; 
         let _ = res;
     }
 
-    /// FIX 1 (cross-platform): cuando HOME/USERPROFILE no estan seteados,
-    /// la funcion debe devolver None (no panic). Esto cubre el branch
-    /// `ok()?` del helper.
     #[test]
     fn fix1_returns_none_when_no_home_env() {
-        // No podemos unset las env vars de forma portable y segura para
-        // el resto del test runner, asi que validamos el contrato: si
-        // alguna existe, devolvemos Some; si no, None. Probamos que la
-        // funcion no panica y devuelve un Option.
+
         let res = get_disk_space();
-        // Solo validamos el tipo: debe ser Option<(f64, f64)>. Si el
-        // runner tiene HOME/USERPROFILE, sera Some con valores >= 0.
+
         if let Some((f, t)) = res {
             assert!(f >= 0.0, "free_gb debe ser >= 0, recibio {f}");
             assert!(t >= 0.0, "total_gb debe ser >= 0, recibio {t}");
             assert!(f <= t, "free_gb ({f}) no puede superar total_gb ({t})");
         }
-        // Si es None, es porque el env no tiene HOME/USERPROFILE — eso
-        // esta OK (es el branch `ok()?`).
+
     }
 }

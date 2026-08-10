@@ -1,7 +1,4 @@
-/**
- * @file Tab "Avanzado" del modal de Settings (M-1 / WT-20260628-13).
- * Opciones tecnicas: Client-ID personalizado, reset de caches, debug.
- */
+
 
 import { useState } from 'react'
 import { APP_VERSION } from '../../utils/appVersion'
@@ -20,7 +17,7 @@ export function SettingsAdvancedTab() {
       Object.keys(localStorage).forEach(k => {
         if (k.startsWith('blinkstream_') || k.startsWith('bs.')) localStorage.removeItem(k)
       })
-    } catch { /* ignore */ }
+    } catch {  }
     window.location.reload()
   }
 
@@ -36,7 +33,7 @@ export function SettingsAdvancedTab() {
           value={customClientId}
           onChange={e => {
             setCustomClientId(e.target.value)
-            try { localStorage.setItem('blinkstream_custom_client_id', e.target.value) } catch { /* ignore */ }
+            try { localStorage.setItem('blinkstream_custom_client_id', e.target.value) } catch {  }
           }}
           placeholder="abc123def456..."
           className="w-full px-3 py-2 rounded-lg bg-bg-tertiary text-text-primary placeholder-text-muted/40 text-[12px] border border-bg-tertiary focus:border-twitch focus:outline-none transition-colors"

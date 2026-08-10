@@ -13,9 +13,6 @@ function absolutizePlaylist(text, baseUrl) {
   }).join('\n')
 }
 
-// Twitch puede rechazar la descarga del manifiesto desde el WebView aunque
-// Streamlink ya haya obtenido una URL firmada válida. El manifiesto se pide
-// mediante Rust, conservando headers Twitch; los segmentos siguen en hls.js.
 export class TauriPlaylistLoader extends Hls.DefaultConfig.loader {
   load(context, config, callbacks) {
     if (context.type !== 'manifest' && context.type !== 'level') {

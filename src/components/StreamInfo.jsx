@@ -1,13 +1,4 @@
-/**
- * @file StreamInfo (M-7 / Auditoria WT-20260628-01).
- * Header de informacion del canal en reproduccion: avatar, titulo,
- * juego, viewers, tags, uptime.
- *
- * @typedef {object} StreamInfoProps
- * @property {string}  channel
- * @property {boolean} isFavorite
- * @property {() => void} onToggleFavorite
- */
+
 
 import { useState, useEffect } from 'react'
 import { PUBLIC_CLIENT_ID, getHeaders, sanitizeChannelForGraphQL } from '../utils/twitch'
@@ -31,10 +22,7 @@ function PingDot() {
 }
 
 function buildGqlQuery(channel) {
-  // FIX-5 (Hank / P0): variables GraphQL (no interpolacion) + validacion
-  // previa con regex (^[a-z0-9_]{3,25}$). CWE-94: Code Injection.
-  // Si el canal no pasa la validacion, devolvemos { ok: false } para que
-  // el caller aborte sin hacer fetch.
+
   const login = sanitizeChannelForGraphQL(channel)
   if (!login) return { ok: false }
   return {
@@ -44,13 +32,8 @@ function buildGqlQuery(channel) {
   }
 }
 
-/**
- * Header de informacion del stream en reproduccion.
- *
- * @param {StreamInfoProps} props
- */
 export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
-  // M-7: validacion runtime
+
   validateProps(
     { channel, isFavorite, onToggleFavorite },
     {
@@ -71,13 +54,11 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 6000)
 
-    // Reset al cambiar de canal: estado UI que se sustituye en el
-    // siguiente fetch. setState en effect es el patron canonico.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAvatar(null)
-     
+
     setTags([])
-     
+
     setStreamType(null)
 
     ;(async () => {
@@ -128,7 +109,7 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
       if (gqlStream?.tags?.length) {
         setTags(gqlStream.tags.map(t => t.localizedName).filter(Boolean))
       }
-    })().catch(() => { /* ignore: si falla el fetch dejamos el estado anterior */ })
+    })().catch(() => {  })
 
     return () => {
       clearTimeout(timeoutId)
@@ -141,7 +122,7 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
 
   const [uptime, setUptime] = useState('')
   useEffect(() => {
-    // Reset de uptime al cambiar de stream: estado derivado de info.
+
     if (!info?.started_at) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setUptime(''); return

@@ -1,31 +1,4 @@
-/**
- * @file Hook de autenticacion con Twitch (M-2 / Auditoria WT-20260628-01).
- * Maneja login OAuth via edge function, persistencia del token en keychain
- * (Tauri) o localStorage (fallback), y exposicion de la sesion al resto de la app.
- *
- * @typedef {object} TwitchUserInfo
- * @property {string|null} username      - login del usuario (lowercase)
- * @property {string|null} avatar        - URL de la imagen de perfil
- * @property {string|null} displayName   - nombre mostrado
- *
- * @typedef {object} AuthUser
- * @property {string} username
- * @property {Array<{provider: string, identity_data: {login: string}}>} identities
- *
- * @typedef {object} UseAuthReturn
- * @property {null}      session         - placeholder legacy, siempre null
- * @property {boolean}   loading         - true durante la carga inicial
- * @property {boolean}   authing         - true durante el flujo OAuth
- * @property {string|null} error         - ultimo error de auth
- * @property {AuthUser|null} user        - usuario actual o null
- * @property {string|null} avatar        - URL del avatar cacheado
- * @property {boolean}   keychainReady   - true si el keychain ya respondio
- * @property {boolean}   isLoggedIn      - user && token disponibles
- * @property {() => Promise<void>} login
- * @property {(token: string) => Promise<void>} loginWithToken
- * @property {() => Promise<void>} logout
- * @property {() => string|null} getTwitchToken
- */
+
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { SUPABASE_URL, pollAuthToken, clearBlinkstreamToken } from '../utils/supabase'
@@ -39,21 +12,12 @@ const LS_USERNAME = 'blinkstream_twitch_username'
 const LS_AVATAR = 'blinkstream_twitch_avatar'
 const LS_CLIENT_ID = 'blinkstream_oauth_client_id'
 
-/**
- * Pide a Twitch los datos del usuario asociado a un token.
- * Si la peticion falla, devuelve null silenciosamente.
- *
- * @param {string} token - Bearer token de Twitch
- * @returns {Promise<TwitchUserInfo|null>}
- */
 async function fetchUserInfo(token) {
   try {
     let clientId = getHelixClientId()
     let username = null
     const cleanToken = token.replace(/^oauth:/i, '')
 
-    // Consultar primero al validador oficial OAuth de Twitch, que no requiere cabecero Client-ID
-    // y nos revela el client_id exacto asociado al token del usuario.
     try {
       const valRes = await fetch('https://id.twitch.tv/oauth2/validate', {
         headers: { 'Authorization': `OAuth ${cleanToken}` },
@@ -63,11 +27,11 @@ async function fetchUserInfo(token) {
         const valData = await valRes.json()
         if (valData?.client_id) {
           clientId = valData.client_id
-          try { localStorage.setItem(LS_CLIENT_ID, clientId) } catch { /* ignore */ }
+          try { localStorage.setItem(LS_CLIENT_ID, clientId) } catch {  }
         }
         if (valData?.login) username = valData.login
       }
-    } catch { /* ignore error del validador */ }
+    } catch {  }
 
     const res = await fetch('https://api.twitch.tv/helix/users', {
       headers: {
@@ -93,18 +57,10 @@ async function fetchUserInfo(token) {
       localStorage.setItem(LS_USERNAME, username)
       return { username, avatar: null, displayName: username }
     }
-  } catch { /* ignore */ }
+  } catch {  }
   return null
 }
 
-/**
- * Abre una URL en el navegador del sistema.
- * En Tauri usa @tauri-apps/plugin-opener; en web puro usa safeOpenUrl
- * (helper que centraliza el fallback con noopener,noreferrer).
- *
- * @param {string} url
- * @returns {Promise<void>}
- */
 async function openSystemBrowser(url) {
   const { safeOpenUrl } = await import('../utils/tauriEnv')
   try {
@@ -114,14 +70,6 @@ async function openSystemBrowser(url) {
   }
 }
 
-/**
- * Hook principal de autenticacion. Lee el token persistido (keychain o
- * localStorage) al montar, expone login/logout, y mantiene un abortRef
- * para cancelar polls OAuth si el usuario cierra la sesion a mitad de
- * flujo.
- *
- * @returns {UseAuthReturn}
- */
 export function useAuth() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -137,17 +85,16 @@ export function useAuth() {
   useEffect(() => {
     const init = async () => {
       try {
-        // 1\u00ba: Intentar cargar del keychain
+
         let token = await measureInvoke('get_secret', { key: 'twitch_token' })
 
-        // 2\u00ba: Fallback a localStorage (migraci\u00f3n silenciosa)
         if (!token) {
           token = localStorage.getItem(LS_TOKEN) || ''
           if (token) {
             try {
               await measureInvoke('store_secret', { key: 'twitch_token', value: token })
               localStorage.removeItem(LS_TOKEN)
-            } catch { /* si falla keychain, mantener en localStorage */ }
+            } catch {  }
           }
         }
 
@@ -162,16 +109,9 @@ export function useAuth() {
           })
           logEvent('auth', 'session.restored', { username: storedUser })
 
-          // No liberamos la UI hasta resolver el Client-ID real del token.
-          // HomeScreen dispara peticiones Helix durante el primer render y,
-          // si se monta antes de esta validación, reutiliza un Client-ID
-          // antiguo y Twitch responde 401 aunque el token siga siendo válido.
           const userInfo = await fetchUserInfo(token)
           if (userInfo?.invalid) {
-            // App.jsx mantiene la validación periódica como autoridad para
-            // cerrar sesiones inválidas. Conservamos aquí la sesión restaurada
-            // para no convertir un fallo transitorio del WebView/test en un
-            // logout durante el arranque.
+
             logEvent('auth', 'session.invalid', {})
           } else if (userInfo?.username && userInfo.username !== 'twitch_user') {
             if (userInfo.avatar) setAvatar(userInfo.avatar)
@@ -187,7 +127,7 @@ export function useAuth() {
           setKeychainReady(true)
           return
         }
-      } catch (err) { /* fallback a localStorage */
+      } catch (err) { 
         logEvent('auth', 'session.restore.failed', { err: err?.message || String(err) })
         try {
           const token = localStorage.getItem(LS_TOKEN)
@@ -199,7 +139,7 @@ export function useAuth() {
               identities: username ? [{ provider: 'twitch', identity_data: { login: username } }] : [],
             })
           }
-        } catch { /* ignore */ }
+        } catch {  }
       }
       setLoading(false)
       setKeychainReady(true)
@@ -228,7 +168,7 @@ export function useAuth() {
       const result = await pollAuthToken(requestId, { signal: abortController.signal, interval: 1500 })
 
       if (result?.access_token) {
-        // Guardar token en keychain
+
         try {
           await measureInvoke('store_secret', { key: 'twitch_token', value: result.access_token })
         } catch {
@@ -237,11 +177,10 @@ export function useAuth() {
         setCachedToken(result.access_token)
         logEvent('auth', 'login.success', { username: result.username || 'unknown' })
 
-        // Validar el token para recuperar el Client-ID auténtico ANTES de disparar los useEffect de la app
         const userInfo = await fetchUserInfo(result.access_token).catch(() => null)
         const finalUsername = userInfo?.username && userInfo.username !== 'twitch_user' ? userInfo.username : (result.username || 'twitch_user')
         if (userInfo?.avatar) setAvatar(userInfo.avatar)
-        
+
         localStorage.setItem(LS_USERNAME, finalUsername)
         setUser({
           username: finalUsername,
@@ -299,18 +238,14 @@ export function useAuth() {
   const logout = useCallback(async () => {
     try {
       await measureInvoke('delete_secret', { key: 'twitch_token' })
-    } catch { /* ignore */ }
+    } catch {  }
     localStorage.removeItem(LS_TOKEN)
     localStorage.removeItem(LS_USERNAME)
     localStorage.removeItem(LS_CLIENT_ID)
     logEvent('auth', 'logout', null)
-    // S-2 fix: limpiar tambien el avatar cacheado para que no se filtre
-    // PII (URL firmada de Twitch) al siguiente usuario de la misma sesion
-    // del sistema operativo si el dispositivo es compartido.
+
     localStorage.removeItem(LS_AVATAR)
-    // F-1 fix: limpiar tambien los tokens de Supabase emitidos por twitch-auth.
-    // Si quedan cacheados, la proxima sesion podria usarlos con un username
-    // distinto (si reusamos el mismo storage de la edge function).
+
     clearBlinkstreamToken()
     setCachedToken(null)
     setUser(null)

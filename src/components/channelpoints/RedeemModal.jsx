@@ -1,15 +1,4 @@
-/**
- * @file Modal para canjear una recompensa (P1 / WT-20260628-14).
- *
- * @typedef {object} RedeemModalProps
- * @property {object|null} reward
- * @property {number|null} userBalance
- * @property {boolean} submitting
- * @property {string|null} error
- * @property {string|null} success
- * @property {(rewardId: string, userInput?: string) => Promise<{ok: boolean, error?: string}>} onRedeem
- * @property {() => void} onClose
- */
+
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
@@ -26,18 +15,9 @@ function fmtCooldown(totalSec) {
 
 export default function RedeemModal({ reward, userBalance, submitting, error, success, onRedeem, onClose }) {
   const [userInput, setUserInput] = useState('')
-  // FIX 2 (WT-20260628-29): si el broadcaster desactiva el reward
-  // mid-flow, el viewer no debe quedarse atascado con un error
-  // generico. Detectamos el caso al mount y deshabilitamos el submit
-  // mostrando un mensaje claro.
-  // Por defecto `reward.is_enabled` puede venir `undefined` en
-  // rewards antiguas de la API: tratamos eso como "activo" para no
-  // romper el flujo normal.
+
   const [isRewardEnabled] = useState(() => reward?.is_enabled !== false)
-  // `now` se refresca cada 1s para que el countdown del cooldown
-  // se actualice sin necesidad de re-render por cambio de `reward`.
-  // Antes se llamaba Date.now() directamente en el render y la regla
-  // `react-hooks/purity` lo marcaba como impure function in render.
+
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -76,7 +56,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
     if (!canSubmit) return
     const res = await onRedeem(reward.id, userInput.trim() || undefined)
     if (res.ok) {
-      // Mantenemos el modal abierto 1.2s para mostrar "success"
+
       setTimeout(() => onClose(), 1200)
     }
   }
@@ -90,7 +70,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
         className="bg-bg-secondary border border-bg-tertiary/60 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Imagen 200x200 */}
+        {}
         <div
           className="w-full aspect-square flex items-center justify-center text-6xl font-bold text-white/80"
           style={{ backgroundColor: reward.background_color || '#9146ff' }}
@@ -106,7 +86,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
           )}
         </div>
 
-        {/* Info */}
+        {}
         <div className="p-5 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <h3 className="text-[17px] font-semibold text-text-primary">
@@ -124,7 +104,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
             </p>
           )}
 
-          {/* User balance info */}
+          {}
           {userBalance != null && (
             <div className="flex items-center justify-between text-[12px] text-text-secondary border-t border-bg-tertiary/40 pt-3">
               <span>{t('cp.redeem.balance')}:</span>
@@ -134,7 +114,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
             </div>
           )}
 
-          {/* Warnings */}
+          {}
           {!isRewardEnabled && (
             <div className="text-[12px] text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2 text-center">
               {t('cp.redeem.disabled_by_broadcaster')}
@@ -147,7 +127,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
             </div>
           )}
 
-          {/* User input si aplica */}
+          {}
           {inputRequired && (
             <div>
               <textarea
@@ -164,7 +144,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
             </div>
           )}
 
-          {/* Status */}
+          {}
           {error && (
             <div className="text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
               {error}
@@ -176,7 +156,7 @@ export default function RedeemModal({ reward, userBalance, submitting, error, su
             </div>
           )}
 
-          {/* Actions */}
+          {}
           <div className="flex gap-2 pt-1">
             <button
               onClick={onClose}

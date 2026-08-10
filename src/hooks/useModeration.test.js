@@ -1,6 +1,5 @@
-// Tests del hook useModeration (M1 / WT-20260628-13).
-// Cubre: acciones ban/unban/timeout/delete, rate limit local, audit
-// log persistente, y los helpers parseDuration + formatRemaining.
+
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 
@@ -23,7 +22,7 @@ describe('useModeration — acciones basicas', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
-    clearRateLimitState() // CRITICO: limpia el state modulo-level entre tests
+    clearRateLimitState() 
     banUserMock.mockReset()
     unbanUserMock.mockReset()
     deleteChatMessageMock.mockReset()
@@ -92,7 +91,7 @@ describe('useModeration — rate limit local', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
-    clearRateLimitState() // CRITICO: limpia el state modulo-level entre tests
+    clearRateLimitState() 
     banUserMock.mockReset()
     unbanUserMock.mockReset()
     deleteChatMessageMock.mockReset()
@@ -108,13 +107,13 @@ describe('useModeration — rate limit local', () => {
     const { result } = renderHook(() =>
       useModeration({ broadcasterId: '111', userId: 'mod1', maxActions: 20, windowMs: 30000 }),
     )
-    // 20 oks
+
     for (let i = 0; i < 20; i++) {
       let ok
       await act(async () => { ok = await result.current.ban(`u${i}`, `user${i}`) })
       expect(ok).toBe(true)
     }
-    // La 21 deberia bloquearse
+
     let ok21
     await act(async () => { ok21 = await result.current.ban('u21', 'user21') })
     expect(ok21).toBe(false)
@@ -123,16 +122,7 @@ describe('useModeration — rate limit local', () => {
   })
 
   it('FIX P0-3: un 403 NO consume rate limit — los slots siguen disponibles', async () => {
-    // FIX P0-3: antes `_consumeRate` se ejecutaba ANTES del await de
-    // banUser. Si Twitch devolvia 403, el slot quedaba consumido y
-    // bloqueaba futuras acciones legitimas hasta que expirara la
-    // ventana. Ahora `_recordRate` se llama solo tras un await exitoso.
-    // Simulamos maxActions=3 para que el test sea rapido.
-    // Primer fetch: 403 (fallo). Segundo fetch: 200 (exito). Tercero: 200.
-    // Si el bug estuviera presente, solo el primer fetch consumiria
-    // un slot (los siguientes contarian como 2 y 3, bloqueando el 4).
-    // Con el fix, el 403 NO consume, asi que los 2 exitosos cuentan
-    // como 1 y 2, y quedan 1 slot libre (no 0).
+
     banUserMock
       .mockResolvedValueOnce({ success: false, error: { message: 'Forbidden' } })
       .mockResolvedValueOnce({ success: true, value: null })
@@ -140,29 +130,29 @@ describe('useModeration — rate limit local', () => {
     const { result } = renderHook(() =>
       useModeration({ broadcasterId: 'FIX-P03', userId: 'mod1', maxActions: 3, windowMs: 30000 }),
     )
-    // 1) ban con 403 — falla, NO consume
+
     let ok1
     await act(async () => { ok1 = await result.current.ban('u1', 'alice') })
     expect(ok1).toBe(false)
-    // El slot 1 NO se consumio. Quedan 3 disponibles, no 2.
+
     expect(result.current.remainingActions).toBe(3)
     expect(result.current.isRateLimited).toBe(false)
-    // 2) ban con 200 — consume
+
     let ok2
     await act(async () => { ok2 = await result.current.ban('u2', 'bob') })
     expect(ok2).toBe(true)
     expect(result.current.remainingActions).toBe(2)
-    // 3) ban con 200 — consume
+
     let ok3
     await act(async () => { ok3 = await result.current.ban('u3', 'charlie') })
     expect(ok3).toBe(true)
     expect(result.current.remainingActions).toBe(1)
-    // 4) ban con 200 — consume (debe pasar, no estar bloqueado por el 403 fantasma)
+
     let ok4
     await act(async () => { ok4 = await result.current.ban('u4', 'diana') })
     expect(ok4).toBe(true)
     expect(result.current.remainingActions).toBe(0)
-    // 5) ban — ahora SI debe bloquearse (ya consumio los 3 exitosos)
+
     let ok5
     await act(async () => { ok5 = await result.current.ban('u5', 'eve') })
     expect(ok5).toBe(false)
@@ -170,13 +160,7 @@ describe('useModeration — rate limit local', () => {
   })
 
   it('FIX P0-3: un fallo de red (helper devuelve error) tampoco consume rate limit', async () => {
-    // Variante: el helper de twitch NO lanza (helixFetch captura todo
-    // y devuelve {success:false, error:AppError}), pero queremos validar
-    // la misma semantica desde la perspectiva del wrapper. Esto cubre
-    // tambien el caso donde la red se cayo: el helper devuelve error,
-    // el wrapper lo recibe, NO consume el slot, y reporta el fallo en
-    // el audit. Asi, el siguiente intento (cuando la red vuelva) tiene
-    // el slot completo disponible.
+
     banUserMock.mockResolvedValueOnce({ success: false, error: { message: 'Network down' } })
     const { result } = renderHook(() =>
       useModeration({ broadcasterId: 'FIX-P03-2', userId: 'mod1', maxActions: 2, windowMs: 30000 }),
@@ -184,16 +168,13 @@ describe('useModeration — rate limit local', () => {
     let ok1
     await act(async () => { ok1 = await result.current.ban('u1', 'alice') })
     expect(ok1).toBe(false)
-    // El slot NO se consumio — quedan 2 disponibles
+
     expect(result.current.remainingActions).toBe(2)
     expect(result.current.isRateLimited).toBe(false)
   })
 
   it('isRateLimited se desactiva despues de la ventana (mockeamos Date.now)', async () => {
-    // FIX P0-3: con la nueva semantica, despues de maxActions exitosos
-    // el state pasa a isRateLimited=true (antes era un setIsRateLimited(false)
-    // hardcoded al final del _consumeRate que dejaba el state inconsistente).
-    // Ahora refleja la realidad: 3 bans en ventana = 3/3 = rate limited.
+
     const realDateNow = Date.now
     let now = 1_000_000
     Date.now = vi.fn(() => now)
@@ -204,17 +185,17 @@ describe('useModeration — rate limit local', () => {
       for (let i = 0; i < 3; i++) {
         await act(async () => { await result.current.ban(`u${i}`, `u${i}`) })
       }
-      // Despues de 3 bans exitosos, isRateLimited DEBE ser true (3/3)
+
       expect(result.current.isRateLimited).toBe(true)
       expect(result.current.remainingActions).toBe(0)
-      // Cuarta accion debe bloquearse
+
       let ok
       await act(async () => { ok = await result.current.ban('u3', 'u3') })
       expect(ok).toBe(false)
       expect(result.current.isRateLimited).toBe(true)
-      // Avanzamos el reloj 1.1s
+
       now += 1100
-      // Esperar a que el interval interno haga el check (500ms)
+
       await waitFor(() => expect(result.current.isRateLimited).toBe(false), { timeout: 2000 })
     } finally {
       Date.now = realDateNow
@@ -243,7 +224,7 @@ describe('useModeration — audit log persistencia', () => {
   })
 
   it('audit log se carga al cambiar de canal', async () => {
-    // Pre-poblar localStorage
+
     const seed = [
       { id: '1', timestamp: 1000, action: 'ban', target: 'u1', targetName: 'old', success: true },
     ]
@@ -263,13 +244,13 @@ describe('useModeration — audit log persistencia', () => {
   })
 
   it('audit log circular: max 100 entradas', async () => {
-    // Hago el test con maxActions alto
+
     const { result: r2 } = renderHook(() => useModeration({ broadcasterId: 'C5', userId: 'mod1', maxActions: 200 }))
     for (let i = 0; i < 120; i++) {
       await act(async () => { await r2.current.ban(`u${i}`, `u${i}`) })
     }
     expect(r2.current.auditLog.length).toBe(100)
-    expect(r2.current.auditLog[0].targetName).toBe('u20') // 120 - 100 = 20 son los mas viejos descartados
+    expect(r2.current.auditLog[0].targetName).toBe('u20') 
   })
 })
 

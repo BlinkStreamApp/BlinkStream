@@ -9,7 +9,7 @@ export default function EmoteRainOverlay({ active = true }) {
 function ActiveEmoteRainOverlay() {
   const [particles, setParticles] = useState([])
   const [activeCombo, setActiveCombo] = useState(null)
-  
+
   const comboTrackerRef = useRef({})
   const comboTimerRef = useRef(null)
 
@@ -21,31 +21,28 @@ function ActiveEmoteRainOverlay() {
       const now = Date.now()
 
       const currentId = ++particleId
-      const duration = Math.random() * 1.2 + 2.5 // 2.5s a 3.7s de ascenso
+      const duration = Math.random() * 1.2 + 2.5 
 
-      // 1. Añadir partícula a la lluvia (máx 20 para cero lag en juegos)
       setParticles(prev => {
         const next = [...prev]
         if (next.length >= 20) {
-          next.shift() // eliminar el más antiguo
+          next.shift() 
         }
         const newParticle = {
           id: currentId,
           url,
           name: name || 'emote',
-          x: Math.floor(Math.random() * 80) + 10, // entre 10% y 90%
-          size: Math.floor(Math.random() * 16) + 36, // 36px a 52px
+          x: Math.floor(Math.random() * 80) + 10, 
+          size: Math.floor(Math.random() * 16) + 36, 
           duration,
         }
         return [...next, newParticle]
       })
 
-      // Eliminar partícula del DOM automáticamente al completar animación
       setTimeout(() => {
         setParticles(prev => prev.filter(p => p.id !== currentId))
       }, (duration * 1000) + 100)
 
-      // 2. Medidor de Combos (en ventana de 5 segundos)
       const tracker = comboTrackerRef.current
       if (!tracker[url] || (now - tracker[url].lastSeen > 5000)) {
         tracker[url] = { count: 1, lastSeen: now, name: name || 'Emote' }
@@ -101,7 +98,7 @@ function ActiveEmoteRainOverlay() {
 
   return (
     <div className="absolute inset-0 z-40 pointer-events-none overflow-hidden select-none font-sans">
-      {/* 1. Lluvia Flotante de Emotes */}
+      {}
       {particles.map(p => (
         <div
           key={p.id}
@@ -127,7 +124,7 @@ function ActiveEmoteRainOverlay() {
         </div>
       ))}
 
-      {/* 2. Medidor de Combos de Fuego (Esquina Inferior Derecha) */}
+      {}
       {activeCombo && (
         <div
           className={`absolute bottom-20 right-6 z-50 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-gradient-to-r backdrop-blur-xl border-2 transform transition-transform duration-150 scale-100 animate-fade-in ${

@@ -1,28 +1,7 @@
-/**
- * @file Menu contextual (click derecho) sobre un mensaje del chat
- * (M-1 / WT-20260628-13). Items segun rol: whisper, view profile,
- * copy username, ban, timeout, mod, vip, etc. Solo acciones de mod
- * para mods.
- *
- * @typedef {object} MessageContextMenuProps
- * @property {{x: number, y: number} | null} position
- * @property {{user_id?: string, user_login: string, user_name: string, message_id?: string}} target
- * @property {boolean} isModerator
- * @property {boolean} isBroadcaster
- * @property {string|null} viewerLogin
- * @property {(action: string, target: object) => void} onAction
- * @property {() => void} onClose
- */
+
 
 import { useEffect, useRef } from 'react'
 
-/**
- * Definicion de items. Cada item tiene:
- *   - id: accion a ejecutar
- *   - label: texto
- *   - danger: si true, color rojo
- *   - requires: 'mod' | 'broadcaster' | 'always' (gating)
- */
 const ALL_ITEMS = [
   { id: 'whisper', label: 'Enviar susurro', requires: 'always', icon: '💬' },
   { id: 'profile', label: 'Ver perfil', requires: 'always', icon: '👤' },
@@ -39,9 +18,6 @@ const ALL_ITEMS = [
   { id: 'delete', label: 'Borrar mensaje', requires: 'mod', icon: '🗑' },
 ]
 
-/**
- * @param {MessageContextMenuProps} props
- */
 export function MessageContextMenu({ position, target, isModerator, isBroadcaster, viewerLogin, onAction, onClose }) {
   const ref = useRef(null)
 
@@ -51,7 +27,7 @@ export function MessageContextMenu({ position, target, isModerator, isBroadcaste
       if (ref.current && !ref.current.contains(e.target)) onClose?.()
     }
     const handleEsc = (e) => { if (e.key === 'Escape') onClose?.() }
-    // Mousedown (no click) para que se cierre antes de que el click llegue al item
+
     document.addEventListener('mousedown', handleOutside)
     document.addEventListener('keydown', handleEsc)
     return () => {
@@ -69,14 +45,12 @@ export function MessageContextMenu({ position, target, isModerator, isBroadcaste
     return false
   })
 
-  // Evitar acciones sobre uno mismo
   const isSelf = viewerLogin && target.user_login?.toLowerCase() === viewerLogin.toLowerCase()
   const filteredItems = visibleItems.filter(item => {
     if (isSelf && (item.id === 'ban' || item.id === 'timeout' || item.id === 'mod' || item.id === 'vip')) return false
     return true
   })
 
-  // Clamp position al viewport
   const left = Math.min(position.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 200)
   const top = Math.min(position.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - (filteredItems.length * 30))
 

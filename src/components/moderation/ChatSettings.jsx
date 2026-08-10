@@ -1,9 +1,4 @@
-/**
- * @file Chat settings (slow/followers/subscribers/emote-only/uniquechat)
- * para el panel de mod (M-1 / WT-20260628-13).
- * Cada toggle llama a setChatMode() del hook useModeration (que audit
- * + emite evento; el send real lo hace Chat.jsx via WS IRC).
- */
+
 
 import ToggleSwitch from '../ToggleSwitch'
 
@@ -15,12 +10,6 @@ const CHAT_MODES = [
   { id: 'uniquechat', label: 'Unique chat', desc: 'Bloquea mensajes repetidos' },
 ]
 
-/**
- * @param {object} props
- * @param {boolean} [props.isModerator]   - solo visible si true
- * @param {(mode: string, value?: number) => Promise<boolean>} props.onSetMode
- * @param {Record<string, boolean>} [props.activeModes]   - estado actual
- */
 export function ChatSettings({ isModerator, onSetMode, activeModes = {} }) {
   if (!isModerator) {
     return (

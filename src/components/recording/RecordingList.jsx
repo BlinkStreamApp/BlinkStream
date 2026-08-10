@@ -1,13 +1,4 @@
-// ============================================================
-// RecordingList.jsx — Lista de grabaciones activas (G1 / WT-20260628-16)
-// ============================================================
-// MVP: una sola grabacion activa a la vez. Renderiza una card con:
-//   - Channel name (placeholder "current" en el MVP)
-//   - Duracion live (HH:MM:SS, useState con setInterval 1s)
-//   - Boton Stop individual
-//
-// Empty state: "No hay grabaciones activas"
-// ============================================================
+
 
 import { useState, useEffect } from 'react'
 import { measureInvoke } from '../../utils/perf'
@@ -17,10 +8,7 @@ import { t } from '../../utils/i18n'
 import { formatDurationHMS } from '../../utils/format'
 
 function RecordingCard({ recording, onStopped }) {
-  // Si el backend devuelve startedAt (timestamp ms), calculamos la
-  // duracion como now - startedAt. Si no, contamos desde el mount
-  // de la card (placeholder MVP: cualquier grabacion lleva 0s al
-  // aparecer y suma hacia arriba).
+
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
     const startedAt = recording?.startedAt
@@ -39,7 +27,7 @@ function RecordingCard({ recording, onStopped }) {
     } catch (err) {
       const msg = typeof err === 'string' ? err : err?.message || String(err)
       if (/no hay grabaci[oó]n activa/i.test(msg)) {
-        // Ya estaba cerrada. Refrescamos igual.
+
         onStopped?.()
         return
       }
@@ -87,8 +75,7 @@ export default function RecordingList({ recordings, onChanged }) {
     <div className="space-y-2">
       {recordings.map((rec, i) => (
         <RecordingCard
-          // El backend no expone IDs en el MVP; usamos index + channelId
-          // (placeholder) como key estable.
+
           key={`${rec.channelId || 'rec'}-${i}`}
           recording={rec}
           onStopped={onChanged}

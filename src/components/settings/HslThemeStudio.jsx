@@ -37,7 +37,7 @@ export default function HslThemeStudio() {
 
   return (
     <div className="space-y-7 text-text-primary animate-fade-in pb-4">
-      {/* Cabecera del Estudio */}
+      {}
       <div className="flex items-start gap-4 bg-[#14141d]/80 p-5 rounded-2xl border border-white/[0.08] backdrop-blur-xl shadow-lg relative overflow-hidden">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-twitch to-fuchsia-600 flex items-center justify-center shrink-0 shadow-[0_0_25px_rgba(145,70,255,0.4)] text-white">
           <PhosphorIcon name="Palette" size={26} weight="duotone" />
@@ -53,7 +53,7 @@ export default function HslThemeStudio() {
         </div>
       </div>
 
-      {/* SECCIÓN 1: Motor Tipográfico (Typography Engine) */}
+      {}
       <div className="bg-[#12121a]/60 border border-white/[0.06] rounded-2xl p-5 space-y-4 backdrop-blur-md shadow-sm">
         <div className="flex items-center justify-between">
           <h4 className="text-[13px] font-bold text-text-primary flex items-center gap-2">
@@ -92,7 +92,7 @@ export default function HslThemeStudio() {
         </div>
       </div>
 
-      {/* SECCIÓN 2: Motor de Iconografía & Estilo de Línea */}
+      {}
       <div className="bg-[#12121a]/60 border border-white/[0.06] rounded-2xl p-5 space-y-4 backdrop-blur-md shadow-sm">
         <div className="flex items-center justify-between">
           <h4 className="text-[13px] font-bold text-text-primary flex items-center gap-2">
@@ -134,7 +134,7 @@ export default function HslThemeStudio() {
         </div>
       </div>
 
-      {/* SECCIÓN 3: 12 Paletas Curadas Premium */}
+      {}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-[13px] font-bold text-text-primary flex items-center gap-2">
@@ -169,7 +169,7 @@ export default function HslThemeStudio() {
         </div>
       </div>
 
-      {/* SECCIÓN 3: Laboratorio HSL Manual & Live Sample Box */}
+      {}
       <div className="bg-[#101018]/90 border border-white/[0.08] rounded-2xl p-5 space-y-6 shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
           <h4 className="text-[13px] font-bold text-text-primary flex items-center gap-2">
@@ -185,9 +185,9 @@ export default function HslThemeStudio() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          {/* Sliders manuales */}
+          {}
           <div className="space-y-4">
-            {/* Slider 1: Matiz / Hue */}
+            {}
             <div className="space-y-1.5">
               <div className="flex justify-between text-[12px] text-text-secondary font-semibold">
                 <span>{t('hsl.hue', 'Matiz (Color Neón)')}</span>
@@ -206,7 +206,7 @@ export default function HslThemeStudio() {
               />
             </div>
 
-            {/* Slider 2: Saturación / Saturation */}
+            {}
             <div className="space-y-1.5">
               <div className="flex justify-between text-[12px] text-text-secondary font-semibold">
                 <span>{t('hsl.saturation', 'Intensidad / Saturación')}</span>
@@ -225,7 +225,7 @@ export default function HslThemeStudio() {
               />
             </div>
 
-            {/* Slider 3: Luminosidad / Lightness */}
+            {}
             <div className="space-y-1.5">
               <div className="flex justify-between text-[12px] text-text-secondary font-semibold">
                 <span>{t('hsl.lightness', 'Luminosidad / Brillo Neón')}</span>
@@ -245,14 +245,14 @@ export default function HslThemeStudio() {
             </div>
           </div>
 
-          {/* Caja de Muestra Interactiva (Live Preview Box) */}
+          {}
           <div className="bg-[#0a0a0e] border border-white/10 rounded-2xl p-4 shadow-xl space-y-3 relative overflow-hidden">
             <div className="text-[11px] font-bold uppercase tracking-widest text-text-muted flex items-center justify-between">
               <span>Muestra en Vivo de Interfaz</span>
               <span className="text-[10px] text-twitch-light lowercase font-mono">({activeFontObj.id})</span>
             </div>
-            
-            {/* Simulación de Mensaje del Chat */}
+
+            {}
             <div className="p-3 rounded-xl bg-[#13131c] border border-white/[0.06] flex items-start gap-2.5">
               <div className="w-8 h-8 rounded-full bg-twitch text-white font-extrabold flex items-center justify-center text-xs shrink-0 shadow-sm shadow-twitch/40">
                 B
@@ -269,7 +269,7 @@ export default function HslThemeStudio() {
               </div>
             </div>
 
-            {/* Controles de demostración interactiva */}
+            {}
             <div className="flex items-center justify-between pt-1">
               <button
                 type="button"

@@ -5,8 +5,6 @@ import App from './App.jsx'
 import { trackWebVitals } from './utils/perf'
 import { logEvent } from './utils/eventLog'
 
-// M-8: arrancar tracking de Core Web Vitals al load.
-// No bloquea el render: trackWebVitals() es no-op si performance API falta.
 if (typeof performance !== 'undefined') {
   if (document.readyState === 'complete') {
     trackWebVitals()
@@ -17,7 +15,6 @@ if (typeof performance !== 'undefined') {
 
 logEvent('perf', 'app.boot', { ua: navigator.userAgent.split(' ').slice(-1)[0] })
 
-// Captura global de errores no manejados → van al eventLog
 window.addEventListener('error', (e) => {
   logEvent('error', 'window.error', { msg: e.message, src: e.filename, line: e.lineno })
 })

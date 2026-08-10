@@ -1,35 +1,13 @@
 /* eslint-disable react-hooks/static-components */
-// Wrapper sobre @phosphor-icons/react con defaults consistentes.
-//
-// Por que un wrapper y no imports directos:
-//  1. Defaults centralizados (size, weight, color) - cambiarlos en un sitio
-//     los cambia en toda la app.
-//  2. IconContext solo se invoca una vez por icono (mas limpio que
-//     envolver cada <Icon size={...} /> en el callsite).
-//  3. Import dinamico via import.meta.glob con `eager: false` (lazy):
-//     Vite descubre los modulos en build time y solo empaqueta los que
-//     se usan. Cero transpile eager de los 9k+ modulos (problema
-//     conocido de Phosphor con Vite).
-//  4. Cache en runtime: tras la primera carga, el icono se sirve
-//     sincronamente en renders posteriores sin re-render extra.
-//
-// Uso:
-//   <PhosphorIcon name="Gear" size={20} weight="regular" />
-//   <PhosphorIcon name="X" size={16} weight="bold" />
-//   <PhosphorIcon name="Coins" size={12} weight="duotone" color="currentColor" />
 
 import { useCallback, useSyncExternalStore } from 'react'
 import { IconContext } from '@phosphor-icons/react/dist/lib/context'
 import { subscribeToIconStyle, getIconWeight } from '../../utils/hslTheme'
 
-// Lista cerrada de iconos usados por BlinkStream. El glob global anterior
-// generaba miles de chunks y más de 1 MB de metadatos en el bundle principal.
 const iconLoaders = import.meta.glob('/node_modules/@phosphor-icons/react/dist/csr/{ArrowsClockwise,ArrowsInSimple,ArrowLeft,ArrowRight,ArrowSquareOut,Camera,CaretDoubleLeft,CaretDoubleRight,CaretDown,CaretLeft,CaretRight,Cat,ChartBar,ChatCircle,ChatCircleDots,ChatCircleSlash,Chats,ChatsCircle,ChatSlash,CheckCircle,ClockCounterClockwise,CloudCheck,Coins,CornersOut,DeviceMobile,DownloadSimple,FilmStrip,Folder,FolderOpen,GameController,Gear,Gift,Headphones,Heart,HeartBreak,Info,Lightning,MagicWand,MagnifyingGlass,MonitorPlay,Palette,Pause,PictureInPicture,Play,PlayCircle,Plus,Power,Record,RocketLaunch,Shield,ShieldCheck,SignOut,Sliders,SlidersHorizontal,Smiley,Sparkle,SpeakerHigh,SpeakerSlash,SpinnerGap,SquaresFour,Television,TextAa,Trash,VideoCamera,WarningCircle,WifiHigh,X}.es.js')
 
-// Estado externo: cada nombre de icono mapea a su componente o a `null`
-// mientras se esta cargando. Una vez cargado, queda cacheado para siempre.
-const iconState = new Map()        // name -> Icon | null (loading) | undefined (missing)
-const loadPromises = new Map()     // name -> Promise<Icon | null>
+const iconState = new Map()        
+const loadPromises = new Map()     
 const subscribers = new Set()
 
 function notify() {
@@ -41,8 +19,6 @@ function subscribe(cb) {
   return () => subscribers.delete(cb)
 }
 
-// Snapshot inmutable para useSyncExternalStore. Importante: devolver un
-// NUEVO objeto cuando algo cambia para que React detecte la actualizacion.
 function getSnapshot(name) {
   return iconState.has(name) ? iconState.get(name) : undefined
 }
@@ -62,7 +38,7 @@ function loadIcon(name) {
     notify()
     return loadPromises.get(name)
   }
-  // Marcamos como "loading" para que el snapshot cambie.
+
   iconState.set(name, null)
   const promise = loader()
     .then((mod) => {
@@ -93,7 +69,6 @@ export default function PhosphorIcon({
   const getNameSnapshot = useCallback(() => getSnapshot(name), [name])
   const IconComponent = useSyncExternalStore(subscribe, getNameSnapshot, getServerSnapshot)
 
-  // Suscripción reactiva al estilo de iconos seleccionado en el estudio
   const themeIconWeight = useSyncExternalStore(subscribeToIconStyle, getIconWeight, getIconWeight)
   const resolvedWeight = fixedWeight ? weight : (weight === 'fill' ? 'fill' : themeIconWeight)
 

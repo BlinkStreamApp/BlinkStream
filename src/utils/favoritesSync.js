@@ -7,25 +7,6 @@ export { clearAuthBrokenFlag, isAuthBroken } from './favoritesCircuitBreaker'
 
 const DATA_FN = `${SUPABASE_URL}/functions/v1/blinkstream-data`
 
-// FIX WT-20260628-82 (Bug A): circuit-breaker a nivel de modulo.
-// Si la nube nos devuelve 401 definitivo (sin token post-refresh),
-// seteamos authBroken=true. A partir de ahi TODOS los calls a
-// authedFetch devuelven inmediatamente una Response 401 sintetica sin
-// tocar la red. Asi cortamos el loop infinito de 500+ requests que
-// se observaba en el log del .exe cuando el usuario no estaba
-// logueado o su token estaba vencido.
-//
-// Se limpia (vuelve a false) cuando el usuario hace login exitoso
-// (ver saveBlinkstreamToken en supabase.js) o logout (via
-// clearBlinkstreamToken -> clearAuthBrokenFlag).
-// Wrapper interno: hace fetch con Authorization Bearer y un unico retry
-// automatico en 401 (rotando el JWT via twitch-auth?refresh=). Si despues
-// del retry sigue 401, devolvemos el error para que el caller degrade
-// elegantemente (favoritos quedan locales).
-//
-// FIX WT-20260628-82: antes del fetch, comprobar el circuit-breaker.
-// Si esta abierto (authBroken=true), devolvemos una Response 401
-// sintetica para no salir a la red.
 async function authedFetch(url, options = {}) {
   if (isAuthBroken()) {
     return new Response(JSON.stringify({ error: 'auth_broken' }), {
@@ -71,7 +52,7 @@ async function authedFetch(url, options = {}) {
     }
     return res
   } catch {
-    // Excepción de red o bloqueo de CORS en el navegador. Abrir inmediatamente el circuit breaker.
+
     markAuthBroken()
     if (import.meta.env.DEV) {
       console.warn(`[authedFetch] Error de red o CORS al comunicar con ${url}. Sincronización cambiada a modo local/offline.`)
@@ -84,13 +65,6 @@ async function authedFetch(url, options = {}) {
   }
 }
 
-/**
- * Lista los favoritos de un usuario desde la nube. Devuelve array vacio
- * si falla (la UI ya tiene fallback local).
- *
- * @param {string} username
- * @returns {Promise<string[]>}
- */
 export async function fetchCloudFavorites(username) {
   if (!username || isAuthBroken()) return []
   try {
@@ -101,15 +75,6 @@ export async function fetchCloudFavorites(username) {
   } catch { return [] }
 }
 
-/**
- * Persiste un favorito en la nube. Fire-and-forget: no lanza y no
- * devuelve nada. Si falla, el favorito sigue en localStorage y se
- * reintentara en el proximo login.
- *
- * @param {string} username
- * @param {string} channel
- * @returns {Promise<void>}
- */
 export async function addCloudFavorite(username, channel) {
   if (!username || isAuthBroken()) return
   try {
@@ -117,15 +82,9 @@ export async function addCloudFavorite(username, channel) {
       method: 'POST',
       body: JSON.stringify({ action: 'fav_add', username, channel }),
     })
-  } catch { /* fire-and-forget */ }
+  } catch {  }
 }
 
-/**
- * Elimina un favorito de la nube. Fire-and-forget.
- * @param {string} username
- * @param {string} channel
- * @returns {Promise<void>}
- */
 export async function removeCloudFavorite(username, channel) {
   if (!username || isAuthBroken()) return
   try {
@@ -133,30 +92,15 @@ export async function removeCloudFavorite(username, channel) {
       method: 'POST',
       body: JSON.stringify({ action: 'fav_remove', username, channel }),
     })
-  } catch { /* fire-and-forget */ }
+  } catch {  }
 }
 
-/**
- * Mezcla favoritos locales y nube, y sube los locales que no esten
- * en la nube en chunks de 10 en serie. Si la nube no responde,
- * devuelve solo los locales (merge idempotente).
- *
- * @param {string[]} localFavorites
- * @param {string} username
- * @returns {Promise<string[]>}
- */
 export async function mergeFavorites(localFavorites, username) {
   if (!username || isAuthBroken()) return localFavorites
   const cloud = await fetchCloudFavorites(username)
   if (!cloud || isAuthBroken()) return localFavorites
   const merged = [...new Set([...localFavorites, ...cloud])]
 
-  // S-5 fix: throttling. Antes se lanzaban N requests simultaneas a la edge
-  // function (una por favorito local no presente en la nube), lo que podia
-  // tumbar el rate-limit del gateway y agotar el JWT por paralelismo.
-  // Ahora: chunks de 10 en serie, cada chunk se lanza en paralelo pero
-  // esperamos al siguiente chunk antes de empezar. Si un batch falla entero,
-  // lo loggeamos y seguimos con el resto — no perdemos la merge, solo un lote.
   const toAdd = localFavorites.filter(ch => !cloud.includes(ch))
   if (toAdd.length === 0) return merged
 
@@ -168,17 +112,14 @@ export async function mergeFavorites(localFavorites, username) {
       const results = await Promise.allSettled(
         chunk.map(ch => addCloudFavorite(username, ch))
       )
-      // addCloudFavorite ya hace swallow internamente, pero si todos
-      // rechazan (p.ej. 401 global) lo dejamos constancia.
+
       const failed = results.filter(r => r.status === 'rejected').length
       if (failed > 0) {
-        // Mantener un log discreto — la UI ya degrada bien porque los
-        // favoritos quedan locales y se reintentaran en el proximo login.
+
         console.warn(`[mergeFavorites] chunk ${i / CHUNK_SIZE + 1}: ${failed}/${chunk.length} failed`)
       }
     } catch (err) {
-      // Promise.allSettled nunca lanza, pero por si acaso no abortamos
-      // toda la merge: continuamos con el siguiente chunk.
+
       console.warn(`[mergeFavorites] chunk ${i / CHUNK_SIZE + 1} failed:`, err?.message || err)
     }
   }
@@ -186,13 +127,6 @@ export async function mergeFavorites(localFavorites, username) {
   return merged
 }
 
-/**
- * Lista los canales que el usuario de un token sigue en Twitch.
- * Pagina hasta 5 paginas (500 canales max). Devuelve array de logins.
- *
- * @param {string} token - Bearer token de Twitch
- * @returns {Promise<string[]>}
- */
 export async function fetchFollowedChannels(token) {
   if (!token) return []
   try {

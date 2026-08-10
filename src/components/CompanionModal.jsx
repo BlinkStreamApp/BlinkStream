@@ -72,14 +72,14 @@ const CompanionModal = ({ onClose }) => {
         className="relative w-full max-w-[440px] max-h-[calc(100vh-2.5rem)] overflow-y-auto overflow-x-hidden bg-gradient-to-b from-[#181b24] via-[#13151c] to-[#0f1117] rounded-3xl border border-cyan-500/30 shadow-2xl shadow-cyan-500/20 text-white p-5 sm:p-6 transition-all animate-scale-up shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* Luces decorativas de fondo envueltas en overflow-hidden para evitar scrollbars horizontales */}
+
+        {}
         <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-3xl">
           <div className="absolute -top-24 -right-24 w-52 h-52 bg-fuchsia-600/15 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -left-24 w-52 h-52 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
         </div>
 
-        {/* Botón de cerrar */}
+        {}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-all z-10"
@@ -88,7 +88,7 @@ const CompanionModal = ({ onClose }) => {
           <PhosphorIcon name="X" size={20} weight="bold" />
         </button>
 
-        {/* Cabecera del modal */}
+        {}
         <div className="flex items-center gap-3 mb-4 pr-6">
           <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-cyan-500 to-fuchsia-500 text-white shadow-lg shadow-cyan-500/30 shrink-0">
             <PhosphorIcon name="DeviceMobile" size={26} weight="fill" />
@@ -125,12 +125,12 @@ const CompanionModal = ({ onClose }) => {
           </div>
         ) : (
           <>
-            {/* Zona central: Código QR y Datos LAN */}
+            {}
             <div className="bg-black/40 border border-white/5 rounded-2xl p-4 mb-4 flex flex-col items-center justify-center shadow-inner">
               {status.isRunning ? (
                 <>
                   <QRCodeSvg value={status.url} size={155} className="mb-3" />
-                  
+
                   <div className="flex items-center justify-center flex-wrap gap-x-2.5 gap-y-1 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 text-[11px] text-white/80 font-mono w-full max-w-full">
                     <span className="flex items-center gap-1 text-cyan-400 font-bold truncate">
                       <PhosphorIcon name="WifiHigh" size={14} weight="bold" /> {status.ip}:{status.port}
@@ -156,7 +156,7 @@ const CompanionModal = ({ onClose }) => {
               )}
             </div>
 
-            {/* Guía rápida in 3 pasos compacta */}
+            {}
             <div className="space-y-1.5 text-[11px] text-white/80 bg-white/5 p-3.5 rounded-2xl border border-white/10 mb-4 leading-relaxed">
               <h4 className="font-bold text-cyan-300 text-xs mb-1 flex items-center gap-1">
                 📋 Guía Rápida de Conexión:
@@ -175,7 +175,7 @@ const CompanionModal = ({ onClose }) => {
               </p>
             </div>
 
-            {/* Pie y control de encendido/apagado */}
+            {}
             <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[11px]">
               <span className="text-white/50 truncate pr-2">
                 🔒 Sesión cifrada y protegida

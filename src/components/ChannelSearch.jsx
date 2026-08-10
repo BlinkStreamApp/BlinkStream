@@ -28,8 +28,7 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
   }, [])
 
   useEffect(() => {
-    // Reset al cambiar de canal: estado UI que depende de currentChannel.
-    // No es cascading render: el effect se re-monta solo al cambiar.
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (currentChannel) { setInput(''); setSuggestions([]) }
   }, [currentChannel])
@@ -38,8 +37,7 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     const val = input.trim()
     if (val.length < 2) {
-      // Input demasiado corto: limpiamos suggestions. setState en effect
-      // es OK porque es reset dependiente de la prop `input`.
+
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSuggestions([]); return
     }

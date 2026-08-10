@@ -1,22 +1,4 @@
-/**
- * @file Lista de viewers del canal (M-1 / WT-20260628-13).
- * Lista scrolleable con avatar, username, badges inline y color por rol.
- * Search bar con debounce 150ms, sort por alpha / recent / role.
- * Click sobre un viewer abre ActionModal (gestion en ModPanel).
- *
- * @typedef {object} ViewerEntry
- * @property {string}  user_id
- * @property {string}  user_login
- * @property {string}  user_name
- * @property {string}  [avatar]
- * @property {('mod'|'vip'|'sub'|'artist'|'staff'|'broadcaster')[]} [badges]
- * @property {number}  [lastSeen]   - timestamp ms (para sort "recent")
- *
- * @typedef {object} ViewerListProps
- * @property {ViewerEntry[]} viewers
- * @property {(viewer: ViewerEntry) => void} onAction
- * @property {boolean} [loading]
- */
+
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
@@ -27,7 +9,6 @@ const SORT_OPTIONS = [
   { id: 'role', label: 'Rol' },
 ]
 
-// Debounce simple: 150ms
 function useDebounced(value, delay = 150) {
   const [v, setV] = useState(value)
   const timerRef = useRef(null)
@@ -70,9 +51,6 @@ function roleRank(badges = []) {
   return 5
 }
 
-/**
- * @param {ViewerListProps} props
- */
 export function ViewerList({ viewers, onAction, loading }) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('alpha')

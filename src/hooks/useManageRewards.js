@@ -1,41 +1,4 @@
-/**
- * @file Hook para broadcasters/mod de Channel Points (P2 / WT-20260628-14).
- *
- * Maneja la gestion de recompensas + redenciones pendientes para
- * un canal donde el usuario actual es el broadcaster (o moderador
- * con permisos). Auto-refresca las redenciones pendientes cada
- * 30s hasta que se llame a una accion o el componente se desmonte.
- *
- * Acciones expuestas:
- *   - createReward(data)
- *   - updateReward(id, data)
- *   - toggleReward(id, isEnabled)
- *   - archiveReward(id)        -> delete en Twitch (soft)
- *   - fulfillRedemption(id)
- *   - cancelRedemption(id, reason?)
- *   - bulkFulfill(ids)
- *   - bulkCancel(ids)
- *   - refresh()                -> refetch manual
- *
- * @typedef {object} ManageRewardsState
- * @property {Array<object>} rewards
- * @property {Array<object>} pendingRedemptions
- * @property {boolean} loading
- * @property {string|null} error
- * @property {() => Promise<void>} refresh
- * @property {(data: object) => Promise<{ok: boolean, data?: object, error?: string}>} createReward
- * @property {(id: string, data: object) => Promise<{ok: boolean, data?: object, error?: string}>} updateReward
- * @property {(id: string, isEnabled: boolean) => Promise<{ok: boolean, error?: string}>} toggleReward
- * @property {(id: string) => Promise<{ok: boolean, error?: string}>} archiveReward
- * @property {(id: string) => Promise<{ok: boolean, error?: string}>} fulfillRedemption
- * @property {(id: string, reason?: string) => Promise<{ok: boolean, error?: string}>} cancelRedemption
- * @property {(ids: string[]) => Promise<{ok: boolean, error?: string}>} bulkFulfill
- * @property {(ids: string[]) => Promise<{ok: boolean, error?: string}>} bulkCancel
- *
- * @typedef {object} UseManageRewardsOptions
- * @property {string|null} broadcasterId
- * @property {number}      [pollIntervalMs=30000]
- */
+
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { logError } from '../utils/errors'
@@ -51,10 +14,6 @@ import {
 
 const PENDING_STATUS = 'UNFULFILLED'
 
-/**
- * @param {UseManageRewardsOptions} opts
- * @returns {ManageRewardsState}
- */
 export function useManageRewards({ broadcasterId, token, pollIntervalMs = 30000 } = {}) {
   const [rewards, setRewards] = useState([])
   const [pendingRedemptions, setPendingRedemptions] = useState([])
@@ -141,8 +100,6 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 30000 
       cancelledRef.current = true
     }
   }, [broadcasterId, refresh])
-
-  // ─── Acciones ────────────────────────────────────────────────
 
   const createReward = useCallback(async (data) => {
     if (!broadcasterId) return { ok: false, error: 'No hay broadcaster activo' }

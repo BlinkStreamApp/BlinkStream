@@ -1,22 +1,9 @@
-/**
- * @file Card de recompensa para el viewer (P1 / WT-20260628-14).
- * Muestra imagen, titulo, costo y estado disabled. Click -> RedeemModal.
- *
- * @typedef {object} RewardCardProps
- * @property {object} reward             - Custom Reward de Twitch
- * @property {number|null} userBalance    - Balance del viewer (null si desconocido)
- * @property {boolean} [channelLive]     - false => deshabilita card aunque todo OK
- * @property {() => void} onClick
- */
+
 
 import { useState, useEffect } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { useT } from '../../utils/i18n'
 
-/**
- * Convierte segundos a string "Xh Ym" / "Ym Zs" / "Zs".
- * @param {number} totalSec
- */
 function fmtCooldown(totalSec) {
   if (!Number.isFinite(totalSec) || totalSec <= 0) return ''
   const h = Math.floor(totalSec / 3600)
@@ -29,9 +16,7 @@ function fmtCooldown(totalSec) {
 
 export default function RewardCard({ reward, userBalance, channelLive = true, onClick }) {
   const t = useT()
-  // `now` se refresca cada 1s para que el cooldown se actualice sin
-  // re-renders espurios. Antes se llamaba Date.now() en render y la
-  // regla `react-hooks/purity` marcaba impure function during render.
+
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -40,8 +25,6 @@ export default function RewardCard({ reward, userBalance, channelLive = true, on
 
   if (!reward) return null
 
-  // Reglas de disabled: Twitch las evalua del lado server, pero
-  // pre-evaluamos aqui para dar feedback inmediato al usuario.
   const isPaused = !reward.is_enabled || !reward.is_in_stock
   const cost = reward.cost || 0
   const noBalance = userBalance != null && userBalance < cost
@@ -58,7 +41,6 @@ export default function RewardCard({ reward, userBalance, channelLive = true, on
   else if (noBalance) disabledReason = 'cp.reward.disabled.points'
   else if (hasCooldown) disabledReason = 'cp.reward.disabled.cooldown'
 
-  // Cooldown countdown (solo si esta habilitado en la reward y activo)
   const cooldownRemainingSec = hasCooldown
     ? Math.max(0, Math.ceil((new Date(reward.cooldown_expires_at).getTime() - now) / 1000))
     : 0
@@ -73,7 +55,7 @@ export default function RewardCard({ reward, userBalance, channelLive = true, on
           : 'border-bg-tertiary/40 bg-bg-secondary hover:border-twitch/50 hover:bg-bg-tertiary/40 cursor-pointer btn-press'}`}
       title={disabled && disabledReason ? disabledReason : ''}
     >
-      {/* Imagen 80x80 */}
+      {}
       <div
         className="w-20 h-20 rounded-lg shrink-0 flex items-center justify-center text-2xl overflow-hidden"
         style={{ backgroundColor: reward.background_color || '#9146ff' }}
@@ -91,7 +73,7 @@ export default function RewardCard({ reward, userBalance, channelLive = true, on
         )}
       </div>
 
-      {/* Info */}
+      {}
       <div className="flex-1 min-w-0">
         <h4
           className="text-[13px] font-semibold text-text-primary leading-tight line-clamp-2"
@@ -108,7 +90,7 @@ export default function RewardCard({ reward, userBalance, channelLive = true, on
           <p className="text-[11px] text-text-muted mt-0.5 line-clamp-1">{reward.prompt}</p>
         )}
         <div className="flex items-center gap-2 mt-1.5">
-          {/* Coin icon + cost */}
+          {}
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-yellow-400">
             <PhosphorIcon name="Coins" size={12} weight="duotone" />
             {cost.toLocaleString('es-ES')}

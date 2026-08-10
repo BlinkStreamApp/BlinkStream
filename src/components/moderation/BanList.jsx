@@ -1,21 +1,4 @@
-/**
- * @file Lista de baneados permanentes (M-1 / WT-20260628-13).
- * Muestra username, razon y fecha de ban. Accion: Unban con confirm.
- *
- * @typedef {object} BanEntry
- * @property {string} user_id
- * @property {string} user_login
- * @property {string} user_name
- * @property {string} [reason]
- * @property {string} [expires_at]   - ISO (vacio para permanentes)
- * @property {string} [created_at]
- * @property {string} [moderator_login] - quien baneó
- *
- * @typedef {object} BanListProps
- * @property {BanEntry[]} bans
- * @property {(ban: BanEntry) => void} [onUnban]
- * @property {boolean} [loading]
- */
+
 
 export function BanList({ bans, onUnban, loading }) {
   return (

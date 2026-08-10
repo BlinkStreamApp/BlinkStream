@@ -1,8 +1,5 @@
 ﻿// Tests del cliente de Twitch.
-// - getHeaders / getGqlHeaders: funciones casi puras (async solo por getStoredToken).
-// - validateToken: depende de measureFetch; lo mockeamos por test.
-// - getDirectStreamUrl: depende de getAccessToken + fetch al usher.
-//   Lo testeamos a nivel de estructura de URL (que el HLS apunte a .m3u8).
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   PUBLIC_CLIENT_ID,
@@ -15,10 +12,8 @@ import {
 } from './twitch'
 import { mockResponse } from '../test/__mocks__/response'
 
-// Mock del modulo de Tauri. Vitest aplica el mock automaticamente a todos
-// los imports de @tauri-apps/api/core en este archivo.
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(async () => null), // get_secret siempre devuelve null -> fallback a localStorage
+  invoke: vi.fn(async () => null), 
 }))
 
 describe('twitch.js — constants', () => {
@@ -33,14 +28,13 @@ describe('getGqlHeaders', () => {
     const h = getGqlHeaders()
     expect(h['Client-ID']).toBe(PUBLIC_CLIENT_ID)
     expect(h['Content-Type']).toBe('application/json')
-    expect(h['Authorization']).toBeUndefined() // nunca lleva Authorization
+    expect(h['Authorization']).toBeUndefined() 
   })
 })
 
 describe('getHeaders', () => {
   beforeEach(() => {
-    // Asegurar storage limpio: invoke mock devuelve null -> getStoredToken
-    // cae a localStorage. Limpiamos para que no haya token previo.
+
     localStorage.clear()
   })
 
@@ -106,7 +100,7 @@ describe('getDirectStreamUrl', () => {
   })
 
   it('construye una URL HLS apuntando a .m3u8 con token/sig/player params', async () => {
-    // Mock del GQL que devuelve playbackAccessToken.
+
     const gqlResponse = mockResponse({
       ok: true,
       status: 200,
@@ -119,7 +113,7 @@ describe('getDirectStreamUrl', () => {
         },
       }),
     })
-    // Mock de usher: devolvemos un m3u8 minimo y luego una URL final.
+
     const m3u8 = `#EXTM3U
 #EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1920x1080,NAME="1080p60"
 https://test-streams.example.com/1080p60.m3u8
@@ -139,18 +133,15 @@ https://test-streams.example.com/480p.m3u8
 
     const url = await getDirectStreamUrl('tester', '1080p60')
 
-    // Sanity: la URL debe terminar en .m3u8 y pertenecer al CDN de Twitch.
     expect(url).toMatch(/\.m3u8$/)
     expect(url).toContain('test-streams.example.com/1080p60.m3u8')
 
-    // Verificamos que el GQL se llamo con la query esperada.
     const gqlCall = fetchSpy.mock.calls[0]
     expect(gqlCall[0]).toContain('gql.twitch.tv/gql')
     const gqlBody = JSON.parse(gqlCall[1].body)
     expect(gqlBody.query).toContain('streamPlaybackAccessToken')
     expect(gqlBody.variables).toEqual({ channelName: 'tester' })
 
-    // Verificamos que el usher recibio el token/sig decodificados.
     const usherCall = fetchSpy.mock.calls[1]
     expect(usherCall[0]).toContain('usher.ttvnw.net')
     expect(usherCall[0]).toContain('token=fake_jwt_value')
@@ -182,11 +173,6 @@ https://test-streams.example.com/480p.m3u8
   })
 })
 
-// ============================================================
-// FIX 1 (Hank / P1): tests de regresion para secureRandomInt.
-// CWE-330: Use of Insufficiently Random Values.
-// Sustituye a Math.random() en cache-busting de getDirectStreamUrl.
-// ============================================================
 describe('secureRandomInt', () => {
   it('devuelve un entero en [0, max)', () => {
     for (let i = 0; i < 100; i++) {
@@ -206,16 +192,13 @@ describe('secureRandomInt', () => {
   })
 
   it('usa crypto.getRandomValues cuando esta disponible (CSPRNG)', () => {
-    // crypto.getRandomValues existe en jsdom moderno. Verificamos que
-    // la distribucion no es degenerada (un sesgo fuerte indicaria que
-    // se cayo al fallback de Math.random).
+
     const buckets = new Array(10).fill(0)
     for (let i = 0; i < 1000; i++) {
       const n = secureRandomInt(10)
       buckets[n]++
     }
-    // Cada bucket deberia tener al menos ~50 hits (esperado: 100).
-    // Si todos estuvieran en 0, eso indicaria un sesgo total (rotura).
+
     for (const b of buckets) {
       expect(b).toBeGreaterThan(0)
     }
@@ -224,8 +207,7 @@ describe('secureRandomInt', () => {
   it('produce valores distintos en llamadas consecutivas', () => {
     const values = new Set()
     for (let i = 0; i < 100; i++) values.add(secureRandomInt(1e9))
-    // 100 valores de un espacio de 1e9 - la probabilidad de colision
-    // es despreciable. Si vemos <95 unicos, el RNG es defectuoso.
+
     expect(values.size).toBeGreaterThan(95)
   })
 })

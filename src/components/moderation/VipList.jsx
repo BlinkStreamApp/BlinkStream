@@ -1,20 +1,4 @@
-/**
- * @file Lista de VIPs del canal (M-1 / WT-20260628-13).
- * Estructura analoga a ModList; accion Unvip solo si broadcaster.
- *
- * @typedef {object} VipEntry
- * @property {string} user_id
- * @property {string} user_login
- * @property {string} user_name
- * @property {string} [avatar]
- * @property {string} [created_at]
- *
- * @typedef {object} VipListProps
- * @property {VipEntry[]} vips
- * @property {(vip: VipEntry) => void} [onUnvip]
- * @property {boolean} [isBroadcaster]
- * @property {boolean} [loading]
- */
+
 
 export function VipList({ vips, onUnvip, isBroadcaster, loading }) {
   return (

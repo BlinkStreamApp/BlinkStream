@@ -1,10 +1,4 @@
-/**
- * @file Settings (M-7 / Auditoria WT-20260628-01, refactor M-1 / WT-20260628-13).
- * Modal de configuracion con 5 tabs: General / Cuenta / Moderacion / Grabacion / Avanzado.
- *
- * @typedef {object} SettingsProps
- * @property {() => void} onClose
- */
+
 
 import { useState, useEffect } from 'react'
 import { BlinkStreamLogo } from './BlinkStreamLogo'
@@ -30,13 +24,6 @@ const TABS = [
 ]
 const LS_TAB_KEY = 'bs.settingsTab'
 
-/**
- * Componente Tabs interno. Sticky en el top del modal.
- * @param {object} props
- * @param {Array<{id: string, label: string}>} props.tabs
- * @param {string} props.active
- * @param {(id: string) => void} props.onChange
- */
 function Tabs({ tabs, active, onChange }) {
   return (
     <div className="flex border-b border-white/[0.08] bg-[#14141d]/70 backdrop-blur-md px-6 shrink-0 overflow-x-auto no-scrollbar gap-2">
@@ -70,15 +57,8 @@ function Tabs({ tabs, active, onChange }) {
   )
 }
 
-/**
- * Modal de configuracion. Mantiene todas las opciones de v1.0.4 dentro
- * del tab General, y deja placeholders para los nuevos tabs (Cuenta,
- * Moderacion, Grabacion, Avanzado). Persiste tab activa en localStorage.
- *
- * @param {SettingsProps} props
- */
 export default function Settings({ onClose }) {
-  // M-7: prop validation. Solo loggea.
+
   validateProps(
     { onClose },
     { onClose: { name: 'function', check: (v) => typeof v === 'function' } },
@@ -98,11 +78,10 @@ export default function Settings({ onClose }) {
     try {
       const stored = localStorage.getItem(LS_TAB_KEY)
       if (stored && TABS.find(t => t.id === stored)) return stored
-    } catch { /* ignore */ }
+    } catch {  }
     return 'general'
   })
 
-  // Estado del tab General (opciones legacy preservadas exactamente igual)
   const [prefQuality, setPrefQuality] = useState(() => localStorage.getItem('blinkstream_quality') || '1080p60')
   const [defaultVol, setDefaultVol] = useState(() => Number(localStorage.getItem('blinkstream_volume')) || 100)
   const [autoTheatre, setAutoTheatre] = useState(() => localStorage.getItem('blinkstream_auto_theatre') === 'true')
@@ -110,12 +89,10 @@ export default function Settings({ onClose }) {
   const [compactMode, setCompactMode] = useState(() => localStorage.getItem('blinkstream_compact') === 'true')
   const [lang, setLang] = useState(getLanguage)
 
-  // Persistencia de la tab activa
   useEffect(() => {
-    try { localStorage.setItem(LS_TAB_KEY, activeTab) } catch { /* ignore */ }
+    try { localStorage.setItem(LS_TAB_KEY, activeTab) } catch {  }
   }, [activeTab])
 
-  // Persistencias legacy (sin tocar)
   useEffect(() => { localStorage.setItem('blinkstream_quality', prefQuality) }, [prefQuality])
   useEffect(() => { localStorage.setItem('blinkstream_volume', String(defaultVol)) }, [defaultVol])
   useEffect(() => { localStorage.setItem('blinkstream_auto_theatre', String(autoTheatre)) }, [autoTheatre])

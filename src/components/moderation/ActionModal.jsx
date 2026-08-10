@@ -1,21 +1,4 @@
-/**
- * @file Modal generico para acciones de moderacion (M-1 / WT-20260628-13).
- * Usado por ViewerList, BanList, TimeoutList, MessageContextMenu, etc.
- *
- * Anti-fat-finger para ban permanente: requiere teclear el username
- * exacto en un campo de confirmacion antes de habilitar el boton.
- *
- * Focus trap basico: el primer input recibe foco al abrir; Esc cierra.
- *
- * @typedef {object} ActionModalProps
- * @property {boolean} open
- * @property {() => void} onClose
- * @property {() => void} onConfirm          - ejecuta la accion final
- * @property {('ban'|'unban'|'timeout'|'untimeout'|'mod'|'unmod'|'vip'|'unvip')} action
- * @property {{ user_id: string, user_login: string, user_name: string }} targetUser
- * @property {string} [defaultReason]
- * @property {boolean} [busy]
- */
+
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 
@@ -28,11 +11,7 @@ const DURATION_PRESETS = [
   { id: '86400', label: '24h' },
 ]
 
-// WT-20260628-27 / FIX 2: Twitch impone un maximo de 2 semanas (14 dias)
-// en el endpoint POST /moderation/bans. Sin esta validacion, un usuario
-// podia teclear `99999999` segundos y el backend respondia 400
-// generico. Ahora capeamos en cliente y mostramos feedback inmediato.
-const MAX_TIMEOUT_SECONDS = 1209600 // 14 * 24 * 60 * 60
+const MAX_TIMEOUT_SECONDS = 1209600 
 const MIN_TIMEOUT_SECONDS = 1
 
 const ACTION_META = {
@@ -56,9 +35,6 @@ function colorClasses(color) {
   }
 }
 
-/**
- * @param {ActionModalProps} props
- */
 export function ActionModal({ open, onClose, onConfirm, action, targetUser, defaultReason, busy }) {
   const meta = ACTION_META[action] || ACTION_META.ban
   const [reason, setReason] = useState(defaultReason || '')
@@ -67,25 +43,22 @@ export function ActionModal({ open, onClose, onConfirm, action, targetUser, defa
   const [confirmTyped, setConfirmTyped] = useState('')
   const firstInputRef = useRef(null)
 
-  // Reset state on open
   useEffect(() => {
     if (open) {
-      // Reset del formulario al abrir. setState en effect: estado UI
-      // derivado del open/target.
+
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setReason(defaultReason || '')
-       
+
       setDuration('600')
-       
+
       setCustomDuration('')
-       
+
       setConfirmTyped('')
-      // Foco al primer input
+
       setTimeout(() => firstInputRef.current?.focus(), 30)
     }
   }, [open, defaultReason, targetUser?.user_id])
 
-  // Esc para cerrar
   useEffect(() => {
     if (!open) return
     const handle = (e) => { if (e.key === 'Escape') onClose() }
@@ -96,16 +69,12 @@ export function ActionModal({ open, onClose, onConfirm, action, targetUser, defa
   const effectiveDuration = useMemo(() => {
     if (duration === 'custom') {
       const n = Number(customDuration) || 0
-      // FIX 2: clamp al rango valido de Twitch. effectiveDuration se usa
-      // para `canConfirm` y para el submit, asi que capeamos aqui para
-      // que el resto del componente vea el valor saneado.
+
       return Math.max(MIN_TIMEOUT_SECONDS, Math.min(MAX_TIMEOUT_SECONDS, n))
     }
     return Number(duration)
   }, [duration, customDuration])
 
-  // FIX 2: derivamos si el custom actual EXCEDE el maximo, para mostrar
-  // feedback inline. No bloquea el render — solo el submit via canConfirm.
   const customDurationError = useMemo(() => {
     if (duration !== 'custom') return ''
     const n = Number(customDuration) || 0
@@ -120,7 +89,7 @@ export function ActionModal({ open, onClose, onConfirm, action, targetUser, defa
     if (busy) return false
     if (meta.requiresReason && !reason.trim()) return false
     if (meta.requiresDuration && effectiveDuration <= 0) return false
-    // FIX 2: bloquear submit si el custom excede el maximo de Twitch.
+
     if (meta.requiresDuration && duration === 'custom') {
       const n = Number(customDuration) || 0
       if (n > MAX_TIMEOUT_SECONDS || n < MIN_TIMEOUT_SECONDS) return false
@@ -200,12 +169,7 @@ export function ActionModal({ open, onClose, onConfirm, action, targetUser, defa
                     min={MIN_TIMEOUT_SECONDS}
                     max={MAX_TIMEOUT_SECONDS}
                     value={customDuration}
-                    // FIX 2: el browser ya no aceptara valores fuera de
-                    // [min,max] via flechas/stepper, pero un paste manual
-                    // puede evadir eso. El error inline + canConfirm
-                    // cubren el paste. El value se mantiene como string
-                    // para no perder UX (typing "60" -> "600" no se
-                    // trunca a "6" en el medio).
+
                     onChange={e => setCustomDuration(e.target.value)}
                     placeholder="Segundos (máx 14 días)..."
                     aria-invalid={customDurationError ? 'true' : 'false'}

@@ -1,8 +1,4 @@
-/**
- * @file Tab "Grabación" del modal de Settings (G1 / Release Final).
- * Dashboard interactivo para configurar ruta de almacenamiento, formato contenedor (MP4/TS),
- * calidad nativa y grabación automática al iniciar stream.
- */
+
 import { useState, useEffect } from 'react'
 import ToggleSwitch from '../ToggleSwitch'
 import PhosphorIcon from '../icons/PhosphorIcon'
@@ -28,19 +24,19 @@ export function SettingsRecordingTab() {
   const [statusMsg, setStatusMsg] = useState('')
 
   useEffect(() => {
-    try { localStorage.setItem(LS_REC_PATH, recPath) } catch { /* storage may be unavailable */ }
+    try { localStorage.setItem(LS_REC_PATH, recPath) } catch {  }
   }, [recPath])
 
   useEffect(() => {
-    try { localStorage.setItem(LS_REC_FORMAT, recFormat) } catch { /* storage may be unavailable */ }
+    try { localStorage.setItem(LS_REC_FORMAT, recFormat) } catch {  }
   }, [recFormat])
 
   useEffect(() => {
-    try { localStorage.setItem(LS_REC_QUALITY, recQuality) } catch { /* storage may be unavailable */ }
+    try { localStorage.setItem(LS_REC_QUALITY, recQuality) } catch {  }
   }, [recQuality])
 
   useEffect(() => {
-    try { localStorage.setItem(LS_REC_AUTOSTART, recAutoStart ? 'true' : 'false') } catch { /* storage may be unavailable */ }
+    try { localStorage.setItem(LS_REC_AUTOSTART, recAutoStart ? 'true' : 'false') } catch {  }
   }, [recAutoStart])
 
   const handleSelectFolder = async () => {

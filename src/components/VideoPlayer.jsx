@@ -1,20 +1,4 @@
-/**
- * @file VideoPlayer (M-7 / Auditoria WT-20260628-01).
- * Reproductor HLS con auto-fallback de calidad, grabacion local via
- * backend Rust, y estadisticas en vivo. Conexion hls.js se recrea al
- * cambiar de canal/calidad y se destruye en cleanup.
- *
- * @typedef {object} VideoPlayerProps
- * @property {string}      channel
- * @property {string}      quality
- * @property {(q: string) => void}   onQualityChange
- * @property {number}      volume
- * @property {(v: number) => void}   onVolumeChange
- * @property {boolean}     theatreMode
- * @property {() => void}  onToggleTheatre
- * @property {boolean}     compact
- * @property {() => void}  onToggleCompact
- */
+
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
@@ -44,11 +28,6 @@ function ClipIcon() { return <PhosphorIcon name="PlayCircle" size={19} weight="r
 function VodIcon() { return <PhosphorIcon name="FilmStrip" size={19} weight="regular" /> }
 function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="regular" /> }
 
-// FALLBACK_QUALITIES a nivel modulo: si lo declaramos dentro del
-// componente, se recrea en cada render y dispara el warning de
-// `react-hooks/exhaustive-deps` en `fetchQualities` (su dep changea
-// constantemente). Como es un array inmutable de strings, sacarlo
-// del cuerpo del componente es seguro.
 const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '936p60', '963p60', '1080p60', '1440p60']
 
 function PlayerSettingsPanel({
@@ -82,7 +61,7 @@ function PlayerSettingsPanel({
         </button>
       </div>
 
-      {/* Fila compacta de Calidad de Stream */}
+      {}
       {availableQualities && availableQualities.length > 0 && (
         <div className="flex items-center justify-between py-1 px-2 rounded-lg bg-twitch/15 border border-twitch/30 gap-2 mb-1 shadow-sm">
           <div className="flex items-center gap-1.5 text-twitch-light shrink-0">
@@ -96,7 +75,7 @@ function PlayerSettingsPanel({
       )}
 
       <div className="space-y-0.5 text-[11px]">
-        {/* Modo Solo Audio */}
+        {}
         <div 
           onClick={onToggleAudioOnly}
           title="Ahorro de datos y ancho de banda"
@@ -109,7 +88,7 @@ function PlayerSettingsPanel({
           <ToggleSwitch active={audioOnly} onClick={onToggleAudioOnly} />
         </div>
 
-        {/* Estadísticas de Vídeo */}
+        {}
         <div 
           onClick={onToggleStats}
           title="Bitrate, FPS, Códec y Buffer en vivo"
@@ -122,7 +101,7 @@ function PlayerSettingsPanel({
           <ToggleSwitch active={showStats} onClick={onToggleStats} />
         </div>
 
-        {/* Chat en Pantalla */}
+        {}
         <div 
           onClick={onToggleOverlayChat}
           title="Mensajes flotantes sobre el stream"
@@ -135,7 +114,7 @@ function PlayerSettingsPanel({
           <ToggleSwitch active={showOverlayChat} onClick={onToggleOverlayChat} />
         </div>
 
-        {/* Lluvia de Emotes */}
+        {}
         <div 
           onClick={onToggleEmoteEffects}
           title="Lluvia en pantalla y medidor de combos"
@@ -148,7 +127,7 @@ function PlayerSettingsPanel({
           <ToggleSwitch active={showEmoteEffects} onClick={onToggleEmoteEffects} />
         </div>
 
-        {/* Modo Compacto */}
+        {}
         <div 
           onClick={onToggleCompact}
           title="Reduce márgenes de la interfaz"
@@ -176,19 +155,13 @@ function PlayerSettingsPanel({
   )
 }
 
-/**
- * Reproductor principal. Maneja HLS, fallback de calidad, grabacion
- * via backend, y estadisticas en vivo.
- *
- * @param {VideoPlayerProps} props
- */
 export default function VideoPlayer({
   channel, quality, onQualityChange, volume, onVolumeChange,
   theatreMode, onToggleTheatre, compact, onToggleCompact, onOpenAppSettings,
   isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken,
 }) {
   const t = useT()
-  // M-7: validamos props criticas (vienen de App.jsx). Solo loggea.
+
   const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
   validateProps(
     { channel, quality, onQualityChange, volume, onVolumeChange, theatreMode, onToggleTheatre, compact, onToggleCompact, onOpenAppSettings },
@@ -230,12 +203,7 @@ export default function VideoPlayer({
   const audioOnlyRef = useRef(false)
   useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
   const [stats, setStats] = useState({ bitrate: 'Calculando...', resolution: 'Calculando...', dropped: 0, buffer: '0.0s' })
-  // G1 / WT-20260628-16: estado de grabacion extraido a useRecording.
-  // El hook maneja isRecording, outputPath, error y cleanup.
-  // - `recording`         → render del badge REC
-  // - `recordingError`    → mensaje user-friendly cerca del badge
-  // - `startRecording`    → abre dialog save y arranca backend
-  // - `hookStopRecording` → mata el proceso en el backend
+
   const {
     isRecording: recording,
     error: recordingError,
@@ -261,7 +229,6 @@ export default function VideoPlayer({
     }
   }, [streamUrl, channel, recording, startRecording])
 
-  // ── Sistema ORIGINAL: get_stream_url con calidad específica ──
   const fetchStream = useCallback(async (ch, q) => {
     if (!ch) return
     if (isFetchingRef.current) return
@@ -270,7 +237,6 @@ export default function VideoPlayer({
 
     const targetQuality = q || quality || 'best'
 
-    // Audio-only: streamlink directo
     if (targetQuality === 'audio_only') {
       try {
         const url = await measureInvoke('get_stream_url', { channel: ch, quality: 'audio_only' })
@@ -285,7 +251,6 @@ export default function VideoPlayer({
       setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
     } catch (e) { console.warn('Streamlink fallback — get_stream_url failed:', e) }
 
-    // Fallback: best
     try {
       const url = await measureInvoke('get_stream_url', { channel: ch, quality: 'best' })
       setStreamUrl(url); setUsingFallback(true); setLoading(false); isFetchingRef.current = false; return
@@ -296,7 +261,6 @@ export default function VideoPlayer({
     setLoading(false); isFetchingRef.current = false
   }, [quality])
 
-  // ── fetchQualities: versión infalible (sin cambios) ──
   const fetchQualities = useCallback(async (ch) => {
     if (!ch) return
     try {
@@ -306,35 +270,23 @@ export default function VideoPlayer({
         return
       }
     } catch (e) { console.warn('Error fetching qualities:', e) }
-    // Siempre mostrar calidades aunque el backend falle
+
     setAvailableQualities(FALLBACK_QUALITIES)
-    // FALLBACK_QUALITIES es constante a nivel modulo (ver arriba); la
-    // regla exhaustive-deps la pide igualmente como dep formal. La
-    // omitimos: la constante nunca cambia.
-     
+
   }, [])
 
-  // ── handleQualityChange: recarga con nueva calidad (SIN hls level API) ──
   const handleQualityChange = useCallback((newQuality) => {
     onQualityChange(newQuality)
     fetchStream(channel, newQuality)
   }, [onQualityChange, fetchStream, channel])
 
-  // ── Carga inicial + reconexión cada 25min ──
-  // `quality` se lee dentro del setTimeout; si lo añadimos a las deps,
-  // el effect se re-montaría cada vez que cambia la calidad y eso
-  // reiniciaría el timer de 25min (UX: el usuario perdería la reconexión
-  // cada vez que cambia calidad). Por eso la omitimos: el reconnect usa
-  // siempre la ultima `quality` accesible via closure + audioOnlyRef.
-   
   useEffect(() => {
     if (abortControllerRef.current) {
-      try { abortControllerRef.current.abort() } catch { /* ignore */ }
+      try { abortControllerRef.current.abort() } catch {  }
     }
     const abortCtrl = new AbortController()
     abortControllerRef.current = abortCtrl
-    // fetchStream*/fetchQualities disparan setState al resolver; es
-    // el patron "fetch on mount/canal-change", no cascading render.
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     Promise.all([fetchStream(channel), fetchQualities(channel)])
     let cancelled = false
@@ -348,68 +300,39 @@ export default function VideoPlayer({
       }, 25 * 60 * 1000)
     }
     reconnect()
-    return () => { cancelled = true; try { abortCtrl.abort() } catch {/* ignore */} clearTimeout(timer) }
-    // `quality` se lee dentro del setTimeout (línea `fetchStream(channel, quality)`);
-    // si la añadimos a deps, el effect se re-montaría cada vez que el
-    // usuario cambia calidad y eso reiniciaría el reconnect de 25min.
-    // Intencional: la regla exhaustive-deps no modela setTimeout largos.
+    return () => { cancelled = true; try { abortCtrl.abort() } catch {} clearTimeout(timer) }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel, fetchStream, fetchQualities])
 
-  // ── Cleanup de grabacion ─────────────────────────────────
-  // G1 / WT-20260628-16: el hook useRecording ya maneja el cleanup en
-  // unmount (fire-and-forget stop_recording). Para el caso de cambio
-  // de canal (B-1 original), necesitamos un efecto extra: si el canal
-  // cambia mientras graba, el backend Rust seguiria grabando el canal
-  // viejo. Lo paramos explicitamente al cambiar `channel`.
   useEffect(() => {
     return () => {
-      // Cleanup del cambio de canal. No await: es cleanup, el usuario
-      // ya esta navegando.
+
       if (recording) {
-         
+
         console.info(`[VideoPlayer] Deteniendo grabacion por cambio de canal → ${channel}`)
         hookStopRecording()
       }
     }
   }, [channel, recording, hookStopRecording])
 
-  // ── hls.js effect: SIMPLE con auto-fallback ──
   useEffect(() => {
     const video = videoRef.current
     if (!video || !streamUrl) return
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
 
-    // Safari nativo
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = streamUrl
       return
     }
 
     if (!Hls.isSupported()) {
-      // El browser no soporta HLS nativo ni hls.js. setError en effect
-      // es legitimo: estado UI derivado de la disponibilidad del codec.
+
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('HLS no soportado')
       return
     }
 
-    // WT-20260628-36: config robusta de HLS.js para streams 2K/1440p.
-    // - maxBufferLength/maxMaxBufferLength/maxBufferSize: buffer generoso
-    //   para absorber picos de bitrate en 2K (Twitch source llega a
-    //   ~6-8 Mbps y con picos de 12 Mbps).
-    // - capLevelToPlayerSize: evita que HLS.js intente decodificar el
-    //   level mas alto cuando el player es mas pequeno (este es el
-    //   trigger #4 del spec: causa directa del 2K-black-screen).
-    // - abrEwmaDefaultEstimate: arranca con 5 Mbps asumidos en vez de
-    //   500 kbps; el default subestima brutalmente streams 2K y fuerza
-    //   un downgrade prematuro que confunde al usuario.
-    // - fragLoadingTimeOut/manifestLoadingTimeOut/levelLoadingTimeOut
-    //   marcados deprecated en 1.6.16 (reemplazados por LoadPolicy) pero
-    //   siguen funcionando; los conservo por estabilidad y porque la
-    //   spec los pide explicitamente. Si rompen build, migrar a
-    //   `fragLoadPolicy: { default: { maxLoadTimeMs: 20000, ... } }`.
-    // - debug solo en dev para no spammear consola en produccion.
     const hls = new Hls({
       loader: TauriPlaylistLoader,
       maxBufferLength: 60,
@@ -433,31 +356,16 @@ export default function VideoPlayer({
     hls.loadSource(streamUrl)
     hls.attachMedia(video)
 
-    // WT-20260628-36: ResizeObserver para re-evaluar capLevelToPlayerSize
-    // cuando el contenedor cambia de tamano (theatre mode, fullscreen,
-    // PiP). `triggerLevelSwap` NO existe en hls.js 1.6.16 — el equivalente
-    // real es manipular `hls.currentLevel` o llamar `hls.startLoad()`.
-    // Aqui solo queremos que hls.js re-mida el player y aplique el cap
-    // automaticamente; lo hacemos con un callback defensivo que verifica
-    // que la API exista antes de invocarla.
     const resizeObserver = new ResizeObserver(() => {
       if (hls && typeof hls.startLoad === 'function') {
-        // startLoad re-evalua el ABR; capLevelToPlayerSize se recalcula
-        // internamente cuando el video element reporta nuevas dimensiones.
-        try { hls.startLoad() } catch { /* noop: no-op en re-entry */ }
+
+        try { hls.startLoad() } catch {  }
       }
     })
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current)
     }
 
-    // WT-20260628-36: listener de errores nativos del <video>. HLS.js NO
-    // emite un ERROR event para todos los fallos del decoder (Codec no
-    // soportado, decode error del browser); estos llegan via video.error.
-    // Codigos: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED.
-    // El 3 (DECODE) es el caso tipico de 2K en WebView2: el HEVC/high
-    // profile falla a decodificar y se queda en pantalla negra. El 4 es
-    // cuando el codec no esta soportado en absoluto.
     const handleVideoError = () => {
       if (!video.error) return
       const errCode = video.error.code
@@ -485,37 +393,25 @@ export default function VideoPlayer({
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
       video.play().catch(() => setPlaying(false))
 
-      // WT-20260628-36: log de diagnostico en dev. Util para confirmar
-      // que el manifest tiene los levels esperados (incluido 2K/1440p).
       if (import.meta.env.DEV) {
         const levelsInfo = data.levels.map(l => `${l.height}p (${Math.round(l.bitrate / 1000)}kbps)`).join(', ')
         console.log(`[HLS] ${data.levels.length} levels: ${levelsInfo}`)
       }
 
-      // WT-20260628-36: auto-fallback inteligente de 5s (antes 8s).
-      // Tres casos:
-      //   1) readyState < 2: no llegaron datos -> bajar 1 level o ir a 'best'
-      //   2) videoWidth === 0 con levels disponibles: caso reportado de
-      //      2K-black-screen; forzar al level mas bajo.
-      //   3) ok: no hacer nada.
       const fallbackTimer = setTimeout(() => {
         if (video.readyState < 2) {
           const currentLevelIdx = hls.currentLevel
           console.warn(`[HLS] current level (${currentLevelIdx}) not playing after 5s, trying fallback`)
           if (hls.levels && hls.levels.length > 1 && currentLevelIdx >= 0 && currentLevelIdx < hls.levels.length - 1) {
-            // +1 = un level mas bajo (los levels se ordenan de mayor a menor
-            // bitrate en hls.js).
+
             hls.currentLevel = currentLevelIdx + 1
           } else {
-            // No hay level mas bajo disponible -> pedir 'best' que es el
-            // flujo mas estable (suele ser 1080p60 o 720p60).
+
             onQualityChange('best')
             fetchStream(channel, 'best')
           }
         } else if (video.videoWidth === 0 && data.levels.length > 1) {
-          // Caso 2K reportado: videoWidth=0 significa que el frame no se
-          // ha renderizado, aunque readyState indique datos. Bajar al
-          // level mas bajo disponible.
+
           console.warn(`[VideoPlayer] videoWidth=0 with levels available, downgrading to lowest`)
           hls.currentLevel = data.levels.length - 1
         }
@@ -523,15 +419,6 @@ export default function VideoPlayer({
       fallbackTimersRef.current = fallbackTimer
     })
 
-    // WT-20260628-36: handler de errores categorizado.
-    // Distingue fatales vs no-fatales (los no-fatales hls.js los resuelve
-    // solo; no actuamos). Para fatales, recuperacion por tipo:
-    //   - NETWORK_ERROR: hls.startLoad() reintenta la carga.
-    //   - MEDIA_ERROR: recoverMediaError() resetea MediaSource; si es un
-    //     problema de codec especifico (bufferIncompatibleCodecsError /
-    //     bufferAppendError), probamos primero un downgrade de level.
-    //   - BUFFER_APPEND_ERROR / BUFFER_FULL_ERROR: recoverMediaError().
-    //   - otros (KEY_SYSTEM, MUX, OTHER): no recuperables, mostrar error.
     hls.on(Hls.Events.ERROR, (_e, data) => {
       if (!data.fatal) {
         if (import.meta.env.DEV) {
@@ -557,8 +444,7 @@ export default function VideoPlayer({
         case Hls.ErrorTypes.MEDIA_ERROR:
           console.error('[HLS] media error', data.details)
           if (data.details === 'bufferIncompatibleCodecsError' || data.details === 'bufferAppendError') {
-            // Codec issue — intentar con el siguiente level mas bajo
-            // antes de recover completo (mas barato que re-buffering).
+
             if (hls.levels && hls.currentLevel >= 0 && hls.currentLevel < hls.levels.length - 1) {
               console.warn(`[HLS] codec issue at level ${hls.currentLevel}, downgrading`)
               hls.currentLevel = hls.currentLevel + 1
@@ -628,10 +514,7 @@ export default function VideoPlayer({
       cancelled = true
       clearTimeout(statsTimer)
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
-      // WT-20260628-36: cleanup del ResizeObserver y del listener nativo
-      // de error del <video>. Sin esto, en re-mount dejariamos observers
-      // y handlers colgando que dispararian warnings en consola y
-      // mantendrian referencias al video element destruido.
+
       resizeObserver.disconnect()
       video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
@@ -643,7 +526,6 @@ export default function VideoPlayer({
   const togglePlay = useCallback(() => { const v = videoRef.current; if (!v) return; if (v.paused) { v.play().catch(() => {}); setPlaying(true) } else { v.pause(); setPlaying(false) } }, [])
   const toggleMute = useCallback(() => { const v = videoRef.current; if (!v) return; v.muted = !muted; setMuted(!muted) }, [muted])
 
-  // ── toggleAudioOnly con fetchStream explícito ──
   const toggleAudioOnly = () => {
     if (audioOnly) {
       onQualityChange(prevQualityRef.current)
@@ -667,7 +549,7 @@ export default function VideoPlayer({
       } else {
         await v.requestPictureInPicture()
       }
-    } catch { /* PiP not supported or denied */ }
+    } catch {  }
   }
 
   const showControlsTemporarily = () => {
@@ -687,17 +569,13 @@ export default function VideoPlayer({
   }, [streamUrl])
 
   useEffect(() => {
-    // Auto-hide del toast de theatre mode: estado UI derivado de
-    // theatreMode. setState en effect es OK aqui.
+
     if (theatreMode) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowTheatreToast(true); const t = setTimeout(() => setShowTheatreToast(false), 2500); return () => clearTimeout(t)
     }
   }, [theatreMode])
 
-  // Barra de progreso de sesion: tick cada 30s para refrescar el width.
-  // Asi evitamos Date.now() durante render (la regla `react-hooks/purity`
-  // detecta funciones impuras llamadas en el cuerpo del componente).
   const [sessionProgress, setSessionProgress] = useState(0)
   useEffect(() => {
     const update = () => {
@@ -753,7 +631,6 @@ export default function VideoPlayer({
     }
   }, [channel])
 
-  // Mando a Distancia Wi-Fi (Fase 4): Conectar botones remotos de Play/Pausa, Silencio y Captura de Clip HD
   useEffect(() => {
     const handleRemotePause = () => togglePlay();
     const handleRemoteMute = () => toggleMute();
@@ -800,13 +677,10 @@ export default function VideoPlayer({
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-    // toggleMute/onToggleTheatre/onVolumeChange: handlers de evento
-    // provistos por el padre. Si los añadimos a deps, el listener se
-    // re-montaría en cada render del padre (no estan memoizados).
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume, muted, streamUrl, playing, captureSnapshot])
 
-  // ──────────────────────── RENDER ────────────────────────
   return (
     <div ref={containerRef} className={`relative bg-black overflow-hidden group/player ${theatreMode ? 'w-full h-full' : 'w-full'}`} style={theatreMode ? {} : { aspectRatio: '16/9', maxHeight: '100%' }}
       onMouseMove={showControlsTemporarily} onMouseEnter={() => setShowControls(true)} onMouseLeave={() => setShowControls(false)}>
@@ -894,9 +768,7 @@ export default function VideoPlayer({
         </div>
       )}
 
-
-
-      {/* Control Bar - Isla flotante premium */}
+      {}
       <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
         <div className="flex items-center gap-4 text-white">
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
@@ -910,8 +782,7 @@ export default function VideoPlayer({
             <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.clips', 'Clips')} aria-label="Abrir clips"><ClipIcon/></button>
             <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.vods', 'VODs')} aria-label="Ver VODs"><VodIcon/></button>
             <button onClick={async () => {
-              // G1 / WT-20260628-16: delega al hook useRecording.
-              // El hook se encarga del dialog save, errores, y eventLog.
+
               if (recording) {
                 await hookStopRecording()
               } else {
@@ -936,7 +807,7 @@ export default function VideoPlayer({
             <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch animate-pulse' : ''}`} title={t('player.settings', 'Ajustes')} aria-label="Ajustes del reproductor"><SettingsIcon/></button>
             <button onClick={onToggleTheatre} className={`hover:text-white transition-colors cursor-pointer ${theatreMode ? 'text-twitch' : ''}`} title={t('player.theatre', 'Teatro (T)')} aria-label="Modo teatro"><TheatreIcon/></button>
             <button onClick={async () => {
-              try { safeOpenUrl(`https://www.twitch.tv/${channel}`, true) } catch { /* ignore: el helper ya hace fallback */ }
+              try { safeOpenUrl(`https://www.twitch.tv/${channel}`, true) } catch {  }
             }} className="hover:text-white transition-colors cursor-pointer" title={t('player.browser', 'Abrir en navegador')} aria-label="Abrir en navegador">
               <PhosphorIcon name="ArrowSquareOut" size={16} weight="regular" />
             </button>

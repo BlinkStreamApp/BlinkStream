@@ -1,16 +1,4 @@
-/**
- * @file Lista de redenciones pendientes para el broadcaster (P2 / WT-20260628-14).
- *
- * @typedef {object} PendingRedemptionsProps
- * @property {Array<object>} redemptions
- * @property {boolean} loading
- * @property {string|null} error
- * @property {(id: string) => void} onFulfill
- * @property {(id: string) => void} onCancel
- * @property {(ids: string[]) => void} onBulkFulfill
- * @property {(ids: string[]) => void} onBulkCancel
- * @property {() => void} onRefresh
- */
+
 
 import { useState, useMemo } from 'react'
 import { t } from '../../utils/i18n'
@@ -23,11 +11,6 @@ function fmtDate(iso) {
   } catch { return '' }
 }
 
-// FIX 4 (WT-20260628-29): con 500+ redenciones en el DOM el FPS se
-// desplomaba. Pagina client-side en chunks de 50 con un "Ver mas".
-// Esto evita la complejidad de un virtualizer (react-window, etc.)
-// y es suficiente para P1: los broadcasters suelen tener <500
-// pendientes y el panel es modal.
 const PAGE_SIZE = 50
 
 export default function PendingRedemptions({
@@ -43,11 +26,9 @@ export default function PendingRedemptions({
   const [selected, setSelected] = useState(new Set())
   const [rewardFilter, setRewardFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('')
-  // FIX 4: cuanto llevamos mostrado. Reset automatico cuando cambia
-  // la lista (nuevo fetch, filtros distintos).
+
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
-  // Lista de rewards unicas para el filtro
   const rewardOptions = useMemo(() => {
     const set = new Map()
     redemptions.forEach(rd => {
@@ -58,7 +39,6 @@ export default function PendingRedemptions({
     return [...set.entries()]
   }, [redemptions])
 
-  // Aplicamos filtros
   const filtered = useMemo(() => {
     return redemptions.filter(rd => {
       if (rewardFilter !== 'all' && rd.reward_id !== rewardFilter) return false
@@ -67,13 +47,8 @@ export default function PendingRedemptions({
     })
   }, [redemptions, rewardFilter, userFilter])
 
-  // FIX 4: cuando cambian los filtros o la lista, reseteamos el
-  // visibleCount al PAGE_SIZE para no dejar al usuario con un "Ver
-  // mas" en un set que ya no aplica.
-  // Lo hacemos con un useMemo derivado: si filtered.length cae por
-  // debajo de visibleCount, capamos.
   const safeVisibleCount = Math.min(visibleCount, filtered.length)
-  // Slice que vamos a renderizar.
+
   const visible = useMemo(
     () => filtered.slice(0, Math.max(safeVisibleCount, 0)),
     [filtered, safeVisibleCount]
@@ -136,7 +111,7 @@ export default function PendingRedemptions({
 
   return (
     <div className="space-y-3">
-      {/* Filtros + bulk actions */}
+      {}
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={rewardFilter}
@@ -243,8 +218,7 @@ export default function PendingRedemptions({
             </div>
           )
         })}
-        {/* FIX 4: paginacion client-side. Mostramos cuantos llevamos
-            y un boton para cargar PAGE_SIZE mas. */}
+        {}
         {hasMore && (
           <div className="flex flex-col items-center gap-1 pt-2">
             <p className="text-[10px] text-text-muted">
