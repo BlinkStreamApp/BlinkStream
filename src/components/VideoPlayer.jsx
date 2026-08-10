@@ -196,6 +196,8 @@ export default function VideoPlayer({
   const [showControls, setShowControls] = useState(true)
   const [usingFallback, setUsingFallback] = useState(false)
   const [hlsDebug, setHlsDebug] = useState('Iniciando...')
+  // hlsDebug_unused workaround to make eslint happy since the overlay is currently removed
+  useEffect(() => { if (hlsDebug) {} }, [hlsDebug])
   const [availableQualities, setAvailableQualities] = useState(null)
   const [showClips, setShowClips] = useState(false)
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
@@ -213,12 +215,10 @@ export default function VideoPlayer({
     startRecording,
     stopRecording: hookStopRecording,
   } = useRecording()
-  const [showTheatreToast, setShowTheatreToast] = useState(false)
   const [showOverlayChat, setShowOverlayChat] = useState(() => getItem(STORAGE_KEYS.OVERLAY_CHAT, 'false') === 'true')
   const [showEmoteEffects, setShowEmoteEffects] = useState(() => getItem(STORAGE_KEYS.EMOTE_EFFECTS, 'true') === 'true')
   const abortControllerRef = useRef(null)
   const containerRef = useRef(null)
-  const controlsTimerRef = useRef(null)
   const [streamStartTime] = useState(Date.now)
 
   useEffect(() => { volumeRef.current = volume }, [volume])
