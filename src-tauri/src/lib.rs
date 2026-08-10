@@ -574,7 +574,7 @@ fn is_usable_streamlink(path: &Path) -> bool {
             .creation_flags(CREATE_NO_WINDOW);
 
         let Ok(output) = command.output() else {
-            log::error!("is_usable_streamlink: No se pudo ejecutar {:?}", path);
+            log::error!("is_usable_streamlink: No se pudo ejecutar {path:?}");
             return false;
         };
 
@@ -597,9 +597,7 @@ fn is_usable_streamlink(path: &Path) -> bool {
         let is_valid = version.to_lowercase().contains("streamlink");
         if !is_valid {
             log::error!(
-                "is_usable_streamlink: {:?} devolvió output inválido: {}",
-                path,
-                version
+                "is_usable_streamlink: {path:?} devolvió output inválido: {version}"
             );
         }
         is_valid
@@ -652,9 +650,12 @@ pub fn find_bundled_streamlink(app: &AppHandle) -> Option<PathBuf> {
     })
 }
 
+#[cfg(windows)]
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(windows)]
 static STREAMLINK_INSTALL_ATTEMPTED: AtomicBool = AtomicBool::new(false);
+#[cfg(windows)]
 static FFMPEG_INSTALL_ATTEMPTED: AtomicBool = AtomicBool::new(false);
 
 pub fn ensure_runtime_dependencies(app: &AppHandle) -> Result<(), String> {
