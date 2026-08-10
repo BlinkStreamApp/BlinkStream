@@ -292,3 +292,34 @@ export function getClientIp(req: Request): string {
 export function isDebugEnabled(): boolean {
   return Deno.env.get("ENABLE_DEBUG") === "true";
 }
+
+type SqlTemplate = (
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+) => Promise<unknown[]>;
+
+export async function consumeSingleUseToken(
+  sql: SqlTemplate,
+  requestId: string,
+): Promise<boolean> {
+  try {
+    const result = await sql`
+      UPDATE public.auth_tokens
+      SET consumed_at = NOW()
+      WHERE request_id = ${requestId} AND consumed_at IS NULL
+      RETURNING request_id
+    `;
+    return Array.isArray(result) && result.length > 0;
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (/column .*consumed_at/i.test(errMsg) || /does not exist/i.test(errMsg)) {
+      const del = await sql`
+        DELETE FROM public.auth_tokens
+        WHERE request_id = ${requestId}
+        RETURNING request_id
+      `;
+      return Array.isArray(del) && del.length > 0;
+    }
+    throw err;
+  }
+}
