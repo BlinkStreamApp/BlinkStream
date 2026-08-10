@@ -130,12 +130,15 @@ jobs:
           APPIMAGE=$(find "$BUNDLE/appimage" -maxdepth 1 -type f -name '*.AppImage' -print -quit)
           UPDATER=$(find "$BUNDLE/appimage" -maxdepth 1 -type f -name '*.AppImage.tar.gz' -print -quit)
           test -n "$DEB" && test -n "$APPIMAGE"
-          test -n "$UPDATER" && test -f "$UPDATER.sig"
 
           mv "$DEB" "$BUNDLE/deb/BlinkStream_${VERSION}_Linux_x86_64.deb"
           mv "$APPIMAGE" "$BUNDLE/appimage/BlinkStream_${VERSION}_Linux_x86_64.AppImage"
-          mv "$UPDATER" "$BUNDLE/appimage/BlinkStream_${VERSION}_Linux_x86_64.AppImage.tar.gz"
-          mv "$UPDATER.sig" "$BUNDLE/appimage/BlinkStream_${VERSION}_Linux_x86_64.AppImage.tar.gz.sig"
+          if [ -n "$UPDATER" ]; then
+            mv "$UPDATER" "$BUNDLE/appimage/BlinkStream_${VERSION}_Linux_x86_64.AppImage.tar.gz"
+            if [ -f "$UPDATER.sig" ]; then
+              mv "$UPDATER.sig" "$BUNDLE/appimage/BlinkStream_${VERSION}_Linux_x86_64.AppImage.tar.gz.sig"
+            fi
+          fi
 
       - name: Build macOS bundles
         if: runner.os == 'macOS'
