@@ -18,6 +18,7 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
     rules: {
+      'no-empty': 'off',
       // Permitimos `void` en handlers de error y `||=` etc. (ES2025)
       'no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
