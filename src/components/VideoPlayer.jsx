@@ -182,8 +182,11 @@ export default function VideoPlayer({
 
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
-  const volumeRef = useRef(volume)
+  const [showVods, setShowVods] = useState(false)
   const isFetchingRef = useRef(false)
+  const networkRetriesRef = useRef(0)
+  const controlsTimeoutRef = useRef(null)
+  const volumeRef = useRef(volume)
   const fallbackTimersRef = useRef(null)
   const [playing, setPlaying] = useState(true)
   const [muted, setMuted] = useState(false)
@@ -192,9 +195,9 @@ export default function VideoPlayer({
   const [error, setError] = useState('')
   const [showControls, setShowControls] = useState(true)
   const [usingFallback, setUsingFallback] = useState(false)
+  const [hlsDebug, setHlsDebug] = useState('Iniciando...')
   const [availableQualities, setAvailableQualities] = useState(null)
   const [showClips, setShowClips] = useState(false)
-  const [showVods, setShowVods] = useState(false)
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
   const [isPiP, setIsPiP] = useState(false)
   const [showStats, setShowStats] = useState(false)
@@ -234,7 +237,8 @@ export default function VideoPlayer({
     if (isFetchingRef.current) return
     isFetchingRef.current = true
     setLoading(true); setError(''); setStreamUrl('')
-
+    isFetchingRef.current = true
+    networkRetriesRef.current = 0
     const targetQuality = q || quality || 'best'
 
     if (targetQuality === 'audio_only') {
@@ -243,6 +247,7 @@ export default function VideoPlayer({
         setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
       } catch (e) { console.warn('Audio-only failed:', e) }
       setError('No se pudo obtener stream de solo audio')
+      setHlsDebug('Fallo audio-only')
       setLoading(false); isFetchingRef.current = false; return
     }
 
@@ -257,6 +262,7 @@ export default function VideoPlayer({
     } catch (e) {
       const msg = typeof e === 'string' ? e : e?.message || e?.toString() || 'Error desconocido'
       setError(`No se pudo cargar ${ch}: ${msg}`)
+      setHlsDebug(`Fallo get_stream_url: ${msg}`)
     }
     setLoading(false); isFetchingRef.current = false
   }, [quality])
@@ -383,9 +389,11 @@ export default function VideoPlayer({
           fetchStream(channel, 'best')
         } else {
           setError(`Fallo de decodificación de vídeo (Hardware/Codec). Intenta actualizar tus drivers o instalar el Media Feature Pack si usas Windows N.`)
+          setHlsDebug('Native MEDIA_ERR_DECODE ignorado/mostrado')
         }
       } else if (errCode === 4) {
         setError(`Formato de vídeo no soportado por tu sistema: ${errMsg}`)
+        setHlsDebug('Native MEDIA_ERR_SRC_NOT_SUPPORTED')
       }
     }
     video.addEventListener('error', handleVideoError)
@@ -430,6 +438,7 @@ export default function VideoPlayer({
       switch (data.type) {
         case Hls.ErrorTypes.NETWORK_ERROR:
           console.error('[HLS] network error', data.details)
+          setHlsDebug(`NETWORK_ERROR: ${data.details}`)
           if (data.details === 'manifestLoadError' || data.response?.code === 403 || data.response?.code === 404) {
             console.warn('[HLS] Error 403/404 o fallo de manifiesto. Deteniendo bucle y reintentando stream desde Streamlink...')
             hls.destroy()
@@ -437,12 +446,22 @@ export default function VideoPlayer({
               setTimeout(() => { fetchStream(channel, quality) }, 2500)
             }
           } else {
-            hls.startLoad()
+            networkRetriesRef.current += 1
+            if (networkRetriesRef.current > 5) {
+              console.warn('[HLS] Demasiados errores de red. Reiniciando stream...')
+              hls.destroy()
+              if (!isFetchingRef.current) {
+                setTimeout(() => { fetchStream(channel, quality) }, 2000)
+              }
+            } else {
+              hls.startLoad()
+            }
           }
           break
 
         case Hls.ErrorTypes.MEDIA_ERROR:
           console.error('[HLS] media error', data.details)
+          setHlsDebug(`MEDIA_ERROR: ${data.details}`)
           if (data.details === 'bufferIncompatibleCodecsError' || data.details === 'bufferAppendError') {
 
             if (hls.levels && hls.currentLevel >= 0 && hls.currentLevel < hls.levels.length - 1) {
@@ -459,11 +478,13 @@ export default function VideoPlayer({
         case Hls.ErrorTypes.BUFFER_APPEND_ERROR:
         case Hls.ErrorTypes.BUFFER_FULL_ERROR:
           console.error('[HLS] buffer error', data.details)
+          setHlsDebug(`BUFFER_ERROR: ${data.details}`)
           hls.recoverMediaError()
           break
 
         default:
           console.error('[HLS] fatal error', data.type, data.details)
+          setHlsDebug(`FATAL: ${data.type} ${data.details}`)
           setError(`Error de reproducción: ${data.details || data.type}`)
           hls.destroy()
       }
@@ -552,11 +573,17 @@ export default function VideoPlayer({
     } catch {  }
   }
 
-  const showControlsTemporarily = () => {
-    setShowControls(true)
-    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current)
-    controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000)
-  }
+  const handleMouseMove = useCallback(() => {
+    if (!showControls) setShowControls(true)
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
+    controlsTimeoutRef.current = setTimeout(() => { setShowControls(false) }, 3000)
+  }, [showControls])
+
+  useEffect(() => {
+    const handleDebug = (e) => setHlsDebug(prev => prev + ' -> ' + e.detail)
+    window.addEventListener('hls-debug', handleDebug)
+    return () => window.removeEventListener('hls-debug', handleDebug)
+  }, [])
 
   useEffect(() => {
     const v = videoRef.current; if (!v) return
@@ -683,7 +710,7 @@ export default function VideoPlayer({
 
   return (
     <div ref={containerRef} className={`relative bg-black overflow-hidden group/player ${theatreMode ? 'w-full h-full' : 'w-full'}`} style={theatreMode ? {} : { aspectRatio: '16/9', maxHeight: '100%' }}
-      onMouseMove={showControlsTemporarily} onMouseEnter={() => setShowControls(true)} onMouseLeave={() => setShowControls(false)}>
+      onMouseMove={handleMouseMove} onMouseEnter={() => setShowControls(true)} onMouseLeave={() => setShowControls(false)}>
 
       {showTheatreToast && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-black/60 backdrop-blur-md rounded-full px-4 py-1.5 text-[12px] text-white/70 animate-fade-in pointer-events-none">

@@ -1022,6 +1022,7 @@ async fn fetch_m3u8_content(url: String) -> Result<String, String> {
     }
 
     let client = reqwest::Client::builder()
+        .use_rustls_tls()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         .timeout(Duration::from_secs(15))
         .build()
@@ -1134,6 +1135,7 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
     validate_slug(&slug)?;
 
     let client = reqwest::Client::builder()
+        .use_native_tls()
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
         .build()
@@ -1229,6 +1231,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
     validate_vod_id(&vod_id)?;
 
     let client = reqwest::Client::builder()
+        .use_native_tls()
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
         .build()
@@ -1298,6 +1301,7 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
     validate_channel(&channel)?;
 
     let client = reqwest::Client::builder()
+        .use_rustls_tls()
         .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
@@ -1462,6 +1466,7 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
     }
 
     let client = reqwest::Client::builder()
+        .use_native_tls()
         .timeout(Duration::from_secs(10))
         .connect_timeout(Duration::from_secs(5))
         .build()

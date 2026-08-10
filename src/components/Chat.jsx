@@ -1135,8 +1135,9 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands')
 
         if (auth.token && auth.username) {
-          ws.send(`PASS oauth:${auth.token}`)
-          ws.send(`NICK ${auth.username}`)
+          const cleanToken = auth.token.replace(/^oauth:/i, '')
+          ws.send(`PASS oauth:${cleanToken}`)
+          ws.send(`NICK ${auth.username.toLowerCase()}`)
         } else {
           ws.send('PASS SCHMOOPIIE')
           ws.send('NICK justinfan12345')
