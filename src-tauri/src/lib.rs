@@ -736,7 +736,9 @@ pub fn ensure_runtime_dependencies(app: &AppHandle) -> Result<(), String> {
     #[cfg(not(windows))]
     {
         if !streamlink_ready {
-            return Err(format!("Streamlink no está instalado.\n\nInstálalo con: {INSTALL_CMD}"));
+            return Err(format!(
+                "Streamlink no está instalado.\n\nInstálalo con: {INSTALL_CMD}"
+            ));
         }
         Ok(())
     }
