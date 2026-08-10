@@ -298,11 +298,12 @@ export async function getStoredToken() {
     try {
       const { invoke } = await import('@tauri-apps/api/core')
       const token = await invoke('get_secret', { key: 'twitch_token' })
-      if (token) return token
+       if (token) return token.replace(/^oauth:/i, '')
     } catch { /* invoke fallo -> fallback */ }
   }
   try {
-    return localStorage.getItem('blinkstream_twitch_token') || null
+    const token = localStorage.getItem('blinkstream_twitch_token') || null
+    return token ? token.replace(/^oauth:/i, '') : null
   } catch { return null }
 }
 
@@ -368,11 +369,12 @@ export async function validateToken(token) {
  */
 export async function getHeaders() {
   const token = await getStoredToken()
+  const cleanToken = token?.replace(/^oauth:/i, '') || null
   const headers = {
-    'Client-ID': token ? getHelixClientId() : PUBLIC_CLIENT_ID,
+    'Client-ID': cleanToken ? getHelixClientId() : PUBLIC_CLIENT_ID,
   }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  if (cleanToken) {
+    headers['Authorization'] = `Bearer ${cleanToken}`
   }
   return headers
 }

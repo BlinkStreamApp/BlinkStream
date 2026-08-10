@@ -63,16 +63,19 @@ fn global_state_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_config_dir()
-        .map_err(|e| format!("No se pudo obtener app_config_dir: {}", e))?;
-    std::fs::create_dir_all(&dir)
-        .map_err(|e| format!("No se pudo crear app_config_dir: {}", e))?;
+        .map_err(|e| format!("No se pudo obtener app_config_dir: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("No se pudo crear app_config_dir: {e}"))?;
     Ok(dir.join("bs.recording.global_enabled.json"))
 }
 
 fn load_global_state_from_disk(app: &AppHandle) -> GlobalRecordingState {
     let path = match global_state_path(app) {
         Ok(p) => p,
-        Err(_) => return GlobalRecordingState { state: "OFF".to_string() },
+        Err(_) => {
+            return GlobalRecordingState {
+                state: "OFF".to_string(),
+            }
+        }
     };
     match std::fs::read_to_string(&path) {
         Ok(content) => {
@@ -82,16 +85,20 @@ fn load_global_state_from_disk(app: &AppHandle) -> GlobalRecordingState {
                     return parsed;
                 }
             }
-            GlobalRecordingState { state: "OFF".to_string() }
+            GlobalRecordingState {
+                state: "OFF".to_string(),
+            }
         }
-        Err(_) => GlobalRecordingState { state: "OFF".to_string() },
+        Err(_) => GlobalRecordingState {
+            state: "OFF".to_string(),
+        },
     }
 }
 
 fn save_global_state_to_disk(app: &AppHandle, state: &GlobalRecordingState) -> Result<(), String> {
     let path = global_state_path(app)?;
     let json = serde_json::to_string_pretty(state)
-        .map_err(|e| format!("Error serializando estado: {}", e))?;
+        .map_err(|e| format!("Error serializando estado: {e}"))?;
 
     // WT-20260628-24 / FIX 3: write-to-temp-then-rename. Si el `fs::write`
     // directo al destino falla a mitad de camino (disco lleno, permisos,
@@ -103,13 +110,13 @@ fn save_global_state_to_disk(app: &AppHandle, state: &GlobalRecordingState) -> R
     // basura.
     let temp_path = path.with_extension("tmp");
     std::fs::write(&temp_path, json)
-        .map_err(|e| format!("Error escribiendo estado en disco: {}", e))?;
+        .map_err(|e| format!("Error escribiendo estado en disco: {e}"))?;
     if let Err(e) = std::fs::rename(&temp_path, &path) {
         // Best-effort cleanup del .tmp antes de propagar el error.
         // El caller (recorder_set_global_enabled) ya hizo rollback en
         // memoria, así que el estado del sistema queda consistente.
         let _ = std::fs::remove_file(&temp_path);
-        return Err(format!("Error escribiendo estado en disco: {}", e));
+        return Err(format!("Error escribiendo estado en disco: {e}"));
     }
     Ok(())
 }
@@ -146,8 +153,7 @@ static CHANNEL_REGEX: std::sync::LazyLock<regex_lite::Regex> =
 fn validate_channel(name: &str) -> Result<(), String> {
     if !CHANNEL_REGEX.is_match(name) {
         return Err(
-            "Nombre de canal inválido. Solo letras, números y guión bajo (3-25 caracteres)."
-                .into(),
+            "Nombre de canal inválido. Solo letras, números y guión bajo (3-25 caracteres).".into(),
         );
     }
     Ok(())
@@ -188,7 +194,11 @@ fn get_disk_space() -> Option<(f64, f64)> {
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
-        let wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let wide: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
         let mut free_bytes: u64 = 0;
         let mut total_bytes: u64 = 0;
         let mut total_free: u64 = 0;
@@ -209,7 +219,9 @@ fn get_disk_space() -> Option<(f64, f64)> {
                 &mut total_free,
             )
         };
-        if ok == 0 { return None; }
+        if ok == 0 {
+            return None;
+        }
         // free_bytes_available es lo que el usuario realmente puede usar
         // respetando quotas. Lo pasamos a GB.
         let free_gb = (free_bytes as f64) / 1_073_741_824.0;
@@ -240,7 +252,11 @@ fn get_disk_space() -> Option<(f64, f64)> {
         }
         // Preferimos f_frsize (POSIX) y caemos a f_bsize si es 0 (algunos
         // FS antiguos). f_blocks / f_bavail son f_flag-safe en Linux/macOS.
-        let frsize = if stat.f_frsize != 0 { stat.f_frsize } else { stat.f_bsize };
+        let frsize = if stat.f_frsize != 0 {
+            stat.f_frsize
+        } else {
+            stat.f_bsize
+        };
         if frsize == 0 {
             return None;
         }
@@ -266,27 +282,27 @@ fn get_disk_space() -> Option<(f64, f64)> {
 /// completa (check + spawn + store) y devolvemos un error claro si
 /// ya hay una grabación activa.
 #[tauri::command]
-pub fn start_recording(app: AppHandle, channel: String, output_path: String) -> Result<String, String> {
+pub fn start_recording(
+    app: AppHandle,
+    channel: String,
+    output_path: String,
+) -> Result<String, String> {
     validate_channel(&channel)?;
 
     // FIX-4 (Hank / P0): la validacion de path es una funcion pura
     // (sin tauri) para poder testearla sin AppHandle. Acepta el
     // output_path del frontend y la lista de directorios permitidos.
-    let allowed_dirs: Vec<std::path::PathBuf> = vec![
-        app.path()
-            .video_dir()
-            .or_else(|_| app.path().app_data_dir())
-            .map_err(|e| {
-                format!(
-                    "No se pudo resolver el directorio permitido para grabaciones: {}",
-                    e
-                )
-            })?,
-    ];
+    let allowed_dirs: Vec<std::path::PathBuf> = vec![app
+        .path()
+        .video_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| {
+            format!("No se pudo resolver el directorio permitido para grabaciones: {e}")
+        })?];
     validate_output_path(&output_path, &allowed_dirs)?;
 
     let binary = find_streamlink(&app)?;
-    let url = format!("twitch.tv/{}", channel);
+    let url = format!("twitch.tv/{channel}");
 
     // Tomamos el lock ANTES de spawn. Si ya hay una grabación activa,
     // rechazamos sin spawne nada.
@@ -296,7 +312,12 @@ pub fn start_recording(app: AppHandle, channel: String, output_path: String) -> 
     }
 
     let mut cmd = Command::new(&binary);
-    let mut args: Vec<String> = vec![url.clone(), "best".to_string(), "-o".to_string(), output_path.to_string()];
+    let mut args: Vec<String> = vec![
+        url.clone(),
+        "best".to_string(),
+        "-o".to_string(),
+        output_path.to_string(),
+    ];
     if let Some(ff_path) = crate::ensure_ffmpeg_path() {
         args.push("--ffmpeg-ffmpeg".to_string());
         args.push(ff_path.to_string_lossy().to_string());
@@ -308,11 +329,13 @@ pub fn start_recording(app: AppHandle, channel: String, output_path: String) -> 
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    let child = cmd.spawn().map_err(|e| format!("No se pudo iniciar grabación: {}", e))?;
+    let child = cmd
+        .spawn()
+        .map_err(|e| format!("No se pudo iniciar grabación: {e}"))?;
     let pid = child.id();
     *rec = Some(child);
 
-    Ok(format!("Grabando (PID: {})", pid))
+    Ok(format!("Grabando (PID: {pid})"))
 }
 
 /// Detiene la grabacion activa. Si no hay ninguna, devuelve error
@@ -346,8 +369,7 @@ pub fn stop_recording() -> Result<String, String> {
 pub fn recorder_set_global_enabled(app: AppHandle, state: String) -> Result<(), String> {
     if !matches!(state.as_str(), "OFF" | "ARMED" | "ON") {
         return Err(format!(
-            "Estado inválido: '{}'. Debe ser OFF, ARMED u ON.",
-            state
+            "Estado inválido: '{state}'. Debe ser OFF, ARMED u ON."
         ));
     }
 
@@ -356,12 +378,17 @@ pub fn recorder_set_global_enabled(app: AppHandle, state: String) -> Result<(), 
     let previous_state = get_global_state_from_memory().state;
 
     set_global_state_in_memory(state.clone());
-    if let Err(e) = save_global_state_to_disk(&app, &GlobalRecordingState { state: state.clone() }) {
+    if let Err(e) = save_global_state_to_disk(
+        &app,
+        &GlobalRecordingState {
+            state: state.clone(),
+        },
+    ) {
         // Rollback en memoria: devolvemos al estado previo.
         set_global_state_in_memory(previous_state);
         return Err(e);
     }
-    log::info!("[recorder] global state set to {}", state);
+    log::info!("[recorder] global state set to {state}");
     Ok(())
 }
 
@@ -429,10 +456,7 @@ pub fn recorder_get_full_state() -> Result<serde_json::Value, String> {
     // Si recorder_list_active falla por cualquier razon, devolvemos
     // lista vacia en vez de propagar el error: el frontend prefiere
     // un estado parcial valido a un polling entero caido.
-    let active = match recorder_list_active() {
-        Ok(v) => v,
-        Err(_) => Vec::new(),
-    };
+    let active = recorder_list_active().unwrap_or_default();
     Ok(serde_json::json!({
         "state": state.state,
         "diskFreeGb": disk_free_gb,
@@ -442,11 +466,14 @@ pub fn recorder_get_full_state() -> Result<serde_json::Value, String> {
 
 fn active_recordings_count() -> usize {
     let rec = RECORDING.lock().unwrap_or_else(|e| e.into_inner());
-    if rec.is_some() { 1 } else { 0 }
+    if rec.is_some() {
+        1
+    } else {
+        0
+    }
 }
 
 // ── Tests (B-2 style) ───────────────────────────────────────
-
 
 /// FIX-4 (Hank / P0): valida que `output_path` sea seguro para escribir
 /// un archivo de grabacion. Reglas:
@@ -454,6 +481,7 @@ fn active_recordings_count() -> usize {
 ///   2) El directorio padre debe existir.
 ///   3) La ruta canonicalizada (resuelve `..` y symlinks) debe estar
 ///      estrictamente dentro de alguno de los `allowed_dirs`.
+///
 /// Esto cierra el vector de path traversal (CWE-22) que tenia la
 /// implementacion previa, que solo validaba is_absolute + parent.exists.
 ///
@@ -477,10 +505,10 @@ pub fn validate_output_path(
     }
     // Canonicalizamos el parent (no el archivo final, que aun no existe).
     let canonical_output = std::fs::canonicalize(parent)
-        .map_err(|e| format!("No se pudo resolver la ruta de salida: {}", e))?;
+        .map_err(|e| format!("No se pudo resolver la ruta de salida: {e}"))?;
     for allowed in allowed_dirs {
         let canonical_allowed = std::fs::canonicalize(allowed)
-            .map_err(|e| format!("No se pudo resolver el directorio permitido: {}", e))?;
+            .map_err(|e| format!("No se pudo resolver el directorio permitido: {e}"))?;
         if canonical_output.starts_with(&canonical_allowed) {
             return Ok(());
         }
@@ -538,16 +566,19 @@ mod tests {
 
     // ── Tests de regresion WT-20260628-24 ───────────────────
 
-    /// FIX 2: la regex se compila una sola vez. `channel_regex()` debe
-    /// devolver siempre la MISMA referencia estatica.
+    /// FIX 2: la regex se compila una sola vez. `CHANNEL_REGEX` debe
+    /// conservar siempre la MISMA referencia estatica.
     #[test]
     fn channel_regex_is_cached_once() {
-        let r1: *const regex_lite::Regex = channel_regex();
-        let r2: *const regex_lite::Regex = channel_regex();
+        let r1: *const regex_lite::Regex = &*CHANNEL_REGEX;
+        let r2: *const regex_lite::Regex = &*CHANNEL_REGEX;
         // OnceLock garantiza misma direccion → mismo objeto.
-        assert_eq!(r1, r2, "channel_regex() debe devolver siempre la misma instancia");
+        assert_eq!(
+            r1, r2,
+            "CHANNEL_REGEX debe devolver siempre la misma instancia"
+        );
         // Y obviamente matchea un canal valido.
-        assert!(channel_regex().is_match("ninja"));
+        assert!(CHANNEL_REGEX.is_match("ninja"));
     }
 
     /// FIX 3: `save_global_state_to_disk` debe dejar el archivo destino
@@ -579,7 +610,10 @@ mod tests {
         assert_eq!(read_back, body);
 
         // Invariante 2: NO hay .tmp huérfano.
-        assert!(!temp_path.exists(), "no debe quedar .tmp tras rename exitoso");
+        assert!(
+            !temp_path.exists(),
+            "no debe quedar .tmp tras rename exitoso"
+        );
 
         // Cleanup.
         let _ = std::fs::remove_file(&path);
@@ -606,7 +640,7 @@ mod tests {
         // asi que usamos uno ya spawneado de un proceso real.
         let dummy = std::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
             .arg(if cfg!(windows) { "/C" } else { "-c" })
-            .arg(if cfg!(windows) { "exit 0" } else { "exit 0" })
+            .arg("exit 0")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -662,10 +696,7 @@ mod tests {
     #[test]
     fn fix4_rejects_nonexistent_parent() {
         let allowed = vec![make_temp_dir("np_allowed")];
-        let res = validate_output_path(
-            "/this/path/does/not/exist/output.mp4",
-            &allowed,
-        );
+        let res = validate_output_path("/this/path/does/not/exist/output.mp4", &allowed);
         assert!(res.is_err(), "parent inexistente debe ser rechazado");
     }
 
@@ -678,27 +709,20 @@ mod tests {
         // El helper canonicaliza `parent` internamente, asi que
         // basta con que `allowed_dir` exista.
         let allowed = vec![allowed_dir.clone()];
-        let res = validate_output_path(
-            output.to_str().unwrap(),
-            &allowed,
-        );
-        assert!(res.is_ok(), "path dentro de allowed debe pasar: {:?}", res);
+        let res = validate_output_path(output.to_str().unwrap(), &allowed);
+        assert!(res.is_ok(), "path dentro de allowed debe pasar: {res:?}");
     }
 
     #[test]
     fn fix4_rejects_path_outside_allowed_dir() {
         let allowed = vec![make_temp_dir("out_allowed")];
         let outside = make_temp_dir("out_outside").join("stream.mp4");
-        let res = validate_output_path(
-            outside.to_str().unwrap(),
-            &allowed,
-        );
+        let res = validate_output_path(outside.to_str().unwrap(), &allowed);
         assert!(res.is_err(), "path fuera de allowed debe ser rechazado");
         let err = res.unwrap_err();
         assert!(
             err.contains("directorios permitidos"),
-            "el error debe mencionar la politica: {}",
-            err
+            "el error debe mencionar la politica: {err}"
         );
     }
 
@@ -726,8 +750,7 @@ mod tests {
             let res = validate_output_path(traversal, &allowed);
             assert!(
                 res.is_err(),
-                "path traversal via .. debe ser rechazado (probado con: {})",
-                traversal
+                "path traversal via .. debe ser rechazado (probado con: {traversal})"
             );
         }
         // Si el parent no existe en esta plataforma, el test es
@@ -744,8 +767,7 @@ mod tests {
         let res = validate_output_path(output.to_str().unwrap(), &allowed);
         assert!(
             res.is_ok(),
-            "path dentro del segundo allowed debe pasar: {:?}",
-            res
+            "path dentro del segundo allowed debe pasar: {res:?}"
         );
     }
 
@@ -799,9 +821,9 @@ mod tests {
         // Solo validamos el tipo: debe ser Option<(f64, f64)>. Si el
         // runner tiene HOME/USERPROFILE, sera Some con valores >= 0.
         if let Some((f, t)) = res {
-            assert!(f >= 0.0, "free_gb debe ser >= 0, recibio {}", f);
-            assert!(t >= 0.0, "total_gb debe ser >= 0, recibio {}", t);
-            assert!(f <= t, "free_gb ({}) no puede superar total_gb ({})", f, t);
+            assert!(f >= 0.0, "free_gb debe ser >= 0, recibio {f}");
+            assert!(t >= 0.0, "total_gb debe ser >= 0, recibio {t}");
+            assert!(f <= t, "free_gb ({f}) no puede superar total_gb ({t})");
         }
         // Si es None, es porque el env no tiene HOME/USERPROFILE — eso
         // esta OK (es el branch `ok()?`).

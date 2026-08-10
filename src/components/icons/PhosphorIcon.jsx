@@ -19,16 +19,12 @@
 //   <PhosphorIcon name="Coins" size={12} weight="duotone" color="currentColor" />
 
 import { useCallback, useSyncExternalStore } from 'react'
-import { IconContext } from '@phosphor-icons/react'
+import { IconContext } from '@phosphor-icons/react/dist/lib/context'
 import { subscribeToIconStyle, getIconWeight } from '../../utils/hslTheme'
 
-// Pre-descubre los 3k+ modulos de iconos en build time. Vite los trata
-// como chunks lazy: cada uno se carga bajo demanda y solo se incluye
-// en el bundle si algun callsite lo referencia.
-// Usamos path absoluto (desde el root del proyecto) en vez de alias de
-// paquete porque `import.meta.glob` exige que el glob empiece por '/'
-// o './' — los nombres de paquete no son validos directamente.
-const iconLoaders = import.meta.glob('/node_modules/@phosphor-icons/react/dist/csr/*.es.js')
+// Lista cerrada de iconos usados por BlinkStream. El glob global anterior
+// generaba miles de chunks y más de 1 MB de metadatos en el bundle principal.
+const iconLoaders = import.meta.glob('/node_modules/@phosphor-icons/react/dist/csr/{ArrowsClockwise,ArrowsInSimple,ArrowLeft,ArrowRight,ArrowSquareOut,Camera,CaretDoubleLeft,CaretDoubleRight,CaretDown,CaretLeft,CaretRight,Cat,ChartBar,ChatCircle,ChatCircleDots,ChatCircleSlash,Chats,ChatsCircle,ChatSlash,CheckCircle,ClockCounterClockwise,CloudCheck,Coins,CornersOut,DeviceMobile,DownloadSimple,FilmStrip,Folder,FolderOpen,GameController,Gear,Gift,Headphones,Heart,HeartBreak,Info,Lightning,MagicWand,MagnifyingGlass,MonitorPlay,Palette,Pause,PictureInPicture,Play,PlayCircle,Plus,Power,Record,RocketLaunch,Shield,ShieldCheck,SignOut,Sliders,SlidersHorizontal,Smiley,Sparkle,SpeakerHigh,SpeakerSlash,SpinnerGap,SquaresFour,Television,TextAa,Trash,VideoCamera,WarningCircle,WifiHigh,X}.es.js')
 
 // Estado externo: cada nombre de icono mapea a su componente o a `null`
 // mientras se esta cargando. Una vez cargado, queda cacheado para siempre.

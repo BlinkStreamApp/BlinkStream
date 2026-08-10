@@ -3,6 +3,10 @@ import { useState, useEffect, useRef } from 'react'
 let particleId = 0
 
 export default function EmoteRainOverlay({ active = true }) {
+  return active ? <ActiveEmoteRainOverlay /> : null
+}
+
+function ActiveEmoteRainOverlay() {
   const [particles, setParticles] = useState([])
   const [activeCombo, setActiveCombo] = useState(null)
   
@@ -10,12 +14,6 @@ export default function EmoteRainOverlay({ active = true }) {
   const comboTimerRef = useRef(null)
 
   useEffect(() => {
-    if (!active) {
-      setParticles([])
-      setActiveCombo(null)
-      return
-    }
-
     const handleEmote = (e) => {
       const { url, name } = e.detail || {}
       if (!url) return
@@ -77,9 +75,7 @@ export default function EmoteRainOverlay({ active = true }) {
       window.removeEventListener('blinkstream:emote', handleEmote)
       if (comboTimerRef.current) clearTimeout(comboTimerRef.current)
     }
-  }, [active])
-
-  if (!active) return null
+  }, [])
 
   const getComboStyle = (count) => {
     if (count >= 15) {

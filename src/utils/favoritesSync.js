@@ -1,6 +1,9 @@
 import { getHelixClientId } from './twitch'
 import { SUPABASE_URL } from './supabase'
 import { getBlinkstreamToken, refreshBlinkstreamToken, clearBlinkstreamToken } from './supabase'
+import { isAuthBroken, markAuthBroken } from './favoritesCircuitBreaker'
+
+export { clearAuthBrokenFlag, isAuthBroken } from './favoritesCircuitBreaker'
 
 const DATA_FN = `${SUPABASE_URL}/functions/v1/blinkstream-data`
 
@@ -15,16 +18,6 @@ const DATA_FN = `${SUPABASE_URL}/functions/v1/blinkstream-data`
 // Se limpia (vuelve a false) cuando el usuario hace login exitoso
 // (ver saveBlinkstreamToken en supabase.js) o logout (via
 // clearBlinkstreamToken -> clearAuthBrokenFlag).
-let authBroken = false
-
-export function isAuthBroken() {
-  return authBroken
-}
-
-export function clearAuthBrokenFlag() {
-  authBroken = false
-}
-
 // Wrapper interno: hace fetch con Authorization Bearer y un unico retry
 // automatico en 401 (rotando el JWT via twitch-auth?refresh=). Si despues
 // del retry sigue 401, devolvemos el error para que el caller degrade
@@ -34,7 +27,7 @@ export function clearAuthBrokenFlag() {
 // Si esta abierto (authBroken=true), devolvemos una Response 401
 // sintetica para no salir a la red.
 async function authedFetch(url, options = {}) {
-  if (authBroken) {
+  if (isAuthBroken()) {
     return new Response(JSON.stringify({ error: 'auth_broken' }), {
       status: 401,
       statusText: 'Unauthorized',
@@ -50,7 +43,7 @@ async function authedFetch(url, options = {}) {
 
   let token = getBlinkstreamToken()
   if (!token) {
-    authBroken = true
+    markAuthBroken()
     return new Response(JSON.stringify({ error: 'no_token' }), {
       status: 401,
       statusText: 'Unauthorized',
@@ -69,7 +62,7 @@ async function authedFetch(url, options = {}) {
         }
       }
       if (!res.ok) {
-        authBroken = true
+        markAuthBroken()
         if (res.status === 401) clearBlinkstreamToken()
         if (import.meta.env.DEV) {
           console.warn(`[authedFetch] Servidor respondió HTTP ${res.status} en ${url}. Sincronización cambiada a modo local/offline (circuit-breaker activo).`)
@@ -77,9 +70,9 @@ async function authedFetch(url, options = {}) {
       }
     }
     return res
-  } catch (err) {
+  } catch {
     // Excepción de red o bloqueo de CORS en el navegador. Abrir inmediatamente el circuit breaker.
-    authBroken = true
+    markAuthBroken()
     if (import.meta.env.DEV) {
       console.warn(`[authedFetch] Error de red o CORS al comunicar con ${url}. Sincronización cambiada a modo local/offline.`)
     }

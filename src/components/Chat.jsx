@@ -194,8 +194,6 @@ function matchEmotesInText(text, twitchEmotesStr, trie) {
   return parts
 }
 
-const badgeCache = { global: null, channels: {} }
-
 function findBadgeUrl(badgeUrls, set, version) {
   if (!badgeUrls || !set) return null
   if (badgeUrls[`${set}/${version}`]) return badgeUrls[`${set}/${version}`]
@@ -1201,9 +1199,9 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
               const raiderCount = parsed['msg-param-viewerCount'] || ''
               const streakVal = parsed['msg-param-value'] || ''
 
-              let eventType = msgId || 'notice'
-              let eventHeader = ''
-              let eventColorClass = ''
+              let eventType
+              let eventHeader
+              let eventColorClass
 
               if (msgId === 'sub') {
                 eventType = 'sub'
@@ -1346,7 +1344,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
         wsRef.current = null
       }
     }
-  }, [channel, auth])
+  }, [channel, auth, isGridMode, isOverlay, viewerLogin])
 
   useEffect(() => {
     if (isAtBottomRef.current) {
@@ -1354,7 +1352,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
     }
   }, [messages])
 
-  function parseChatCommand(text, targetCh = channel) {
+  const parseChatCommand = useCallback((text, targetCh = channel) => {
     const meMatch = text.match(/^\/me\s+(.+)/i)
     if (meMatch) {
       return `PRIVMSG #${targetCh} :\u0001ACTION ${meMatch[1]}\u0001`
@@ -1376,7 +1374,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
     }
 
     return `PRIVMSG #${targetCh} :${text}`
-  }
+  }, [channel])
 
   const sendMessage = (e) => {
     e.preventDefault()
@@ -1405,8 +1403,10 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
   }
 
   // Mando a Distancia Wi-Fi (Fase 4): Recibir texto del teclado móvil y enviarlo al chat sin duplicaciones
-  const companionChatRef = useRef({ auth, channel, ws: wsRef.current });
-  companionChatRef.current = { auth, channel, ws: wsRef.current };
+  const companionChatRef = useRef({ auth: null, channel: '' });
+  useEffect(() => {
+    companionChatRef.current = { auth, channel };
+  }, [auth, channel]);
 
   useEffect(() => {
     // Si isOverlay está activo junto al chat normal, solo permitimos al chat principal procesar el mensaje del móvil
@@ -1417,7 +1417,8 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
       if (isCancelled) return;
       listen('companion_send_chat', (e) => {
         const text = e.payload?.text;
-        const { auth: curAuth, channel: curCh, ws: curWs } = companionChatRef.current || {};
+        const { auth: curAuth, channel: curCh } = companionChatRef.current || {};
+        const curWs = wsRef.current;
         if (!text || !curWs || curWs.readyState !== 1 || !curAuth?.token || !curAuth?.username) return;
         const cmd = parseChatCommand(text, curCh);
         if (cmd) {
@@ -1442,7 +1443,7 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
       isCancelled = true;
       if (unlistenFn) unlistenFn();
     };
-  }, [isOverlay]);
+  }, [isOverlay, parseChatCommand]);
 
 
   return (

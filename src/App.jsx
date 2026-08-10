@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import ChannelSearch from './components/ChannelSearch'
 import StreamInfo from './components/StreamInfo'
-import HomeScreen from './components/HomeScreen'
-import Settings from './components/Settings'
-import AboutDialog from './components/AboutDialog'
 import ConfirmDialog from './components/ConfirmDialog'
-import Onboarding from './components/Onboarding'
-import CPPanel from './components/channelpoints/CPPanel'
 import PhosphorIcon from './components/icons/PhosphorIcon'
 import DiskSpaceIndicator from './components/recording/DiskSpaceIndicator'
 // FIX P1-4: Provider que monta useGlobalRecording UNA sola vez. Los
@@ -20,10 +15,14 @@ import { applyStoredHslTheme, applyStoredCustomFont, applyStoredCustomIconStyle 
 
 const VideoPlayer = lazy(() => import('./components/VideoPlayer'))
 const Chat = lazy(() => import('./components/Chat'))
-const InstallerScreen = lazy(() => import('./components/installer/InstallerScreen'))
-const UninstallerScreen = lazy(() => import('./components/installer/UninstallerScreen'))
 const MultiStreamGrid = lazy(() => import('./components/multistream/MultiStreamGrid'))
 const CompanionModal = lazy(() => import('./components/CompanionModal'))
+const HomeScreen = lazy(() => import('./components/HomeScreen'))
+const Settings = lazy(() => import('./components/Settings'))
+const AboutDialog = lazy(() => import('./components/AboutDialog'))
+const Onboarding = lazy(() => import('./components/Onboarding'))
+const CPPanel = lazy(() => import('./components/channelpoints/CPPanel'))
+const ModPanel = lazy(() => import('./components/moderation/ModPanel'))
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
@@ -51,7 +50,6 @@ import { useT } from './utils/i18n'
 // App. ModPanel es el drawer lateral con los 6 tabs (VIEWERS / MODS /
 // VIPS / BANS / TIMEOUTS / SETTINGS).
 import { ModerationProvider } from './components/moderation/ModerationContext'
-import { ModPanel } from './components/moderation/ModPanel'
 
 function PlayerFallback() {
   return (
@@ -224,6 +222,7 @@ function MainApp() {
   }, [isLoggedIn, getTwitchToken, logout])
 
   useEffect(() => {
+    if (!isTauri()) return
     let cancelled = false
     const checkUpdate = async () => {
       try {
@@ -414,19 +413,16 @@ function MainApp() {
   }, [selectChannel]);
 
   // Obtener avatar del canal actualmente reproduciéndose para mostrar su foto en el Mando Wi-Fi
-  const [companionAvatar, setCompanionAvatar] = useState('');
+  const [fetchedCompanionAvatar, setFetchedCompanionAvatar] = useState({ channel: '', url: '' });
+  const favoriteCompanionAvatar = channel
+    ? (liveFavorites || []).find(f => typeof f === 'object' && f.name?.toLowerCase() === channel.toLowerCase())?.avatar || ''
+    : '';
+  const companionAvatar = favoriteCompanionAvatar
+    || (fetchedCompanionAvatar.channel === channel ? fetchedCompanionAvatar.url : '');
 
   useEffect(() => {
-    if (!channel) {
-      setCompanionAvatar('');
-      return;
-    }
+    if (!channel || favoriteCompanionAvatar) return;
     const controller = new AbortController();
-    const favObj = (liveFavorites || []).find(f => typeof f === 'object' && f.name?.toLowerCase() === channel.toLowerCase());
-    if (favObj?.avatar) {
-      setCompanionAvatar(favObj.avatar);
-      return;
-    }
     getHeaders().then(async (headers) => {
       try {
         const res = await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(channel)}`, {
@@ -436,12 +432,12 @@ function MainApp() {
         if (!res.ok || controller.signal.aborted) return;
         const data = await res.json();
         if (data?.data?.[0]?.profile_image_url && !controller.signal.aborted) {
-          setCompanionAvatar(data.data[0].profile_image_url);
+          setFetchedCompanionAvatar({ channel, url: data.data[0].profile_image_url });
         }
       } catch { /* ignore aborts and fetch errors */ }
     });
     return () => { controller.abort(); };
-  }, [channel, liveFavorites]);
+  }, [channel, favoriteCompanionAvatar]);
 
   // Sincronizar estado actual hacia el servidor local del Mando Wi-Fi para que el móvil muestre datos del directo
   useEffect(() => {
@@ -501,7 +497,7 @@ function MainApp() {
     <div
       onContextMenu={(e) => e.preventDefault()}
       className={`h-screen w-screen flex flex-col bg-bg-primary text-text-primary ${theatreMode ? 'theatre-mode' : ''} ${compact ? 'compact-mode' : ''}`}>
-      {showOnboarding && <Onboarding onFinish={finishOnboarding} />}
+      {showOnboarding && <Suspense fallback={null}><Onboarding onFinish={finishOnboarding} /></Suspense>}
 
       <TitleBar />
 
@@ -682,15 +678,17 @@ function MainApp() {
                 </div>
               </>
             ) : (
-              <HomeScreen
-                isLoggedIn={isLoggedIn}
-                onSelect={selectChannel}
-                onToggleFavorite={toggleFavorite}
-                favorites={favorites}
-                recentChannels={recentChannels}
-                onRemoveRecent={removeRecent}
-                onShowAbout={() => setShowAbout(true)}
-              />
+              <Suspense fallback={<PlayerFallback />}>
+                <HomeScreen
+                  isLoggedIn={isLoggedIn}
+                  onSelect={selectChannel}
+                  onToggleFavorite={toggleFavorite}
+                  favorites={favorites}
+                  recentChannels={recentChannels}
+                  onRemoveRecent={removeRecent}
+                  onShowAbout={() => setShowAbout(true)}
+                />
+              </Suspense>
             )}
           </div>
 
@@ -715,12 +713,12 @@ function MainApp() {
         </div>
       )}
 
-      {showSettings && <Settings onClose={handleCloseSettings} />}
+      {showSettings && <Suspense fallback={null}><Settings onClose={handleCloseSettings} /></Suspense>}
       {showCompanionModal && <Suspense fallback={null}><CompanionModal onClose={() => setShowCompanionModal(false)} /></Suspense>}
-      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+      {showAbout && <Suspense fallback={null}><AboutDialog onClose={() => setShowAbout(false)} /></Suspense>}
       {/* WT-20260628-14: Panel de Channel Points (P1 + P2) */}
       {channel && broadcasterId && (
-        <CPPanel
+        <Suspense fallback={null}><CPPanel
           open={showCPPanel}
           onClose={() => setShowCPPanel(false)}
           channel={channel}
@@ -728,7 +726,7 @@ function MainApp() {
           userId={viewerUserId}
           userToken={getTwitchToken()}
           isBroadcaster={!!viewerUserId && viewerUserId === broadcasterId}
-        />
+        /></Suspense>
       )}
       {/* WT-20260628-56: Panel de moderacion lateral. Misma firma
           que CPPanel: open + onClose + broadcasterId/userId. El
@@ -738,13 +736,13 @@ function MainApp() {
           el empty-state "no tienes permisos" en vez de un null
           silencioso. */}
       {channel && (
-        <ModPanel
+        <Suspense fallback={null}><ModPanel
           open={showModPanel && roleState.isModerator}
           onClose={() => setShowModPanel(false)}
           broadcasterId={broadcasterId}
           userId={viewerUserId}
           channel={channel}
-        />
+        /></Suspense>
       )}
       {showLogoutConfirm && (
         <ConfirmDialog
@@ -805,39 +803,66 @@ function MainApp() {
   )
 }
 
-function App() {
-  const [bootstrapperMode, setBootstrapperMode] = useState('app')
+function RuntimeDependencyGate({ children }) {
+  const [status, setStatus] = useState(() => isTauri() ? 'checking' : 'ready')
+  const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (isTauri()) {
-      import('@tauri-apps/api/core').then(({ invoke }) => {
-        invoke('get_bootstrapper_mode').then(mode => {
-          if (mode && mode !== 'app') setBootstrapperMode(mode)
-        }).catch(console.error)
-      }).catch(console.error)
-    } else {
-      const params = new URLSearchParams(window.location.search)
-      const mode = params.get('mode')
-      if (mode === 'installer' || mode === 'uninstaller') setBootstrapperMode(mode)
+  const checkDependencies = useCallback(() => {
+    if (!isTauri()) {
+      setStatus('ready')
+      return
     }
+
+    setStatus('checking')
+    setError('')
+    invoke('ensure_stream_dependencies')
+      .then(() => {
+        console.info('[runtime] Streamlink y FFmpeg preparados')
+        setStatus('ready')
+      })
+      .catch(reason => {
+        const message = typeof reason === 'string' ? reason : reason?.message || String(reason)
+        console.error('[runtime] Dependencias de streaming no disponibles:', message)
+        setError(message)
+        setStatus('error')
+      })
   }, [])
 
-  if (bootstrapperMode === 'installer') {
-    return (
-      <Suspense fallback={<div className="h-screen w-screen bg-bg-primary" />}>
-        <InstallerScreen />
-      </Suspense>
-    )
-  }
-  if (bootstrapperMode === 'uninstaller') {
-    return (
-      <Suspense fallback={<div className="h-screen w-screen bg-bg-primary" />}>
-        <UninstallerScreen />
-      </Suspense>
-    )
-  }
+  useEffect(() => {
+    if (!isTauri()) return
+    let cancelled = false
+    queueMicrotask(() => { if (!cancelled) checkDependencies() })
+    return () => { cancelled = true }
+  }, [checkDependencies])
 
-  return <MainApp />
+  if (status === 'ready') return children
+
+  return (
+    <div className="h-screen w-screen flex items-center justify-center bg-bg-primary text-text-primary p-8">
+      <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-bg-secondary/90 p-7 shadow-2xl">
+        {status === 'checking' ? (
+          <>
+            <div className="w-9 h-9 mb-4 border-2 border-twitch border-t-transparent rounded-full animate-spin" />
+            <h1 className="text-lg font-bold mb-2">Preparando reproducción</h1>
+            <p className="text-sm text-text-muted">Instalando y validando Streamlink y FFmpeg. Este proceso solo se realiza cuando faltan.</p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-lg font-bold text-red-300 mb-2">No se pudieron preparar las dependencias</h1>
+            <p className="text-sm text-text-muted mb-4">BlinkStream necesita Streamlink y FFmpeg para reproducir streams.</p>
+            <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 text-xs text-red-200 mb-5">{error}</pre>
+            <button onClick={checkDependencies} className="rounded-lg bg-twitch px-4 py-2 text-sm font-semibold text-white hover:bg-twitch/80 cursor-pointer">
+              Reintentar instalación
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function App() {
+  return <RuntimeDependencyGate><MainApp /></RuntimeDependencyGate>
 }
 
 export default App

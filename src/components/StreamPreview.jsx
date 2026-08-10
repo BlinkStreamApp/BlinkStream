@@ -24,6 +24,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
 import { invoke } from '@tauri-apps/api/core'
+import { TauriPlaylistLoader } from '../utils/tauriHls'
 
 /**
  * Preview HLS silencioso del stream. Sin UI: solo el <video> element.
@@ -96,6 +97,7 @@ export default function StreamPreview({ stream, enabled, quality = 'best' }) {
       }
 
       hls = new Hls({
+        loader: TauriPlaylistLoader,
         maxBufferLength: 30,        // 30s de buffer (default hls.js, suficiente para previews)
         maxMaxBufferLength: 60,     // cap de 60s
         capLevelToPlayerSize: true, // no descargar qualities más altas que el tamaño del video

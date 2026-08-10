@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
 import { measureInvoke } from '../../utils/perf'
+import { TauriPlaylistLoader } from '../../utils/tauriHls'
 import { useT } from '../../utils/i18n'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import LiveBadge from '../LiveBadge'
@@ -57,13 +58,11 @@ export default function GridCell({
   }, [quality])
 
   useEffect(() => {
-    if (channel) {
-      fetchStream(channel, quality)
-    } else {
-      setStreamUrl('')
-      setError('')
-    }
+    const loadTimer = channel
+      ? window.setTimeout(() => fetchStream(channel, quality), 0)
+      : null
     return () => {
+      if (loadTimer !== null) window.clearTimeout(loadTimer)
       if (hlsRef.current) {
         hlsRef.current.destroy()
         hlsRef.current = null
@@ -86,6 +85,7 @@ export default function GridCell({
 
     if (Hls.isSupported()) {
       const hls = new Hls({
+        loader: TauriPlaylistLoader,
         maxBufferLength: 30,
         maxMaxBufferLength: 120,
         capLevelToPlayerSize: true,

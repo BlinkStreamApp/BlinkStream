@@ -27,6 +27,7 @@ import {
   FavListQuerySchema,
   parseOrReject,
 } from "./_validation.ts";
+import { trustedTwitchUsername } from "./_identity.ts";
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const DB_URL = Deno.env.get("SUPABASE_DB_URL") || "";
@@ -138,14 +139,15 @@ async function authenticate(req: Request): Promise<AuthOk | AuthFail> {
   }
 
   const userId = data.user.id;
-  // username desde metadata; fallback al email local-part.
-  const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>;
-  const username = typeof meta.username === "string"
-    ? meta.username
-    : (data.user.email?.split("@")[0] ?? "");
-
   if (!userId) {
     return { ok: false, status: 401, reason: "no_user_id" };
+  }
+
+  // app_metadata solo puede modificarlo el servidor. Para usuarios antiguos,
+  // aceptamos exclusivamente el email determinista creado por twitch-auth.
+  const username = trustedTwitchUsername(data.user);
+  if (!username) {
+    return { ok: false, status: 401, reason: "missing_trusted_username" };
   }
 
   return { ok: true, userId, username };
@@ -214,14 +216,14 @@ async function handleList(userId: string, origin: string | null) {
   }
 }
 
-async function handleAdd(userId: string, channel: string, origin: string | null) {
+async function handleAdd(userId: string, username: string, channel: string, origin: string | null) {
   if (!sql) return json({ ok: false, error: "db_offline" }, 503, origin);
   if (!ALLOWED_TABLES.has("favorites")) return json({ ok: false, error: "table_blocked" }, 403, origin);
   try {
     await sql`
-      INSERT INTO public.favorites (user_id, channel)
-      VALUES (${userId}, ${channel})
-      ON CONFLICT (user_id, channel) DO NOTHING
+      INSERT INTO public.favorites (user_id, username, channel)
+      VALUES (${userId}, ${username}, ${channel})
+      ON CONFLICT (user_id, channel) WHERE user_id IS NOT NULL DO NOTHING
     `;
     return json({ ok: true }, 200, origin);
   } catch (err) {
@@ -246,7 +248,7 @@ async function handleRemove(userId: string, channel: string, origin: string | nu
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
-Deno.serve(async (req: Request) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const origin = req.headers.get("origin");
 
   // Preflight
@@ -319,7 +321,7 @@ Deno.serve(async (req: Request) => {
         return await handleList(auth.userId, origin);
       case "fav_add":
         if (!parsed.data.channel) return json({ ok: false, error: "channel_required" }, 400, origin);
-        return await handleAdd(auth.userId, parsed.data.channel, origin);
+        return await handleAdd(auth.userId, auth.username, parsed.data.channel, origin);
       case "fav_remove":
         if (!parsed.data.channel) return json({ ok: false, error: "channel_required" }, 400, origin);
         return await handleRemove(auth.userId, parsed.data.channel, origin);
@@ -333,7 +335,11 @@ Deno.serve(async (req: Request) => {
     logEvent("unhandled_error", { msg: (err as Error).message });
     return json({ ok: false, error: "internal_error" }, 500, origin);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}
 
 // Re-export para tests
 export {

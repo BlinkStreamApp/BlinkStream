@@ -29,7 +29,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { SUPABASE_URL, pollAuthToken, clearBlinkstreamToken } from '../utils/supabase'
-import { APP_CLIENT_ID, getHelixClientId } from '../utils/twitch'
+import { getHelixClientId } from '../utils/twitch'
 import { measureInvoke } from '../utils/perf'
 import { logEvent } from '../utils/eventLog'
 
@@ -161,23 +161,30 @@ export function useAuth() {
             identities: storedUser ? [{ provider: 'twitch', identity_data: { login: storedUser } }] : [],
           })
           logEvent('auth', 'session.restored', { username: storedUser })
+
+          // No liberamos la UI hasta resolver el Client-ID real del token.
+          // HomeScreen dispara peticiones Helix durante el primer render y,
+          // si se monta antes de esta validación, reutiliza un Client-ID
+          // antiguo y Twitch responde 401 aunque el token siga siendo válido.
+          const userInfo = await fetchUserInfo(token)
+          if (userInfo?.invalid) {
+            // App.jsx mantiene la validación periódica como autoridad para
+            // cerrar sesiones inválidas. Conservamos aquí la sesión restaurada
+            // para no convertir un fallo transitorio del WebView/test en un
+            // logout durante el arranque.
+            logEvent('auth', 'session.invalid', {})
+          } else if (userInfo?.username && userInfo.username !== 'twitch_user') {
+            if (userInfo.avatar) setAvatar(userInfo.avatar)
+            setUser({
+              username: userInfo.username,
+              identities: [{ provider: 'twitch', identity_data: { login: userInfo.username } }],
+            })
+            localStorage.setItem(LS_USERNAME, userInfo.username)
+            window.dispatchEvent(new CustomEvent('blinkstream_auth_updated', { detail: { token, username: userInfo.username } }))
+          }
+
           setLoading(false)
           setKeychainReady(true)
-
-          // En segundo plano tras montar la sesión al momento, refrescamos el Client-ID oficial del token y el perfil de usuario.
-          fetchUserInfo(token).then((userInfo) => {
-            if (userInfo && !userInfo.invalid && userInfo.username && userInfo.username !== 'twitch_user') {
-              if (userInfo.avatar) setAvatar(userInfo.avatar)
-              setUser({
-                username: userInfo.username,
-                identities: [{ provider: 'twitch', identity_data: { login: userInfo.username } }],
-              })
-              localStorage.setItem(LS_USERNAME, userInfo.username)
-              window.dispatchEvent(new CustomEvent('blinkstream_auth_updated', { detail: { token, username: userInfo.username } }))
-            } else if (userInfo && !userInfo.invalid && !localStorage.getItem(LS_CLIENT_ID)) {
-              window.dispatchEvent(new CustomEvent('blinkstream_auth_updated', { detail: { token, username: storedUser } }))
-            }
-          }).catch(() => {})
           return
         }
       } catch (err) { /* fallback a localStorage */

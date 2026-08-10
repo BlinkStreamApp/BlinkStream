@@ -579,7 +579,12 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
       }, 60000)
     }
     pollStatus()
-    return () => { cancelled = true; clearTimeout(timer) }
+    window.addEventListener('blinkstream_auth_updated', fetchLiveStatus)
+    return () => { 
+      cancelled = true
+      clearTimeout(timer)
+      window.removeEventListener('blinkstream_auth_updated', fetchLiveStatus)
+    }
   }, [fetchLiveStatus])
 
   useEffect(() => {

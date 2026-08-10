@@ -18,19 +18,8 @@
     "core:event:default",
     "core:event:allow-listen",
     "core:event:allow-emit",
-    {
-      "identifier": "fs:allow-write",
-      "scope": {
-        "allow": ["$DESKTOP/**", "$DOCUMENTS/**", "$DOWNLOAD/**"]
-      }
-    },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "scope": {
-        "allow": ["$DESKTOP/**", "$DOCUMENTS/**", "$DOWNLOAD/**"]
-      }
-    },
     "notification:default",
-    "updater:default"
+    "updater:default",
+    "process:allow-restart"
   ]
 }

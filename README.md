@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.1--a-e94560" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.3.8-e94560" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
 </p>
@@ -20,7 +20,7 @@
 
 | Feature | Description |
 |---------|-------------|
-| 🎯 **Custom Installer** | Immersive Twitch-themed installer with native custom installation directory selector |
+| 🎯 **Native Installer** | Signed-update-ready NSIS installer with automatic migration from legacy installations |
 | 🌧️ **Emote Rain & Combos** | Floating real-time emote particle overlays and dynamic neon Combo meter (HYPERS, SUPER, GODLIKE) |
 | 🔔 **Smart Chat Tabs** | Quick navigation bar filtering between All messages, @Mentions with live notification counter, and ⭐ Featured events |
 | 📺 **Live Streams** | Smooth Twitch stream playback using integrated Streamlink + FFmpeg engine |
@@ -45,9 +45,8 @@
 
 ### Windows
 Download the official installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases). Existing installations update automatically:
-- ⭐ **`BlinkStream-Setup_1.3.1-a_Custom.exe`** *(Recommended — 100% Custom Twitch-themed setup with path selection)*
-- `BlinkStream_1.3.1-a_Win_x64.exe` *(Standard NSIS installer)*
-- `BlinkStream_1.3.1-a_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream_1.3.8_Win_x64.exe`** *(Recommended — NSIS installer and automatic updates)*
+- `BlinkStream_1.3.8_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
 > **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
@@ -63,13 +62,13 @@ Download the official installer from [GitHub Releases](https://github.com/BlinkS
 ### macOS
 ```bash
 brew install streamlink
-# Download BlinkStream_1.3.1-a_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
+# Download BlinkStream_1.3.8_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
 ```
 
 ### Linux (Debian / Ubuntu)
 ```bash
 sudo apt install streamlink
-# Download BlinkStream_1.3.1-a_Linux_x86_64.deb or .AppImage from Releases
+# Download BlinkStream_1.3.8_Linux_x86_64.deb or .AppImage from Releases
 ```
 
 ---
@@ -114,7 +113,6 @@ pnpm tauri build
 blinkstream/
 ├── src/                     # React 19 + Tailwind CSS Frontend
 │   ├── components/          # Modularized UI Components
-│   │   ├── installer/       # Custom Windows Setup & Directory Picker
 │   │   ├── moderation/      # Mod Panel, Timeout/Ban controllers
 │   │   ├── channelpoints/   # Twitch Reward Redemptions UI
 │   │   ├── recording/       # Video Recording Controller & Disk Monitor
@@ -124,7 +122,6 @@ blinkstream/
 │   └── utils/               # Twitch API integrations, encryption, & analytics
 ├── src-tauri/               # Rust Backend (Tauri v2.11)
 │   ├── src/
-│   │   ├── installer.rs     # Windows Registry, shortcuts, & custom setup commands
 │   │   ├── recorder.rs      # Cross-platform stream capture & POSIX fs storage metrics
 │   │   ├── lib.rs           # Core IPC bindings & single-instance management
 │   │   └── main.rs          # Application Entrypoint
@@ -153,10 +150,10 @@ blinkstream/
 
 | Metric | Value |
 |--------|-------|
-| **Windows Installer Size** | ~3.8 MB (Ultra-lightweight footprint) |
-| **Initial Bundle Load** | ~280 KB minified & compressed |
-| **Security Auditing** | **0 Known Vulnerabilities** across Rust and npm dependency graphs |
-| **Automated Test Suite** | **295 Unit & Integration Tests** passing (Vitest 4) |
+| **Windows Installer Size** | ~4.2 MB |
+| **Initial Bundle Load** | ~366 KB minified (~112 KB gzip) |
+| **Security Auditing** | **0 known npm production vulnerabilities** |
+| **Automated Test Suite** | **291 frontend + 39 Rust tests** passing |
 | **Content Security Policy** | 9 restrictive directives, **0 wildcards allowed** |
 | **Supported Platforms** | Windows 10/11, macOS 13+ (Silicon & Intel), Ubuntu/Debian Linux |
 

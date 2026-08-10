@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::io::{Read, Write};
 use std::net::{TcpListener, UdpSocket};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,58 +61,123 @@ fn detect_local_ip() -> String {
 fn get_server_state() -> Arc<Mutex<CompanionServerState>> {
     SERVER_STATE
         .get_or_init(|| {
-            let pin = format!("{:04}", (std::process::id() % 9000) + 1000);
             Arc::new(Mutex::new(CompanionServerState {
                 is_running: false,
                 port: 9876,
                 ip: detect_local_ip(),
-                pin,
+                pin: String::new(),
                 state_data: CompanionStateData::default(),
             }))
         })
         .clone()
 }
 
-pub fn init_and_start_companion_server(app: AppHandle) {
+fn query_parameter<'a>(query: &'a str, key: &str) -> Option<&'a str> {
+    query.split('&').find_map(|pair| {
+        let (candidate, value) = pair.split_once('=')?;
+        (candidate == key).then_some(value)
+    })
+}
+
+fn request_body(req: &str) -> Option<&str> {
+    req.split_once("\r\n\r\n").map(|(_, body)| body)
+}
+
+fn supplied_pin(query: &str, req: &str) -> Option<String> {
+    query_parameter(query, "pin")
+        .map(str::to_owned)
+        .or_else(|| {
+            let value = serde_json::from_str::<serde_json::Value>(request_body(req)?).ok()?;
+            value.get("pin").and_then(|pin| {
+                pin.as_str()
+                    .map(str::to_owned)
+                    .or_else(|| pin.as_u64().map(|n| n.to_string()))
+            })
+        })
+}
+
+fn generate_pin() -> Result<String, String> {
+    let value = getrandom::u32()
+        .map_err(|e| format!("No se pudo generar un PIN seguro para el mando: {e}"))?;
+    Ok(format!("{:06}", (value % 900_000) + 100_000))
+}
+
+pub fn init_and_start_companion_server(app: AppHandle) -> Result<(), String> {
     let state_arc = get_server_state();
     let (ip, port) = {
         let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
         if guard.is_running {
-            return;
+            return Ok(());
         }
+        guard.pin = generate_pin()?;
         guard.is_running = true;
         (guard.ip.clone(), guard.port)
     };
 
-    let bind_addr = format!("0.0.0.0:{}", port);
+    let bind_addr = format!("0.0.0.0:{port}");
     let listener = match TcpListener::bind(&bind_addr) {
         Ok(l) => l,
         Err(e) => {
-            log::warn!("[Companion] El puerto {} está en uso ({}), intentando 9877...", port, e);
+            log::warn!("[Companion] El puerto {port} está en uso ({e}), intentando 9877...");
             let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
             guard.port = 9877;
             match TcpListener::bind("0.0.0.0:9877") {
                 Ok(l2) => l2,
                 Err(e2) => {
-                    log::error!("[Companion] Fallo crítico al enlazar servidor local: {}", e2);
+                    log::error!("[Companion] Fallo crítico al enlazar servidor local: {e2}");
                     guard.is_running = false;
-                    return;
+                    return Err(format!("No se pudo iniciar el mando Wi-Fi: {e2}"));
                 }
             }
         }
     };
 
+    if let Err(error) = listener.set_nonblocking(true) {
+        state_arc
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_running = false;
+        return Err(format!(
+            "No se pudo configurar el servidor del mando: {error}"
+        ));
+    }
+
     let app_clone = app.clone();
     thread::spawn(move || {
-        log::info!("[Companion] Servidor Remoto escuchando en http://{}:{}", ip, port);
-        for stream_res in listener.incoming() {
-            if let Ok(mut stream) = stream_res {
-                let state_arc = get_server_state();
-                let app_handle = app_clone.clone();
-                let _ = handle_client_stream(&mut stream, state_arc, app_handle);
+        log::info!("[Companion] Servidor Remoto escuchando en http://{ip}:{port}");
+        loop {
+            let is_running = {
+                let state = get_server_state();
+                let guard = state.lock().unwrap_or_else(|e| e.into_inner());
+                guard.is_running
+            };
+            if !is_running {
+                log::info!("[Companion] Servidor Remoto detenido");
+                break;
+            }
+
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let state_arc = get_server_state();
+                    let app_handle = app_clone.clone();
+                    let _ = handle_client_stream(&mut stream, state_arc, app_handle);
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(50));
+                }
+                Err(e) => {
+                    log::error!("[Companion] Error aceptando conexión: {e}");
+                    let state = get_server_state();
+                    state
+                        .lock()
+                        .unwrap_or_else(|err| err.into_inner())
+                        .is_running = false;
+                    break;
+                }
             }
         }
     });
+    Ok(())
 }
 
 fn handle_client_stream(
@@ -149,10 +215,12 @@ fn handle_client_stream(
         ""
     };
 
-    let cors_headers = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\n";
+    // La interfaz móvil se sirve desde este mismo origen. No habilitamos CORS:
+    // así una web externa no puede usar el navegador para atacar la API LAN.
+    let response_headers = "Cache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY\r\nContent-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'\r\n";
 
     if method == "OPTIONS" {
-        let resp = format!("HTTP/1.1 204 No Content\r\n{}\r\n", cors_headers);
+        let resp = format!("HTTP/1.1 204 No Content\r\n{response_headers}\r\n");
         stream.write_all(resp.as_bytes())?;
         return Ok(());
     }
@@ -163,21 +231,13 @@ fn handle_client_stream(
             guard.pin.clone()
         };
 
-        let mut has_valid_pin = false;
-        if query.contains(&format!("pin={}", expected_pin)) {
-            has_valid_pin = true;
-        } else if let Some(body_start) = req_str.find("\r\n\r\n") {
-            let body = &req_str[body_start + 4..];
-            if body.contains(&format!("\"pin\":\"{}\"", expected_pin)) || body.contains(&format!("\"pin\":{}", expected_pin)) {
-                has_valid_pin = true;
-            }
-        }
+        let has_valid_pin = supplied_pin(query, &req_str).as_deref() == Some(&expected_pin);
 
         if !has_valid_pin {
             let err_json = json!({"error": "Unauthorized", "message": "PIN de seguridad incorrecto u omitido. Escanea el código QR desde BlinkStream."}).to_string();
             let resp = format!(
                 "HTTP/1.1 403 Forbidden\r\n{}Content-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
-                cors_headers,
+                response_headers,
                 err_json.len(),
                 err_json
             );
@@ -190,7 +250,7 @@ fn handle_client_stream(
         let html = get_companion_html();
         let resp = format!(
             "HTTP/1.1 200 OK\r\n{}Content-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
-            cors_headers,
+            response_headers,
             html.len(),
             html
         );
@@ -205,7 +265,7 @@ fn handle_client_stream(
         };
         let resp = format!(
             "HTTP/1.1 200 OK\r\n{}Content-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
-            cors_headers,
+            response_headers,
             json_str.len(),
             json_str
         );
@@ -214,8 +274,7 @@ fn handle_client_stream(
     }
 
     if method == "POST" && path == "/api/command" {
-        if let Some(body_start) = req_str.find("\r\n\r\n") {
-            let body = &req_str[body_start + 4..];
+        if let Some(body) = request_body(&req_str) {
             if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body) {
                 if let Some(action) = json_val.get("action").and_then(|v| v.as_str()) {
                     if action == "send_chat" {
@@ -226,10 +285,11 @@ fn handle_client_stream(
                 }
             }
         }
-        let ok_json = json!({"status": "success", "message": "Orden procesada por BlinkStream"}).to_string();
+        let ok_json =
+            json!({"status": "success", "message": "Orden procesada por BlinkStream"}).to_string();
         let resp = format!(
             "HTTP/1.1 200 OK\r\n{}Content-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
-            cors_headers,
+            response_headers,
             ok_json.len(),
             ok_json
         );
@@ -238,7 +298,10 @@ fn handle_client_stream(
     }
 
     let not_found = "404 Not Found in BlinkStream Companion Remote Server";
-    let resp = format!("HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n{}", not_found.len(), not_found);
+    let resp = format!(
+        "HTTP/1.1 404 Not Found\r\n{response_headers}Content-Length: {}\r\n\r\n{not_found}",
+        not_found.len()
+    );
     stream.write_all(resp.as_bytes())?;
     Ok(())
 }
@@ -259,7 +322,7 @@ pub fn get_companion_status() -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 pub fn start_companion_server_cmd(app: AppHandle) -> Result<serde_json::Value, String> {
-    init_and_start_companion_server(app);
+    init_and_start_companion_server(app)?;
     get_companion_status()
 }
 
@@ -272,6 +335,7 @@ pub fn stop_companion_server_cmd() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // Tauri IPC recibe estos campos planos desde la UI existente.
 pub fn update_companion_state(
     channel: Option<String>,
     title: Option<String>,
@@ -284,14 +348,30 @@ pub fn update_companion_state(
 ) -> Result<(), String> {
     let state_arc = get_server_state();
     let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(c) = channel { guard.state_data.channel = c; }
-    if let Some(t) = title { guard.state_data.title = t; }
-    if let Some(v) = volume { guard.state_data.volume = v; }
-    if let Some(m) = is_muted { guard.state_data.is_muted = m; }
-    if let Some(l) = is_live { guard.state_data.is_live = l; }
-    if let Some(vm) = view_mode { guard.state_data.view_mode = vm; }
-    if let Some(favs) = favorites_live { guard.state_data.favorites_live = favs; }
-    if let Some(a) = avatar { guard.state_data.avatar = a; }
+    if let Some(c) = channel {
+        guard.state_data.channel = c;
+    }
+    if let Some(t) = title {
+        guard.state_data.title = t;
+    }
+    if let Some(v) = volume {
+        guard.state_data.volume = v;
+    }
+    if let Some(m) = is_muted {
+        guard.state_data.is_muted = m;
+    }
+    if let Some(l) = is_live {
+        guard.state_data.is_live = l;
+    }
+    if let Some(vm) = view_mode {
+        guard.state_data.view_mode = vm;
+    }
+    if let Some(favs) = favorites_live {
+        guard.state_data.favorites_live = favs;
+    }
+    if let Some(a) = avatar {
+        guard.state_data.avatar = a;
+    }
     Ok(())
 }
 
@@ -519,4 +599,26 @@ fn get_companion_html() -> &'static str {
     </script>
 </body>
 </html>"#
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{query_parameter, request_body, supplied_pin};
+
+    #[test]
+    fn pin_query_requires_exact_parameter_name() {
+        assert_eq!(query_parameter("pin=123456&x=1", "pin"), Some("123456"));
+        assert_eq!(query_parameter("notpin=123456", "pin"), None);
+        assert_eq!(supplied_pin("notpin=123456", ""), None);
+    }
+
+    #[test]
+    fn pin_body_requires_exact_json_field() {
+        let request = "POST /api/command HTTP/1.1\r\n\r\n{\"pin\":\"123456\"}";
+        assert_eq!(request_body(request), Some("{\"pin\":\"123456\"}"));
+        assert_eq!(supplied_pin("", request).as_deref(), Some("123456"));
+
+        let spoofed = "POST /api/command HTTP/1.1\r\n\r\n{\"notpin\":\"123456\"}";
+        assert_eq!(supplied_pin("", spoofed), None);
+    }
 }

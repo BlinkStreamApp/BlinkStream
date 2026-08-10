@@ -266,7 +266,11 @@ async function migrateLegacyRefreshToken() {
 
 async function saveBlinkstreamToken({ jwt, refreshToken, expiresIn, userId }) {
   try {
-    localStorage.setItem(LS_BLINKSTREAM_JWT, jwt)
+    if (jwt) {
+      localStorage.setItem(LS_BLINKSTREAM_JWT, jwt)
+    } else {
+      localStorage.removeItem(LS_BLINKSTREAM_JWT)
+    }
     // expiresIn viene en segundos. Guardamos timestamp absoluto en ms.
     const expiresAtMs = Date.now() + (Number(expiresIn) || 3600) * 1000
     localStorage.setItem(LS_BLINKSTREAM_EXPIRES, String(expiresAtMs))

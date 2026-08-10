@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { DeviceMobile, X, CheckCircle, ShieldCheck, WifiHigh, ArrowsClockwise, Power } from '@phosphor-icons/react';
 import QRCodeSvg from './QRCodeSvg';
+import PhosphorIcon from './icons/PhosphorIcon';
 
 const CompanionModal = ({ onClose }) => {
   const [status, setStatus] = useState({ isRunning: false, url: '', ip: '', port: 9876, pin: '' });
@@ -23,7 +23,20 @@ const CompanionModal = ({ onClose }) => {
   };
 
   useEffect(() => {
-    fetchStatus();
+    let cancelled = false;
+    invoke('get_companion_status')
+      .then(res => {
+        if (cancelled) return;
+        setStatus(res);
+        setError(null);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.error('Error obteniendo estado del Mando Wi-Fi:', err);
+        setError('No se pudo contactar con el servidor local del Mando Wi-Fi.');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -72,13 +85,13 @@ const CompanionModal = ({ onClose }) => {
           className="absolute top-4 right-4 p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-all z-10"
           title="Cerrar ventana (Escape)"
         >
-          <X size={20} weight="bold" />
+          <PhosphorIcon name="X" size={20} weight="bold" />
         </button>
 
         {/* Cabecera del modal */}
         <div className="flex items-center gap-3 mb-4 pr-6">
           <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-cyan-500 to-fuchsia-500 text-white shadow-lg shadow-cyan-500/30 shrink-0">
-            <DeviceMobile size={26} weight="fill" />
+            <PhosphorIcon name="DeviceMobile" size={26} weight="fill" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -86,7 +99,7 @@ const CompanionModal = ({ onClose }) => {
                 Mando Wi-Fi Móvil
               </h2>
               <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wide ${status.isRunning ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
-                {status.isRunning ? <><CheckCircle size={12} weight="fill" /> Activo</> : 'Detenido'}
+                {status.isRunning ? <><PhosphorIcon name="CheckCircle" size={12} weight="fill" /> Activo</> : 'Detenido'}
               </span>
             </div>
             <p className="text-[11px] text-white/60 mt-0.5 leading-tight">
@@ -97,7 +110,7 @@ const CompanionModal = ({ onClose }) => {
 
         {loading && !status.url ? (
           <div className="py-12 flex flex-col items-center justify-center text-white/70">
-            <ArrowsClockwise size={32} className="animate-spin text-cyan-400 mb-2" />
+            <PhosphorIcon name="ArrowsClockwise" size={32} className="animate-spin text-cyan-400 mb-2" />
             <p className="text-xs font-semibold">Sincronizando con servidor LAN...</p>
           </div>
         ) : error ? (
@@ -120,17 +133,17 @@ const CompanionModal = ({ onClose }) => {
                   
                   <div className="flex items-center justify-center flex-wrap gap-x-2.5 gap-y-1 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 text-[11px] text-white/80 font-mono w-full max-w-full">
                     <span className="flex items-center gap-1 text-cyan-400 font-bold truncate">
-                      <WifiHigh size={14} weight="bold" /> {status.ip}:{status.port}
+                      <PhosphorIcon name="WifiHigh" size={14} weight="bold" /> {status.ip}:{status.port}
                     </span>
                     <span className="text-white/30 hidden sm:inline">|</span>
                     <span className="flex items-center gap-1 text-fuchsia-400 font-bold truncate" title="Código PIN para evitar accesos no autorizados en redes compartidas">
-                      <ShieldCheck size={15} weight="bold" /> PIN: {status.pin}
+                      <PhosphorIcon name="ShieldCheck" size={15} weight="bold" /> PIN: {status.pin}
                     </span>
                   </div>
                 </>
               ) : (
                 <div className="py-8 text-center">
-                  <Power size={40} className="text-white/30 mx-auto mb-2" />
+                  <PhosphorIcon name="Power" size={40} className="text-white/30 mx-auto mb-2" />
                   <p className="text-white/70 font-semibold text-xs mb-2">El servidor del Mando Remoto está en reposo.</p>
                   <button
                     onClick={toggleServer}
@@ -173,7 +186,7 @@ const CompanionModal = ({ onClose }) => {
                   disabled={loading}
                   className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-rose-500/20 text-white hover:text-rose-400 border border-white/15 hover:border-rose-500/40 text-[11px] font-bold transition-all flex items-center gap-1 shrink-0"
                 >
-                  <Power size={13} weight="bold" /> Detener
+                  <PhosphorIcon name="Power" size={13} weight="bold" /> Detener
                 </button>
               )}
             </div>

@@ -13,6 +13,7 @@ import { validateProps } from '../utils/validateProps'
 import { logError } from '../utils/errors'
 import PhosphorIcon from './icons/PhosphorIcon'
 import { useT } from '../utils/i18n'
+import { APP_VERSION } from '../utils/appVersion'
 
 function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> }
 
@@ -45,7 +46,7 @@ export default function AboutDialog({ onClose }) {
       .then(setAppVersion)
       .catch((err) => {
         logError(err, { component: 'AboutDialog', action: 'getVersion' })
-        setAppVersion('1.0.3')
+        setAppVersion(APP_VERSION)
       })
   }, [])
 

@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react'
+import { APP_VERSION } from '../../utils/appVersion'
 
 function loadCustomClientId() {
   try { return localStorage.getItem('blinkstream_custom_client_id') || '' } catch { return '' }
@@ -54,7 +55,7 @@ export function SettingsAdvancedTab() {
 
       <div className="border-t border-bg-tertiary/50 pt-4">
         <p className="text-[11px] text-text-muted/50 leading-relaxed">
-          Versión: 1.3.1 — Suite Pro con Inmersión Total de Chat (Lluvia de Emotes & Combos), Multi-Stream y Telemetría en Vivo.
+          Versión: {APP_VERSION} — Suite Pro con Inmersión Total de Chat (Lluvia de Emotes & Combos), Multi-Stream y Telemetría en Vivo.
         </p>
       </div>
     </div>

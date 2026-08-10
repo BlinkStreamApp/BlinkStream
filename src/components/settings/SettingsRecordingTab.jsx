@@ -28,19 +28,19 @@ export function SettingsRecordingTab() {
   const [statusMsg, setStatusMsg] = useState('')
 
   useEffect(() => {
-    try { localStorage.setItem(LS_REC_PATH, recPath) } catch {}
+    try { localStorage.setItem(LS_REC_PATH, recPath) } catch { /* storage may be unavailable */ }
   }, [recPath])
 
   useEffect(() => {
-    try { localStorage.setItem(LS_REC_FORMAT, recFormat) } catch {}
+    try { localStorage.setItem(LS_REC_FORMAT, recFormat) } catch { /* storage may be unavailable */ }
   }, [recFormat])
 
   useEffect(() => {
-    try { localStorage.setItem(LS_REC_QUALITY, recQuality) } catch {}
+    try { localStorage.setItem(LS_REC_QUALITY, recQuality) } catch { /* storage may be unavailable */ }
   }, [recQuality])
 
   useEffect(() => {
-    try { localStorage.setItem(LS_REC_AUTOSTART, recAutoStart ? 'true' : 'false') } catch {}
+    try { localStorage.setItem(LS_REC_AUTOSTART, recAutoStart ? 'true' : 'false') } catch { /* storage may be unavailable */ }
   }, [recAutoStart])
 
   const handleSelectFolder = async () => {

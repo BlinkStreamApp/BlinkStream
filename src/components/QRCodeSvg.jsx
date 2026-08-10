@@ -1,4 +1,3 @@
-import React from 'react';
 
 // Generador de matriz QR ultraligero e integrado (sin dependencias externas)
 // Basado en algoritmo estándar QR para URLs cortas/medias (Mando Wi-Fi de BlinkStream)

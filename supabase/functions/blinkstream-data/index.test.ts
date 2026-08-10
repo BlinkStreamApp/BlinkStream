@@ -22,6 +22,7 @@ import {
   USERNAME_REGEX,
   parseOrReject,
 } from "./_validation.ts";
+import { trustedTwitchUsername } from "./_identity.ts";
 import {
   ALLOWED_ORIGINS,
   ALLOWED_TABLES,
@@ -122,6 +123,55 @@ Deno.test("security: tabla favorites esta en whitelist", () => {
   assert(!ALLOWED_TABLES.has("auth_tokens"));
   assert(!ALLOWED_TABLES.has("users"));
   assert(!ALLOWED_TABLES.has("pg_catalog"));
+});
+
+Deno.test("identity: app_metadata administrada es la fuente confiable", () => {
+  assertEquals(
+    trustedTwitchUsername({
+      app_metadata: { username: "Trusted_User" },
+      email: "twitch-fallback@blinkstream.local",
+    }),
+    "trusted_user",
+  );
+});
+
+Deno.test("identity: user_metadata editable nunca concede identidad", () => {
+  assertEquals(
+    trustedTwitchUsername({
+      app_metadata: {},
+      email: "attacker@example.com",
+      user_metadata: { username: "victim" },
+    } as never),
+    null,
+  );
+});
+
+Deno.test("identity: usuarios legacy usan solo el email determinista", () => {
+  assertEquals(
+    trustedTwitchUsername({ email: "twitch-legacy_user@blinkstream.local" }),
+    "legacy_user",
+  );
+  assertEquals(trustedTwitchUsername({ email: "admin@example.com" }), null);
+});
+
+Deno.test("database: fav_add deduplica por user_id y canal", async () => {
+  const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+  assertStringIncludes(
+    source,
+    "ON CONFLICT (user_id, channel) WHERE user_id IS NOT NULL DO NOTHING",
+  );
+});
+
+Deno.test("database: migration revoca get_user_id_by_email de PUBLIC", async () => {
+  const migrations = new URL("../../migrations/", import.meta.url);
+  const files = [...Deno.readDirSync(migrations)]
+    .map((entry) => entry.name)
+    .filter((name) => name.endsWith("_harden_favorites_identity_permissions.sql"));
+  assertEquals(files.length, 1);
+  const source = await Deno.readTextFile(new URL(files[0], migrations));
+  assertStringIncludes(source, "FROM PUBLIC, anon, authenticated");
+  assertStringIncludes(source, 'DROP POLICY IF EXISTS "favorites_select_policy"');
+  assertStringIncludes(source, "REVOKE ALL ON TABLE public.favorites FROM anon");
 });
 
 // ─── Tests de rate limit ──────────────────────────────────────────────────

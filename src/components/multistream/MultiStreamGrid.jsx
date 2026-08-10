@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy } from 'react'
+import { useState, Suspense, lazy } from 'react'
 import { useT } from '../../utils/i18n'
 import GridCell from './GridCell'
 import PhosphorIcon from '../icons/PhosphorIcon'

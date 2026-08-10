@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useT } from '../../utils/i18n'
 import { HSL_PRESETS, FONT_PRESETS, ICON_STYLES, applyStoredHslTheme, saveAndApplyHslTheme, applyStoredCustomFont, saveAndApplyCustomFont, applyStoredCustomIconStyle, saveAndApplyCustomIconStyle } from '../../utils/hslTheme'
 import PhosphorIcon from '../icons/PhosphorIcon'

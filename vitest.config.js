@@ -11,23 +11,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
-  // FIX WT-20260628-31: vitest 2.x + @vitejs/plugin-react 6.x tiene un bug
-  // conocido por el cual los archivos `.test.jsx` NO reciben la inyeccion
-  // del automatic JSX runtime, mientras que los `.jsx` normales si. Esto
-  // provoca `ReferenceError: React is not defined` al renderizar componentes
-  // en tests (afecto a 11 casos en channelpoints.fixes.test.jsx).
-  //
-  // Workaround limpio: forzar `esbuild.jsx: 'automatic'` para que vitest
-  // haga la transformacion del JSX con jsx-runtime en lugar de esperar a
-  // que el plugin de React la aplique. Asi nos ahorramos tocar todos los
-  // tests con `import React from 'react'` y la build sigue limpia.
-  //
-  // Ademas, pre-bundleamos `react/jsx-runtime` y `react-dom/client` para
-  // que el automatic runtime este disponible en el optimizeDeps y no se
-  // quede fuera del cache. Esto tambien acelera el arranque de los tests.
-  esbuild: {
-    jsx: 'automatic',
-  },
+  // Vitest 4 y el plugin de React comparten el runtime JSX automático.
+  // Pre-bundlearlo mantiene rápido el arranque de las suites React.
   optimizeDeps: {
     include: ['react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom/client'],
   },
@@ -54,6 +39,7 @@ export default defineConfig({
       '**/dist/**',
       '**/.{idea,git,cache,output,temp}/**',
       'supabase/**', // tests Deno, no vitest
+      'scripts/build-updater-manifest.test.mjs', // suite del runner nativo de Node
     ],
   },
 })

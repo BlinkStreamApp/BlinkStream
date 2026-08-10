@@ -165,7 +165,7 @@ export function useChannelPoints({ broadcasterId, userToken, userId, channel, ca
     const flat = all.flat()
     flat.sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at))
     setMyRedemptions(flat.slice(0, 50))
-  }, [broadcasterId, userId])
+  }, [broadcasterId, channel, userId, userToken])
 
   const refresh = useCallback(async () => {
     // Invalidamos cache de rewards para forzar refetch.

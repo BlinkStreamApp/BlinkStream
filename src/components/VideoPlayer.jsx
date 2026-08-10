@@ -19,6 +19,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
 import { measureInvoke } from '../utils/perf'
+import { TauriPlaylistLoader } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
 import { safeOpenUrl } from '../utils/tauriEnv'
@@ -32,10 +33,6 @@ import PhosphorIcon from './icons/PhosphorIcon'
 import Chat from './Chat'
 import EmoteRainOverlay from './EmoteRainOverlay'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
-// FASE 4 / WT-20260628-45: Lordicon animado para el boton REC. Solo
-// se monta cuando `recording` es true; el resto del tiempo seguimos
-// con Phosphor (mas liviano, sin fetch de CDN).
-import AnimatedIcon from './icons/AnimatedIcon'
 
 function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
@@ -414,6 +411,7 @@ export default function VideoPlayer({
     //   `fragLoadPolicy: { default: { maxLoadTimeMs: 20000, ... } }`.
     // - debug solo en dev para no spammear consola en produccion.
     const hls = new Hls({
+      loader: TauriPlaylistLoader,
       maxBufferLength: 60,
       maxMaxBufferLength: 600,
       maxBufferSize: 60 * 1000 * 1000,
@@ -640,8 +638,8 @@ export default function VideoPlayer({
 
   useEffect(() => { const v = videoRef.current; if (v) v.volume = muted ? 0 : volume / 100 }, [volume, muted, streamUrl])
 
-  const togglePlay = () => { const v = videoRef.current; if (!v) return; if (v.paused) { v.play().catch(() => {}); setPlaying(true) } else { v.pause(); setPlaying(false) } }
-  const toggleMute = () => { const v = videoRef.current; if (!v) return; v.muted = !muted; setMuted(!muted) }
+  const togglePlay = useCallback(() => { const v = videoRef.current; if (!v) return; if (v.paused) { v.play().catch(() => {}); setPlaying(true) } else { v.pause(); setPlaying(false) } }, [])
+  const toggleMute = useCallback(() => { const v = videoRef.current; if (!v) return; v.muted = !muted; setMuted(!muted) }, [muted])
 
   // ── toggleAudioOnly con fetchStream explícito ──
   const toggleAudioOnly = () => {
@@ -766,7 +764,7 @@ export default function VideoPlayer({
       window.removeEventListener('companion_toggle_mute', handleRemoteMute);
       window.removeEventListener('companion_take_snapshot', handleRemoteSnap);
     };
-  }, [playing, muted, captureSnapshot]);
+  }, [togglePlay, toggleMute, captureSnapshot]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -783,7 +781,7 @@ export default function VideoPlayer({
         case 'KeyT':
           if (!e.ctrlKey && !e.metaKey) onToggleTheatre(); break
         case 'KeyC':
-          if (!e.ctrlKey && !e.metaKey && onToggleChat) onToggleChat(); break
+          if (!e.ctrlKey && !e.metaKey) setShowOverlayChat(p => !p); break
         case 'KeyS':
           if (((e.ctrlKey || e.metaKey) && e.shiftKey) || (!e.ctrlKey && !e.metaKey && !e.altKey)) {
             e.preventDefault()
@@ -918,18 +916,7 @@ export default function VideoPlayer({
                 await startRecording(channel)
               }
             }} className={`hover:text-white transition-colors cursor-pointer ${recording ? 'text-red-500' : ''}`} title={recording ? t('player.stopRecord', 'Detener grabación') : t('player.record', 'Grabar stream')} aria-label="Grabar stream">
-              {recording ? (
-                // FASE 4 / WT-20260628-45: Lordicon animado. Si la red/CDN
-                // falla, AnimatedIcon cae a Phosphor Record duotone.
-                <AnimatedIcon
-                  src="https://cdn.lordicon.com/lbjeurwh.json"
-                  fallback="Record"
-                  size={18}
-                  color="#ef4444"
-                />
-              ) : (
-                <PhosphorIcon name="Record" size={18} weight="duotone" />
-              )}
+              <PhosphorIcon name="Record" size={18} weight={recording ? 'fill' : 'duotone'} className={recording ? 'animate-pulse' : ''} />
             </button>
             <button
               onClick={captureSnapshot}

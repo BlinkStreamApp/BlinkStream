@@ -132,9 +132,14 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 30000 
   }, [broadcasterId, pollIntervalMs, fetchPending])
 
   useEffect(() => {
-    cancelledRef.current = false
-    refresh()
-    return () => { cancelledRef.current = true }
+    const refreshTimer = window.setTimeout(() => {
+      cancelledRef.current = false
+      refresh()
+    }, 0)
+    return () => {
+      window.clearTimeout(refreshTimer)
+      cancelledRef.current = true
+    }
   }, [broadcasterId, refresh])
 
   // ─── Acciones ────────────────────────────────────────────────

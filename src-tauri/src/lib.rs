@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::Duration;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use std::time::Instant;
 use tauri::AppHandle;
 use tauri::Manager;
@@ -13,7 +13,6 @@ use wait_timeout::ChildExt;
 // se referencian directamente desde recorder::*.
 mod recorder;
 pub use recorder::{start_recording, stop_recording};
-pub mod installer;
 pub mod companion;
 
 #[cfg(windows)]
@@ -22,9 +21,9 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+use keyring::Entry;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
-use keyring::Entry;
 
 // ============================================================
 // Twitch API Client ID (backend Rust)
@@ -73,13 +72,12 @@ fn warn_legacy_client_id_once() {
 // TWITCH_CLIENT_ID esta configurado, este const nunca se usa.
 const LEGACY_FALLBACK_CLIENT_ID: &str = "z8bat49d2evj5nkmg5kmkge24sa7z9";
 
-
 pub fn try_lock_single_instance(name: &str) -> bool {
     let lock_dir = single_instance_lock_dir();
     if std::fs::create_dir_all(&lock_dir).is_err() {
         return true;
     }
-    let lock_path = lock_dir.join(format!("{}.lock", name));
+    let lock_path = lock_dir.join(format!("{name}.lock"));
 
     if lock_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&lock_path) {
@@ -91,7 +89,11 @@ pub fn try_lock_single_instance(name: &str) -> bool {
         }
     }
 
-    match OpenOptions::new().create_new(true).write(true).open(&lock_path) {
+    match OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&lock_path)
+    {
         Ok(mut f) => {
             let _ = writeln!(f, "{}", std::process::id());
             true
@@ -163,8 +165,7 @@ static VOD_ID_REGEX: std::sync::LazyLock<regex_lite::Regex> =
 fn validate_channel(name: &str) -> Result<(), String> {
     if !CHANNEL_REGEX.is_match(name) {
         return Err(
-            "Nombre de canal inválido. Solo letras, números y guión bajo (3-25 caracteres)."
-                .into(),
+            "Nombre de canal inválido. Solo letras, números y guión bajo (3-25 caracteres).".into(),
         );
     }
     Ok(())
@@ -197,19 +198,124 @@ const INSTALL_CMD: &str = "brew install streamlink";
 #[cfg(target_os = "linux")]
 const INSTALL_CMD: &str = "sudo apt install streamlink  # o pip install streamlink";
 
+#[cfg(all(target_arch = "x86_64", target_os = "windows"))]
+const STREAMLINK_TARGET_TRIPLE: &str = "x86_64-pc-windows-msvc";
+#[cfg(all(target_arch = "aarch64", target_os = "windows"))]
+const STREAMLINK_TARGET_TRIPLE: &str = "aarch64-pc-windows-msvc";
+#[cfg(all(target_arch = "x86_64", target_os = "macos"))]
+const STREAMLINK_TARGET_TRIPLE: &str = "x86_64-apple-darwin";
+#[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+const STREAMLINK_TARGET_TRIPLE: &str = "aarch64-apple-darwin";
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+const STREAMLINK_TARGET_TRIPLE: &str = "x86_64-unknown-linux-gnu";
+
+#[cfg(not(any(
+    all(target_arch = "x86_64", target_os = "windows"),
+    all(target_arch = "aarch64", target_os = "windows"),
+    all(target_arch = "x86_64", target_os = "macos"),
+    all(target_arch = "aarch64", target_os = "macos"),
+    all(target_arch = "x86_64", target_os = "linux"),
+)))]
+const STREAMLINK_TARGET_TRIPLE: &str = "unknown";
+
+#[cfg(windows)]
+fn new_winget_command() -> std::process::Command {
+    let mut candidates = Vec::new();
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        candidates.push(
+            PathBuf::from(local_app_data)
+                .join("Microsoft")
+                .join("WindowsApps")
+                .join("winget.exe"),
+        );
+    }
+    candidates.push(PathBuf::from(r"C:\Windows\System32\winget.exe"));
+
+    candidates
+        .into_iter()
+        .find(|path| path.is_file())
+        .map_or_else(
+            || std::process::Command::new("winget"),
+            std::process::Command::new,
+        )
+}
+
+#[cfg(windows)]
+fn run_winget_install(package_id: &str) -> Result<(), String> {
+    let mut command = new_winget_command();
+    command.args([
+        "install",
+        "--id",
+        package_id,
+        "--exact",
+        "--scope",
+        "user",
+        "--silent",
+        "--accept-package-agreements",
+        "--accept-source-agreements",
+        "--disable-interactivity",
+    ]);
+    command.creation_flags(CREATE_NO_WINDOW);
+    let output = command
+        .output()
+        .map_err(|e| format!("No se pudo ejecutar winget para {package_id}: {e}"))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    // Algunos manifiestos no admiten --scope user (ej: Streamlink). Reintentamos sin esa
+    // opción antes de devolver el error al instalador.
+    let mut fallback = new_winget_command();
+    fallback.args([
+        "install",
+        "--id",
+        package_id,
+        "--exact",
+        "--accept-package-agreements",
+        "--accept-source-agreements",
+    ]);
+    // Sin CREATE_NO_WINDOW ni --silent para que el usuario pueda ver prompts de origen o UAC
+    let fallback_out = fallback
+        .output()
+        .map_err(|e| format!("Fallback winget falló: {e}"))?;
+
+    if fallback_out.status.success() {
+        Ok(())
+    } else {
+        let details = String::from_utf8_lossy(&fallback_out.stderr)
+            .trim()
+            .chars()
+            .take(240)
+            .collect::<String>();
+        Err(format!(
+            "winget no pudo instalar {} (código {}). {}",
+            package_id,
+            fallback_out.status.code().unwrap_or(-1),
+            details
+        ))
+    }
+}
+
 /// Localiza ffmpeg y asegura que su directorio esté en el PATH del proceso actual
 /// para que streamlink pueda grabar y procesar flujos HLS sin errores.
 pub fn ensure_ffmpeg_path() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         let mut where_cmd = std::process::Command::new("where.exe");
-        where_cmd.arg("ffmpeg.exe").stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null());
+        where_cmd
+            .arg("ffmpeg.exe")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null());
         where_cmd.creation_flags(CREATE_NO_WINDOW);
         if let Ok(output) = where_cmd.output() {
             if output.status.success() {
                 for line in String::from_utf8_lossy(&output.stdout).lines() {
                     let p = PathBuf::from(line.trim());
-                    if p.exists() && p.extension().map_or(false, |ext| ext.eq_ignore_ascii_case("exe")) {
+                    if p.exists()
+                        && p.extension()
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+                    {
                         if let Some(parent) = p.parent() {
                             add_to_process_path(parent);
                         }
@@ -221,31 +327,76 @@ pub fn ensure_ffmpeg_path() -> Option<PathBuf> {
 
         let mut candidate_paths = Vec::new();
         if let Ok(pf) = std::env::var("ProgramFiles") {
-            candidate_paths.push(PathBuf::from(&pf).join("FFmpeg").join("bin").join("ffmpeg.exe"));
-            candidate_paths.push(PathBuf::from(&pf).join("Gyan").join("FFmpeg").join("bin").join("ffmpeg.exe"));
+            candidate_paths.push(
+                PathBuf::from(&pf)
+                    .join("FFmpeg")
+                    .join("bin")
+                    .join("ffmpeg.exe"),
+            );
+            candidate_paths.push(
+                PathBuf::from(&pf)
+                    .join("Gyan")
+                    .join("FFmpeg")
+                    .join("bin")
+                    .join("ffmpeg.exe"),
+            );
         }
         if let Ok(pf_x86) = std::env::var("ProgramFiles(x86)") {
-            candidate_paths.push(PathBuf::from(&pf_x86).join("FFmpeg").join("bin").join("ffmpeg.exe"));
+            candidate_paths.push(
+                PathBuf::from(&pf_x86)
+                    .join("FFmpeg")
+                    .join("bin")
+                    .join("ffmpeg.exe"),
+            );
         }
         candidate_paths.push(PathBuf::from(r"C:\Program Files\FFmpeg\bin\ffmpeg.exe"));
+        candidate_paths.push(PathBuf::from(r"C:\ffmpeg\bin\ffmpeg.exe"));
         candidate_paths.push(PathBuf::from(r"C:\ProgramData\chocolatey\bin\ffmpeg.exe"));
         if let Ok(up) = std::env::var("USERPROFILE") {
-            candidate_paths.push(PathBuf::from(&up).join("scoop").join("apps").join("ffmpeg").join("current").join("bin").join("ffmpeg.exe"));
-            candidate_paths.push(PathBuf::from(&up).join("AppData").join("Local").join("Microsoft").join("WinGet").join("Links").join("ffmpeg.exe"));
+            candidate_paths.push(
+                PathBuf::from(&up)
+                    .join("scoop")
+                    .join("apps")
+                    .join("ffmpeg")
+                    .join("current")
+                    .join("bin")
+                    .join("ffmpeg.exe"),
+            );
+            candidate_paths.push(
+                PathBuf::from(&up)
+                    .join("AppData")
+                    .join("Local")
+                    .join("Microsoft")
+                    .join("WinGet")
+                    .join("Links")
+                    .join("ffmpeg.exe"),
+            );
+        }
+        if let Ok(lad) = std::env::var("LOCALAPPDATA") {
+            candidate_paths.push(
+                PathBuf::from(&lad)
+                    .join("Programs")
+                    .join("Streamlink")
+                    .join("ffmpeg")
+                    .join("ffmpeg.exe"),
+            );
         }
 
         if let Ok(lad) = std::env::var("LOCALAPPDATA") {
-            let winget_pkgs = PathBuf::from(&lad).join("Microsoft").join("WinGet").join("Packages");
+            let winget_pkgs = PathBuf::from(&lad)
+                .join("Microsoft")
+                .join("WinGet")
+                .join("Packages");
             if let Ok(entries) = std::fs::read_dir(winget_pkgs) {
                 for entry in entries.flatten() {
                     let name = entry.file_name().to_string_lossy().to_lowercase();
                     if name.contains("ffmpeg") || name.contains("gyan") {
-                        if let Ok(sub) = std::fs::read_dir(entry.path()) {
-                            for s in sub.flatten() {
-                                let f = s.path().join("bin").join("ffmpeg.exe");
-                                if f.exists() { candidate_paths.push(f); }
-                            }
-                        }
+                        collect_named_executables(
+                            &entry.path(),
+                            "ffmpeg.exe",
+                            5,
+                            &mut candidate_paths,
+                        );
                     }
                 }
             }
@@ -264,11 +415,41 @@ pub fn ensure_ffmpeg_path() -> Option<PathBuf> {
 }
 
 #[cfg(windows)]
+fn collect_named_executables(
+    root: &Path,
+    file_name: &str,
+    max_depth: u8,
+    output: &mut Vec<PathBuf>,
+) {
+    if max_depth == 0 {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file()
+            && path
+                .file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case(file_name))
+        {
+            output.push(path);
+        } else if path.is_dir() {
+            collect_named_executables(&path, file_name, max_depth - 1, output);
+        }
+    }
+}
+
+#[cfg(windows)]
 fn add_to_process_path(new_dir: &std::path::Path) {
     if let Ok(current_path) = std::env::var("PATH") {
         let new_dir_str = new_dir.to_string_lossy();
-        if !current_path.split(';').any(|p| p.eq_ignore_ascii_case(&new_dir_str)) {
-            let updated_path = format!("{};{}", new_dir_str, current_path);
+        if !current_path
+            .split(';')
+            .any(|p| p.eq_ignore_ascii_case(&new_dir_str))
+        {
+            let updated_path = format!("{new_dir_str};{current_path}");
             std::env::set_var("PATH", updated_path);
         }
     }
@@ -278,19 +459,68 @@ fn add_to_process_path(new_dir: &std::path::Path) {
 fn check_streamlink_windows_locations() -> Option<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(pf) = std::env::var("ProgramFiles") {
-        candidates.push(PathBuf::from(&pf).join("Streamlink").join("bin").join("streamlink.exe"));
+        candidates.push(
+            PathBuf::from(&pf)
+                .join("Streamlink")
+                .join("bin")
+                .join("streamlink.exe"),
+        );
         candidates.push(PathBuf::from(&pf).join("Streamlink").join("streamlink.exe"));
     }
     if let Ok(pf_x86) = std::env::var("ProgramFiles(x86)") {
-        candidates.push(PathBuf::from(&pf_x86).join("Streamlink").join("bin").join("streamlink.exe"));
-        candidates.push(PathBuf::from(&pf_x86).join("Streamlink").join("streamlink.exe"));
+        candidates.push(
+            PathBuf::from(&pf_x86)
+                .join("Streamlink")
+                .join("bin")
+                .join("streamlink.exe"),
+        );
+        candidates.push(
+            PathBuf::from(&pf_x86)
+                .join("Streamlink")
+                .join("streamlink.exe"),
+        );
     }
-    candidates.push(PathBuf::from(r"C:\Program Files\Streamlink\bin\streamlink.exe"));
-    candidates.push(PathBuf::from(r"C:\Program Files (x86)\Streamlink\bin\streamlink.exe"));
+    candidates.push(PathBuf::from(
+        r"C:\Program Files\Streamlink\bin\streamlink.exe",
+    ));
+    candidates.push(PathBuf::from(
+        r"C:\Program Files (x86)\Streamlink\bin\streamlink.exe",
+    ));
 
     if let Ok(lad) = std::env::var("LOCALAPPDATA") {
-        candidates.push(PathBuf::from(&lad).join("Programs").join("Streamlink").join("bin").join("streamlink.exe"));
-        candidates.push(PathBuf::from(&lad).join("Microsoft").join("WinGet").join("Links").join("streamlink.exe"));
+        candidates.push(
+            PathBuf::from(&lad)
+                .join("Programs")
+                .join("Streamlink")
+                .join("streamlink.exe"),
+        );
+        candidates.push(
+            PathBuf::from(&lad)
+                .join("Programs")
+                .join("Streamlink")
+                .join("bin")
+                .join("streamlink.exe"),
+        );
+        candidates.push(
+            PathBuf::from(&lad)
+                .join("Microsoft")
+                .join("WinGet")
+                .join("Links")
+                .join("streamlink.exe"),
+        );
+
+        let winget_pkgs = PathBuf::from(&lad)
+            .join("Microsoft")
+            .join("WinGet")
+            .join("Packages");
+        if let Ok(entries) = std::fs::read_dir(winget_pkgs) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+                if name.contains("streamlink") {
+                    collect_named_executables(&entry.path(), "streamlink.exe", 5, &mut candidates);
+                }
+            }
+        }
 
         let py_progs = PathBuf::from(&lad).join("Programs").join("Python");
         if let Ok(entries) = std::fs::read_dir(py_progs) {
@@ -310,27 +540,55 @@ fn check_streamlink_windows_locations() -> Option<PathBuf> {
     }
 
     if let Ok(up) = std::env::var("USERPROFILE") {
-        candidates.push(PathBuf::from(&up).join("scoop").join("apps").join("streamlink").join("current").join("bin").join("streamlink.exe"));
-        candidates.push(PathBuf::from(&up).join("scoop").join("apps").join("streamlink").join("current").join("streamlink.exe"));
+        candidates.push(
+            PathBuf::from(&up)
+                .join("scoop")
+                .join("apps")
+                .join("streamlink")
+                .join("current")
+                .join("bin")
+                .join("streamlink.exe"),
+        );
+        candidates.push(
+            PathBuf::from(&up)
+                .join("scoop")
+                .join("apps")
+                .join("streamlink")
+                .join("current")
+                .join("streamlink.exe"),
+        );
     }
-    candidates.push(PathBuf::from(r"C:\ProgramData\chocolatey\bin\streamlink.exe"));
+    candidates.push(PathBuf::from(
+        r"C:\ProgramData\chocolatey\bin\streamlink.exe",
+    ));
 
     for p in candidates {
-        if p.exists() {
-            if let Some(parent) = p.parent() { add_to_process_path(parent); }
+        if p.exists() && is_usable_streamlink(&p) {
+            if let Some(parent) = p.parent() {
+                add_to_process_path(parent);
+            }
             return Some(p);
         }
     }
 
     let mut where_cmd = std::process::Command::new("where.exe");
-    where_cmd.arg("streamlink.exe").stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null());
+    where_cmd
+        .arg("streamlink.exe")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
     where_cmd.creation_flags(CREATE_NO_WINDOW);
     if let Ok(output) = where_cmd.output() {
         if output.status.success() {
             for line in String::from_utf8_lossy(&output.stdout).lines() {
                 let p = PathBuf::from(line.trim());
-                if p.exists() && p.extension().map_or(false, |ext| ext.eq_ignore_ascii_case("exe")) {
-                    if let Some(parent) = p.parent() { add_to_process_path(parent); }
+                if p.exists()
+                    && p.extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+                    && is_usable_streamlink(&p)
+                {
+                    if let Some(parent) = p.parent() {
+                        add_to_process_path(parent);
+                    }
                     return Some(p);
                 }
             }
@@ -340,52 +598,182 @@ fn check_streamlink_windows_locations() -> Option<PathBuf> {
     None
 }
 
-pub fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
-    ensure_ffmpeg_path(); // Asegurar siempre que ffmpeg esté en el PATH antes de ejecutar streamlink
-
-    let target_triple = format!(
-        "{}-{}-{}",
-        std::env::consts::ARCH,
-        std::env::consts::OS,
-        if cfg!(target_os = "windows") { "windows-msvc" }
-        else if cfg!(target_os = "macos") { "apple-darwin" }
-        else { "linux-gnu" }
-    );
-    let sidecar_name = format!("streamlink-{}", target_triple);
-    let sidecar_exe = if cfg!(windows) { format!("{}.exe", sidecar_name) } else { sidecar_name };
-
-    if let Ok(resource_dir) = app.path().resource_dir() {
-        let sidecar_path = resource_dir.join("binaries").join(&sidecar_exe);
-        if sidecar_path.exists() {
-            return Ok(sidecar_path);
-        }
-        let sidecar_path2 = resource_dir.join(&sidecar_exe);
-        if sidecar_path2.exists() {
-            return Ok(sidecar_path2);
-        }
+/// Los launchers de Streamlink para Windows dependen de `Python\` y `pkgs\`
+/// junto a ellos. El sidecar histórico contiene únicamente el launcher, por
+/// lo que en una máquina limpia termina con stdout vacío. Validamos el
+/// ejecutable antes de usarlo.
+fn is_usable_streamlink(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
     }
 
     #[cfg(windows)]
     {
-        if let Some(path) = check_streamlink_windows_locations() {
-            return Ok(path);
+        let mut command = std::process::Command::new(path);
+        command
+            .arg("--version")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .creation_flags(CREATE_NO_WINDOW);
+
+        let Ok(output) = command.output() else {
+            return false;
+        };
+        if !output.status.success() {
+            return false;
         }
 
-        // Si no se encuentra, iniciamos instalación silenciosa de Streamlink y FFmpeg sin abrir consola
-        log::info!("Streamlink o FFmpeg ausentes. Ejecutando instalación silenciosa vía winget...");
-        let mut winget_sl = std::process::Command::new("winget");
-        winget_sl.args(["install", "Streamlink.Streamlink", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
-            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
-        winget_sl.creation_flags(CREATE_NO_WINDOW);
-        let _ = winget_sl.status();
+        let version = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        version.to_lowercase().contains("streamlink")
+    }
 
-        let mut winget_ff = std::process::Command::new("winget");
-        winget_ff.args(["install", "Gyan.FFmpeg", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
-            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
-        winget_ff.creation_flags(CREATE_NO_WINDOW);
-        let _ = winget_ff.status();
+    #[cfg(not(windows))]
+    {
+        true
+    }
+}
 
-        ensure_ffmpeg_path();
+pub fn find_bundled_streamlink(app: &AppHandle) -> Option<PathBuf> {
+    let resource_dir = app.path().resource_dir().ok();
+    let exe_dir = app.path().executable_dir().ok();
+    let expected_names = [
+        format!("streamlink-{STREAMLINK_TARGET_TRIPLE}.exe"),
+        format!("streamlinkw-{STREAMLINK_TARGET_TRIPLE}.exe"),
+        "streamlink.exe".to_string(),
+        "streamlinkw.exe".to_string(),
+    ];
+
+    let mut search_dirs = Vec::new();
+    if let Some(dir) = resource_dir {
+        search_dirs.push(dir.join("binaries"));
+        search_dirs.push(dir);
+    }
+    if let Some(dir) = exe_dir {
+        search_dirs.push(dir);
+    }
+
+    for dir in &search_dirs {
+        for name in &expected_names {
+            let path = dir.join(name);
+            if path.is_file() && is_usable_streamlink(&path) {
+                return Some(path);
+            }
+        }
+    }
+
+    // El bundler NSIS coloca externalBin junto al ejecutable instalado.
+    search_dirs.into_iter().find_map(|dir| {
+        let entries = std::fs::read_dir(dir).ok()?;
+        entries.flatten().map(|entry| entry.path()).find(|path| {
+            path.is_file()
+                && is_usable_streamlink(path)
+                && path.file_name().is_some_and(|name| {
+                    let value = name.to_string_lossy().to_lowercase();
+                    value.starts_with("streamlink") && value.ends_with(".exe")
+                })
+        })
+    })
+}
+
+pub fn ensure_runtime_dependencies(app: &AppHandle) -> Result<(), String> {
+    let bundled_streamlink = find_bundled_streamlink(app);
+    let system_streamlink = {
+        #[cfg(windows)]
+        {
+            check_streamlink_windows_locations()
+        }
+        #[cfg(target_os = "macos")]
+        {
+            [
+                "/opt/homebrew/bin/streamlink",
+                "/usr/local/bin/streamlink",
+                "/opt/local/bin/streamlink",
+            ]
+            .iter()
+            .map(PathBuf::from)
+            .find(|path| path.is_file())
+        }
+        #[cfg(target_os = "linux")]
+        {
+            [
+                "/usr/bin/streamlink",
+                "/usr/local/bin/streamlink",
+                "/opt/streamlink/bin/streamlink",
+            ]
+            .iter()
+            .map(PathBuf::from)
+            .find(|path| path.is_file())
+        }
+        #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+        {
+            None
+        }
+    };
+    let streamlink_ready = bundled_streamlink.is_some() || system_streamlink.is_some();
+
+    #[cfg(windows)]
+    {
+        let ffmpeg_ready = ensure_ffmpeg_path().is_some();
+        if !streamlink_ready {
+            log::info!("Streamlink no encontrado; instalando Streamlink.Streamlink con winget");
+            run_winget_install("Streamlink.Streamlink")?;
+        }
+        if !ffmpeg_ready {
+            log::info!("FFmpeg no encontrado; instalando Gyan.FFmpeg con winget");
+            run_winget_install("Gyan.FFmpeg")?;
+        }
+
+        let streamlink_path =
+            find_bundled_streamlink(app).or_else(check_streamlink_windows_locations);
+        if streamlink_path.is_none() {
+            return Err("Streamlink se instaló, pero streamlink.exe no fue localizado. Reinicia la aplicación para actualizar el PATH.".into());
+        }
+        if let Some(path) = streamlink_path {
+            log::info!("runtime: Streamlink listo en {}", path.display());
+        }
+
+        let ffmpeg_path = ensure_ffmpeg_path();
+        if ffmpeg_path.is_none() {
+            return Err("FFmpeg se instaló, pero ffmpeg.exe no fue localizado. Reinicia la aplicación para actualizar el PATH.".into());
+        }
+        if let Some(path) = ffmpeg_path {
+            log::info!("runtime: FFmpeg listo en {}", path.display());
+        }
+        Ok(())
+    }
+
+    #[cfg(not(windows))]
+    {
+        if !streamlink_ready {
+            return Err(format!(
+                "Streamlink no está instalado.\n\nInstálalo con: {}",
+                INSTALL_CMD
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[tauri::command]
+async fn ensure_stream_dependencies(app: AppHandle) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || ensure_runtime_dependencies(&app))
+        .await
+        .map_err(|e| format!("Error comprobando dependencias de streaming: {e}"))?
+}
+
+pub fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
+    ensure_runtime_dependencies(app)?;
+
+    if let Some(path) = find_bundled_streamlink(app) {
+        return Ok(path);
+    }
+
+    #[cfg(windows)]
+    {
         if let Some(path) = check_streamlink_windows_locations() {
             return Ok(path);
         }
@@ -394,11 +782,17 @@ pub fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
     #[cfg(target_os = "macos")]
     {
         let brew_path = PathBuf::from("/usr/local/bin/streamlink");
-        if brew_path.exists() { return Ok(brew_path); }
+        if brew_path.exists() {
+            return Ok(brew_path);
+        }
         let brew_arm_path = PathBuf::from("/opt/homebrew/bin/streamlink");
-        if brew_arm_path.exists() { return Ok(brew_arm_path); }
+        if brew_arm_path.exists() {
+            return Ok(brew_arm_path);
+        }
         let macports_path = PathBuf::from("/opt/local/bin/streamlink");
-        if macports_path.exists() { return Ok(macports_path); }
+        if macports_path.exists() {
+            return Ok(macports_path);
+        }
 
         let status = std::process::Command::new("brew")
             .args(["install", "streamlink"])
@@ -408,7 +802,9 @@ pub fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
         if let Ok(s) = status {
             if s.success() {
                 for p in ["/opt/homebrew/bin/streamlink", "/usr/local/bin/streamlink"] {
-                    if PathBuf::from(p).exists() { return Ok(PathBuf::from(p)); }
+                    if PathBuf::from(p).exists() {
+                        return Ok(PathBuf::from(p));
+                    }
                 }
             }
         }
@@ -416,12 +812,20 @@ pub fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
 
     #[cfg(target_os = "linux")]
     {
-        for p in ["/usr/bin/streamlink", "/usr/local/bin/streamlink", "/opt/streamlink/bin/streamlink"] {
-            if PathBuf::from(p).exists() { return Ok(PathBuf::from(p)); }
+        for p in [
+            "/usr/bin/streamlink",
+            "/usr/local/bin/streamlink",
+            "/opt/streamlink/bin/streamlink",
+        ] {
+            if PathBuf::from(p).exists() {
+                return Ok(PathBuf::from(p));
+            }
         }
     }
 
-    Err(format!("Streamlink no está instalado.\n\nInstálalo con: {}", INSTALL_CMD))
+    Err(format!(
+        "Streamlink no está instalado.\n\nInstálalo con: {INSTALL_CMD}"
+    ))
 }
 
 /// Ejecuta streamlink con un timeout configurable (en segundos).
@@ -451,12 +855,12 @@ fn run_streamlink_with_timeout(
     cmd.creation_flags(CREATE_NO_WINDOW);
 
     let mut child = cmd.spawn().map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                format!("Streamlink no está instalado.\n\nInstálalo con: {}", INSTALL_CMD)
-            } else {
-                format!("Error al ejecutar streamlink: {}", e)
-            }
-        })?;
+        if e.kind() == std::io::ErrorKind::NotFound {
+            format!("Streamlink no está instalado.\n\nInstálalo con: {INSTALL_CMD}")
+        } else {
+            format!("Error al ejecutar streamlink: {e}")
+        }
+    })?;
 
     // Leer pipes en hilos paralelos MIENTRAS el hijo se ejecuta
     // Esto evita el deadlock cuando streamlink produce mucha salida
@@ -487,7 +891,7 @@ fn run_streamlink_with_timeout(
     let timeout = Duration::from_secs(timeout_secs);
     let _status = match child
         .wait_timeout(timeout)
-        .map_err(|e| format!("Error esperando a streamlink: {}", e))?
+        .map_err(|e| format!("Error esperando a streamlink: {e}"))?
     {
         Some(status) => status,
         None => {
@@ -496,16 +900,16 @@ fn run_streamlink_with_timeout(
             // Unir hilos pendientes para evitar thread leak
             let _ = stdout_thread.join();
             let _ = stderr_thread.join();
-            return Err(
-                format!("Streamlink tardó más de {} segundos.", timeout_secs),
-            );
+            return Err(format!("Streamlink tardó más de {timeout_secs} segundos."));
         }
     };
 
     // Recoger resultados de los hilos
-    let stdout = stdout_thread.join()
+    let stdout = stdout_thread
+        .join()
         .map_err(|_| "Error interno leyendo stdout de streamlink".to_string())?;
-    let stderr = stderr_thread.join()
+    let stderr = stderr_thread
+        .join()
         .map_err(|_| "Error interno leyendo stderr de streamlink".to_string())?;
 
     Ok((stdout, stderr))
@@ -522,7 +926,11 @@ fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<(String, String), St
 // El Mutex RECORDING tambien vive ahora en recorder.rs (single source of truth).
 
 #[tauri::command]
-async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Result<String, String> {
+async fn get_stream_url(
+    app: AppHandle,
+    channel: String,
+    quality: String,
+) -> Result<String, String> {
     validate_channel(&channel)?;
     // FIX WT-20260628-88: Twitch HLS playlists devuelven 403 si la request
     // no lleva un token valido (puede ser de usuario o app). Orden de
@@ -560,9 +968,7 @@ async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Res
                 if let Some(t) = v.get("token").and_then(|x| x.as_str()) {
                     if !t.is_empty() {
                         resolved_token = Some(t.to_string());
-                        log::info!(
-                            "get_stream_url: usando app token (no user token en keychain)"
-                        );
+                        log::info!("get_stream_url: usando app token (no user token en keychain)");
                     }
                 }
             }
@@ -570,7 +976,7 @@ async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Res
                 // No es fatal: streamlink probara sin token. Logueamos
                 // para que el operador sepa por que volvio el 403 si
                 // vuelve.
-                log::warn!("get_stream_url: get_app_token fallo: {}", e);
+                log::warn!("get_stream_url: get_app_token fallo: {e}");
             }
         }
     }
@@ -590,7 +996,7 @@ async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Res
         if should_try_auth {
             log::info!("get_stream_url: Acceso público fallido o exclusivo. Reintentando con token de Twitch...");
             clean_args.push("--twitch-api-header".to_string());
-            clean_args.push(format!("Authorization=Bearer {}", token));
+            clean_args.push(format!("Authorization=Bearer {token}"));
             let arg_refs_auth: Vec<&str> = clean_args.iter().map(String::as_str).collect();
             res_sl = run_streamlink(&app, &arg_refs_auth);
         }
@@ -606,12 +1012,14 @@ async fn get_stream_url(app: AppHandle, channel: String, quality: String) -> Res
     // retornar un error explicito con sugerencia accionable.
     if url.starts_with("error:") {
         return Err(format!(
-            "Streamlink fallo: {}. Usa 'worst' o 'best' como quality para evitar este error (las qualities exactas como '480p' o '480p30' dependen del canal).",
-            url
+            "Streamlink fallo: {url}. Usa 'worst' o 'best' como quality para evitar este error (las qualities exactas como '480p' o '480p30' dependen del canal)."
         ));
     }
     if url.is_empty() {
-        return Err(format!("Streamlink no devolvió URL. stderr: {}", stderr.trim()));
+        return Err(format!(
+            "Streamlink no devolvió URL. stderr: {}",
+            stderr.trim()
+        ));
     }
     Ok(url)
 }
@@ -625,7 +1033,7 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
     // Primero obtenemos cualquier variante con best
     let (stdout, stderr) = run_streamlink(
         &app,
-        &[&format!("twitch.tv/{}", channel), "best", "--stream-url"],
+        &[&format!("twitch.tv/{channel}"), "best", "--stream-url"],
     )?;
     let variant_url = stdout.trim();
 
@@ -647,17 +1055,14 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
             let prefix = &variant_url[..last_slash];
             let suffix = &variant_url[last_slash + 1..];
             if suffix.ends_with(".m3u8") {
-                let master = format!("{}.m3u8", prefix);
+                let master = format!("{prefix}.m3u8");
                 return Ok(master);
             }
         }
     }
 
     // Si no podemos extraer el master, devolvemos la URL de la variante
-    log::warn!(
-        "get_master_playlist: formato inesperado, devolviendo variante: {}",
-        variant_url
-    );
+    log::warn!("get_master_playlist: formato inesperado, devolviendo variante: {variant_url}");
     Ok(variant_url.to_string())
 }
 
@@ -680,38 +1085,47 @@ async fn fetch_m3u8_content(url: String) -> Result<String, String> {
             && !url.contains("twitch.tv")
             && !url.contains("cloudfront.net"))
     {
-        return Err(format!("URL no permitida por seguridad: {}", url));
+        return Err(format!("URL no permitida por seguridad: {url}"));
     }
 
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         .timeout(Duration::from_secs(15))
         .build()
-        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
+        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
 
     let response = client
         .get(&url)
         .header("Client-ID", TWITCH_WEB_CLIENT_ID)
         .send()
         .await
-        .map_err(|e| format!("Error en fetch: {}", e))?;
+        .map_err(|e| format!("Error en fetch: {e}"))?;
 
     let status = response.status();
     if !status.is_success() {
-        return Err(format!("HTTP {}: {}", status, url));
+        return Err(format!("HTTP {status}: {url}"));
     }
 
     let text = response
         .text()
         .await
-        .map_err(|e| format!("Error leyendo respuesta: {}", e))?;
+        .map_err(|e| format!("Error leyendo respuesta: {e}"))?;
 
     log::info!("fetch_m3u8_content: OK ({} bytes, {})", text.len(), url);
     Ok(text)
 }
 
 const DEFAULT_QUALITIES: &[&str] = &[
-    "audio_only", "160p", "360p", "480p", "720p", "720p60", "936p60", "963p60", "1080p60", "1440p60",
+    "audio_only",
+    "160p",
+    "360p",
+    "480p",
+    "720p",
+    "720p60",
+    "936p60",
+    "963p60",
+    "1080p60",
+    "1440p60",
 ];
 
 /// Devuelve las calidades disponibles para un canal.
@@ -729,7 +1143,7 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
     let defaults: Vec<String> = DEFAULT_QUALITIES.iter().map(|&s| s.to_string()).collect();
 
     if let Err(e) = validate_channel(&channel) {
-        log::error!("get_available_qualities: validate_channel error: {}", e);
+        log::error!("get_available_qualities: validate_channel error: {e}");
         return defaults;
     }
 
@@ -743,7 +1157,7 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
         // un minuto entero si algo está mal.
         run_streamlink_with_timeout(
             &app,
-            &[&format!("twitch.tv/{}", channel_for_blocking), "--stream-url"],
+            &[&format!("twitch.tv/{channel_for_blocking}"), "--stream-url"],
             15,
         )
     })
@@ -752,7 +1166,7 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
     let run_result = match join_result {
         Ok(r) => r,
         Err(e) => {
-            log::error!("get_available_qualities: spawn_blocking join error: {}", e);
+            log::error!("get_available_qualities: spawn_blocking join error: {e}");
             return defaults;
         }
     };
@@ -792,7 +1206,7 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
             }
         }
         Err(e) => {
-            log::error!("get_available_qualities: streamlink error: {}", e);
+            log::error!("get_available_qualities: streamlink error: {e}");
             defaults
         }
     }
@@ -807,8 +1221,8 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
         .build()
-        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
-    
+        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
+
     // El slug viaja como variable GraphQL ($slug), nunca como string
     // interpolado. Así un slug con `"` o `\` no puede romper la query.
     let body = serde_json::json!({
@@ -822,10 +1236,13 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("HTTP error: {}", e))?;
+        .map_err(|e| format!("HTTP error: {e}"))?;
 
     let status = response.status();
-    let text = response.text().await.map_err(|e| format!("Read error: {}", e))?;
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("Read error: {e}"))?;
 
     if !status.is_success() {
         // S-6: NO exponer el cuerpo HTTP al frontend. Log internamente
@@ -860,34 +1277,42 @@ async fn get_twitch_clip_url(slug: String) -> Result<String, String> {
         );
         return Err("Twitch API: clip no encontrado".to_string());
     };
-    
-    let source_url = clip.get("videoQualities")
+
+    let source_url = clip
+        .get("videoQualities")
         .and_then(|q| q.as_array())
         .and_then(|a| a.first())
         .and_then(|q| q.get("sourceURL"))
         .and_then(|u| u.as_str())
         .unwrap_or("");
-    
-    let token = clip.get("playbackAccessToken")
+
+    let token = clip
+        .get("playbackAccessToken")
         .and_then(|t| t.get("value"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    
-    let sig = clip.get("playbackAccessToken")
+
+    let sig = clip
+        .get("playbackAccessToken")
         .and_then(|t| t.get("signature"))
         .and_then(|s| s.as_str())
         .unwrap_or("");
 
     if source_url.is_empty() || token.is_empty() || sig.is_empty() {
-        return Err(format!("Missing data. URL:{}, Token:{}, Sig:{}", 
-            if source_url.is_empty() { "MISSING" } else { "OK" },
+        return Err(format!(
+            "Missing data. URL:{}, Token:{}, Sig:{}",
+            if source_url.is_empty() {
+                "MISSING"
+            } else {
+                "OK"
+            },
             if token.is_empty() { "MISSING" } else { "OK" },
             if sig.is_empty() { "MISSING" } else { "OK" }
         ));
     }
 
     let encoded = urlencoding::encode(token);
-    Ok(format!("{}?token={}&sig={}", source_url, encoded, sig))
+    Ok(format!("{source_url}?token={encoded}&sig={sig}"))
 }
 
 #[tauri::command]
@@ -899,7 +1324,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
         .build()
-        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
+        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
 
     // El VOD ID viaja como variable GraphQL ($id), nunca como string
     // interpolado. Validamos formato numérico en validate_vod_id().
@@ -914,9 +1339,9 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("HTTP: {}", e))?;
+        .map_err(|e| format!("HTTP: {e}"))?;
 
-    let text = response.text().await.map_err(|e| format!("Read: {}", e))?;
+    let text = response.text().await.map_err(|e| format!("Read: {e}"))?;
     // S-6: log interno con detalle, mensaje genérico al frontend.
     let json_res: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
         log::error!(
@@ -928,7 +1353,9 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
         "Twitch API: respuesta inválida".to_string()
     })?;
 
-    let video = json_res.get("data").and_then(|d| d.get("video"))
+    let video = json_res
+        .get("data")
+        .and_then(|d| d.get("video"))
         .ok_or_else(|| {
             // S-6: cuerpo puede contener HTML de error o info sensible;
             // nunca exponer al frontend.
@@ -940,10 +1367,16 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
             "Twitch API: video no encontrado".to_string()
         })?;
 
-    let token = video.get("playbackAccessToken").and_then(|t| t.get("value")).and_then(|v| v.as_str())
+    let token = video
+        .get("playbackAccessToken")
+        .and_then(|t| t.get("value"))
+        .and_then(|v| v.as_str())
         .ok_or("No token")?;
 
-    let sig = video.get("playbackAccessToken").and_then(|t| t.get("signature")).and_then(|s| s.as_str())
+    let sig = video
+        .get("playbackAccessToken")
+        .and_then(|t| t.get("signature"))
+        .and_then(|s| s.as_str())
         .ok_or("No sig")?;
 
     if token.is_empty() || sig.is_empty() {
@@ -952,8 +1385,7 @@ async fn get_vod_manifest_url(vod_id: String) -> Result<String, String> {
 
     let encoded = urlencoding::encode(token);
     Ok(format!(
-        "https://usher.ttvnw.net/vod/{}.m3u8?nauth={}&nauthsig={}&allow_source=true&allow_audio_only=true",
-        vod_id, encoded, sig
+        "https://usher.ttvnw.net/vod/{vod_id}.m3u8?nauth={encoded}&nauthsig={sig}&allow_source=true&allow_audio_only=true"
     ))
 }
 
@@ -968,7 +1400,7 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
         .build()
-        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
+        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
 
     // ── Step 1: Obtener access token vía GraphQL de Twitch ──
     // El channel viaja como variable GraphQL ($channelName) — ya validado
@@ -985,16 +1417,19 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .json(&gql_body)
         .send()
         .await
-        .map_err(|e| format!("Error conectando con Twitch GQL: {}", e))?;
+        .map_err(|e| format!("Error conectando con Twitch GQL: {e}"))?;
 
     if !gql_res.status().is_success() {
-        return Err(format!("Twitch GQL respondió con HTTP {}", gql_res.status()));
+        return Err(format!(
+            "Twitch GQL respondió con HTTP {}",
+            gql_res.status()
+        ));
     }
 
     let gql_data: serde_json::Value = gql_res
         .json()
         .await
-        .map_err(|e| format!("Error parseando respuesta GQL: {}", e))?;
+        .map_err(|e| format!("Error parseando respuesta GQL: {e}"))?;
 
     let token = gql_data["data"]["streamPlaybackAccessToken"]["value"]
         .as_str()
@@ -1024,10 +1459,13 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
         .header("Client-Id", TWITCH_WEB_CLIENT_ID)
         .send()
         .await
-        .map_err(|e| format!("Error conectando con Twitch Usher: {}", e))?;
+        .map_err(|e| format!("Error conectando con Twitch Usher: {e}"))?;
 
     if !usher_res.status().is_success() {
-        return Err(format!("Twitch Usher respondió con HTTP {}", usher_res.status()));
+        return Err(format!(
+            "Twitch Usher respondió con HTTP {}",
+            usher_res.status()
+        ));
     }
 
     // Devolver la URL final (después de redirecciones)
@@ -1038,30 +1476,35 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
 /// Servicio: "blinkstream", cuenta: el key proporcionado.
 #[tauri::command]
 async fn store_secret(key: String, value: String) -> Result<(), String> {
-    let entry = Entry::new("blinkstream", &key).map_err(|e| format!("Error creando entrada keychain: {}", e))?;
-    entry.set_password(&value).map_err(|e| format!("Error guardando en keychain: {}", e))
+    let entry = Entry::new("blinkstream", &key)
+        .map_err(|e| format!("Error creando entrada keychain: {e}"))?;
+    entry
+        .set_password(&value)
+        .map_err(|e| format!("Error guardando en keychain: {e}"))
 }
 
 /// Recupera un secreto del keychain del SO.
 /// Devuelve vacío si no existe.
 #[tauri::command]
 async fn get_secret(key: String) -> Result<String, String> {
-    let entry = Entry::new("blinkstream", &key).map_err(|e| format!("Error creando entrada keychain: {}", e))?;
+    let entry = Entry::new("blinkstream", &key)
+        .map_err(|e| format!("Error creando entrada keychain: {e}"))?;
     match entry.get_password() {
         Ok(password) => Ok(password),
         Err(keyring::Error::NoEntry) => Ok(String::new()),
-        Err(e) => Err(format!("Error leyendo keychain: {}", e)),
+        Err(e) => Err(format!("Error leyendo keychain: {e}")),
     }
 }
 
 /// Elimina un secreto del keychain del SO.
 #[tauri::command]
 async fn delete_secret(key: String) -> Result<(), String> {
-    let entry = Entry::new("blinkstream", &key).map_err(|e| format!("Error creando entrada keychain: {}", e))?;
+    let entry = Entry::new("blinkstream", &key)
+        .map_err(|e| format!("Error creando entrada keychain: {e}"))?;
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(format!("Error eliminando del keychain: {}", e)),
+        Err(e) => Err(format!("Error eliminando del keychain: {e}")),
     }
 }
 
@@ -1086,10 +1529,9 @@ async fn delete_secret(key: String) -> Result<(), String> {
 // tiene fallback posible por seguridad.
 // ============================================================
 
-const TWITCH_APP_CLIENT_SECRET: &str = match option_env!("TWITCH_APP_CLIENT_SECRET") {
-    Some(s) if !s.is_empty() => s,
-    _ => "",
-};
+fn twitch_app_client_secret() -> Option<&'static str> {
+    option_env!("TWITCH_APP_CLIENT_SECRET").filter(|secret| !secret.is_empty())
+}
 
 // Aviso de una sola vez por sesion del proceso: si no hay secret
 // configurado, lo loggeamos para que el operador sepa por que
@@ -1097,7 +1539,7 @@ const TWITCH_APP_CLIENT_SECRET: &str = match option_env!("TWITCH_APP_CLIENT_SECR
 static APP_TOKEN_MISCONFIG_WARN: std::sync::Once = std::sync::Once::new();
 
 fn warn_missing_app_secret_once() {
-    if !TWITCH_APP_CLIENT_SECRET.is_empty() {
+    if twitch_app_client_secret().is_some() {
         return;
     }
     APP_TOKEN_MISCONFIG_WARN.call_once(|| {
@@ -1125,16 +1567,16 @@ fn app_token_cache() -> &'static AppTokenCache {
 async fn get_app_token() -> Result<serde_json::Value, String> {
     warn_missing_app_secret_once();
 
-    if TWITCH_APP_CLIENT_SECRET.is_empty() {
-        return Err(
-            "TWITCH_APP_CLIENT_SECRET no configurado. Define la variable de entorno en build-time."
-                .into(),
-        );
-    }
+    let client_secret = twitch_app_client_secret().ok_or_else(|| {
+        "TWITCH_APP_CLIENT_SECRET no configurado. Define la variable de entorno en build-time."
+            .to_string()
+    })?;
 
     // 1) Cache: si tenemos uno valido, lo devolvemos sin red.
     {
-        let cache = app_token_cache().lock().map_err(|e| format!("Lock poisoned: {}", e))?;
+        let cache = app_token_cache()
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         if let Some((token, expires_at)) = cache.as_ref() {
             if *expires_at > Instant::now() {
                 // Devolvemos el token + expiresAt en ms epoch para
@@ -1143,7 +1585,9 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_millis() as u64;
-                let ttl_ms = expires_at.saturating_duration_since(Instant::now()).as_millis() as u64;
+                let ttl_ms = expires_at
+                    .saturating_duration_since(Instant::now())
+                    .as_millis() as u64;
                 return Ok(serde_json::json!({
                     "token": token,
                     "expiresAt": now + ttl_ms,
@@ -1157,21 +1601,24 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
         .timeout(Duration::from_secs(10))
         .connect_timeout(Duration::from_secs(5))
         .build()
-        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
+        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
 
     let res = client
         .post("https://id.twitch.tv/oauth2/token")
         .query(&[
             ("client_id", TWITCH_APP_CLIENT_ID),
-            ("client_secret", TWITCH_APP_CLIENT_SECRET),
+            ("client_secret", client_secret),
             ("grant_type", "client_credentials"),
         ])
         .send()
         .await
-        .map_err(|e| format!("Error conectando con Twitch OAuth: {}", e))?;
+        .map_err(|e| format!("Error conectando con Twitch OAuth: {e}"))?;
 
     let status = res.status();
-    let text = res.text().await.map_err(|e| format!("Error leyendo respuesta: {}", e))?;
+    let text = res
+        .text()
+        .await
+        .map_err(|e| format!("Error leyendo respuesta: {e}"))?;
 
     if !status.is_success() {
         // S-6: log interno con codigo de estado, mensaje generico al
@@ -1186,7 +1633,11 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
     }
 
     let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
-        log::error!("Twitch OAuth JSON parse error: err={} body_len={}", e, text.len());
+        log::error!(
+            "Twitch OAuth JSON parse error: err={} body_len={}",
+            e,
+            text.len()
+        );
         "Twitch OAuth: respuesta invalida".to_string()
     })?;
 
@@ -1202,10 +1653,15 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
 
     // Cache: TTL = expires_in - 60s para evitar edge cases. Si
     // expires_in es 0 o absurdo, no cacheamos (pedimos de nuevo).
-    let safe_ttl = if expires_in_secs > 60 { expires_in_secs - 60 } else { 0 };
+    let safe_ttl = expires_in_secs.saturating_sub(60);
     if safe_ttl > 0 {
-        let mut cache = app_token_cache().lock().map_err(|e| format!("Lock poisoned: {}", e))?;
-        *cache = Some((token.clone(), Instant::now() + Duration::from_secs(safe_ttl)));
+        let mut cache = app_token_cache()
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
+        *cache = Some((
+            token.clone(),
+            Instant::now() + Duration::from_secs(safe_ttl),
+        ));
     }
 
     // Devolvemos expiresAt como ms epoch (mismo formato que el
@@ -1227,23 +1683,16 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
-        // FIX WT-20260628-77: DevTools se habilitan via la feature flag
-        // "devtools" en el crate `tauri` (ver Cargo.toml). NO se
-        // inicializa aqui como `.plugin(...)` porque en Tauri 2.x no
-        // existe el crate separado `tauri-plugin-devtools`; los DevTools
-        // son built-in y se activan automaticamente cuando la feature
-        // esta presente y `tauri.conf.json -> build.devtools = true`.
         .invoke_handler(tauri::generate_handler![
             store_secret,
             get_secret,
             delete_secret,
             get_stream_url,
+            ensure_stream_dependencies,
             get_available_qualities,
             get_direct_stream_url,
             get_master_playlist,
@@ -1258,12 +1707,6 @@ pub fn run() {
             recorder::recorder_get_global_state,
             recorder::recorder_list_active,
             recorder::recorder_get_full_state,
-            // Comandos IPC del Instalador/Bootstrapper
-            installer::get_bootstrapper_mode,
-            installer::get_default_install_dir,
-            installer::install_blinkstream_custom,
-            installer::launch_installed_app_and_exit,
-            installer::uninstall_blinkstream_custom,
             // Mando a Distancia Wi-Fi Móvil (Companion Remote)
             companion::get_companion_status,
             companion::start_companion_server_cmd,
@@ -1273,21 +1716,8 @@ pub fn run() {
         .setup(|app| {
             let mut labels_to_close = Vec::new();
             warn_legacy_client_id_once();
-            companion::init_and_start_companion_server(app.handle().clone());
-
-            // Configurar ventana modal de 768x580px en caso de arrancar en modo instalador o desinstalador
-            if let Some(main_win) = app.get_webview_window("main") {
-                let mode = installer::detect_bootstrapper_mode();
-                if mode == "installer" || mode == "uninstaller" {
-                    let size = tauri::PhysicalSize::new(768, 580);
-                    let _ = main_win.set_min_size(Some(size));
-                    let _ = main_win.set_size(size);
-                    let _ = main_win.set_max_size(Some(size));
-                    let _ = main_win.set_resizable(false);
-                    let _ = main_win.center();
-                    let title = if mode == "installer" { "BlinkStream Setup" } else { "Desinstalar BlinkStream" };
-                    let _ = main_win.set_title(title);
-                }
+            if let Err(error) = companion::init_and_start_companion_server(app.handle().clone()) {
+                log::error!("[Companion] No se pudo iniciar el servidor: {error}");
             }
 
             // G1 / WT-20260628-16: carga el estado global de grabacion
@@ -1308,7 +1738,11 @@ pub fn run() {
 
             app.handle().plugin(
                 tauri_plugin_log::Builder::default()
-                    .level(if cfg!(debug_assertions) { log::LevelFilter::Info } else { log::LevelFilter::Warn })
+                    .level(if cfg!(debug_assertions) {
+                        log::LevelFilter::Info
+                    } else {
+                        log::LevelFilter::Warn
+                    })
                     .build(),
             )?;
             Ok(())
@@ -1453,14 +1887,13 @@ mod tests {
         // el command debe devolver un error claro (no panic, no
         // token invalido). Solo testeable cuando el secret esta
         // vacio en la build de test (que es lo normal en CI).
-        if TWITCH_APP_CLIENT_SECRET.is_empty() {
+        if twitch_app_client_secret().is_none() {
             let res = get_app_token().await;
             assert!(res.is_err(), "get_app_token sin secret debe devolver Err");
             let err = res.unwrap_err();
             assert!(
                 err.contains("TWITCH_APP_CLIENT_SECRET"),
-                "el error debe mencionar la variable faltante, got: {}",
-                err
+                "el error debe mencionar la variable faltante, got: {err}"
             );
         }
         // Si el secret SI esta configurado (build local con .env),

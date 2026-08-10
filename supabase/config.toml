@@ -413,7 +413,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # verificar firma contra JWKS (defensa en profundidad).
 [functions.blinkstream-data]
 verify_jwt = true
-import_map = "./supabase/functions/blinkstream-data/deno.json"
+import_map = "./functions/blinkstream-data/deno.json"
 
 [functions.twitch-auth]
 verify_jwt = false  # callback OAuth de Twitch: no envia JWT

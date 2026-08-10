@@ -2,7 +2,7 @@
 // F-1 fix: ademas del access_token de Twitch, emite un JWT de Supabase
 // firmado por el service role. Este JWT lo valida blinkstream-data con
 // supabase.auth.getUser() (P0-2 hardening). El username viaja en
-// user_metadata.username para que blinkstream-data pueda compararlo con
+// app_metadata.username para que blinkstream-data pueda compararlo con
 // el body/query (lineas 142-145 y 312 de su index.ts).
 //
 // Endpoints:
@@ -76,7 +76,7 @@ const supabaseAdmin = SUPABASE_URL && SERVICE_ROLE_KEY
 //   1. Solo emitimos tokens a usuarios que YA autenticaron con Twitch
 //      (probado por el code+state del callback de Twitch).
 //   2. La password random nunca sale del server ni se reutiliza.
-//   3. El user resultante tiene user_metadata.username = twitch login,
+//   3. El user resultante tiene app_metadata.username = twitch login,
 //      que es exactamente lo que blinkstream-data espera comparar.
 //
 // Si SUPABASE_URL o SERVICE_ROLE_KEY faltan, supabaseAdmin es null y la
@@ -101,7 +101,8 @@ async function issueSupabaseSession(twitchLogin: string): Promise<SupabaseSessio
       email,
       password: randomPwd,
       email_confirm: true,
-      user_metadata: { username: twitchLogin, provider: "twitch" },
+      app_metadata: { username: twitchLogin.toLowerCase(), provider: "twitch" },
+      user_metadata: { username: twitchLogin.toLowerCase(), provider: "twitch" },
     });
 
     if (createErr) {
@@ -125,7 +126,11 @@ async function issueSupabaseSession(twitchLogin: string): Promise<SupabaseSessio
       if (existing) {
         const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
           existing.id,
-          { password: randomPwd, user_metadata: { username: twitchLogin, provider: "twitch" } },
+          {
+            password: randomPwd,
+            app_metadata: { username: twitchLogin.toLowerCase(), provider: "twitch" },
+            user_metadata: { username: twitchLogin.toLowerCase(), provider: "twitch" },
+          },
         );
         if (updateErr) {
           console.error("issueSupabaseSession update error:", updateErr.message);
