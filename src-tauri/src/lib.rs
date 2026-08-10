@@ -1009,25 +1009,32 @@ async fn get_stream_url(
         }
     }
 
-    // Intentar primero SIN token de autenticaicón (acceso público limpio) para que Streamlink utilice su cliente web nativo.
-    // Esto evita que Twitch Usher restrinja la playlist m3u8 con cabeceras que provocan errores HTTP 403 al cargarse desde WebView2/HLS.
-    let mut clean_args = args.clone();
-    let arg_refs_clean: Vec<&str> = clean_args.iter().map(String::as_str).collect();
-    let mut res_sl = run_streamlink(&app, &arg_refs_clean);
+    // Intentar primero CON el token de autenticación (si existe) para que Twitch reconozca la suscripción y evite enviar anuncios (que Streamlink bloquea dejando la pantalla en negro).
+    let mut auth_args = args.clone();
+    let mut res_sl = if let Some(token) = resolved_token {
+        auth_args.push("--twitch-api-header".to_string());
+        auth_args.push(format!("Authorization=Bearer {token}"));
+        let arg_refs_auth: Vec<&str> = auth_args.iter().map(String::as_str).collect();
+        run_streamlink(&app, &arg_refs_auth)
+    } else {
+        // Fallback forzado para inicializar un Err sintético si no hay token
+        Err("No hay token disponible".to_string())
+    };
 
-    // Si el acceso público falla (por ejemplo, streams exclusivos para suscriptores), intentamos con el token Bearer
-    if let Some(token) = resolved_token {
-        let should_try_auth = match &res_sl {
-            Err(_) => true,
-            Ok((stdout, _)) => stdout.trim().starts_with("error:") || stdout.trim().is_empty(),
-        };
-        if should_try_auth {
-            log::info!("get_stream_url: Acceso público fallido o exclusivo. Reintentando con token de Twitch...");
-            clean_args.push("--twitch-api-header".to_string());
-            clean_args.push(format!("Authorization=Bearer {token}"));
-            let arg_refs_auth: Vec<&str> = clean_args.iter().map(String::as_str).collect();
-            res_sl = run_streamlink(&app, &arg_refs_auth);
+    // Si el acceso autenticado falla (por token expirado o 403), o si no había token, intentamos de forma anónima
+    let should_try_clean = match &res_sl {
+        Err(_) => true,
+        Ok((stdout, _)) => stdout.trim().starts_with("error:") || stdout.trim().is_empty(),
+    };
+
+    if should_try_clean {
+        if auth_args.len() > args.len() {
+            log::info!("get_stream_url: Fallo con token (posiblemente expirado). Reintentando de forma anónima...");
+        } else {
+            log::info!("get_stream_url: Acceso anónimo (no hay token)...");
         }
+        let arg_refs_clean: Vec<&str> = args.iter().map(String::as_str).collect();
+        res_sl = run_streamlink(&app, &arg_refs_clean);
     }
 
     let (stdout, stderr) = res_sl?;
