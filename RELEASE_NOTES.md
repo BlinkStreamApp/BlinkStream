@@ -1,8 +1,8 @@
-## 🚀 What's New in Version 1.3.1 (Hotfix & The Immersion Update)
+## 🚀 What's New in Version 1.3.2 (Hotfix & The Immersion Update)
 
 A targeted Hotfix release addressing UI/UX improvements, resolution selector additions, and critical component fixes, building on top of our monumental Immersion & Command Center Update!
 
-### 🔧 v1.3.1 Hotfix & Bug Fixes
+### 🔧 v1.3.2 Hotfix & Bug Fixes
 - **OAuth & Helix Authentication Loop Fix:** Engineered a robust dynamic OAuth Client ID auto-discovery mechanism (`getHelixClientId`) utilizing Twitch's official token validation endpoint. This eliminates false-positive HTTP 401 errors during session validation and permanently prevents automatic session logouts when launching standalone build binaries.
 - **Channel Points Redeem Modal Z-Index Fix:** Resolved an issue where reward redemption modals appeared blurred or behind side panels by elevating modal layer stacking (`z-[999999]`) across `RedeemModal.jsx`, `RewardForm.jsx`, and `ActionModal.jsx`.
 - **Expanded Pro Resolution Support:** Added official native dropdown support for modern high-bitrate streaming resolutions including **1440p60 (2K)**, **963p60**, and **936p60**. Relocated and integrated the Quality Selector directly inside the Player Settings menu.
@@ -24,10 +24,10 @@ A targeted Hotfix release addressing UI/UX improvements, resolution selector add
 - **OTA Auto-Updater Ready:** Configured with secure cryptographic signature verification via `updater.json` for background over-the-air updates.
 
 ### 💾 Available Downloads
-- ⭐ **`BlinkStream-Setup_1.3.1_Custom.exe`** *(Recommended — 100% Custom Twitch-themed bootstrapper setup with Custom Directory Selector)*
-- **`BlinkStream_1.3.1_Win_x64.exe`** *(Standard silent NSIS setup)*
-- **`BlinkStream_1.3.1_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
-- **`BlinkStream_1.3.1_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
-- **`BlinkStream_1.3.1_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
-- **`BlinkStream_1.3.1_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
-- **`BlinkStream_1.3.1_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*
+- ⭐ **`BlinkStream-Setup_1.3.2_Custom.exe`** *(Recommended — 100% Custom Twitch-themed bootstrapper setup with Custom Directory Selector)*
+- **`BlinkStream_1.3.2_Win_x64.exe`** *(Standard silent NSIS setup)*
+- **`BlinkStream_1.3.2_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
+- **`BlinkStream_1.3.2_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
+- **`BlinkStream_1.3.2_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
+- **`BlinkStream_1.3.2_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
+- **`BlinkStream_1.3.2_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*

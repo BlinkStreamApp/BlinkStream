@@ -132,7 +132,13 @@ jobs:
           test -n "$DEB" && test -n "$APPIMAGE"
 
           mv "$DEB" "$BUNDLE/deb/BlinkStream_${VERSION}_Linux_x86_64.deb"
+          if [ -f "$DEB.sig" ]; then
+            mv "$DEB.sig" "$BUNDLE/deb/BlinkStream_${VERSION}_Linux_x86_64.deb.sig"
+          fi
           mv "$APPIMAGE" "$BUNDLE/appimage/BlinkStream_${VERSION}_Linux_x86_64.AppImage"
+          if [ -f "$APPIMAGE.sig" ]; then
+            mv "$APPIMAGE.sig" "$BUNDLE/appimage/BlinkStream_${VERSION}_Linux_x86_64.AppImage.sig"
+          fi
           if [ -n "$UPDATER" ]; then
             mv "$UPDATER" "$BUNDLE/appimage/BlinkStream_${VERSION}_Linux_x86_64.AppImage.tar.gz"
             if [ -f "$UPDATER.sig" ]; then
@@ -182,8 +188,17 @@ jobs:
           if (-not (Test-Path "$($nsis[0].FullName).sig")) { throw "Missing NSIS updater signature" }
 
           Rename-Item -LiteralPath $msi[0].FullName -NewName "BlinkStream_${version}_Win_x64.msi"
+          if (Test-Path "$($msi[0].FullName).sig") {
+            Rename-Item -LiteralPath "$($msi[0].FullName).sig" -NewName "BlinkStream_${version}_Win_x64.msi.sig"
+          }
           Rename-Item -LiteralPath $nsis[0].FullName -NewName "BlinkStream_${version}_Win_x64.exe"
-          Rename-Item -LiteralPath "$($nsis[0].FullName).sig" -NewName "BlinkStream_${version}_Win_x64.exe.sig"
+          if (Test-Path "$($nsis[0].FullName).sig") {
+            Rename-Item -LiteralPath "$($nsis[0].FullName).sig" -NewName "BlinkStream_${version}_Win_x64.exe.sig"
+          }
+
+          if (Test-Path "src-tauri/target/${{ matrix.target }}/release/blinkstream.exe") {
+            Copy-Item "src-tauri/target/${{ matrix.target }}/release/blinkstream.exe" -Destination "$bundle/nsis/BlinkStream-Setup_${version}_Custom.exe"
+          }
 
       - name: Upload Linux artifacts
         if: runner.os == 'Linux'
