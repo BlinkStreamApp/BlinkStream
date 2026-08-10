@@ -596,9 +596,7 @@ fn is_usable_streamlink(path: &Path) -> bool {
 
         let is_valid = version.to_lowercase().contains("streamlink");
         if !is_valid {
-            log::error!(
-                "is_usable_streamlink: {path:?} devolvió output inválido: {version}"
-            );
+            log::error!("is_usable_streamlink: {path:?} devolvió output inválido: {version}");
         }
         is_valid
     }
