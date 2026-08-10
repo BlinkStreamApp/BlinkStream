@@ -25,10 +25,8 @@ function findFile(root, expectedName) {
     }
   }
   visit(root)
-  if (matches.length !== 1) {
-    throw new Error(`Se esperaba una firma ${expectedName}; encontradas: ${matches.length}`)
-  }
-  return matches[0]
+  if (matches.length === 1) return matches[0]
+  return null
 }
 
 export function buildUpdaterManifest({ version, repository, tag, artifactsDir, notesFile }) {
@@ -53,12 +51,20 @@ export function buildUpdaterManifest({ version, repository, tag, artifactsDir, n
 
   for (const [platform, artifactName] of Object.entries(specs)) {
     const signaturePath = findFile(artifactsDir, `${artifactName}.sig`)
+    if (!signaturePath) {
+      console.warn(`Firma no encontrada para ${platform} (${artifactName}.sig), omitiendo plataforma`)
+      continue
+    }
     const signature = readFileSync(signaturePath, 'utf8').trim()
     if (!signature) throw new Error(`Firma vacía: ${basename(signaturePath)}`)
     platforms[platform] = {
       signature,
       url: `${baseUrl}/${artifactName}`,
     }
+  }
+
+  if (Object.keys(platforms).length === 0) {
+    throw new Error('No se encontró ninguna firma para ninguna plataforma')
   }
 
   const notes = existsSync(notesFile)

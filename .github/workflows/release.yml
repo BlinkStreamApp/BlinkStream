@@ -249,7 +249,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: signatures-${{ matrix.artifact }}
-          if-no-files-found: error
+          if-no-files-found: warn
           path: src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
 
   release:
