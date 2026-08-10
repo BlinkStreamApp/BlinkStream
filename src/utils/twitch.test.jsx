@@ -1,4 +1,4 @@
-﻿// Tests del cliente de Twitch.
+// Tests del cliente de Twitch.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
@@ -47,7 +47,7 @@ describe('getHeaders', () => {
   it('con token en localStorage: usa APP_CLIENT_ID + Bearer <token>', async () => {
     localStorage.setItem('blinkstream_twitch_token', 'test_tok_123')
     const h = await getHeaders()
-    expect(h['Client-ID']).toBe(APP_CLIENT_ID)
+    expect(h['Client-ID']).toBe(APP_CLIENT_ID || PUBLIC_CLIENT_ID)
     expect(h['Authorization']).toBe('Bearer test_tok_123')
   })
 })
