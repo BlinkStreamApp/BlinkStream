@@ -63,7 +63,7 @@ jobs:
         run: node supabase/functions/twitch-auth/_security-test.mjs
 
       - name: Edge Function tests
-        run: deno test --allow-env --allow-read --allow-net supabase/functions/twitch-auth/index.test.ts supabase/functions/blinkstream-data/index.test.ts
+        run: deno test --node-modules-dir=auto --allow-env --allow-read --allow-net supabase/functions/twitch-auth/index.test.ts supabase/functions/blinkstream-data/index.test.ts
 
   build:
     needs: quality
