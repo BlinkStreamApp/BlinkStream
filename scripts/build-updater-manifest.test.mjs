@@ -11,7 +11,7 @@ const ARTIFACTS = [
   `BlinkStream_${VERSION}_Win_x64.exe`,
   `BlinkStream_${VERSION}_macOS_arm64.app.tar.gz`,
   `BlinkStream_${VERSION}_macOS_x64.app.tar.gz`,
-  `BlinkStream_${VERSION}_Linux_x86_64.AppImage.tar.gz`,
+  `BlinkStream_${VERSION}_Linux_x86_64.AppImage`,
 ]
 
 function fixture() {
@@ -40,7 +40,7 @@ test('genera un manifiesto completo con firmas multilínea', () => {
     assert.match(manifest.platforms['windows-x86_64'].signature, /second-line/)
     assert.equal(
       manifest.platforms['linux-x86_64'].url,
-      `https://github.com/BlinkStreamApp/BlinkStream/releases/download/v${VERSION}/BlinkStream_${VERSION}_Linux_x86_64.AppImage.tar.gz`,
+      `https://github.com/BlinkStreamApp/BlinkStream/releases/download/v${VERSION}/BlinkStream_${VERSION}_Linux_x86_64.AppImage`,
     )
     assert.match(manifest.notes, /Correcciones importantes/)
   } finally {

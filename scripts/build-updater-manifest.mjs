@@ -44,7 +44,7 @@ export function buildUpdaterManifest({ version, repository, tag, artifactsDir, n
     'windows-x86_64': `BlinkStream_${version}_Win_x64.exe`,
     'darwin-aarch64': `BlinkStream_${version}_macOS_arm64.app.tar.gz`,
     'darwin-x86_64': `BlinkStream_${version}_macOS_x64.app.tar.gz`,
-    'linux-x86_64': `BlinkStream_${version}_Linux_x86_64.AppImage.tar.gz`,
+    'linux-x86_64': `BlinkStream_${version}_Linux_x86_64.AppImage`,
   }
   const baseUrl = `https://github.com/${repository}/releases/download/${tag}`
   const platforms = {}
