@@ -48,10 +48,30 @@ test('genera un manifiesto completo con firmas multilínea', () => {
   }
 })
 
-test('falla si falta una firma requerida', () => {
+test('omite plataforma si falta su firma', () => {
   const { root, notesFile } = fixture()
   try {
     rmSync(join(root, 'signatures', 'nested', `${ARTIFACTS[0]}.sig`))
+    const manifest = buildUpdaterManifest({
+      version: VERSION,
+      repository: 'BlinkStreamApp/BlinkStream',
+      tag: `v${VERSION}`,
+      artifactsDir: root,
+      notesFile,
+    })
+    assert.equal(Object.keys(manifest.platforms).length, 3)
+    assert.equal(manifest.platforms['windows-x86_64'], undefined)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('falla si faltan todas las firmas', () => {
+  const root = mkdtempSync(join(tmpdir(), 'blinkstream-updater-empty-'))
+  mkdirSync(join(root, 'empty'), { recursive: true })
+  const notesFile = join(root, 'RELEASE_NOTES.md')
+  writeFileSync(notesFile, '# Notes\n')
+  try {
     assert.throws(
       () => buildUpdaterManifest({
         version: VERSION,
@@ -60,7 +80,7 @@ test('falla si falta una firma requerida', () => {
         artifactsDir: root,
         notesFile,
       }),
-      /encontradas: 0/,
+      /ninguna/,
     )
   } finally {
     rmSync(root, { recursive: true, force: true })
