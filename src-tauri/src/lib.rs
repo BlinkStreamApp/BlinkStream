@@ -1049,6 +1049,39 @@ async fn fetch_m3u8_content(url: String) -> Result<String, String> {
     Ok(text)
 }
 
+#[tauri::command]
+async fn fetch_m3u8_chunk(url: String) -> Result<Vec<u8>, String> {
+    if !url.starts_with("https://")
+        || (!url.contains("ttvnw.net")
+            && !url.contains("twitch.tv")
+            && !url.contains("cloudfront.net"))
+    {
+        return Err(format!("URL no permitida por seguridad: {url}"));
+    }
+
+    let client = reqwest::Client::builder()
+        .use_rustls_tls()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
+
+    let response = client
+        .get(&url)
+        .header("Client-ID", TWITCH_WEB_CLIENT_ID)
+        .send()
+        .await
+        .map_err(|e| format!("Error en fetch chunk: {e}"))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("HTTP {status}: {url}"));
+    }
+
+    let bytes = response.bytes().await.map_err(|e| format!("Error leyendo bytes: {e}"))?;
+    Ok(bytes.to_vec())
+}
+
 const DEFAULT_QUALITIES: &[&str] = &[
     "audio_only",
     "160p",
@@ -1558,6 +1591,7 @@ pub fn run() {
             get_direct_stream_url,
             get_master_playlist,
             fetch_m3u8_content,
+            fetch_m3u8_chunk,
             get_twitch_clip_url,
             get_vod_manifest_url,
             start_recording,

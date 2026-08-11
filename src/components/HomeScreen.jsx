@@ -807,7 +807,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
                 <div className="mt-4 p-3 rounded-xl bg-bg-secondary/50 border border-bg-tertiary/40">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-[13px] font-bold text-text-primary">{t('liveNow', 'En vivo ahora')}</h3>
-                    <button onClick={() => { setActiveGameId(null); setGameStreams([]) }} className="text-[11px] text-text-muted hover:text-text-primary cursor-pointer">✕</button>
+                    <button onClick={() => { setActiveGameId(null); setGameStreams([]) }} className="text-[11px] text-text-muted hover:text-text-primary cursor-pointer">Cerrar </button>
                   </div>
                   {gameLoading ? <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin" /></div>
                   : gameStreams.length === 0 ? <p className="text-[12px] text-text-muted text-center py-2">{t('noLiveStreams', 'No hay streams en vivo')}</p>
