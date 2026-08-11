@@ -62,12 +62,11 @@ function VodVideo({ video }) {
   useEffect(() => {
     const v = videoRef.current
     if (!url || !v) return
-    if (v.canPlayType('application/vnd.apple.mpegurl')) { v.src = url }
-    else if (Hls.isSupported()) {
+    if (Hls.isSupported()) {
       const hls = new Hls(); hlsRef.current = hls
       hls.loadSource(url); hls.attachMedia(v)
-    } else {
-
+    } else if (v.canPlayType('application/vnd.apple.mpegurl')) { v.src = url }
+    else {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('HLS no soportado')
     }

@@ -328,15 +328,13 @@ export default function VideoPlayer({
     if (!video || !streamUrl) return
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl
-      return
-    }
-
     if (!Hls.isSupported()) {
-
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setError('HLS no soportado')
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = streamUrl
+      } else {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setError('HLS no soportado')
+      }
       return
     }
 

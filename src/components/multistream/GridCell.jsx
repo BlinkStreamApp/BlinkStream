@@ -77,11 +77,6 @@ export default function GridCell({
       hlsRef.current = null
     }
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl
-      return
-    }
-
     if (Hls.isSupported()) {
       const hls = new Hls({
         loader: TauriPlaylistLoader,
@@ -96,6 +91,8 @@ export default function GridCell({
         video.play().then(() => setIsPlaying(true)).catch(() => {})
       })
       hlsRef.current = hls
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = streamUrl
     }
   }, [streamUrl])
 
