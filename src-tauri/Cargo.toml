@@ -31,7 +31,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 wait-timeout = "0.2"
 regex-lite = "0.1"
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "native-tls", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "native-tls", "rustls-tls", "rustls-tls-webpki-roots"] }
 urlencoding = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-notification = "2"
