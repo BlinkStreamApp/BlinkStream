@@ -1078,7 +1078,10 @@ async fn fetch_m3u8_chunk(url: String) -> Result<Vec<u8>, String> {
         return Err(format!("HTTP {status}: {url}"));
     }
 
-    let bytes = response.bytes().await.map_err(|e| format!("Error leyendo bytes: {e}"))?;
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Error leyendo bytes: {e}"))?;
     Ok(bytes.to_vec())
 }
 
