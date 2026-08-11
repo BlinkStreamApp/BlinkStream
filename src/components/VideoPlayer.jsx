@@ -237,6 +237,7 @@ export default function VideoPlayer({
     if (!ch) return
     if (isFetchingRef.current) return
     isFetchingRef.current = true
+    console.log(`[VideoPlayer] fetchStream llamado: channel=${ch}, quality=${q || quality || 'best'}`)
     setLoading(true); setError(''); setStreamUrl('')
     isFetchingRef.current = true
     networkRetriesRef.current = 0
@@ -254,8 +255,9 @@ export default function VideoPlayer({
 
     try {
       const url = await measureInvoke('get_stream_url', { channel: ch, quality: targetQuality })
+      console.log(`[VideoPlayer] streamUrl obtenida para ${ch}: ${url?.substring(0, 80)}...`)
       setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
-    } catch (e) { console.warn('Streamlink fallback — get_stream_url failed:', e) }
+    } catch (e) { console.warn('[VideoPlayer] get_stream_url failed:', e) }
 
     try {
       const url = await measureInvoke('get_stream_url', { channel: ch, quality: 'best' })
@@ -326,6 +328,7 @@ export default function VideoPlayer({
   useEffect(() => {
     const video = videoRef.current
     if (!video || !streamUrl) return
+    console.log(`[VideoPlayer] Inicializando HLS con streamUrl: ${streamUrl?.substring(0, 80)}...`)
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
 
     if (!Hls.isSupported()) {

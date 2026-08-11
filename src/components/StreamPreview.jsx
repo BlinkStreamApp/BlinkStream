@@ -26,6 +26,7 @@ export default function StreamPreview({ stream, enabled, quality = 'best' }) {
     let cancelled = false
 
     async function start() {
+      console.log(`[StreamPreview] Iniciando preview para ${channel}`)
 
       const FALLBACK_ORDER = ['best', '720p60', '720p', '480p', '360p', 'worst', 'audio_only']
       let m3u8Url = ''
@@ -39,22 +40,28 @@ export default function StreamPreview({ stream, enabled, quality = 'best' }) {
         TRIED.add(q)
         try {
           m3u8Url = await invoke('get_stream_url', { channel, quality: q })
-          if (m3u8Url) break
-        } catch (_e) {  }
+          if (m3u8Url) {
+            console.log(`[StreamPreview] URL obtenida para ${channel} (${q}):`, m3u8Url.substring(0, 80) + '...')
+            break
+          }
+        } catch (e) {
+          console.warn(`[StreamPreview] get_stream_url falló para ${channel} quality=${q}:`, e)
+        }
       }
       if (gen !== generationRef.current || cancelled) return
-      if (!m3u8Url) { setError(true); return }
+      if (!m3u8Url) { console.warn(`[StreamPreview] No se obtuvo URL para ${channel}`); setError(true); return }
 
-      if (Hls.isSupported()) {
-        // Inicializar hls
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = m3u8Url
-        return
-      } else {
-        setError(true)
+      if (!Hls.isSupported()) {
+        console.warn('[StreamPreview] Hls.isSupported() = false')
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = m3u8Url
+        } else {
+          setError(true)
+        }
         return
       }
 
+      console.log(`[StreamPreview] Creando instancia HLS para ${channel}`)
       hls = new Hls({
         loader: TauriPlaylistLoader,
         maxBufferLength: 30,        
@@ -71,11 +78,13 @@ export default function StreamPreview({ stream, enabled, quality = 'best' }) {
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (gen !== generationRef.current || cancelled) return
+        console.log(`[StreamPreview] Manifest parsed para ${channel}, reproduciendo`)
         video.play().catch(() => {  })
       })
 
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (gen !== generationRef.current || cancelled) return
+        console.error(`[StreamPreview] HLS error para ${channel}:`, data.type, data.details, data.fatal ? '(FATAL)' : '')
         if (!data.fatal) return
 
         setError(true)
