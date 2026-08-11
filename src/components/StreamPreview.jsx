@@ -45,11 +45,12 @@ export default function StreamPreview({ stream, enabled, quality = 'best' }) {
       if (gen !== generationRef.current || cancelled) return
       if (!m3u8Url) { setError(true); return }
 
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      if (Hls.isSupported()) {
+        // Inicializar hls
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = m3u8Url
         return
-      }
-      if (!Hls.isSupported()) {
+      } else {
         setError(true)
         return
       }
