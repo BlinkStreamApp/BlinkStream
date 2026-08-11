@@ -1051,7 +1051,6 @@ async fn fetch_m3u8_content(url: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn fetch_segment(url: String) -> Result<Vec<u8>, String> {
-
     if !url.starts_with("https://")
         || (!url.contains("ttvnw.net")
             && !url.contains("twitch.tv")
