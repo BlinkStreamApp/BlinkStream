@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "BlinkStream",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "identifier": "com.blinkstream.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://id.twitch.tv https://clips.twitch.tv https://player.twitch.tv; child-src 'self' https://*.twitch.tv https://player.twitch.tv; worker-src 'self' blob:; connect-src 'self' http://ipc.localhost http://tauri.localhost https://oncbojnqxpxctwnhehau.supabase.co https://7tv.io https://*.twitch.tv https://*.jtvnw.net https://*.ttvnw.net https://*.cloudfront.net https://api.betterttv.net https://api.7tv.app https://api.frankerfacez.com https://cdn.betterttv.com https://cdn.7tv.app https://cdn.frankerfacez.com wss://irc-ws.chat.twitch.tv:443 wss://irc.chat.twitch.tv:443; img-src 'self' https://*.twitch.tv https://*.jtvnw.net https://static-cdn.jtvnw.net https://*.ttvnw.net https://cdn.betterttv.com https://cdn.betterttv.net https://cdn.7tv.app https://cdn.frankerfacez.com data:; media-src 'self' https://*.twitch.tv https://*.jtvnw.net https://static-cdn.jtvnw.net https://*.ttvnw.net https://*.cloudfront.net blob:; font-src 'self' data:;"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://id.twitch.tv https://clips.twitch.tv https://player.twitch.tv; child-src 'self' https://*.twitch.tv https://player.twitch.tv; worker-src 'self' blob:; connect-src 'self' http://ipc.localhost http://tauri.localhost https://oncbojnqxpxctwnhehau.supabase.co https://7tv.io https://*.twitch.tv https://*.jtvnw.net https://*.ttvnw.net https://*.hls.ttvnw.net https://*.cloudfront.net https://*.cloudfront.hls.ttvnw.net https://*.akamaized.net https://api.betterttv.net https://api.7tv.app https://api.frankerfacez.com https://cdn.betterttv.com https://cdn.7tv.app https://cdn.frankerfacez.com wss://irc-ws.chat.twitch.tv:443 wss://irc.chat.twitch.tv:443; img-src 'self' https://*.twitch.tv https://*.jtvnw.net https://static-cdn.jtvnw.net https://*.ttvnw.net https://cdn.betterttv.com https://cdn.betterttv.net https://cdn.7tv.app https://cdn.frankerfacez.com data:; media-src 'self' https://*.twitch.tv https://*.jtvnw.net https://static-cdn.jtvnw.net https://*.ttvnw.net https://*.hls.ttvnw.net https://*.cloudfront.net https://*.cloudfront.hls.ttvnw.net https://*.akamaized.net blob:; font-src 'self' data:;"
     }
   },
   "bundle": {
