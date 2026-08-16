@@ -3,6 +3,7 @@ import Hls from 'hls.js'
 import { measureInvoke } from '../../utils/perf'
 import { TauriPlaylistLoader } from '../../utils/tauriHls'
 import { useT } from '../../utils/i18n'
+import { useStereoPanner } from '../../hooks/useStereoPanner'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import LiveBadge from '../LiveBadge'
 
@@ -16,7 +17,10 @@ export default function GridCell({
   isChatActive,
   onSelectChat,
   onSelectSingleChannel,
-  gridCount = 2
+  gridCount = 2,
+  externalPan,
+  onPanChange,
+  isBinaural = false,
 }) {
   const t = useT()
   const [inputVal, setInputVal] = useState('')
@@ -33,6 +37,13 @@ export default function GridCell({
 
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
+  const { pan, setPan, isSupported: isPanSupported } = useStereoPanner(videoRef, externalPan ?? 0)
+
+  useEffect(() => {
+    if (externalPan !== undefined) {
+      setPan(externalPan)
+    }
+  }, [externalPan, setPan])
 
   const fetchStream = useCallback(async (ch, targetQ) => {
     if (!ch) return
@@ -214,7 +225,7 @@ export default function GridCell({
           onPause={() => setIsPlaying(false)}
           autoPlay
           playsInline
-          muted={!isAudioFocused}
+          muted={!isAudioFocused && !isBinaural}
         />
         {!isPlaying && !loading && !error && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 pointer-events-none">
@@ -254,7 +265,7 @@ export default function GridCell({
         <div className="flex items-center gap-1.5 shrink-0">
           {}
           <div className={`flex items-center gap-1.5 px-1.5 py-1 rounded-lg border transition-all ${
-            isAudioFocused
+            isAudioFocused || isBinaural
               ? 'bg-twitch/30 border-twitch shadow-[0_0_15px_rgba(145,70,255,0.4)]'
               : 'bg-black/60 border-white/10'
           }`}>
@@ -262,22 +273,51 @@ export default function GridCell({
               onClick={() => onFocusAudio(index)}
               title={t('grid.audioTip', 'Clic para enfocar audio de este stream')}
               className={`flex items-center justify-center transition-transform cursor-pointer ${
-                isAudioFocused ? 'text-green-400 scale-110 font-bold' : 'text-text-muted hover:text-white'
+                isAudioFocused || isBinaural ? 'text-green-400 scale-110 font-bold' : 'text-text-muted hover:text-white'
               }`}
             >
-              <PhosphorIcon name={isAudioFocused && volume > 0 ? "SpeakerHigh" : "SpeakerSlash"} size={17} weight={isAudioFocused ? "fill" : "regular"} />
+              <PhosphorIcon name={(isAudioFocused || isBinaural) && volume > 0 ? "SpeakerHigh" : "SpeakerSlash"} size={17} weight={isAudioFocused || isBinaural ? "fill" : "regular"} />
             </button>
 
-            {isAudioFocused && (
+            {(isAudioFocused || isBinaural) && (
               <input
                 type="range"
                 min="0"
                 max="100"
                 value={volume}
                 onChange={(e) => handleVolumeChange(e.target.value)}
-                className="w-16 sm:w-20 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer accent-twitch transition-all"
+                className="w-14 sm:w-16 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer accent-twitch transition-all"
                 title={`${t('set.defaultVolume', 'Volumen')}: ${volume}%`}
               />
+            )}
+
+            {(isAudioFocused || isBinaural) && isPanSupported && (
+              <div className="flex items-center bg-black/50 rounded p-0.5 border border-white/10 text-[9px] font-mono font-bold ml-0.5">
+                <button
+                  type="button"
+                  onClick={() => { setPan(-1); onPanChange?.(index, -1); }}
+                  title={t('grid.panLeft', 'Oído Izquierdo (L)')}
+                  className={`px-1 py-0.5 rounded cursor-pointer transition-colors ${pan <= -0.5 ? 'bg-cyan-500 text-black font-extrabold' : 'text-text-muted hover:text-white'}`}
+                >
+                  L
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPan(0); onPanChange?.(index, 0); }}
+                  title={t('grid.panCenter', 'Centro (Estéreo)')}
+                  className={`px-1 py-0.5 rounded cursor-pointer transition-colors ${pan > -0.5 && pan < 0.5 ? 'bg-twitch text-white' : 'text-text-muted hover:text-white'}`}
+                >
+                  C
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPan(1); onPanChange?.(index, 1); }}
+                  title={t('grid.panRight', 'Oído Derecho (R)')}
+                  className={`px-1 py-0.5 rounded cursor-pointer transition-colors ${pan >= 0.5 ? 'bg-cyan-500 text-black font-extrabold' : 'text-text-muted hover:text-white'}`}
+                >
+                  R
+                </button>
+              </div>
             )}
           </div>
 

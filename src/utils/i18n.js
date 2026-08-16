@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 
 const translations = {
   es: {
+    'grid.binauralMode': 'Modo Binaural (L/R)',
+    'grid.binauralTip': 'Asigna automáticamente el canal 1 al oído izquierdo y el canal 2 al derecho',
+    'grid.panLeft': 'Oído Izquierdo (L)',
+    'grid.panCenter': 'Centro (Estéreo)',
+    'grid.panRight': 'Oído Derecho (R)',
     'player.nightMode': 'Modo Nocturno (Compresor)',
     'player.nightModeDesc': 'Atenúa picos y ruidos fuertes repentinos y realza voces suaves',
 
@@ -219,6 +224,11 @@ const translations = {
     'aboutMadeWith': 'Hecho con ♥ para la comunidad',
   },
   en: {
+    'grid.binauralMode': 'Binaural Mode (L/R)',
+    'grid.binauralTip': 'Automatically routes channel 1 to left ear and channel 2 to right ear',
+    'grid.panLeft': 'Left Ear (L)',
+    'grid.panCenter': 'Center (Stereo)',
+    'grid.panRight': 'Right Ear (R)',
     'player.nightMode': 'Night Mode (Compressor)',
     'player.nightModeDesc': 'Attenuates sudden loud spikes and enhances quiet voices',
 
@@ -434,6 +444,11 @@ const translations = {
     'aboutMadeWith': 'Made with ♥ for the community',
   },
   fr: {
+    'grid.binauralMode': 'Mode Binaural (G/D)',
+    'grid.binauralTip': 'Achemine automatiquement le canal 1 vers l’oreille gauche et le 2 vers la droite',
+    'grid.panLeft': 'Oreille Gauche (G)',
+    'grid.panCenter': 'Centre (Stéréo)',
+    'grid.panRight': 'Oreille Droite (D)',
     'player.nightMode': 'Mode Nuit (Compresseur)',
     'player.nightModeDesc': 'Atténue les bruits forts soudains et améliore les voix douces',
     search: 'Rechercher une chaîne...',
@@ -509,6 +524,11 @@ const translations = {
     'aboutMadeWith': 'Fait avec ♥ pour la communauté',
   },
   de: {
+    'grid.binauralMode': 'Binauraler Modus (L/R)',
+    'grid.binauralTip': 'Leitet Kanal 1 automatisch auf das linke Ohr und Kanal 2 auf das rechte Ohr',
+    'grid.panLeft': 'Linkes Ohr (L)',
+    'grid.panCenter': 'Mitte (Stereo)',
+    'grid.panRight': 'Rechtes Ohr (R)',
     'player.nightMode': 'Nachtmodus (Kompressor)',
     'player.nightModeDesc': 'Dämpft plötzliche laute Spitzen und verstärkt leise Stimmen',
     search: 'Kanal suchen...',
@@ -584,6 +604,11 @@ const translations = {
     'aboutMadeWith': 'Mit ♥ für die Community gemacht',
   },
   pt: {
+    'grid.binauralMode': 'Modo Binaural (E/D)',
+    'grid.binauralTip': 'Direciona o canal 1 para o ouvido esquerdo e o canal 2 para o direito',
+    'grid.panLeft': 'Ouvido Esquerdo (E)',
+    'grid.panCenter': 'Centro (Estéreo)',
+    'grid.panRight': 'Ouvido Direito (D)',
     'player.nightMode': 'Modo Noturno (Compressor)',
     'player.nightModeDesc': 'Atenua picos altos repentinos e realça vozes suaves',
     search: 'Buscar canal...',
@@ -659,6 +684,11 @@ const translations = {
     'aboutMadeWith': 'Feito com ♥ para a comunidade',
   },
   ja: {
+    'grid.binauralMode': 'バイノーラルモード（L/R）',
+    'grid.binauralTip': 'チャンネル1を左耳、チャンネル2を右耳に自動ルーティングします',
+    'grid.panLeft': '左耳（L）',
+    'grid.panCenter': 'センター（ステレオ）',
+    'grid.panRight': '右耳（R）',
     'player.nightMode': 'ナイトモード（コンプレッサー）',
     'player.nightModeDesc': '突然の大声を抑え、聞き取りにくい声を強調します',
     search: 'チャンネルを検索...',
@@ -734,6 +764,11 @@ const translations = {
     'aboutMadeWith': 'コミュニティのために♥を込めて制作',
   },
   ko: {
+    'grid.binauralMode': '바이노럴 모드 (L/R)',
+    'grid.binauralTip': '채널 1을 왼쪽 귀로, 채널 2를 오른쪽 귀로 자동 라우팅합니다',
+    'grid.panLeft': '왼쪽 귀 (L)',
+    'grid.panCenter': '중앙 (스테레오)',
+    'grid.panRight': '오른쪽 귀 (R)',
     'player.nightMode': '야간 모드 (압축기)',
     'player.nightModeDesc': '갑작스러운 큰 소리를 줄이고 작은 음성을 보정합니다',
     search: '채널 검색...',
@@ -809,6 +844,11 @@ const translations = {
     'aboutMadeWith': '커뮤니티를 위해 ♥로 제작됨',
   },
   ru: {
+    'grid.binauralMode': 'Бинауральный режим (Л/П)',
+    'grid.binauralTip': 'Автоматически направляет канал 1 в левое ухо, а канал 2 в правое',
+    'grid.panLeft': 'Левое ухо (Л)',
+    'grid.panCenter': 'Центр (Стерео)',
+    'grid.panRight': 'Правое ухо (П)',
     'player.nightMode': 'Ночной режим (Компрессор)',
     'player.nightModeDesc': 'Сглаживает резкие громкие звуки и усиливает тихие голоса',
     search: 'Поиск канала...',

@@ -34,6 +34,18 @@ export default function MultiStreamGrid({
   const [focusedAudioIdx, setFocusedAudioIdx] = useState(0)
   const [activeChatIdx, setActiveChatIdx] = useState(0)
   const [showChatPanel, setShowChatPanel] = useState(true)
+  const [isBinauralActive, setIsBinauralActive] = useState(false)
+  const [cellPans, setCellPans] = useState([-1, 1, 0, 0])
+
+  const handleToggleBinaural = () => {
+    setIsBinauralActive(prev => {
+      const next = !prev
+      if (next) {
+        setCellPans([-1, 1, 0, 0])
+      }
+      return next
+    })
+  }
 
   const handleSetChannel = (index, newChannel) => {
     setChannels(prev => {
@@ -81,6 +93,19 @@ export default function MultiStreamGrid({
 
           {}
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleToggleBinaural}
+              className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 text-[11px] font-bold transition-all cursor-pointer ${
+                isBinauralActive
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_15px_rgba(6,182,212,0.35)]'
+                  : 'bg-bg-tertiary border-white/10 text-text-muted hover:text-white hover:bg-white/5'
+              }`}
+              title={t('grid.binauralTip', 'Asigna automáticamente el canal 1 al oído izquierdo y el canal 2 al derecho')}
+            >
+              <PhosphorIcon name="Headphones" size={15} weight={isBinauralActive ? 'fill' : 'regular'} className={isBinauralActive ? 'text-cyan-300' : ''} />
+              <span className="hidden sm:inline">{t('grid.binauralMode', 'Modo Binaural (L/R)')}</span>
+            </button>
+
             <div className="flex p-1 rounded-xl bg-bg-tertiary border border-white/10 gap-1">
               {[
                 { count: 2, label: 'Dual (2)' },
@@ -144,6 +169,13 @@ export default function MultiStreamGrid({
                 onSelectChat={(idx) => setActiveChatIdx(idx)}
                 onSelectSingleChannel={onSelectChannel}
                 gridCount={gridCount}
+                externalPan={cellPans[i]}
+                onPanChange={(idx, val) => setCellPans(p => {
+                  const copy = [...p]
+                  copy[idx] = val
+                  return copy
+                })}
+                isBinaural={isBinauralActive && (i === 0 || i === 1)}
               />
             </div>
           ))}
