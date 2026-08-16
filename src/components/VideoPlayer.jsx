@@ -30,7 +30,7 @@ function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="reg
 
 const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '936p60', '963p60', '1080p60', '1440p60']
 
-function formatPlayerError(rawError, channelName) {
+function formatPlayerError(rawError, channelName, t) {
   if (!rawError) return null
   const str = String(rawError)
   const lower = str.toLowerCase()
@@ -41,15 +41,17 @@ function formatPlayerError(rawError, channelName) {
     lower.includes('stream is offline') ||
     lower.includes('is not live')
   ) {
+    const rawTitle = t ? t('player.offlineTitle', '{channel} está Offline') : '{channel} está Offline'
+    const title = rawTitle.replace('{channel}', channelName || (t ? t('player.channelDefault', 'El canal') : 'El canal'))
     return {
       isOffline: true,
-      title: `${channelName || 'El canal'} está Offline`,
-      desc: 'Este canal no está transmitiendo en directo en este momento.',
+      title,
+      desc: t ? t('player.offlineDesc', 'Este canal no está transmitiendo en directo en este momento.') : 'Este canal no está transmitiendo en directo en este momento.',
     }
   }
   return {
     isOffline: false,
-    title: 'Error de reproducción',
+    title: t ? t('player.recordingError', 'Error de reproducción') : 'Error de reproducción',
     desc: str.replace(/^No se pudo cargar [^:]+:\s*/i, '').replace(/Streamlink fallo:\s*error:\s*/i, ''),
   }
 }
@@ -821,7 +823,7 @@ export default function VideoPlayer({
       )}
 
       {error && !loading && (() => {
-        const errInfo = formatPlayerError(error, channel)
+        const errInfo = formatPlayerError(error, channel, t)
         if (errInfo?.isOffline) {
           return (
             <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
@@ -831,7 +833,7 @@ export default function VideoPlayer({
                 </div>
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                  <span>OFFLINE</span>
+                  <span>{t('player.offlineBadge', 'OFFLINE')}</span>
                 </div>
                 <h3 className="text-sm md:text-base font-bold text-white mb-1">{errInfo.title}</h3>
                 <p className="text-[11px] md:text-xs text-text-muted max-w-xs leading-relaxed mb-4">
@@ -843,21 +845,21 @@ export default function VideoPlayer({
                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer hover:scale-[1.02]"
                   >
                     <PhosphorIcon name="ArrowsClockwise" size={14} weight="bold" />
-                    <span>Comprobar directo</span>
+                    <span>{t('player.checkLive', 'Comprobar directo')}</span>
                   </button>
                   <button
                     onClick={() => setShowVods(true)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
                   >
                     <PhosphorIcon name="FilmStrip" size={14} />
-                    <span>Ver VODs</span>
+                    <span>{t('player.watchVods', 'Ver VODs')}</span>
                   </button>
                   <button
                     onClick={() => setShowClips(true)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
                   >
                     <PhosphorIcon name="PlayCircle" size={14} />
-                    <span>Clips</span>
+                    <span>{t('player.clips', 'Clips')}</span>
                   </button>
                 </div>
               </div>
@@ -871,14 +873,14 @@ export default function VideoPlayer({
               <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3 shadow-xl">
                 <PhosphorIcon name="WarningCircle" size={26} weight="duotone" />
               </div>
-              <p className="text-red-300 text-sm font-bold mb-1">{errInfo?.title || 'Error'}</p>
+              <p className="text-red-300 text-sm font-bold mb-1">{errInfo?.title || t('player.error', 'Error')}</p>
               <p className="text-xs text-text-muted break-words mb-4 leading-relaxed">{errInfo?.desc || error}</p>
               <button
                 onClick={() => fetchStream(channel)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer"
               >
                 <PhosphorIcon name="ArrowsClockwise" size={14} weight="bold" />
-                <span>Reintentar</span>
+                <span>{t('player.retry', 'Reintentar')}</span>
               </button>
             </div>
           </div>

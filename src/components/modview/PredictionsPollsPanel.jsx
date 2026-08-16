@@ -9,8 +9,10 @@ import {
   endPoll,
   getUserIdByLogin,
 } from '../../utils/twitch'
+import { useT } from '../../utils/i18n'
 
 export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, isLoggedIn = true, onLoginWithToken }) {
+  const t = useT()
   const [subTab, setSubTab] = useState('predictions') // 'predictions' | 'polls'
   const [predictions, setPredictions] = useState([])
   const [polls, setPolls] = useState([])
@@ -161,7 +163,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
                 : 'text-white/60 hover:text-white'
             }`}
           >
-            🎲 Predicciones
+            🎲 {t('mod.tab.predictions', 'Predicciones')}
           </button>
           <button
             onClick={() => { setSubTab('polls'); setShowCreateModal(false) }}
@@ -171,7 +173,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
                 : 'text-white/60 hover:text-white'
             }`}
           >
-            📊 Encuestas
+            📊 {t('mod.tab.polls', 'Encuestas')}
           </button>
         </div>
 
@@ -181,13 +183,13 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-twitch hover:bg-twitch-glow text-white text-xs font-semibold transition-all cursor-pointer shadow-sm shadow-twitch/30"
           >
             <PhosphorIcon name="Plus" size={13} weight="bold" />
-            <span>{showCreateModal ? 'Cerrar' : 'Nueva'}</span>
+            <span>{showCreateModal ? t('mod.inspector.close', 'Cerrar') : t('mod.pred.new', '+ Nueva')}</span>
           </button>
           <button
             onClick={loadData}
             disabled={loading}
             className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Recargar"
+            title={t('player.retry', 'Recargar')}
           >
             <PhosphorIcon name="ArrowsClockwise" size={14} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -387,7 +389,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
           predictions.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-6 text-center text-text-muted select-none">
               <PhosphorIcon name="Coins" size={24} className="text-white/20 mb-2" />
-              <p className="text-xs font-semibold text-white/70">Sin predicciones recientes</p>
+              <p className="text-xs font-semibold text-white/70">{t('mod.pred.empty', 'Sin predicciones recientes')}</p>
               <p className="text-[10px] text-text-muted mt-0.5">Usa "+ Nueva" para iniciar una predicción para tu chat.</p>
             </div>
           ) : (
@@ -409,49 +411,42 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
 
                   {/* Outcomes breakdown */}
                   <div className="space-y-1.5 pt-1">
-                    {outcomes.map(out => {
-                      const points = out.channel_points || 0
-                      const pct = totalPoints > 0 ? Math.round((points / totalPoints) * 100) : 0
-                      const isWinner = pred.winning_outcome_id === out.id
-
+                    {outcomes.map(o => {
+                      const pts = o.channel_points || 0
+                      const pct = totalPoints > 0 ? Math.round((pts / totalPoints) * 100) : 0
                       return (
-                        <div key={out.id} className="space-y-0.5">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-semibold text-white/90 flex items-center gap-1">
-                              {isWinner && <span>👑</span>}
-                              {out.title}
-                            </span>
-                            <span className="text-text-muted font-mono">{pct}% ({points} pts)</span>
+                        <div key={o.id} className="p-2 rounded-lg bg-black/40 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-white truncate">{o.title}</span>
+                            <span className="text-twitch-glow font-bold text-[11px]">{pts.toLocaleString()} pts ({pct}%)</span>
                           </div>
-                          <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-twitch to-purple-500 rounded-full transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
+                          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full bg-twitch rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                           </div>
-
-                          {isActive && (
-                            <button
-                              onClick={() => handleResolvePrediction(pred.id, 'RESOLVED', out.id)}
-                              disabled={actionPending}
-                              className="text-[10px] text-green-400 hover:text-green-300 hover:underline cursor-pointer pt-0.5"
-                            >
-                              ✓ Elegir "{out.title}" como ganadora
-                            </button>
-                          )}
                         </div>
                       )
                     })}
                   </div>
 
                   {isActive && (
-                    <div className="flex items-center justify-end pt-1">
+                    <div className="pt-2 border-t border-white/10 flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider mr-1">Resolver:</span>
+                      {outcomes.map(o => (
+                        <button
+                          key={o.id}
+                          onClick={() => handleResolvePrediction(pred.id, 'RESOLVED', o.id)}
+                          disabled={actionPending}
+                          className="px-2 py-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 text-green-300 rounded-lg text-[10px] font-bold cursor-pointer transition-all disabled:opacity-50"
+                        >
+                          ✓ Ganó "{o.title}"
+                        </button>
+                      ))}
                       <button
-                        onClick={() => handleResolvePrediction(pred.id, 'CANCELED')}
+                        onClick={() => handleResolvePrediction(pred.id, 'CANCELED', null)}
                         disabled={actionPending}
-                        className="text-[10px] text-red-400 hover:text-red-300 hover:underline cursor-pointer"
+                        className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 rounded-lg text-[10px] font-semibold cursor-pointer transition-all disabled:opacity-50"
                       >
-                        ✕ Cancelar & Reembolsar Puntos
+                        ✕ Cancelar
                       </button>
                     </div>
                   )}
@@ -463,7 +458,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
           polls.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-6 text-center text-text-muted select-none">
               <PhosphorIcon name="ChartBar" size={24} className="text-white/20 mb-2" />
-              <p className="text-xs font-semibold text-white/70">Sin encuestas recientes</p>
+              <p className="text-xs font-semibold text-white/70">{t('mod.poll.empty', 'Sin encuestas recientes')}</p>
               <p className="text-[10px] text-text-muted mt-0.5">Usa "+ Nueva" para lanzar una encuesta en el canal.</p>
             </div>
           ) : (

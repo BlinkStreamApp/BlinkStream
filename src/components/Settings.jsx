@@ -176,7 +176,7 @@ export default function Settings({ onClose }) {
                     onClick={() => setActiveTab('hsl')}
                     className="shrink-0 py-2.5 px-4 rounded-xl bg-gradient-to-r from-twitch to-fuchsia-600 hover:from-twitch-dark hover:to-fuchsia-700 text-white text-[12px] font-bold shadow-md shadow-twitch/30 flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.03] cursor-pointer"
                   >
-                    <span>🎨 Abrir Estudio</span>
+                    <span>🎨 {t('set.openStudio', 'Abrir Estudio')}</span>
                     <span className="text-[10px] bg-black/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-extrabold text-white/90">v2.2</span>
                   </button>
                 </div>

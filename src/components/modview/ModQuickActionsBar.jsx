@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { useT } from '../../utils/i18n'
 
 export function ModQuickActionsBar({
   channel,
@@ -13,6 +14,7 @@ export function ModQuickActionsBar({
   isRateLimited = false,
   onOpenLayoutDrawer,
 }) {
+  const t = useT()
   const [showSlowMenu, setShowSlowMenu] = useState(false)
   const [showFollowersMenu, setShowFollowersMenu] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
@@ -67,7 +69,7 @@ export function ModQuickActionsBar({
       <div className="flex items-center gap-2.5 min-w-0">
         <div className="flex items-center gap-1.5 bg-twitch/15 text-twitch-glow border border-twitch/30 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
           <PhosphorIcon name="ShieldCheck" size={16} weight="fill" className="text-twitch animate-pulse" />
-          <span>Mod View</span>
+          <span>{t('mod.title', 'Mod View')}</span>
         </div>
         <div className="flex items-center gap-1.5 truncate">
           <span className="text-xs font-bold text-white truncate">{channel}</span>
@@ -85,10 +87,10 @@ export function ModQuickActionsBar({
               ? 'bg-red-500/20 border-red-500/60 text-red-300 shadow-lg shadow-red-500/20 animate-pulse'
               : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10 hover:text-white'
           }`}
-          title={shieldActive ? 'Desactivar Modo Escudo' : 'Activar Modo Escudo (Anti-Raid)'}
+          title={shieldActive ? t('mod.quick.shieldTipOff', 'Desactivar Modo Escudo') : t('mod.quick.shieldTipOn', 'Activar Modo Escudo (Anti-Raid)')}
         >
           <PhosphorIcon name="Shield" size={15} weight={shieldActive ? 'fill' : 'bold'} />
-          <span>{shieldActive ? 'Escudo Activo' : 'Modo Escudo'}</span>
+          <span>{shieldActive ? t('mod.quick.shieldActive', 'Escudo Activo') : t('mod.quick.shield', 'Modo Escudo')}</span>
         </button>
 
         {/* Emote Only Toggle */}
@@ -99,10 +101,10 @@ export function ModQuickActionsBar({
               ? 'bg-purple-500/20 border-purple-500/60 text-purple-300 shadow-sm shadow-purple-500/20'
               : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
           }`}
-          title="Solo Emotes"
+          title={t('mod.quick.emotes', 'Solo Emotes')}
         >
           <PhosphorIcon name="Smiley" size={15} weight={activeModes.emoteonly ? 'fill' : 'regular'} />
-          <span>Solo Emotes</span>
+          <span>{t('mod.quick.emotes', 'Solo Emotes')}</span>
         </button>
 
         {/* Subscribers Only Toggle */}
@@ -113,10 +115,10 @@ export function ModQuickActionsBar({
               ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-sm shadow-amber-500/20'
               : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
           }`}
-          title="Solo Suscriptores"
+          title={t('mod.quick.subs', 'Solo Subs')}
         >
           <PhosphorIcon name="Sparkle" size={15} weight={activeModes.subscribers ? 'fill' : 'regular'} />
-          <span>Solo Subs</span>
+          <span>{t('mod.quick.subs', 'Solo Subs')}</span>
         </button>
 
         {/* Slow Mode Dropdown */}
@@ -128,22 +130,21 @@ export function ModQuickActionsBar({
                 ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
                 : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
             }`}
-            title="Modo Lento"
+            title={t('mod.quick.slow', 'Modo Lento')}
           >
             <PhosphorIcon name="ClockCounterClockwise" size={15} />
-            <span>{activeModes.slow ? `Lento (${activeModes.slow}s)` : 'Modo Lento'}</span>
+            <span>{activeModes.slow ? `${t('mod.quick.slow', 'Lento')} (${activeModes.slow}s)` : t('mod.quick.slow', 'Modo Lento')}</span>
             <PhosphorIcon name="CaretDoubleRight" size={10} className="rotate-90 text-white/40" />
           </button>
 
           {showSlowMenu && (
             <div className="absolute top-full mt-1.5 left-0 w-36 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs">
-              <button onClick={() => handleSlowSelect(0)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white">Desactivar</button>
-              <button onClick={() => handleSlowSelect(3)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">3 segundos</button>
-              <button onClick={() => handleSlowSelect(5)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">5 segundos</button>
-              <button onClick={() => handleSlowSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">10 segundos</button>
-              <button onClick={() => handleSlowSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">30 segundos</button>
-              <button onClick={() => handleSlowSelect(60)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">60 segundos</button>
-              <button onClick={() => handleSlowSelect(120)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">120 segundos</button>
+              <button onClick={() => handleSlowSelect(0)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white">{t('mod.quick.slowOff', 'Desactivar')}</button>
+              <button onClick={() => handleSlowSelect(3)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow3s', '3 segundos')}</button>
+              <button onClick={() => handleSlowSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow10s', '10 segundos')}</button>
+              <button onClick={() => handleSlowSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow30s', '30 segundos')}</button>
+              <button onClick={() => handleSlowSelect(60)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow60s', '60 segundos')}</button>
+              <button onClick={() => handleSlowSelect(120)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow120s', '120 segundos')}</button>
             </div>
           )}
         </div>
@@ -157,20 +158,20 @@ export function ModQuickActionsBar({
                 ? 'bg-blue-500/20 border-blue-500/60 text-blue-300'
                 : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
             }`}
-            title="Solo Seguidores"
+            title={t('mod.quick.followers', 'Seguidores')}
           >
             <PhosphorIcon name="Heart" size={15} />
-            <span>{activeModes.followers !== undefined && activeModes.followers !== null && activeModes.followers !== false ? `Seguidores` : 'Seguidores'}</span>
+            <span>{t('mod.quick.followers', 'Seguidores')}</span>
             <PhosphorIcon name="CaretDoubleRight" size={10} className="rotate-90 text-white/40" />
           </button>
 
           {showFollowersMenu && (
             <div className="absolute top-full mt-1.5 left-0 w-40 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs">
-              <button onClick={() => handleFollowersSelect(-1)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white">Desactivar</button>
-              <button onClick={() => handleFollowersSelect(0)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">Cualquier seguidor</button>
-              <button onClick={() => handleFollowersSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; 10 minutos</button>
-              <button onClick={() => handleFollowersSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; 30 minutos</button>
-              <button onClick={() => handleFollowersSelect(1440)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; 1 día</button>
+              <button onClick={() => handleFollowersSelect(-1)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white">{t('mod.quick.followersOff', 'Todos los usuarios')}</button>
+              <button onClick={() => handleFollowersSelect(0)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.followers0m', 'Cualquier seguidor')}</button>
+              <button onClick={() => handleFollowersSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; {t('mod.quick.followers10m', '10 min')}</button>
+              <button onClick={() => handleFollowersSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; {t('mod.quick.followers30m', '30 min')}</button>
+              <button onClick={() => handleFollowersSelect(1440)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; {t('mod.quick.followers1d', '1 día')}</button>
             </div>
           )}
         </div>
@@ -178,28 +179,28 @@ export function ModQuickActionsBar({
         {/* Clear Chat */}
         {confirmClear ? (
           <div className="flex items-center gap-1 bg-red-500/20 border border-red-500/40 rounded-lg p-0.5">
-            <span className="text-[11px] text-red-300 font-semibold px-1.5">¿Vaciar?</span>
+            <span className="text-[11px] text-red-300 font-semibold px-1.5">{t('mod.quick.clearConfirm', '¿Vaciar?')}</span>
             <button
               onClick={() => { setConfirmClear(false); onClearChat?.() }}
               className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded cursor-pointer transition-colors"
             >
-              Sí
+              {t('mod.quick.confirm', 'Sí')}
             </button>
             <button
               onClick={() => setConfirmClear(false)}
               className="px-1.5 py-1 text-white/60 hover:text-white text-[10px] cursor-pointer"
             >
-              No
+              {t('mod.quick.cancel', 'No')}
             </button>
           </div>
         ) : (
           <button
             onClick={() => setConfirmClear(true)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white/60 hover:text-red-400 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 cursor-pointer transition-all"
-            title="Vaciar Chat del Canal"
+            title={t('mod.quick.clearTitle', 'Vaciar Chat del Canal')}
           >
             <PhosphorIcon name="Trash" size={15} />
-            <span>Limpiar</span>
+            <span>{t('mod.quick.clear', 'Limpiar')}</span>
           </button>
         )}
       </div>
@@ -208,7 +209,7 @@ export function ModQuickActionsBar({
       <div className="flex items-center gap-2.5 shrink-0">
         <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-text-muted font-mono bg-white/5 border border-white/10 px-2 py-1 rounded-lg">
           <span className={isRateLimited ? 'text-red-400 font-bold' : 'text-green-400 font-semibold'}>⚡ {remainingActions}/20</span>
-          <span className="text-white/40">acciones</span>
+          <span className="text-white/40">{t('mod.quick.actions', 'acciones')}</span>
         </div>
 
         <button
@@ -217,7 +218,7 @@ export function ModQuickActionsBar({
           title="Personalizar paneles y distribución de Mod View"
         >
           <PhosphorIcon name="SlidersHorizontal" size={14} weight="bold" className="text-twitch-glow" />
-          <span>Paneles</span>
+          <span>{t('mod.quick.panels', 'Paneles')}</span>
         </button>
 
         <button
@@ -226,7 +227,7 @@ export function ModQuickActionsBar({
           title="Salir de la Vista de Moderador (Esc / Ctrl+M)"
         >
           <PhosphorIcon name="X" size={14} weight="bold" />
-          <span>Salir</span>
+          <span>{t('mod.quick.exit', 'Salir')}</span>
         </button>
       </div>
     </div>

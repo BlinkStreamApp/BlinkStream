@@ -13,6 +13,7 @@ import { PredictionsPollsPanel } from './PredictionsPollsPanel'
 import { ActivityFeed } from './ActivityFeed'
 import { RewardsQueuePanel } from './RewardsQueuePanel'
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { useT } from '../../utils/i18n'
 
 const VideoPlayer = lazy(() => import('../VideoPlayer'))
 const Chat = lazy(() => import('../Chat'))
@@ -41,6 +42,7 @@ export function ModView({
   onExit,
   onLoginWithToken,
 }) {
+  const t = useT()
   const modState = useModeration({ broadcasterId, userId })
   const roleState = useChannelRole({ broadcasterId, userId, channel })
   const rewardsState = useManageRewards({ broadcasterId, token: twitchToken })
@@ -186,15 +188,15 @@ export function ModView({
       <div className="shrink-0 p-2.5 bg-white/5 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <PhosphorIcon name="Chats" size={18} className="text-twitch-glow" weight="duotone" />
-          <span className="text-xs font-bold text-white uppercase tracking-wider">Chat de Moderación</span>
+          <span className="text-xs font-bold text-white uppercase tracking-wider">{t('mod.chat.title', 'Chat de Moderación')}</span>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-text-muted">
-          <span>Clic en usuario para inspeccionar</span>
+          <span>{t('mod.chat.clickInspect', 'Clic en usuario para inspeccionar')}</span>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-xs">Cargando chat...</div>}>
+        <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-xs">{t('mod.chat.loading', 'Cargando chat...')}</div>}>
           <Chat
             channel={channel}
             broadcasterId={broadcasterId}
@@ -231,7 +233,7 @@ export function ModView({
               title="Mod Log de Auditoría"
             >
               <PhosphorIcon name="ClockCounterClockwise" size={13} />
-              <span>Log</span>
+              <span>{t('mod.tab.audit', 'Log')}</span>
             </button>
           )}
 
@@ -246,7 +248,7 @@ export function ModView({
               title="Lista de Espectadores y Moderadores"
             >
               <PhosphorIcon name="ChatsCircle" size={13} />
-              <span>Usuarios</span>
+              <span>{t('mod.tab.users', 'Usuarios')}</span>
             </button>
           )}
 
@@ -261,7 +263,7 @@ export function ModView({
               title="Fuente de Actividad (Subs, Raids, Bits)"
             >
               <PhosphorIcon name="Lightning" size={13} />
-              <span>Actividad</span>
+              <span>{t('mod.tab.activity', 'Actividad')}</span>
             </button>
           )}
 
@@ -276,7 +278,7 @@ export function ModView({
               title="Cola de AutoMod y Solicitudes de Unban"
             >
               <PhosphorIcon name="ShieldCheck" size={13} />
-              <span>AutoMod</span>
+              <span>{t('mod.tab.automod', 'AutoMod')}</span>
               {heldMessages.length > 0 && (
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
               )}
@@ -294,7 +296,7 @@ export function ModView({
               title="Predicciones y Encuestas"
             >
               <PhosphorIcon name="Coins" size={13} />
-              <span>Predicciones</span>
+              <span>{t('mod.tab.predictions', 'Predicciones')}</span>
             </button>
           )}
 
@@ -309,7 +311,7 @@ export function ModView({
               title="Cola de Solicitudes de Puntos"
             >
               <PhosphorIcon name="Gift" size={13} />
-              <span>Puntos</span>
+              <span>{t('mod.tab.rewards', 'Puntos')}</span>
               {rewardsState.pendingRedemptions?.length > 0 && (
                 <span className="px-1 py-0.2 bg-twitch text-[9px] rounded-full font-bold">
                   {rewardsState.pendingRedemptions.length}
@@ -326,7 +328,7 @@ export function ModView({
             title="Vaciar registro local de acciones"
           >
             <PhosphorIcon name="Trash" size={11} />
-            <span>Limpiar</span>
+            <span>{t('mod.audit.clear', 'Limpiar')}</span>
           </button>
         )}
       </div>
@@ -352,7 +354,7 @@ export function ModView({
                 : 'text-white/60 hover:text-white'
             }`}
           >
-            Solicitudes Unban
+            {t('mod.tab.unbanRequests', 'Solicitudes Unban')}
           </button>
         </div>
       )}

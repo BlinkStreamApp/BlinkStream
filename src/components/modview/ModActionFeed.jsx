@@ -1,15 +1,17 @@
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { useT } from '../../utils/i18n'
 
 export function ModActionFeed({ auditLog = [], onInspectUser }) {
+  const t = useT()
   if (auditLog.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center text-text-muted select-none">
         <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-2 text-white/30">
           <PhosphorIcon name="ClockCounterClockwise" size={20} weight="duotone" />
         </div>
-        <p className="text-xs font-semibold text-white/70">Sin acciones recientes</p>
+        <p className="text-xs font-semibold text-white/70">{t('mod.audit.empty', 'Sin acciones recientes')}</p>
         <p className="text-[10px] text-text-muted mt-0.5">
-          Las sanciones y cambios de moderación se registrarán aquí en vivo.
+          {t('mod.audit.emptyDesc', 'Las sanciones y cambios de moderación se registrarán aquí en vivo.')}
         </p>
       </div>
     )

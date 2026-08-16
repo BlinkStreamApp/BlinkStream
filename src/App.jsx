@@ -488,7 +488,7 @@ function MainApp() {
             className="flex items-center gap-2 px-3 py-1.5 ml-2 rounded-xl border bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 hover:from-cyan-500/25 hover:to-fuchsia-500/25 text-cyan-300 border-cyan-500/40 hover:border-cyan-400 shadow-sm hover:shadow-cyan-500/20 hover:scale-[1.02] transition-all cursor-pointer text-[12px] font-extrabold shrink-0"
           >
             <PhosphorIcon name="DeviceMobile" size={18} weight="fill" className="text-cyan-400 animate-bounce-short" />
-            <span className="hidden sm:inline">Mando Wi-Fi</span>
+            <span className="hidden sm:inline">{t('nav.wifiRemote', 'Mando Wi-Fi')}</span>
           </button>
 
           {}
