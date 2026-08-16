@@ -947,39 +947,39 @@ export async function redeemCustomReward(broadcasterId, rewardId, userInput, use
   }
 }
 
-export async function getChannelRole(broadcasterId, userId, signal) {
-  if (!broadcasterId || !userId) {
-    return ok('unknown')
-  }
-  if (broadcasterId === userId) {
+export async function getChannelRole(broadcasterId, userId, signal, channel) {
+  if (broadcasterId && userId && String(broadcasterId) === String(userId)) {
     return ok('broadcaster')
   }
 
-  // 1. Try Twitch GQL with user's OAuth token (works for mods without requiring broadcaster scope)
+  // 1. Try Twitch GQL with user's OAuth token and channel login (works for mods without requiring broadcaster scope)
   const token = await getStoredToken()
-  if (token) {
+  const login = sanitizeChannelForGraphQL(channel)
+  if (token && login) {
     try {
+      const cleanToken = token.replace(/^oauth:/i, '')
       const gqlRes = await fetch('https://gql.twitch.tv/gql', {
         method: 'POST',
         headers: {
           'Client-ID': PUBLIC_CLIENT_ID,
-          'Authorization': `OAuth ${token}`,
+          'Authorization': `OAuth ${cleanToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           query: `
-            query CheckChannelRole($id: ID!) {
-              user(id: $id) {
+            query CheckChannelRole($login: String!) {
+              user(login: $login) {
                 id
+                login
                 self {
                   isModerator
-                  isBroadcaster
                   isVIP
+                  isEditor
                 }
               }
             }
           `,
-          variables: { id: String(broadcasterId) },
+          variables: { login },
         }),
         signal,
       })
@@ -987,16 +987,24 @@ export async function getChannelRole(broadcasterId, userId, signal) {
       if (gqlRes.ok) {
         const d = await gqlRes.json()
         const self = d?.data?.user?.self
+        const targetUserId = d?.data?.user?.id
+        if (targetUserId && userId && String(targetUserId) === String(userId)) {
+          return ok('broadcaster')
+        }
         if (self) {
-          if (self.isBroadcaster) return ok('broadcaster')
           if (self.isModerator) return ok('mod')
           if (self.isVIP) return ok('vip')
+          if (self.isEditor) return ok('editor')
           return ok('viewer')
         }
       }
     } catch {
       // Fallback to Helix
     }
+  }
+
+  if (!broadcasterId || !userId) {
+    return ok('unknown')
   }
 
   // 2. Helix fallback

@@ -16,8 +16,8 @@ function evictOldestIfFull() {
   if (oldestKey !== undefined) _cache.delete(oldestKey)
 }
 
-function getCached(broadcasterId, userId) {
-  const key = `${broadcasterId}:${userId}`
+function getCached(broadcasterId, userId, channel) {
+  const key = `${broadcasterId || ''}:${userId || ''}:${channel || ''}`
   const entry = _cache.get(key)
   if (!entry) return null
   if (Date.now() - entry.ts > CACHE_TTL_MS) {
@@ -27,27 +27,26 @@ function getCached(broadcasterId, userId) {
   return entry
 }
 
-function setCached(broadcasterId, userId, role) {
-  const key = `${broadcasterId}:${userId}`
-
+function setCached(broadcasterId, userId, channel, role) {
+  const key = `${broadcasterId || ''}:${userId || ''}:${channel || ''}`
   _cache.set(key, { role, ts: Date.now() })
   evictOldestIfFull()
 }
 
 export function useChannelRole({ broadcasterId, userId, channel } = {}) {
-  const [role, setRole] = useState( ('unknown'))
+  const [role, setRole] = useState('unknown')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const abortRef = useRef(null)
 
-  const fetchRole = useCallback(async (bId, uId) => {
-    if (!bId || !uId) {
+  const fetchRole = useCallback(async (bId, uId, ch) => {
+    if (!ch && !bId) {
       setRole('unknown')
       setLoading(false)
       return
     }
 
-    const cached = getCached(bId, uId)
+    const cached = getCached(bId, uId, ch)
     if (cached) {
       setRole(cached.role)
       setError(null)
@@ -60,14 +59,13 @@ export function useChannelRole({ broadcasterId, userId, channel } = {}) {
     abortRef.current = ac
     setLoading(true)
     setError(null)
-    const result = await getChannelRole(bId, uId, ac.signal)
+    const result = await getChannelRole(bId, uId, ac.signal, ch)
     if (ac.signal.aborted) return
     if (result.success) {
       setRole(result.value)
-      setCached(bId, uId, result.value)
+      setCached(bId, uId, ch, result.value)
       setError(null)
     } else {
-
       setRole('viewer')
       setError(result.error)
     }
@@ -75,19 +73,18 @@ export function useChannelRole({ broadcasterId, userId, channel } = {}) {
   }, [])
 
   useEffect(() => {
-
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchRole(broadcasterId, userId)
+    fetchRole(broadcasterId, userId, channel)
     return () => abortRef.current?.abort()
   }, [broadcasterId, userId, channel, fetchRole])
 
   const refresh = useCallback(() => {
-    if (broadcasterId && userId) {
-      const key = `${broadcasterId}:${userId}`
+    if (channel || broadcasterId) {
+      const key = `${broadcasterId || ''}:${userId || ''}:${channel || ''}`
       _cache.delete(key)
-      fetchRole(broadcasterId, userId)
+      fetchRole(broadcasterId, userId, channel)
     }
-  }, [broadcasterId, userId, fetchRole])
+  }, [broadcasterId, userId, channel, fetchRole])
 
   return {
     role,
