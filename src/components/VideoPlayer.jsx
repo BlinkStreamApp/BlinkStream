@@ -401,7 +401,22 @@ export default function VideoPlayer({
     video.addEventListener('error', handleVideoError)
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
-      video.play().catch(() => setPlaying(false))
+      const playPromise = video.play()
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setPlaying(true))
+          .catch(err => {
+            console.warn('[VideoPlayer] Autoplay bloqueado, reintentando con mute:', err)
+            video.muted = true
+            setMuted(true)
+            video.play()
+              .then(() => setPlaying(true))
+              .catch(e => {
+                console.warn('[VideoPlayer] Playback falló incluso en mute:', e)
+                setPlaying(false)
+              })
+          })
+      }
 
       if (import.meta.env.DEV) {
         const levelsInfo = data.levels.map(l => `${l.height}p (${Math.round(l.bitrate / 1000)}kbps)`).join(', ')
@@ -413,15 +428,12 @@ export default function VideoPlayer({
           const currentLevelIdx = hls.currentLevel
           console.warn(`[HLS] current level (${currentLevelIdx}) not playing after 5s, trying fallback`)
           if (hls.levels && hls.levels.length > 1 && currentLevelIdx >= 0 && currentLevelIdx < hls.levels.length - 1) {
-
             hls.currentLevel = currentLevelIdx + 1
           } else {
-
             onQualityChange('best')
             fetchStream(channel, 'best')
           }
         } else if (video.videoWidth === 0 && data.levels.length > 1) {
-
           console.warn(`[VideoPlayer] videoWidth=0 with levels available, downgrading to lowest`)
           hls.currentLevel = data.levels.length - 1
         }
@@ -720,7 +732,7 @@ export default function VideoPlayer({
         </div>
       )}
 
-      <video ref={videoRef} crossOrigin="anonymous" className={`w-full h-full object-contain ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
+      <video ref={videoRef} className={`w-full h-full object-contain ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
       {audioOnly && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 select-none">
           <div className="w-16 h-16 rounded-2xl bg-twitch/20 flex items-center justify-center mb-3 animate-pulse-glow">

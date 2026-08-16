@@ -20,14 +20,26 @@ export class TauriPlaylistLoader extends Hls.DefaultConfig.loader {
     }
 
     const trequest = performance.now()
-    console.log(`[TauriHLS] Fetching ${context.type}: ${context.url.substring(0, 100)}...`)
+    if (this.stats && this.stats.loading) {
+      this.stats.loading.start = trequest
+    }
+
     invoke('fetch_m3u8_content', { url: context.url })
       .then(text => {
         const tload = performance.now()
-        console.log(`[TauriHLS] OK ${context.type} (${text.length} bytes, ${Math.round(tload - trequest)}ms)`)
+        if (this.stats) {
+          if (this.stats.loading) {
+            this.stats.loading.first = Math.max(tload, this.stats.loading.start || trequest)
+            this.stats.loading.end = tload
+          }
+          this.stats.loaded = text.length
+          this.stats.total = text.length
+          this.stats.bwEstimate = Math.round((text.length * 8000) / Math.max(1, (tload - trequest)))
+        }
+
         callbacks.onSuccess(
-          { url: context.url, data: absolutizePlaylist(text, context.url) },
-          { trequest, tfirst: tload, tload, loaded: text.length, total: text.length },
+          { url: context.url, data: absolutizePlaylist(text, context.url), code: 200 },
+          this.stats,
           context,
           null,
         )
