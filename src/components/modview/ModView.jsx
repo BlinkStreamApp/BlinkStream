@@ -131,6 +131,7 @@ export function ModView({
               onBan={modState.ban}
               onUnban={modState.unban}
               onClose={() => setSelectedUser(null)}
+              onSelectUser={handleSelectUser}
               isBroadcaster={roleState.isBroadcaster}
             />
           </div>
@@ -206,6 +207,8 @@ export function ModView({
             ) : (
               <ActiveModsPanel
                 broadcasterId={broadcasterId}
+                userId={userId}
+                recentMessages={chatMessages}
                 onInspectUser={handleSelectUser}
               />
             )}

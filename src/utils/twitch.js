@@ -1077,3 +1077,34 @@ export async function updateChatSettings(broadcasterId, moderatorId, settings) {
   )
 }
 
+export async function getChatters(broadcasterId, moderatorId, first = 100) {
+  if (!broadcasterId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getChatters' })
+  }
+  const modParam = moderatorId ? `&moderator_id=${encodeURIComponent(moderatorId)}` : ''
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${encodeURIComponent(broadcasterId)}${modParam}&first=${first}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getChatters', broadcasterId, moderatorId },
+  )
+  if (!result.success) return result
+  return ok(result.value?.data || [])
+}
+
+export async function getUserByLogin(login) {
+  if (!login) {
+    return err(ErrorCode.TWITCH_API_ERROR, 'login requerido', { action: 'getUserByLogin' })
+  }
+  const cleanLogin = String(login).replace(/^@/, '').trim().toLowerCase()
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/users?login=${encodeURIComponent(cleanLogin)}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getUserByLogin', login: cleanLogin },
+  )
+  if (!result.success) return result
+  const users = result.value?.data || []
+  return ok(users[0] || null)
+}
+
+
+

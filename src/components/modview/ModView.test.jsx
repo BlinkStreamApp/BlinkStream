@@ -89,10 +89,23 @@ describe('UserInspectorCard', () => {
     { id: 'm3', user: 'troll_user', text: 'Hello spam 2', timestamp: Date.now() - 1000 },
   ]
 
-  it('renders placeholder when no user is selected', () => {
-    render(<UserInspectorCard targetUser={null} />)
-    expect(screen.getByText('Inspector de Usuario')).toBeInTheDocument()
-    expect(screen.getByText(/Haz clic en cualquier mensaje/i)).toBeInTheDocument()
+  it('renders search bar and recent chatters list when no user is selected', () => {
+    const onSelectUser = vi.fn()
+    render(
+      <UserInspectorCard
+        targetUser={null}
+        recentMessages={recentMessages}
+        onSelectUser={onSelectUser}
+      />
+    )
+    expect(screen.getByText(/Inspector & Buscador de Usuario/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Buscar o escribir @usuario.../i)).toBeInTheDocument()
+    expect(screen.getByText(/Participantes Recientes/i)).toBeInTheDocument()
+    expect(screen.getByText('troll_user')).toBeInTheDocument()
+
+    // Click on chatter selects user
+    fireEvent.click(screen.getByText('troll_user'))
+    expect(onSelectUser).toHaveBeenCalledWith(expect.objectContaining({ username: 'troll_user' }))
   })
 
   it('renders selected user details and session history', () => {
