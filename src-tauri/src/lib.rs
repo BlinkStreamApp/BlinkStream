@@ -1690,6 +1690,46 @@ async fn download_media_range(
     Ok(output_file.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+async fn set_click_through(app: AppHandle, label: String, ignore: bool) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(&label) {
+        window
+            .set_ignore_cursor_events(ignore)
+            .map_err(|e| format!("Error modificando cursor events: {e}"))?;
+        Ok(())
+    } else {
+        Err(format!("Ventana {label} no encontrada"))
+    }
+}
+
+#[tauri::command]
+async fn open_gamer_overlay(app: AppHandle, channel: String) -> Result<(), String> {
+    use tauri::Emitter;
+    let label = "gamer_overlay";
+    if let Some(existing) = app.get_webview_window(label) {
+        let _ = existing.set_focus();
+        let _ = existing.emit("overlay_channel_change", &channel);
+        return Ok(());
+    }
+
+    let url_str = format!("index.html?overlay=true&channel={}", urlencoding::encode(&channel));
+    let url = tauri::WebviewUrl::App(url_str.into());
+
+    let _window = tauri::WebviewWindowBuilder::new(&app, label, url)
+        .title("BlinkStream Gamer HUD")
+        .inner_size(360.0, 560.0)
+        .min_inner_size(240.0, 300.0)
+        .resizable(true)
+        .always_on_top(true)
+        .transparent(true)
+        .decorations(false)
+        .shadow(false)
+        .build()
+        .map_err(|e| format!("Error al crear overlay gamer: {e}"))?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1712,6 +1752,8 @@ pub fn run() {
             get_twitch_clip_url,
             get_vod_manifest_url,
             download_media_range,
+            set_click_through,
+            open_gamer_overlay,
             start_recording,
             stop_recording,
             get_app_token,

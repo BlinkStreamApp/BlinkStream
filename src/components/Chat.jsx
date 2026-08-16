@@ -8,6 +8,7 @@ import { useModerationDialogSafe } from './moderation/moderationContextValue'
 import { useT } from '../utils/i18n'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { safeOpenUrl, isTauri } from '../utils/tauriEnv'
+import { invoke } from '@tauri-apps/api/core'
 
 async function gqlGetUserIdByLogin(channel) {
   const login = sanitizeChannelForGraphQL(channel)
@@ -1683,6 +1684,24 @@ export default function Chat({
           <span className={`w-1.5 h-1.5 rounded-full ${antiSpam ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
           Anti-Spam
         </button>
+
+        {isTauri() && !isOverlay && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await invoke('open_gamer_overlay', { channel })
+              } catch (err) {
+                console.warn('Failed to open gamer overlay:', err)
+              }
+            }}
+            className="p-1 rounded-md text-text-muted hover:text-cyan-400 hover:bg-white/5 transition-colors cursor-pointer"
+            title="Abrir Overlay Gamer Transparente (HUD sobre videojuegos)"
+            aria-label="Abrir Overlay Gamer Transparente"
+          >
+            <PhosphorIcon name="PictureInPicture" size={14} weight="duotone" />
+          </button>
+        )}
 
         {/* WT-20260628-48: el boton de ajustes (gear) se movio a la barra de input.
             El popup con "Ocultar chat" vive ahora justo encima del boton Enviar. */}

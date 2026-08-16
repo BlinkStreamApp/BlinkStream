@@ -21,6 +21,7 @@ const Onboarding = lazy(() => import('./components/Onboarding'))
 const CPPanel = lazy(() => import('./components/channelpoints/CPPanel'))
 const ModPanel = lazy(() => import('./components/moderation/ModPanel'))
 const ModView = lazy(() => import('./components/modview/ModView'))
+const GamerChatOverlay = lazy(() => import('./components/overlay/GamerChatOverlay'))
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
@@ -821,6 +822,14 @@ function RuntimeDependencyGate({ children }) {
 }
 
 function App() {
+  const isOverlay = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('overlay') === 'true'
+  if (isOverlay) {
+    return (
+      <Suspense fallback={<div className="bg-transparent" />}>
+        <GamerChatOverlay />
+      </Suspense>
+    )
+  }
   return <RuntimeDependencyGate><MainApp /></RuntimeDependencyGate>
 }
 
