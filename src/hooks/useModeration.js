@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  banUser, unbanUser, deleteChatMessage,
+  banUser, unbanUser, deleteChatMessage, clearChatMessages, updateChatSettings, getChatSettings,
 } from '../utils/twitch'
 import { logEvent } from '../utils/eventLog'
 
@@ -233,25 +233,77 @@ export function useModeration({ broadcasterId, userId: moderatorId, maxActions =
   }, [broadcasterId, moderatorId, _checkAndClaimSlot, _recordRate, _appendAudit])
 
   const clearChat = useCallback(async () => {
-    if (!broadcasterId) return false
-
-    _appendAudit({ action: 'clear', target: 'channel', targetName: 'channel', success: true })
-    return true
-  }, [broadcasterId, _appendAudit])
+    if (!broadcasterId || !moderatorId) return false
+    if (!_checkAndClaimSlot()) return false
+    const result = await clearChatMessages(broadcasterId, moderatorId)
+    if (result.success) {
+      _recordRate()
+      _appendAudit({ action: 'clear', target: 'channel', targetName: 'channel', success: true })
+      return true
+    }
+    _appendAudit({ action: 'clear', target: 'channel', targetName: 'channel', success: false, error: result.error?.message })
+    return false
+  }, [broadcasterId, moderatorId, _checkAndClaimSlot, _recordRate, _appendAudit])
 
   const setChatMode = useCallback(async (mode, value) => {
-    if (!broadcasterId) return false
+    if (!broadcasterId || !moderatorId) return false
     if (!_checkAndClaimSlot()) return false
-    _recordRate()
+
+    const settings = {}
+    if (mode === 'slow') {
+      settings.slow_mode = true
+      settings.slow_mode_wait_time = Math.max(3, Math.min(120, Number(value) || 30))
+    } else if (mode === 'slowoff') {
+      settings.slow_mode = false
+    } else if (mode === 'emoteonly') {
+      settings.emote_mode = true
+    } else if (mode === 'emoteonlyoff') {
+      settings.emote_mode = false
+    } else if (mode === 'subscribers') {
+      settings.subscriber_mode = true
+    } else if (mode === 'subscribersoff') {
+      settings.subscriber_mode = false
+    } else if (mode === 'followers') {
+      settings.follower_mode = true
+      settings.follower_mode_duration = Math.max(0, Math.min(129600, Number(value) || 0))
+    } else if (mode === 'followersoff') {
+      settings.follower_mode = false
+    } else if (mode === 'uniquechat') {
+      settings.unique_chat_mode = true
+    } else if (mode === 'uniquechatoff') {
+      settings.unique_chat_mode = false
+    }
+
+    const result = await updateChatSettings(broadcasterId, moderatorId, settings)
+    if (result.success) {
+      _recordRate()
+      _appendAudit({
+        action: 'chat_mode',
+        target: mode,
+        targetName: mode,
+        reason: value != null ? String(value) : undefined,
+        success: true,
+      })
+      return true
+    }
+
     _appendAudit({
       action: 'chat_mode',
       target: mode,
       targetName: mode,
       reason: value != null ? String(value) : undefined,
-      success: true,
+      success: false,
+      error: result.error?.message,
     })
-    return true
-  }, [broadcasterId, _checkAndClaimSlot, _recordRate, _appendAudit])
+    return false
+  }, [broadcasterId, moderatorId, _checkAndClaimSlot, _recordRate, _appendAudit])
+
+  const fetchChatSettings = useCallback(async () => {
+    if (!broadcasterId) return null
+    const result = await getChatSettings(broadcasterId, moderatorId)
+    if (result.success) return result.value
+    return null
+  }, [broadcasterId, moderatorId])
 
   const clearAuditLog = useCallback(() => {
     if (!broadcasterId) return
@@ -276,6 +328,7 @@ export function useModeration({ broadcasterId, userId: moderatorId, maxActions =
     deleteMessage,
     clearChat,
     setChatMode,
+    fetchChatSettings,
     clearAuditLog,
     reloadAuditLog,
   }

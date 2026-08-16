@@ -1,4 +1,4 @@
-import { useState, useCallback, Suspense, lazy } from 'react'
+import { useState, useEffect, useCallback, Suspense, lazy } from 'react'
 import { useModeration } from '../../hooks/useModeration'
 import { useChannelRole } from '../../hooks/useChannelRole'
 import { ModQuickActionsBar } from './ModQuickActionsBar'
@@ -31,6 +31,27 @@ export function ModView({
   const [rightPanelTab, setRightPanelTab] = useState('audit') // 'audit' | 'team'
   const [chatMessages, setChatMessages] = useState([])
   const [activeModes, setActiveModes] = useState({})
+
+  const { fetchChatSettings } = modState
+  useEffect(() => {
+    let cancelled = false
+    const loadModes = async () => {
+      if (fetchChatSettings) {
+        const s = await fetchChatSettings()
+        if (s && !cancelled) {
+          setActiveModes({
+            slow: s.slow_mode ? (s.slow_mode_wait_time || 30) : false,
+            emoteonly: !!s.emote_mode,
+            subscribers: !!s.subscriber_mode,
+            followers: s.follower_mode ? (s.follower_mode_duration ?? 0) : false,
+            uniquechat: !!s.unique_chat_mode,
+          })
+        }
+      }
+    }
+    loadModes()
+    return () => { cancelled = true }
+  }, [fetchChatSettings])
 
   const handleSelectUser = useCallback((userObj) => {
     if (!userObj) {
@@ -133,6 +154,7 @@ export function ModView({
                 twitchToken={twitchToken}
                 twitchUsername={twitchUsername}
                 broadcasterId={broadcasterId}
+                userId={userId}
                 isModerator={roleState.isModerator}
                 isBroadcaster={roleState.isBroadcaster}
                 viewerLogin={twitchUsername}

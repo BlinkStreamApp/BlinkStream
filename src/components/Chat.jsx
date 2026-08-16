@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
-import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL, getHeaders } from '../utils/twitch'
+import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL, getHeaders, banUser, unbanUser, clearChatMessages, updateChatSettings, getUserIdByLogin } from '../utils/twitch'
 import PhosphorIcon from './icons/PhosphorIcon'
 import { adjustColorContrast } from '../utils/format'
 
@@ -469,6 +469,7 @@ export default function Chat({
   twitchToken,
   twitchUsername,
   broadcasterId,
+  userId,
   onOpenCPPanel,
   isModerator,
   isBroadcaster,
@@ -1376,54 +1377,214 @@ export default function Chat({
     }
   }, [messages])
 
-  const parseChatCommand = useCallback((text, targetCh = channel) => {
+  const handleSlashCommand = useCallback(async (text) => {
     const meMatch = text.match(/^\/me\s+(.+)/i)
     if (meMatch) {
-      return `PRIVMSG #${targetCh} :\u0001ACTION ${meMatch[1]}\u0001`
-    }
-
-    const cmdMatch = text.match(/^\/(\w+)\b\s*(.*)/)
-    if (cmdMatch) {
-      const cmd = cmdMatch[1].toLowerCase()
-      const args = cmdMatch[2]
-      const supported = ['ban', 'unban', 'timeout', 'untimeout', 'mods', 'vips',
-        'slow', 'slowoff', 'followers', 'followersoff', 'subscribers', 'subscribersoff',
-        'emoteonly', 'emoteonlyoff', 'clear', 'host', 'unhost', 'raid', 'unraid',
-        'color', 'commercial', 'delete', 'announce', 'shoutout']
-      if (supported.includes(cmd)) {
-        return `PRIVMSG #${targetCh} :/${cmd} ${args}`.trimEnd()
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(`PRIVMSG #${channel} :\u0001ACTION ${meMatch[1]}\u0001\r\n`)
       }
-      setConnError(`Comando /${cmd} no reconocido`)
-      return null
-    }
-
-    return `PRIVMSG #${targetCh} :${text}`
-  }, [channel])
-
-  const sendMessage = (e) => {
-    e.preventDefault()
-    const text = inputText.trim()
-    if (!text || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
-    if (!auth.token || !auth.username) {
-      setConnError('Debes iniciar sesión para enviar mensajes')
-      return
-    }
-
-    const cmd = parseChatCommand(text)
-    if (cmd) {
       setMessages(prev => [...prev, {
         id: ++msgIdCounter,
         channel,
         user: auth.username,
         color: '#bf94ff',
-        message: text,
+        message: meMatch[1],
         emotes: '',
         badges: [],
       }])
-      wsRef.current.send(cmd + '\r\n')
       setInputText('')
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+      return
     }
+
+    const cmdMatch = text.match(/^\/(\w+)\b\s*(.*)/)
+    if (!cmdMatch) return
+
+    const cmd = cmdMatch[1].toLowerCase()
+    const args = cmdMatch[2].trim()
+    const modId = userId || auth.userId
+
+    if (cmd === 'clear') {
+      if (!isModerator && !isBroadcaster) {
+        setConnError('No tienes permisos de moderador para vaciar el chat.')
+        return
+      }
+      setInputText('')
+      const r = await clearChatMessages(broadcasterId, modId)
+      if (r.success) {
+        setMessages([{
+          id: ++msgIdCounter,
+          channel,
+          user: 'BlinkStream',
+          isNotice: true,
+          eventHeader: '🧹 El chat ha sido vaciado (/clear)',
+          eventColorClass: 'from-cyan-950/80 to-blue-900/40 border-cyan-500/60 text-cyan-300',
+        }])
+      } else {
+        setConnError(r.error?.message || 'Error al vaciar el chat.')
+      }
+      return
+    }
+
+    if (['slow', 'slowoff', 'emoteonly', 'emoteonlyoff', 'subscribers', 'subscribersoff', 'followers', 'followersoff', 'uniquechat', 'uniquechatoff'].includes(cmd)) {
+      if (!isModerator && !isBroadcaster) {
+        setConnError('No tienes permisos para modificar los ajustes del chat.')
+        return
+      }
+      setInputText('')
+      const settings = {}
+      let desc = ''
+      if (cmd === 'slow') {
+        const s = Math.max(3, Math.min(120, Number(args) || 30))
+        settings.slow_mode = true
+        settings.slow_mode_wait_time = s
+        desc = `Modo lento activado (${s}s)`
+      } else if (cmd === 'slowoff') {
+        settings.slow_mode = false
+        desc = 'Modo lento desactivado'
+      } else if (cmd === 'emoteonly') {
+        settings.emote_mode = true
+        desc = 'Modo solo emotes activado'
+      } else if (cmd === 'emoteonlyoff') {
+        settings.emote_mode = false
+        desc = 'Modo solo emotes desactivado'
+      } else if (cmd === 'subscribers') {
+        settings.subscriber_mode = true
+        desc = 'Modo solo suscriptores activado'
+      } else if (cmd === 'subscribersoff') {
+        settings.subscriber_mode = false
+        desc = 'Modo solo suscriptores desactivado'
+      } else if (cmd === 'followers') {
+        const m = Math.max(0, Math.min(129600, Number(args) || 0))
+        settings.follower_mode = true
+        settings.follower_mode_duration = m
+        desc = `Modo solo seguidores activado (${m}m)`
+      } else if (cmd === 'followersoff') {
+        settings.follower_mode = false
+        desc = 'Modo solo seguidores desactivado'
+      } else if (cmd === 'uniquechat') {
+        settings.unique_chat_mode = true
+        desc = 'Modo chat único activado'
+      } else if (cmd === 'uniquechatoff') {
+        settings.unique_chat_mode = false
+        desc = 'Modo chat único desactivado'
+      }
+
+      const r = await updateChatSettings(broadcasterId, modId, settings)
+      if (r.success) {
+        setMessages(prev => [...prev, {
+          id: ++msgIdCounter,
+          channel,
+          user: 'BlinkStream',
+          isNotice: true,
+          eventHeader: `⚙️ ${desc}`,
+          eventColorClass: 'from-purple-950/80 to-indigo-900/40 border-purple-500/60 text-purple-300',
+        }])
+      } else {
+        setConnError(r.error?.message || 'Error al actualizar ajustes del chat.')
+      }
+      return
+    }
+
+    if (cmd === 'ban' || cmd === 'timeout' || cmd === 'unban' || cmd === 'untimeout') {
+      if (!isModerator && !isBroadcaster) {
+        setConnError('No tienes permisos de moderador.')
+        return
+      }
+      setInputText('')
+      const parts = args.split(/\s+/)
+      const targetName = parts[0]?.replace(/^@/, '')
+      if (!targetName) {
+        setConnError(`Uso: /${cmd} <usuario> [tiempo] [motivo]`)
+        return
+      }
+
+      const targetId = await getUserIdByLogin(targetName)
+      if (!targetId) {
+        setConnError(`No se encontró el usuario @${targetName}`)
+        return
+      }
+
+      if (cmd === 'ban') {
+        const reason = parts.slice(1).join(' ') || undefined
+        const r = await banUser(broadcasterId, modId, targetId, reason)
+        if (r.success) {
+          setMessages(prev => [...prev, {
+            id: ++msgIdCounter,
+            channel,
+            user: 'BlinkStream',
+            isNotice: true,
+            eventHeader: `🚫 @${targetName} ha sido baneado permanentemente.`,
+            eventColorClass: 'from-red-950/80 to-rose-900/40 border-red-500/60 text-red-300',
+          }])
+        } else {
+          setConnError(r.error?.message || `Error al banear a @${targetName}`)
+        }
+      } else if (cmd === 'timeout') {
+        const dur = Number(parts[1]) || 600
+        const reason = parts.slice(Number(parts[1]) ? 2 : 1).join(' ') || undefined
+        const r = await banUser(broadcasterId, modId, targetId, reason, dur)
+        if (r.success) {
+          setMessages(prev => [...prev, {
+            id: ++msgIdCounter,
+            channel,
+            user: 'BlinkStream',
+            isNotice: true,
+            eventHeader: `⏱️ @${targetName} ha sido silenciado por ${dur}s.`,
+            eventColorClass: 'from-amber-950/80 to-yellow-900/40 border-amber-500/60 text-amber-300',
+          }])
+        } else {
+          setConnError(r.error?.message || `Error al silenciar a @${targetName}`)
+        }
+      } else if (cmd === 'unban' || cmd === 'untimeout') {
+        const r = await unbanUser(broadcasterId, modId, targetId)
+        if (r.success) {
+          setMessages(prev => [...prev, {
+            id: ++msgIdCounter,
+            channel,
+            user: 'BlinkStream',
+            isNotice: true,
+            eventHeader: `✅ @${targetName} ha sido desbaneado / perdonado.`,
+            eventColorClass: 'from-green-950/80 to-emerald-900/40 border-green-500/60 text-green-300',
+          }])
+        } else {
+          setConnError(r.error?.message || `Error al desbanear a @${targetName}`)
+        }
+      }
+      return
+    }
+
+    setConnError(`Comando /${cmd} no soportado o requiere permisos especiales.`)
+    setInputText('')
+  }, [channel, auth, broadcasterId, userId, isModerator, isBroadcaster])
+
+  const sendMessage = async (e) => {
+    e.preventDefault()
+    const text = inputText.trim()
+    if (!text) return
+    if (!auth.token || !auth.username) {
+      setConnError('Debes iniciar sesión para enviar mensajes')
+      return
+    }
+
+    if (text.startsWith('/')) {
+      await handleSlashCommand(text)
+      return
+    }
+
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+
+    setMessages(prev => [...prev, {
+      id: ++msgIdCounter,
+      channel,
+      user: auth.username,
+      color: '#bf94ff',
+      message: text,
+      emotes: '',
+      badges: [],
+    }])
+    wsRef.current.send(`PRIVMSG #${channel} :${text}\r\n`)
+    setInputText('')
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
   // Mando a Distancia Wi-Fi (Fase 4): Recibir texto del teclado móvil y enviarlo al chat sin duplicaciones
@@ -1439,25 +1600,30 @@ export default function Chat({
     let isCancelled = false;
     import('@tauri-apps/api/event').then(({ listen }) => {
       if (isCancelled) return;
-      listen('companion_send_chat', (e) => {
-        const text = e.payload?.text;
+      listen('companion_send_chat', async (e) => {
+        const text = e.payload?.text?.trim();
         const { auth: curAuth, channel: curCh } = companionChatRef.current || {};
-        const curWs = wsRef.current;
-        if (!text || !curWs || curWs.readyState !== 1 || !curAuth?.token || !curAuth?.username) return;
-        const cmd = parseChatCommand(text, curCh);
-        if (cmd) {
-          setMessages(prev => [...prev, {
-            id: ++msgIdCounter,
-            channel: curCh,
-            user: curAuth.username,
-            color: '#bf94ff',
-            message: text,
-            emotes: '',
-            badges: [],
-          }]);
-          curWs.send(cmd + '\r\n');
-          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        if (!text || !curAuth?.token || !curAuth?.username) return;
+
+        if (text.startsWith('/')) {
+          await handleSlashCommand(text);
+          return;
         }
+
+        const curWs = wsRef.current;
+        if (!curWs || curWs.readyState !== 1) return;
+
+        setMessages(prev => [...prev, {
+          id: ++msgIdCounter,
+          channel: curCh,
+          user: curAuth.username,
+          color: '#bf94ff',
+          message: text,
+          emotes: '',
+          badges: [],
+        }]);
+        curWs.send(`PRIVMSG #${curCh} :${text}\r\n`);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
       }).then(fn => {
         if (isCancelled) fn();
         else unlistenFn = fn;
@@ -1467,7 +1633,7 @@ export default function Chat({
       isCancelled = true;
       if (unlistenFn) unlistenFn();
     };
-  }, [isOverlay, parseChatCommand]);
+  }, [isOverlay, handleSlashCommand]);
 
   return (
     <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>

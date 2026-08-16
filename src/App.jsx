@@ -669,6 +669,7 @@ function MainApp() {
                   twitchToken={getTwitchToken()}
                   twitchUsername={username || localStorage.getItem('blinkstream_twitch_username')}
                   broadcasterId={broadcasterId}
+                  userId={viewerUserId}
                   onOpenCPPanel={() => setShowCPPanel(p => !p)}
                   isModerator={roleState.isModerator}
                   isBroadcaster={roleState.isBroadcaster}

@@ -6,6 +6,9 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 const banUserMock = vi.fn()
 const unbanUserMock = vi.fn()
 const deleteChatMessageMock = vi.fn()
+const clearChatMessagesMock = vi.fn()
+const updateChatSettingsMock = vi.fn()
+const getChatSettingsMock = vi.fn()
 vi.mock('../utils/twitch', async () => {
   const actual = await vi.importActual('../utils/twitch')
   return {
@@ -13,6 +16,9 @@ vi.mock('../utils/twitch', async () => {
     banUser: (...args) => banUserMock(...args),
     unbanUser: (...args) => unbanUserMock(...args),
     deleteChatMessage: (...args) => deleteChatMessageMock(...args),
+    clearChatMessages: (...args) => clearChatMessagesMock(...args),
+    updateChatSettings: (...args) => updateChatSettingsMock(...args),
+    getChatSettings: (...args) => getChatSettingsMock(...args),
   }
 })
 
@@ -26,9 +32,15 @@ describe('useModeration — acciones basicas', () => {
     banUserMock.mockReset()
     unbanUserMock.mockReset()
     deleteChatMessageMock.mockReset()
+    clearChatMessagesMock.mockReset()
+    updateChatSettingsMock.mockReset()
+    getChatSettingsMock.mockReset()
     banUserMock.mockResolvedValue({ success: true, value: null })
     unbanUserMock.mockResolvedValue({ success: true, value: null })
     deleteChatMessageMock.mockResolvedValue({ success: true, value: null })
+    clearChatMessagesMock.mockResolvedValue({ success: true, value: null })
+    updateChatSettingsMock.mockResolvedValue({ success: true, value: null })
+    getChatSettingsMock.mockResolvedValue({ success: true, value: null })
   })
 
   afterEach(() => vi.restoreAllMocks())
@@ -259,6 +271,10 @@ describe('useModeration — chat modes + clear', () => {
     localStorage.clear()
     clearRateLimitState()
     banUserMock.mockReset()
+    updateChatSettingsMock.mockReset()
+    clearChatMessagesMock.mockReset()
+    updateChatSettingsMock.mockResolvedValue({ success: true, value: null })
+    clearChatMessagesMock.mockResolvedValue({ success: true, value: null })
   })
   afterEach(() => {
     clearRateLimitState()

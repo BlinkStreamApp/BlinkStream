@@ -1030,8 +1030,50 @@ export async function deleteChatMessage(broadcasterId, moderatorId, messageId) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId y messageId requeridos', { action: 'deleteChatMessage' })
   }
   return helixFetch(
-    `https://api.twitch.tv/helix/moderation/chat_messages?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&message_id=${encodeURIComponent(messageId)}`,
+    `https://api.twitch.tv/helix/moderation/chat?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&message_id=${encodeURIComponent(messageId)}`,
     { method: 'DELETE' },
     { component: 'twitch', action: 'deleteChatMessage', broadcasterId, moderatorId, messageId },
   )
 }
+
+export async function clearChatMessages(broadcasterId, moderatorId) {
+  if (!broadcasterId || !moderatorId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y moderatorId requeridos', { action: 'clearChatMessages' })
+  }
+  return helixFetch(
+    `https://api.twitch.tv/helix/moderation/chat?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}`,
+    { method: 'DELETE' },
+    { component: 'twitch', action: 'clearChatMessages', broadcasterId, moderatorId },
+  )
+}
+
+export async function getChatSettings(broadcasterId, moderatorId) {
+  if (!broadcasterId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getChatSettings' })
+  }
+  const modParam = moderatorId ? `&moderator_id=${encodeURIComponent(moderatorId)}` : ''
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/chat/settings?broadcaster_id=${encodeURIComponent(broadcasterId)}${modParam}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getChatSettings', broadcasterId, moderatorId },
+  )
+  if (!result.success) return result
+  const list = result.value?.data || []
+  return ok(list[0] || null)
+}
+
+export async function updateChatSettings(broadcasterId, moderatorId, settings) {
+  if (!broadcasterId || !moderatorId || !settings) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId y settings requeridos', { action: 'updateChatSettings' })
+  }
+  return helixFetch(
+    `https://api.twitch.tv/helix/chat/settings?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    },
+    { component: 'twitch', action: 'updateChatSettings', broadcasterId, moderatorId, settings },
+  )
+}
+
