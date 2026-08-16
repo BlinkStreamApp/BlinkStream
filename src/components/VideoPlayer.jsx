@@ -380,10 +380,10 @@ export default function VideoPlayer({
     const hls = new Hls({
       loader: TauriPlaylistLoader,
       lowLatencyMode: true,
-      backBufferLength: 10,
-      maxBufferLength: 8,
-      maxMaxBufferLength: 16,
-      maxBufferSize: 30 * 1000 * 1000,
+      backBufferLength: 8,
+      maxBufferLength: 6,
+      maxMaxBufferLength: 12,
+      maxBufferSize: 25 * 1000 * 1000,
       capLevelToPlayerSize: true,
       abrEwmaDefaultEstimate: 5_000_000,
       abrBandWidthFactor: 0.95,
@@ -392,10 +392,13 @@ export default function VideoPlayer({
       fragLoadingTimeOut: 20000,
       manifestLoadingTimeOut: 15000,
       levelLoadingTimeOut: 15000,
+      liveSyncDuration: 1.5,
+      liveMaxLatencyDuration: 3.0,
       liveSyncDurationCount: 1,
-      liveMaxLatencyDurationCount: 2.5,
+      liveMaxLatencyDurationCount: 2,
       liveDurationInfinity: true,
-      maxLiveSyncPlaybackRate: 1.15,
+      maxLiveSyncPlaybackRate: 1.2,
+      highBufferWatchdogPeriod: 1,
       enableSoftwareAES: true,
       debug: false,
     })
@@ -438,6 +441,15 @@ export default function VideoPlayer({
       }
     }
     video.addEventListener('error', handleVideoError)
+
+    hls.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
+      if (data?.details?.live && typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
+        const latency = hls.latency
+        if (typeof latency === 'number' && latency > 3.5) {
+          try { video.currentTime = hls.liveSyncPosition } catch {}
+        }
+      }
+    })
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
       if (typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {

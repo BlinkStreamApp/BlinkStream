@@ -909,6 +909,9 @@ async fn get_stream_url(
         format!("twitch.tv/{}", channel),
         quality.clone(),
         "--stream-url".to_string(),
+        "--twitch-low-latency".to_string(),
+        "--hls-live-edge".to_string(),
+        "1".to_string(),
         "--twitch-supported-codecs".to_string(),
         "h264".to_string(),
     ];
@@ -985,7 +988,14 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
 
     let (stdout, stderr) = run_streamlink(
         &app,
-        &[&format!("twitch.tv/{channel}"), "best", "--stream-url"],
+        &[
+            &format!("twitch.tv/{channel}"),
+            "best",
+            "--stream-url",
+            "--twitch-low-latency",
+            "--hls-live-edge",
+            "1",
+        ],
     )?;
     let variant_url = stdout.trim();
 
