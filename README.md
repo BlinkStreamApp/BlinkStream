@@ -9,9 +9,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.7-e94560" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.4.0-e94560" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
+  <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
 </p>
 
 ---
@@ -20,23 +21,22 @@
 
 | Feature | Description |
 |---------|-------------|
-| 🎯 **Native Installer** | Signed-update-ready NSIS installer with automatic migration from legacy installations |
+| 🌍 **Global Localization** | 100% Comprehensive translations across 8 languages (ES, EN, FR, DE, PT, JA, KO, RU) |
+| 🛡️ **Pro Mod View Workspace** | Dedicated multi-dock command center (`Ctrl+M`) with live mod logs, AutoMod queue, unban appeals, active viewers, predictions, and channel point redemptions |
+| ⚡ **Ultra-Low Latency (LL-HLS)** | Aggressive live edge sync with instant 0-delay playback, dynamic 1.2x catchup, and 1-click live resync |
+| 💬 **Rich IRC Chat & Badges** | Real-time chat with 7TV/BTTV/FFZ emotes, optimistic badge rendering (Sub, Mod, VIP, Founder, Turbo), and custom colors |
 | 🌧️ **Emote Rain & Combos** | Floating real-time emote particle overlays and dynamic neon Combo meter (HYPERS, SUPER, GODLIKE) |
-| 🔔 **Smart Chat Tabs** | Quick navigation bar filtering between All messages, @Mentions with live notification counter, and ⭐ Featured events |
+| 🔔 **Smart Chat Tabs** | Quick navigation bar filtering between All messages, @Mentions with live counter, and ⭐ Featured events |
 | 📺 **Live Streams** | Smooth Twitch stream playback using integrated Streamlink + FFmpeg engine |
 | 🎬 **Clips & VODs** | Dedicated video-on-demand and clip player with selectable multi-quality tiers |
-| 💬 **Rich IRC Chat** | Real-time chat integration supporting third-party emotes (BTTV, 7TV, FFZ) and docking controls |
-| 🛡️ **Advanced Moderation** | Complete moderation tools: timeout/ban management, chat slow-mode, and VIP/mod badges |
 | 💎 **Channel Points** | Integrated channel point redemption tracking, custom reward execution, and live balance UI |
 | 📼 **Local Recording** | Built-in live recording system with automatic disk space monitoring and background encoding |
 | 🔐 **OAuth Authentication** | Secure Twitch login powered by Supabase Edge Functions with state-of-the-art token security |
 | ⭐ **Cloud Sync Favorites** | Synchronize favorite streamers and custom watchlists securely via cloud storage |
-| 🔍 **Smart Search** | Auto-complete channel discovery prioritizing online broadcasts with low-latency indicators |
-| 🎨 **Customization Studio** | Deep theme customization (AMOLED Black, Cyberpunk Gold, Emerald) with selectable Google Fonts |
-| 📊 **Pro Telemetry (Nerd Stats)** | Real-time live HUD measuring exact HTML5 frame rendering, FPS, network bitrate (Kbps), and buffer offset |
-| 🎮 **Glassmorphism Player** | Ergonomic quick-controls gear with centralized compact mode, audio-only toggles, and clean UI |
-| 🔒 **Hardened Security** | Strict Content Security Policy (CSP), rustls TLS, and secure keychain storage |
-| ⚡ **Zero Bloat & Lazy Load** | Optimized chunk splitting and circuit-breaker network sync for instantaneous offline/online resiliency |
+| 🎨 **Theme Studio** | Deep theme customization (AMOLED Black, Cyberpunk Gold, Emerald) with selectable Google Fonts |
+| 📊 **Pro Telemetry (Nerd Stats)** | Real-time live HUD measuring exact live broadcast delay, RAM buffer ahead, bitrate, resolution, FPS, and dropped frames |
+| 📱 **Mobile Wi-Fi Remote** | Control playback, channel switching, and volume wirelessly from any smartphone or tablet |
+| 🔒 **Hardened Security** | Strict Content Security Policy (CSP), rustls TLS, and secure OS keychain storage |
 | 🔄 **Over-The-Air Updates** | Automated background checking and seamless self-updating via official GitHub Releases |
 
 ---
@@ -45,8 +45,8 @@
 
 ### Windows
 Download the official installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases). Existing installations update automatically:
-- ⭐ **`BlinkStream_1.3.7_Win_x64.exe`** *(Recommended — NSIS installer and automatic updates)*
-- `BlinkStream_1.3.7_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream_1.4.0_Win_x64.exe`** *(Recommended — NSIS installer and automatic updates)*
+- `BlinkStream_1.4.0_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
 > **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
@@ -62,13 +62,13 @@ Download the official installer from [GitHub Releases](https://github.com/BlinkS
 ### macOS
 ```bash
 brew install streamlink
-# Download BlinkStream_1.3.7_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
+# Download BlinkStream_1.4.0_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
 ```
 
 ### Linux (Debian / Ubuntu)
 ```bash
 sudo apt install streamlink
-# Download BlinkStream_1.3.7_Linux_x86_64.deb or .AppImage from Releases
+# Download BlinkStream_1.4.0_Linux_x86_64.deb or .AppImage from Releases
 ```
 
 ---
@@ -99,7 +99,7 @@ pnpm tauri build --bundles app
 
 ### Linux
 ```bash
-sudo apt install streamlink libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev
+sudo apt update && sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 pnpm install
 pnpm build
 pnpm tauri build
@@ -107,44 +107,5 @@ pnpm tauri build
 
 ---
 
-## 🏗️ Architecture
-
-```
-blinkstream/
-├── src/                     # React 19 + Tailwind CSS Frontend
-│   ├── components/          # Modularized UI Components
-│   │   ├── moderation/      # Mod Panel, Timeout/Ban controllers
-│   │   ├── channelpoints/   # Twitch Reward Redemptions UI
-│   │   ├── recording/       # Video Recording Controller & Disk Monitor
-│   │   ├── HomeScreen.jsx   # Main Navigation & Carousel Hub
-│   │   └── ...
-│   ├── hooks/               # Custom state hooks (useAuth, useRecording, etc.)
-│   └── utils/               # Twitch API integrations, encryption, & analytics
-├── src-tauri/               # Rust Backend (Tauri v2.11)
-│   ├── src/
-│   │   ├── recorder.rs      # Cross-platform stream capture & POSIX fs storage metrics
-│   │   ├── lib.rs           # Core IPC bindings & single-instance management
-│   │   └── main.rs          # Application Entrypoint
-│   └── tauri.conf.json      # Hardened security manifest & bundler targets
-└── .github/workflows/       # CI/CD Pipelines (Multi-OS Automated Builds)
-```
-
----
-
-## 🔧 Technical Stack
-
-| Layer | Technology |
-|-------|------------|
-| **Desktop Shell** | Tauri v2.11 |
-| **Frontend Runtime** | React 19 + Tailwind CSS |
-| **Backend Core** | Rust 1.88.0 (Async Tokio engine) |
-| **Module Bundler** | Vite + pnpm |
-| **Video Streaming** | HLS.js + Streamlink + FFmpeg |
-| **Authentication** | Supabase Edge Functions + Twitch OAuth 2.0 |
-| **Chat Transport** | WebSocket IRC (`wss://irc-ws.chat.twitch.tv`) |
-| **CI/CD Automation** | GitHub Actions (Windows, macOS ARM/Intel, Linux) |
-
----
-
 ## 📄 License
-BlinkStream is distributed under the [MIT License](LICENSE).
+Distributed under the **MIT License**. See `LICENSE` for more information.
