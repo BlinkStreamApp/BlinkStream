@@ -32,9 +32,9 @@ export function UserInspectorCard({
           username: uname,
           displayName: m.displayName || m.user_name || uname,
           avatar: m.avatar || null,
-          isSub: !!(m.isSub || m.badges?.some?.(b => b.name === 'subscriber')),
-          isVip: !!(m.isVip || m.badges?.some?.(b => b.name === 'vip')),
-          isMod: !!(m.isMod || m.badges?.some?.(b => b.name === 'moderator')),
+          isSub: !!(m.isSub || m.badges?.some?.(b => b.name === 'subscriber' || b.set === 'subscriber')),
+          isVip: !!(m.isVip || m.badges?.some?.(b => b.name === 'vip' || b.set === 'vip')),
+          isMod: !!(m.isMod || m.badges?.some?.(b => b.name === 'moderator' || b.set === 'moderator' || b.name === 'broadcaster' || b.set === 'broadcaster')),
           lastMessage: m.text || m.message || '',
           timestamp: m.timestamp || 0,
         })

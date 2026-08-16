@@ -43,26 +43,69 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
           userId: c.user_id || c.id || '',
           user_login: c.user_login || c.user_name,
           user_name: c.user_name || c.user_login,
+          isMod: false,
+          isBroadcaster: false,
+          isVip: false,
+          isSub: false,
         })
       }
     }
     for (const m of recentMessages) {
-      const uname = (m.user || m.user_login || m.displayName || '').toLowerCase()
-      if (uname && !map.has(uname)) {
-        map.set(uname, {
+      const uname = (m.user || m.user_login || m.displayName || m.user_name || '').toLowerCase()
+      if (uname) {
+        const existing = map.get(uname) || {
           userId: m.user_id || m.userId || '',
           user_login: uname,
-          user_name: m.displayName || m.user_name || uname,
-          isSub: !!(m.isSub || m.badges?.some?.(b => b.name === 'subscriber')),
-          isVip: !!(m.isVip || m.badges?.some?.(b => b.name === 'vip')),
-          isMod: !!(m.isMod || m.badges?.some?.(b => b.name === 'moderator')),
+          user_name: m.displayName || m.user_name || m.user || uname,
+        }
+
+        const badges = m.badges || []
+        const isBroadcaster = !!(m.isBroadcaster || badges.some(b => b.set === 'broadcaster' || b.name === 'broadcaster'))
+        const isMod = !!(m.isMod || isBroadcaster || badges.some(b => b.set === 'moderator' || b.name === 'moderator'))
+        const isVip = !!(m.isVip || badges.some(b => b.set === 'vip' || b.name === 'vip'))
+        const isSub = !!(m.isSub || badges.some(b => b.set === 'subscriber' || b.name === 'subscriber'))
+
+        map.set(uname, {
+          ...existing,
+          isBroadcaster: existing.isBroadcaster || isBroadcaster,
+          isMod: existing.isMod || isMod,
+          isVip: existing.isVip || isVip,
+          isSub: existing.isSub || isSub,
         })
       }
     }
     return Array.from(map.values())
   }, [chatters, recentMessages])
 
-  const currentList = tab === 'chatters' ? mergedChatters : tab === 'mods' ? mods : vips
+  const allMods = useMemo(() => {
+    const map = new Map()
+    for (const m of mods) {
+      const u = (m.user_login || m.user_name || '').toLowerCase()
+      if (u) map.set(u, { ...m, isMod: true })
+    }
+    for (const c of mergedChatters) {
+      if (c.isMod || c.isBroadcaster) {
+        map.set(c.user_login.toLowerCase(), { ...c, isMod: true })
+      }
+    }
+    return Array.from(map.values())
+  }, [mods, mergedChatters])
+
+  const allVips = useMemo(() => {
+    const map = new Map()
+    for (const v of vips) {
+      const u = (v.user_login || v.user_name || '').toLowerCase()
+      if (u) map.set(u, { ...v, isVip: true })
+    }
+    for (const c of mergedChatters) {
+      if (c.isVip) {
+        map.set(c.user_login.toLowerCase(), { ...c, isVip: true })
+      }
+    }
+    return Array.from(map.values())
+  }, [vips, mergedChatters])
+
+  const currentList = tab === 'chatters' ? mergedChatters : tab === 'mods' ? allMods : allVips
   const filteredList = currentList.filter(item => {
     const name = item.user_name || item.user_login || item.name || ''
     return name.toLowerCase().includes(search.toLowerCase())
@@ -87,7 +130,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
               tab === 'mods' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'text-white/60 hover:text-white'
             }`}
           >
-            Mods ({mods.length})
+            Mods ({allMods.length})
           </button>
           <button
             onClick={() => setTab('vips')}
@@ -95,7 +138,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
               tab === 'vips' ? 'bg-pink-500/20 text-pink-300 border border-pink-500/30' : 'text-white/60 hover:text-white'
             }`}
           >
-            VIPs ({vips.length})
+            VIPs ({allVips.length})
           </button>
         </div>
 
@@ -137,6 +180,10 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
             const displayName = item.user_name || item.name || username
             const userId = item.user_id || item.id
 
+            const isMod = tab === 'mods' || item.isMod
+            const isVip = tab === 'vips' || item.isVip
+            const isBroadcaster = item.isBroadcaster
+
             return (
               <div
                 key={userId || username}
@@ -144,9 +191,10 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
                   username,
                   displayName,
                   userId,
-                  isMod: tab === 'mods' || item.isMod,
-                  isVip: tab === 'vips' || item.isVip,
+                  isMod,
+                  isVip,
                   isSub: item.isSub,
+                  isBroadcaster,
                 })}
                 className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.07] border border-white/5 cursor-pointer transition-all group"
               >
@@ -155,12 +203,34 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
                     {username.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-white truncate group-hover:text-twitch-glow">{displayName}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-xs font-semibold text-white truncate group-hover:text-twitch-glow">{displayName}</p>
+                      {isBroadcaster && (
+                        <span className="px-1.5 py-0.2 rounded bg-red-500/20 text-red-300 text-[9px] font-extrabold border border-red-500/30">
+                          STREAMER
+                        </span>
+                      )}
+                      {isMod && !isBroadcaster && (
+                        <span className="px-1.5 py-0.2 rounded bg-green-500/20 text-green-300 text-[9px] font-extrabold border border-green-500/30 flex items-center gap-0.5">
+                          ⚔️ MOD
+                        </span>
+                      )}
+                      {isVip && (
+                        <span className="px-1.5 py-0.2 rounded bg-pink-500/20 text-pink-300 text-[9px] font-extrabold border border-pink-500/30 flex items-center gap-0.5">
+                          💎 VIP
+                        </span>
+                      )}
+                      {item.isSub && (
+                        <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[9px] font-extrabold border border-purple-500/30">
+                          ⭐ SUB
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-text-muted/60 truncate">@{username}</p>
                   </div>
                 </div>
 
-                <span className="text-[10px] text-white/30 group-hover:text-white/80 transition-colors">
+                <span className="text-[10px] text-white/30 group-hover:text-white/80 transition-colors shrink-0 ml-2">
                   Inspeccionar ➔
                 </span>
               </div>

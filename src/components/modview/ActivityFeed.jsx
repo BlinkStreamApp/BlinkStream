@@ -8,7 +8,16 @@ export function ActivityFeed({ messages = [], onInspectUser }) {
   const activities = useMemo(() => {
     const list = []
     for (const m of messages) {
-      if (m.eventType === 'reward' || m.isReward) {
+      if (
+        m.eventType === 'reward' ||
+        m.isReward ||
+        m.custom_reward_id ||
+        m.msg_id === 'highlighted-message' ||
+        m.msg_id === 'custom-reward-redemption' ||
+        m.msg_id === 'community-points-redemption' ||
+        (typeof m.message === 'string' && /redeemed\s+(.+)\s+\(\d+\s+points\)/i.test(m.message)) ||
+        (typeof m.eventHeader === 'string' && (m.eventHeader.includes('Canje') || m.eventHeader.includes('Puntos')))
+      ) {
         list.push({
           id: m.id || m.timestamp,
           type: 'reward',
@@ -18,7 +27,7 @@ export function ActivityFeed({ messages = [], onInspectUser }) {
           text: m.message || '',
           timestamp: m.timestamp || 0,
         })
-      } else if (m.eventType === 'bits') {
+      } else if (m.eventType === 'bits' || (m.bits && parseInt(m.bits, 10) > 0)) {
         list.push({
           id: m.id || m.timestamp,
           type: 'bits',
@@ -28,23 +37,32 @@ export function ActivityFeed({ messages = [], onInspectUser }) {
           text: m.message || '',
           timestamp: m.timestamp || 0,
         })
-      } else if (m.msg_id === 'sub' || m.msg_id === 'resub' || m.msg_id === 'subgift') {
+      } else if (
+        m.msg_id === 'sub' ||
+        m.msg_id === 'resub' ||
+        m.msg_id === 'subgift' ||
+        m.msg_id === 'submysterygift' ||
+        m.eventType === 'sub' ||
+        m.eventType === 'resub' ||
+        m.eventType === 'subgift' ||
+        m.eventType === 'submysterygift'
+      ) {
         list.push({
           id: m.id || m.timestamp,
           type: 'subs',
           user: m.user || m.user_name || 'Espectador',
           userId: m.user_id,
-          title: m.msg_id === 'subgift' ? '🎁 Suscripción de Regalo' : m.msg_id === 'resub' ? '⭐ Resubscripción' : '⭐ Nueva Suscripción',
+          title: m.eventHeader || (m.msg_id === 'subgift' ? '🎁 Suscripción de Regalo' : m.msg_id === 'resub' ? '⭐ Resubscripción' : '⭐ Nueva Suscripción'),
           text: m.message || '',
           timestamp: m.timestamp || 0,
         })
-      } else if (m.msg_id === 'raid') {
+      } else if (m.msg_id === 'raid' || m.eventType === 'raid') {
         list.push({
           id: m.id || m.timestamp,
           type: 'raids',
           user: m.user || m.user_name || 'Streamer',
           userId: m.user_id,
-          title: '🚀 Raid Entrante!',
+          title: m.eventHeader || '🚀 Raid Entrante!',
           text: m.message || '',
           timestamp: m.timestamp || 0,
         })
@@ -118,27 +136,22 @@ export function ActivityFeed({ messages = [], onInspectUser }) {
                 className={`p-3 rounded-xl border ${colorClass} space-y-1.5 animate-fade-in shadow-sm`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold">{item.title}</span>
-                  <span className="text-[10px] text-text-muted font-mono">{timeStr}</span>
+                  <span className="text-xs font-bold truncate">{item.title}</span>
+                  <span className="text-[10px] opacity-60 font-mono shrink-0">{timeStr}</span>
                 </div>
 
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 pt-0.5">
                   <button
                     onClick={() => onInspectUser?.({ username: item.user, userId: item.userId })}
-                    className="text-xs font-bold text-white hover:text-twitch-glow hover:underline cursor-pointer truncate"
+                    className="text-xs font-semibold hover:underline cursor-pointer flex items-center gap-1 truncate"
                   >
-                    @{item.user}
-                  </button>
-                  <button
-                    onClick={() => onInspectUser?.({ username: item.user, userId: item.userId })}
-                    className="text-[10px] text-white/40 hover:text-white cursor-pointer"
-                  >
-                    Inspeccionar ➔
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                    <span>@{item.user.replace(/^@/, '')}</span>
                   </button>
                 </div>
 
                 {item.text && (
-                  <p className="text-xs text-white/80 bg-black/40 p-2 rounded-lg border border-white/5 break-words">
+                  <p className="text-xs opacity-85 break-words bg-black/30 p-2 rounded-lg border border-white/5">
                     "{item.text}"
                   </p>
                 )}
