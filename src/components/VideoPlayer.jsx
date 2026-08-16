@@ -18,6 +18,7 @@ import Chat from './Chat'
 import EmoteRainOverlay from './EmoteRainOverlay'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { useAudioCompressor } from '../hooks/useAudioCompressor'
+import { useLiveDVR } from '../hooks/useLiveDVR'
 
 function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
@@ -251,6 +252,16 @@ export default function VideoPlayer({
   useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
   const [stats, setStats] = useState({ bitrate: 'Calculando...', resolution: 'Calculando...', dropped: 0, buffer: '0.0s' })
   const { isNightMode, toggleNightMode } = useAudioCompressor(videoRef)
+  const {
+    delayFromLive,
+    isAtLiveEdge,
+    bufferDuration,
+    bufferStart,
+    currentTime: dvrCurrentTime,
+    seekToLive: dvrSeekToLive,
+    seekRelative,
+    seekToPercent,
+  } = useLiveDVR(videoRef, hlsRef)
 
   const {
     isRecording: recording,
@@ -268,15 +279,29 @@ export default function VideoPlayer({
   useEffect(() => { volumeRef.current = volume }, [volume])
 
   const jumpToLive = useCallback(() => {
-    const video = videoRef.current
-    const hls = hlsRef.current
-    if (!video) return
-    if (hls && typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
-      video.currentTime = hls.liveSyncPosition
-    } else if (video.seekable && video.seekable.length > 0) {
-      video.currentTime = Math.max(0, video.seekable.end(video.seekable.length - 1) - 0.5)
+    dvrSeekToLive()
+  }, [dvrSeekToLive])
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return
+
+      if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault()
+        seekRelative(-10)
+      } else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault()
+        seekRelative(10)
+      } else if (e.key === 'Home' || e.key === '0') {
+        e.preventDefault()
+        dvrSeekToLive()
+      }
     }
-  }, [])
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [seekRelative, dvrSeekToLive])
 
   useEffect(() => {
     if (streamUrl && channel && !recording && localStorage.getItem('blinkstream_rec_autostart') === 'true') {
@@ -712,11 +737,11 @@ export default function VideoPlayer({
     }
   }, [theatreMode])
 
-  const [sessionProgress, setSessionProgress] = useState(0)
+  const [_sessionProgress, _setSessionProgress] = useState(0)
   useEffect(() => {
     const update = () => {
       const elapsed = (Date.now() - streamStartTime) / 1000
-      setSessionProgress(Math.min((elapsed / 3600) * 100, 100))
+      _setSessionProgress(Math.min((elapsed / 3600) * 100, 100))
     }
     update()
     const id = setInterval(update, 30000)
@@ -958,10 +983,10 @@ export default function VideoPlayer({
       {/* Controls Bar (only shown when stream is active) */}
       {!error && !loading && (
         <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
-        <div className="flex items-center gap-4 text-white">
+        <div className="flex items-center gap-3 text-white">
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
           <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? t('player.unmute', 'Activar sonido') : t('player.mute', 'Silenciar')}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
-          <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={handleVolume} className="w-20 h-1 accent-twitch bg-white/20 rounded-lg appearance-none cursor-pointer" aria-label="Volumen" aria-valuemin="0" aria-valuemax="100" aria-valuenow={muted ? 0 : volume} />
+          <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={handleVolume} className="w-16 sm:w-20 h-1 accent-twitch bg-white/20 rounded-lg appearance-none cursor-pointer" aria-label="Volumen" aria-valuemin="0" aria-valuemax="100" aria-valuenow={muted ? 0 : volume} />
           <button
             onClick={toggleNightMode}
             className={`hover:text-white transition-colors cursor-pointer p-1 rounded-lg ${isNightMode ? 'text-amber-300 bg-amber-500/15' : 'text-white/40 hover:bg-white/5'}`}
@@ -970,7 +995,25 @@ export default function VideoPlayer({
           >
             <PhosphorIcon name="Moon" size={16} weight={isNightMode ? 'fill' : 'duotone'} />
           </button>
-          <LiveBadge onClick={jumpToLive} title={t('player.jumpToLive', 'Sincronizar con el directo')} />
+          <div className="flex items-center gap-1.5">
+            <LiveBadge onClick={jumpToLive} title={t('player.jumpToLive', 'Sincronizar con el directo')} />
+            {!isAtLiveEdge && delayFromLive > 0 && (
+              <button
+                onClick={jumpToLive}
+                className="px-2 py-0.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold cursor-pointer transition-all animate-pulse"
+                title="Atrasado respecto al directo. Clic para volver a EN VIVO."
+              >
+                -{Math.floor(delayFromLive)}s ⏩
+              </button>
+            )}
+            <button
+              onClick={() => seekRelative(-10)}
+              className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-white/60 hover:text-white text-[10px] font-mono font-bold cursor-pointer transition-colors"
+              title="Rebobinar 10 segundos (J)"
+            >
+              -10s
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 text-white/60">
@@ -1014,10 +1057,22 @@ export default function VideoPlayer({
           </div>
         </div>
 
-        <div className="absolute top-0 left-5 right-5 h-[2px] bg-white/10 rounded-full overflow-hidden -translate-y-1">
-          <div className="bg-twitch h-full shadow-[0_0_8px_#9146FF] transition-all duration-1000" style={{
-            width: `${sessionProgress}%`
-          }} />
+        {/* Interactive DVR Timeline Scrubber */}
+        <div 
+          className="absolute top-0 left-5 right-5 h-2.5 bg-white/10 rounded-full overflow-hidden -translate-y-1 cursor-pointer group"
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            const percent = ((e.clientX - rect.left) / rect.width) * 100
+            seekToPercent(percent)
+          }}
+          title={isAtLiveEdge ? 'En directo (Live Edge)' : `Atrasado -${Math.floor(delayFromLive)}s (Clic para saltar)`}
+        >
+          <div 
+            className={`h-full transition-all duration-300 ${isAtLiveEdge ? 'bg-twitch shadow-[0_0_8px_#9146FF]' : 'bg-amber-400 shadow-[0_0_8px_#F59E0B]'}`}
+            style={{
+              width: `${bufferDuration > 0 ? Math.min(100, Math.max(0, ((dvrCurrentTime - bufferStart) / bufferDuration) * 100)) : 100}%`
+            }} 
+          />
         </div>
       </div>
       )}
