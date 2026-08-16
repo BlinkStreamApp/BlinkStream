@@ -649,6 +649,36 @@ export default function Chat({
   const lineBufferRef = useRef('')
   const trieRef = useRef({})
   const mountedRef = useRef(true)
+  const userBadgesRef = useRef([])
+  const userColorRef = useRef(null)
+  const userDisplayNameRef = useRef('')
+
+  useEffect(() => {
+    userBadgesRef.current = []
+    userColorRef.current = null
+    userDisplayNameRef.current = auth.username || ''
+  }, [auth.username, channel])
+
+  const getUserBadgesForSend = useCallback(() => {
+    const list = [...(userBadgesRef.current || [])]
+    const chLower = (channel || '').toLowerCase()
+    const userLower = (auth?.username || '').toLowerCase()
+
+    if (isBroadcaster || (userLower && chLower === userLower)) {
+      if (!list.some(b => b.set === 'broadcaster')) {
+        list.unshift({ set: 'broadcaster', version: '1' })
+      }
+    } else if (isModerator || isMod) {
+      if (!list.some(b => b.set === 'moderator')) {
+        list.unshift({ set: 'moderator', version: '1' })
+      }
+    } else if (isVip) {
+      if (!list.some(b => b.set === 'vip')) {
+        list.unshift({ set: 'vip', version: '1' })
+      }
+    }
+    return list
+  }, [channel, auth?.username, isBroadcaster, isModerator, isMod, isVip])
 
   useEffect(() => {
     trieRef.current = buildEmoteTrie(emotes)
@@ -1141,6 +1171,28 @@ export default function Chat({
           const parts = rest.split(' ')
           const usernoticeIdx = parts.indexOf('USERNOTICE')
           const privmsgIdx = parts.indexOf('PRIVMSG')
+          const userstateIdx = parts.indexOf('USERSTATE')
+          const globaluserstateIdx = parts.indexOf('GLOBALUSERSTATE')
+
+          if (userstateIdx !== -1 || globaluserstateIdx !== -1) {
+            const parsed = parseMessageTags(tags)
+            if (parsed.badges) {
+              const badgeList = parsed.badges.split(',').map(b => {
+                const [set, version] = b.split('/')
+                return { set, version }
+              })
+              userBadgesRef.current = badgeList
+            } else if (parsed.badges === '') {
+              userBadgesRef.current = []
+            }
+            if (parsed.color) {
+              userColorRef.current = parsed.color
+            }
+            if (parsed['display-name']) {
+              userDisplayNameRef.current = parsed['display-name']
+            }
+            continue
+          }
 
           if (usernoticeIdx !== -1) {
               const parsed = parseMessageTags(tags)
@@ -1324,14 +1376,19 @@ export default function Chat({
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(`PRIVMSG #${channel} :\u0001ACTION ${meMatch[1]}\u0001\r\n`)
       }
+      const myBadges = getUserBadgesForSend()
+      const myColor = userColorRef.current || '#bf94ff'
+      const myDisplayName = userDisplayNameRef.current || auth.username
+
       setMessages(prev => [...prev, {
         id: ++msgIdCounter,
         channel,
-        user: auth.username,
-        color: '#bf94ff',
+        user: myDisplayName,
+        color: myColor,
         message: meMatch[1],
         emotes: '',
-        badges: [],
+        badges: myBadges,
+        timestamp: Date.now(),
       }])
       setInputText('')
       return
@@ -1514,14 +1571,19 @@ export default function Chat({
 
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
 
+    const myBadges = getUserBadgesForSend()
+    const myColor = userColorRef.current || '#bf94ff'
+    const myDisplayName = userDisplayNameRef.current || auth.username
+
     setMessages(prev => [...prev, {
       id: ++msgIdCounter,
       channel,
-      user: auth.username,
-      color: '#bf94ff',
+      user: myDisplayName,
+      color: myColor,
       message: text,
       emotes: '',
-      badges: [],
+      badges: myBadges,
+      timestamp: Date.now(),
     }])
     wsRef.current.send(`PRIVMSG #${channel} :${text}\r\n`)
     setInputText('')
@@ -1554,14 +1616,19 @@ export default function Chat({
         const curWs = wsRef.current;
         if (!curWs || curWs.readyState !== 1) return;
 
+        const myBadges = getUserBadgesForSend()
+        const myColor = userColorRef.current || '#bf94ff'
+        const myDisplayName = userDisplayNameRef.current || curAuth.username
+
         setMessages(prev => [...prev, {
           id: ++msgIdCounter,
           channel: curCh,
-          user: curAuth.username,
-          color: '#bf94ff',
+          user: myDisplayName,
+          color: myColor,
           message: text,
           emotes: '',
-          badges: [],
+          badges: myBadges,
+          timestamp: Date.now(),
         }]);
         curWs.send(`PRIVMSG #${curCh} :${text}\r\n`);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
@@ -1574,7 +1641,7 @@ export default function Chat({
       isCancelled = true;
       if (unlistenFn) unlistenFn();
     };
-  }, [isOverlay, handleSlashCommand]);
+  }, [isOverlay, handleSlashCommand, getUserBadgesForSend]);
 
   return (
     <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
