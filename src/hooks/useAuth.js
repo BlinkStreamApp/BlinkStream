@@ -18,6 +18,8 @@ async function fetchUserInfo(token) {
     let username = null
     const cleanToken = token.replace(/^oauth:/i, '')
 
+    let userId = null
+
     try {
       const valRes = await fetch('https://id.twitch.tv/oauth2/validate', {
         headers: { 'Authorization': `OAuth ${cleanToken}` },
@@ -30,6 +32,10 @@ async function fetchUserInfo(token) {
           try { localStorage.setItem(LS_CLIENT_ID, clientId) } catch {  }
         }
         if (valData?.login) username = valData.login
+        if (valData?.user_id) {
+          userId = valData.user_id
+          try { localStorage.setItem('bs.twitch.viewer_userid', userId) } catch {  }
+        }
       }
     } catch {  }
 
@@ -47,15 +53,19 @@ async function fetchUserInfo(token) {
         const avatar = userData.profile_image_url || null
         username = userData.login || username || null
         const displayName = userData.display_name || null
+        if (userData.id) {
+          userId = userData.id
+          try { localStorage.setItem('bs.twitch.viewer_userid', userId) } catch {  }
+        }
         if (avatar) localStorage.setItem(LS_AVATAR, avatar)
         if (username) localStorage.setItem(LS_USERNAME, username)
-        return { username, avatar, displayName }
+        return { username, avatar, displayName, userId }
       }
     }
 
     if (username) {
       localStorage.setItem(LS_USERNAME, username)
-      return { username, avatar: null, displayName: username }
+      return { username, avatar: null, displayName: username, userId }
     }
   } catch {  }
   return null

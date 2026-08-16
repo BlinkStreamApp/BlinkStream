@@ -955,6 +955,51 @@ export async function getChannelRole(broadcasterId, userId, signal) {
     return ok('broadcaster')
   }
 
+  // 1. Try Twitch GQL with user's OAuth token (works for mods without requiring broadcaster scope)
+  const token = await getStoredToken()
+  if (token) {
+    try {
+      const gqlRes = await fetch('https://gql.twitch.tv/gql', {
+        method: 'POST',
+        headers: {
+          'Client-ID': PUBLIC_CLIENT_ID,
+          'Authorization': `OAuth ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `
+            query CheckChannelRole($id: ID!) {
+              user(id: $id) {
+                id
+                self {
+                  isModerator
+                  isBroadcaster
+                  isVIP
+                }
+              }
+            }
+          `,
+          variables: { id: String(broadcasterId) },
+        }),
+        signal,
+      })
+
+      if (gqlRes.ok) {
+        const d = await gqlRes.json()
+        const self = d?.data?.user?.self
+        if (self) {
+          if (self.isBroadcaster) return ok('broadcaster')
+          if (self.isModerator) return ok('mod')
+          if (self.isVIP) return ok('vip')
+          return ok('viewer')
+        }
+      }
+    } catch {
+      // Fallback to Helix
+    }
+  }
+
+  // 2. Helix fallback
   const modRes = await helixFetch(
     `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
     { method: 'GET' },

@@ -279,6 +279,13 @@ function MainApp() {
   }, [channel])
 
   useEffect(() => {
+    if (user?.userId && user.userId !== viewerUserId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setViewerUserId(user.userId)
+    }
+  }, [user?.userId, viewerUserId])
+
+  useEffect(() => {
     if (!isLoggedIn || viewerUserId) return
     const token = getTwitchToken()
     if (!token) return
@@ -498,7 +505,7 @@ function MainApp() {
           {}
           <div className="flex items-center gap-1">
             {/* Pro Mod View button */}
-            {channel && (roleState.isModerator || roleState.isBroadcaster) && !roleState.loading && (
+            {channel && (roleState.isModerator || roleState.isBroadcaster) && (
               <button
                 onClick={() => setViewMode(p => p === 'modview' ? 'normal' : 'modview')}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all text-xs font-bold border btn-press ${
