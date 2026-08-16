@@ -177,18 +177,30 @@ export default function GridCell({
             <span className="text-[12px] font-medium text-text-secondary">{t('player.connecting', 'Conectando…')}</span>
           </div>
         )}
-        {error && !loading && (
-          <div className="flex flex-col items-center gap-2 p-4 text-center z-10 max-w-[80%]">
-            <PhosphorIcon name="WarningCircle" size={32} className="text-red-400" weight="duotone" />
-            <p className="text-[13px] font-semibold text-red-300">{error}</p>
-            <button
-              onClick={() => fetchStream(channel, quality)}
-              className="px-3 py-1 mt-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-[11px] text-red-200 font-bold cursor-pointer transition-colors"
-            >
-              {t('player.retry', 'Reintentar')}
-            </button>
-          </div>
-        )}
+        {error && !loading && (() => {
+          const lower = String(error).toLowerCase()
+          const isOffline = lower.includes('no playable streams found') || lower.includes('offline') || lower.includes('no streams found')
+          return (
+            <div className="flex flex-col items-center gap-1.5 p-4 text-center z-10 max-w-[85%] select-none animate-fade-in">
+              <div className="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-text-muted mb-0.5 shadow-lg">
+                <PhosphorIcon name="Television" size={22} className="text-white/40" weight="duotone" />
+              </div>
+              <p className="text-xs font-bold text-white">
+                {isOffline ? `${channel} está Offline` : 'Error al cargar'}
+              </p>
+              <p className="text-[11px] text-text-muted max-w-[200px] leading-tight">
+                {isOffline ? 'El canal no está transmitiendo en directo.' : error}
+              </p>
+              <button
+                onClick={() => fetchStream(channel, quality)}
+                className="px-3 py-1 mt-1 rounded-lg bg-twitch hover:bg-twitch-dark text-[11px] text-white font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-md"
+              >
+                <PhosphorIcon name="ArrowsClockwise" size={12} weight="bold" />
+                <span>{t('player.retry', 'Reintentar')}</span>
+              </button>
+            </div>
+          )
+        })()}
         <video
           ref={videoRef}
           className="w-full h-full object-contain cursor-pointer"

@@ -30,6 +30,30 @@ function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="reg
 
 const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '936p60', '963p60', '1080p60', '1440p60']
 
+function formatPlayerError(rawError, channelName) {
+  if (!rawError) return null
+  const str = String(rawError)
+  const lower = str.toLowerCase()
+  if (
+    lower.includes('no playable streams found') ||
+    lower.includes('offline') ||
+    lower.includes('no streams found') ||
+    lower.includes('stream is offline') ||
+    lower.includes('is not live')
+  ) {
+    return {
+      isOffline: true,
+      title: `${channelName || 'El canal'} está Offline`,
+      desc: 'Este canal no está transmitiendo en directo en este momento.',
+    }
+  }
+  return {
+    isOffline: false,
+    title: 'Error de reproducción',
+    desc: str.replace(/^No se pudo cargar [^:]+:\s*/i, '').replace(/Streamlink fallo:\s*error:\s*/i, ''),
+  }
+}
+
 function PlayerSettingsPanel({
   onClose,
   compact,
@@ -796,17 +820,70 @@ export default function VideoPlayer({
         </div>
       )}
 
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
-          <div className="text-center px-6 max-w-sm">
-            <p className="text-red-400 text-sm font-medium mb-1">Error</p>
-            <p className="text-xs text-white/60 break-words mb-3">{error}</p>
-            <button onClick={() => fetchStream(channel)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-twitch hover:bg-twitch-dark text-white text-xs cursor-pointer transition-colors">
-              Reintentar
-            </button>
+      {error && !loading && (() => {
+        const errInfo = formatPlayerError(error, channel)
+        if (errInfo?.isOffline) {
+          return (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-md z-10 animate-fade-in">
+              <div className="text-center px-6 max-w-md flex flex-col items-center select-none">
+                <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-text-muted mb-3.5 shadow-2xl backdrop-blur-xl">
+                  <PhosphorIcon name="Television" size={32} className="text-white/40" weight="duotone" />
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                  <span>OFFLINE</span>
+                </div>
+                <h3 className="text-base font-bold text-white mb-1.5">{errInfo.title}</h3>
+                <p className="text-xs text-text-muted max-w-xs leading-relaxed mb-5">
+                  {errInfo.desc}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fetchStream(channel)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer hover:scale-[1.02]"
+                  >
+                    <PhosphorIcon name="ArrowsClockwise" size={14} weight="bold" />
+                    <span>Comprobar directo</span>
+                  </button>
+                  <button
+                    onClick={() => setShowVods(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
+                  >
+                    <PhosphorIcon name="FilmStrip" size={14} />
+                    <span>Ver VODs</span>
+                  </button>
+                  <button
+                    onClick={() => setShowClips(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
+                  >
+                    <PhosphorIcon name="PlayCircle" size={14} />
+                    <span>Clips</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        return (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/85 backdrop-blur-sm z-10 animate-fade-in">
+            <div className="text-center px-6 max-w-sm flex flex-col items-center">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3 shadow-xl">
+                <PhosphorIcon name="WarningCircle" size={26} weight="duotone" />
+              </div>
+              <p className="text-red-300 text-sm font-bold mb-1">{errInfo?.title || 'Error'}</p>
+              <p className="text-xs text-text-muted break-words mb-4 leading-relaxed">{errInfo?.desc || error}</p>
+              <button
+                onClick={() => fetchStream(channel)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer"
+              >
+                <PhosphorIcon name="ArrowsClockwise" size={14} weight="bold" />
+                <span>Reintentar</span>
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {}
       <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
