@@ -17,6 +17,7 @@ import PhosphorIcon from './icons/PhosphorIcon'
 import Chat from './Chat'
 import EmoteRainOverlay from './EmoteRainOverlay'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
+import { useAudioCompressor } from '../hooks/useAudioCompressor'
 
 function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
@@ -68,6 +69,8 @@ function PlayerSettingsPanel({
   onToggleOverlayChat,
   showEmoteEffects,
   onToggleEmoteEffects,
+  isNightMode,
+  onToggleNightMode,
   onOpenAppSettings,
   quality,
   onQualityChange,
@@ -101,6 +104,19 @@ function PlayerSettingsPanel({
       )}
 
       <div className="space-y-0.5 text-[11px]">
+        {}
+        <div 
+          onClick={onToggleNightMode}
+          title="Atenúa picos y ruidos fuertes repentinos y realza voces suaves"
+          className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]"
+        >
+          <div className="flex items-center gap-2">
+            <PhosphorIcon name="Moon" size={15} weight="duotone" className={isNightMode ? "text-amber-300" : "text-text-muted"} />
+            <span className="font-semibold text-white/90">Modo Nocturno (Audio)</span>
+          </div>
+          <ToggleSwitch active={isNightMode} onClick={onToggleNightMode} />
+        </div>
+
         {}
         <div 
           onClick={onToggleAudioOnly}
@@ -234,6 +250,7 @@ export default function VideoPlayer({
   const audioOnlyRef = useRef(false)
   useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
   const [stats, setStats] = useState({ bitrate: 'Calculando...', resolution: 'Calculando...', dropped: 0, buffer: '0.0s' })
+  const { isNightMode, toggleNightMode } = useAudioCompressor(videoRef)
 
   const {
     isRecording: recording,
@@ -945,6 +962,14 @@ export default function VideoPlayer({
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
           <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? t('player.unmute', 'Activar sonido') : t('player.mute', 'Silenciar')}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
           <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={handleVolume} className="w-20 h-1 accent-twitch bg-white/20 rounded-lg appearance-none cursor-pointer" aria-label="Volumen" aria-valuemin="0" aria-valuemax="100" aria-valuenow={muted ? 0 : volume} />
+          <button
+            onClick={toggleNightMode}
+            className={`hover:text-white transition-colors cursor-pointer p-1 rounded-lg ${isNightMode ? 'text-amber-300 bg-amber-500/15' : 'text-white/40 hover:bg-white/5'}`}
+            title={isNightMode ? `${t('player.nightMode', 'Modo Nocturno')}: ON` : `${t('player.nightMode', 'Modo Nocturno')}: OFF`}
+            aria-label="Modo Nocturno (Compresor)"
+          >
+            <PhosphorIcon name="Moon" size={16} weight={isNightMode ? 'fill' : 'duotone'} />
+          </button>
           <LiveBadge onClick={jumpToLive} title={t('player.jumpToLive', 'Sincronizar con el directo')} />
         </div>
 
@@ -1025,6 +1050,8 @@ export default function VideoPlayer({
               return n
             })
           }}
+          isNightMode={isNightMode}
+          onToggleNightMode={toggleNightMode}
           onOpenAppSettings={onOpenAppSettings}
         />
       )}

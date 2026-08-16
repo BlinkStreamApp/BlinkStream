@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 
 const translations = {
   es: {
+    'player.nightMode': 'Modo Nocturno (Compresor)',
+    'player.nightModeDesc': 'Atenúa picos y ruidos fuertes repentinos y realza voces suaves',
 
     search: 'Buscar canal...',
     settings: 'Configuración',
@@ -217,6 +219,8 @@ const translations = {
     'aboutMadeWith': 'Hecho con ♥ para la comunidad',
   },
   en: {
+    'player.nightMode': 'Night Mode (Compressor)',
+    'player.nightModeDesc': 'Attenuates sudden loud spikes and enhances quiet voices',
 
     search: 'Search channel...',
     settings: 'Settings',
@@ -430,6 +434,8 @@ const translations = {
     'aboutMadeWith': 'Made with ♥ for the community',
   },
   fr: {
+    'player.nightMode': 'Mode Nuit (Compresseur)',
+    'player.nightModeDesc': 'Atténue les bruits forts soudains et améliore les voix douces',
     search: 'Rechercher une chaîne...',
     settings: 'Paramètres',
     about: 'À propos de BlinkStream',
@@ -503,6 +509,8 @@ const translations = {
     'aboutMadeWith': 'Fait avec ♥ pour la communauté',
   },
   de: {
+    'player.nightMode': 'Nachtmodus (Kompressor)',
+    'player.nightModeDesc': 'Dämpft plötzliche laute Spitzen und verstärkt leise Stimmen',
     search: 'Kanal suchen...',
     settings: 'Einstellungen',
     about: 'Über BlinkStream',
@@ -576,6 +584,8 @@ const translations = {
     'aboutMadeWith': 'Mit ♥ für die Community gemacht',
   },
   pt: {
+    'player.nightMode': 'Modo Noturno (Compressor)',
+    'player.nightModeDesc': 'Atenua picos altos repentinos e realça vozes suaves',
     search: 'Buscar canal...',
     settings: 'Configurações',
     about: 'Sobre o BlinkStream',
@@ -649,6 +659,8 @@ const translations = {
     'aboutMadeWith': 'Feito com ♥ para a comunidade',
   },
   ja: {
+    'player.nightMode': 'ナイトモード（コンプレッサー）',
+    'player.nightModeDesc': '突然の大声を抑え、聞き取りにくい声を強調します',
     search: 'チャンネルを検索...',
     settings: '設定',
     about: 'BlinkStreamについて',
@@ -722,6 +734,8 @@ const translations = {
     'aboutMadeWith': 'コミュニティのために♥を込めて制作',
   },
   ko: {
+    'player.nightMode': '야간 모드 (압축기)',
+    'player.nightModeDesc': '갑작스러운 큰 소리를 줄이고 작은 음성을 보정합니다',
     search: '채널 검색...',
     settings: '설정',
     about: 'BlinkStream 정보',
@@ -795,6 +809,8 @@ const translations = {
     'aboutMadeWith': '커뮤니티를 위해 ♥로 제작됨',
   },
   ru: {
+    'player.nightMode': 'Ночной режим (Компрессор)',
+    'player.nightModeDesc': 'Сглаживает резкие громкие звуки и усиливает тихие голоса',
     search: 'Поиск канала...',
     settings: 'Настройки',
     about: 'О BlinkStream',
