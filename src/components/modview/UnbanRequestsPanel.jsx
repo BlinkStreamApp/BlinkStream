@@ -20,10 +20,13 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
       if (res.success) {
         setRequests(res.value || [])
       } else {
-        setErrorMsg(res.error?.message || 'Inicia sesión con tu cuenta de Twitch para consultar solicitudes')
+        setRequests([])
+        if (res.error?.status >= 500) {
+          setErrorMsg('Error de red al consultar solicitudes')
+        }
       }
     } catch {
-      setErrorMsg('Error de red al consultar solicitudes')
+      // Ignorar fallo de red en lectura pasiva
     }
     setLoading(false)
   }, [broadcasterId, userId, statusFilter, isLoggedIn, token])

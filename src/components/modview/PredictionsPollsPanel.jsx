@@ -36,15 +36,27 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, token, isLoggedI
     try {
       if (subTab === 'predictions') {
         const res = await getPredictions(broadcasterId, 20, token)
-        if (res.success) setPredictions(res.value || [])
-        else setStatusMessage(res.error?.message || 'Inicia sesión con tu cuenta de Twitch para gestionar este panel')
+        if (res.success) {
+          setPredictions(res.value || [])
+        } else {
+          setPredictions([])
+          if (res.error?.status >= 500) {
+            setStatusMessage('Error del servidor de Twitch al cargar predicciones')
+          }
+        }
       } else {
         const res = await getPolls(broadcasterId, 20, token)
-        if (res.success) setPolls(res.value || [])
-        else setStatusMessage(res.error?.message || 'Inicia sesión con tu cuenta de Twitch para gestionar este panel')
+        if (res.success) {
+          setPolls(res.value || [])
+        } else {
+          setPolls([])
+          if (res.error?.status >= 500) {
+            setStatusMessage('Error del servidor de Twitch al cargar encuestas')
+          }
+        }
       }
     } catch {
-      setStatusMessage('Error de conexión al cargar datos')
+      // Ignorar fallo de red en lectura pasiva
     }
     setLoading(false)
   }, [broadcasterId, subTab, isLoggedIn, token])
