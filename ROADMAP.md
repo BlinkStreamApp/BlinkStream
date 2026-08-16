@@ -2,9 +2,9 @@
 
 > *Engineering the future of high-performance, distraction-free desktop live streaming.*
 
-Welcome to the official **BlinkStream Roadmap**. As an open-source engineering project built upon high-performance desktop native frameworks (Tauri, Vite, React, and Supabase), our mission is to deliver the cleanest, fastest, and most privacy-focused Twitch client ever conceived.
+Welcome to the official **BlinkStream Roadmap**. As an open-source engineering project built upon high-performance desktop native frameworks (Tauri v2 in Rust, React 19, and Supabase), our mission is to deliver the cleanest, fastest, and most privacy-focused Twitch client ever conceived.
 
-Below is our structured technical progression, detailing past milestones, our immediate release target, and upcoming enhancements across user experience (UI/UX) and core system functionality. We strictly adhere to sequential Semantic Versioning (SemVer).
+Below is our structured technical progression, detailing completed milestones, immediate release targets, and upcoming enhancements across user experience (UI/UX) and core system functionality. We strictly adhere to sequential Semantic Versioning (SemVer).
 
 ---
 
@@ -12,7 +12,7 @@ Below is our structured technical progression, detailing past milestones, our im
 *Focus: Optimizing core architectures and introducing rapid QoL desktop workflows.*
 
 ### 🎨 UI & UX Improvements
-- **Ultra-Clean Theatre Mode**: Minimalistic fullscreen overlay that auto-hides navigation controls and fades out unnecessary interface boundaries.
+- **Ultra-Clean Theatre Mode**: Minimalistic fullscreen overlay that auto-hides navigation controls and fades out unnecessary interface boundaries (`T`).
 - **Collapsible Quick-Switcher Sidebar**: A responsive floating mini-dock showing real-time live avatars and view count badges of favorite followed channels for zero-friction switching.
 - **Dynamic Theme Studio**: HSL color calibration toolkit allowing users to switch beyond standard Twitch Purple into custom themes (*Cyberpunk Yellow, Neon Cyan, Emerald Glow, and True OLED AMOLED Black*).
 
@@ -35,7 +35,7 @@ Below is our structured technical progression, detailing past milestones, our im
 
 ---
 
-## 🎯 Phase 3: v1.3.7 — The "Immersion & Command Center" Update (Hotfix) [CURRENT RELEASE]
+## ✅ Phase 3: v1.3.7 — The "Immersion & Command Center" Update [CURRENT RELEASE]
 *Focus: Multi-stream consumption, social chat interactivity, and dynamic glassmorphic player controls.*
 
 ### 🎨 UI & UX Improvements
@@ -45,64 +45,77 @@ Below is our structured technical progression, detailing past milestones, our im
 
 ### ⚙️ Core Functionality
 - **Real-Time Floating Emote Rain Engine**: Decoupled, high-performance particle overlay (`EmoteRainOverlay.jsx`) rendering incoming Twitch, 7TV, BetterTTV, and FFZ emotes gently floating across the player screen with a strict 20-particle RAM ceiling for zero gaming lag.
-- **Neon Combo Meter HUD**: Automatic detection of chat emote burts (3+ repeats within 5 seconds), projecting dynamic tier badges onto the player HUD (*HYPERS COMBO*, *SUPER COMBO! 🔥*, and *GODLIKE COMBO! ⚡💀*).
+- **Neon Combo Meter HUD**: Automatic detection of chat emote bursts (3+ repeats within 5 seconds), projecting dynamic tier badges onto the player HUD (*HYPERS COMBO*, *SUPER COMBO! 🔥*, and *GODLIKE COMBO! ⚡💀*).
 - **User Mentions Neon Highlighting**: Automatic detection of `@username` tags, applying an amber/gold glowing border and gradient background to relevant messages.
+- **Mobile Wi-Fi Remote Companion (Early Release)**: Integrated local HTTP/WebSocket pairing server to control player playback, volume, and channels directly from any smartphone or tablet on the same Wi-Fi network.
 
 ---
 
-## 📋 Phase 4: v1.4.x — Pro Mod View & Media Archive [NEXT MILESTONE]
-*Focus: Desktop OS integration, professional moderation command center, and offline media saving.*
+## 🎯 Phase 4: v1.4.x — Pro Mod View, Live Stream DVR & Audio Intelligence [NEXT IMMEDIATE MILESTONE]
+*Focus: Professional moderation workspace, interactive live rewinding, and acoustic comfort.*
 
 ### 🎨 UI & UX Improvements
 - **Pro Mod View (Centro de Mando para Moderadores)**: Workspace dedicado en cuadrícula multi-panel exclusivo para moderadores y broadcasters (`Ctrl + M` / Botón 🛡️):
-  - **Live Stream & Chat Integrado**: Monitor de transmisión a baja latencia junto a chat enriquecido con botones rápidos de sanción por línea.
-  - **Tarjeta de Inspección de Usuario (User Card Inspector)**: Al hacer clic en cualquier espectador se despliega historial de mensajes, antigüedad de cuenta, sanciones pasadas y botones de acción rápida (1s purga, 10m, 24h, Ban).
+  - **Live Stream & Chat Integrado**: Monitor de transmisión a baja latencia junto a chat enriquecido con botones rápidos de sanción por línea (`1s purga`, `10m timeout`, `ban`).
+  - **Tarjeta de Inspección de Usuario (User Card Inspector)**: Al hacer clic en cualquier espectador se despliega historial de mensajes recientes, antigüedad de cuenta, sanciones pasadas y botones de acción directa.
   - **Barra Superior de Acciones Rápidas (Quick Channel Actions)**: Toggles de 1 clic para Modo Escudo (Shield Mode), Modo Lento (Slow Mode), Solo Emotes, Solo Seguidores, Solo Suscriptores y Limpieza de Chat.
   - **Feed de Registro de Auditoría en Vivo (Mod Action Log)**: Registro cronológico en tiempo real de todas las acciones ejecutadas por otros moderadores y AutoMod.
   - **Lista de Moderadores Conectados**: Panel con los moderadores del equipo activos en la sesión actual.
-- **Haptic Windows Toast Notifications (Smart Streamer Tracker)**: Real-time native OS desktop alerts triggered the exact millisecond a favorite channel goes live, featuring instant-click deep linking into the player.
-- **Live / Offline Filter Toggle**: One-click quick filter on the favorite streamer sidebar to instantly isolate channels currently broadcasting.
+- **Live Stream Rewind & DVR Timeline**: Barra de tiempo interactiva con soporte de rebobinado en vivo:
+  - **Rebobinado Corto Instantáneo (Buffer RAM)**: Saltos de 10s a 2 minutos con 0 ms de latencia mediante atajos (`J`, `K`, `L` o flechas).
+  - **Rebobinado Completo del Directo (Live VOD Sync)**: Acceso a la emisión completa desde el minuto 0 con botón instantáneo `[🔴 EN VIVO]` para regresar al directo en tiempo real.
+  - **Verificación de Suscriptor / Super-Feature**: Integración con Helix Subscriptions API o habilitación universal como superpoder de BlinkStream.
 
 ### ⚙️ Core Functionality
-- **VOD & Clip Archive Downloader**: Integrated high-speed asynchronous download manager supporting direct MP4 video downloading and background batch management for offline viewing and content editing.
+- **Modo Nocturno / Compresor de Rango Dinámico (Loudness Equalizer)**: Compresión de audio por software (Web Audio API) que atenúa automáticamente gritos o explosiones repentinas y amplifica diálogos suaves para ver transmisiones de noche sin sobresaltos.
+- **Haptic Windows Toast Notifications (Smart Streamer Tracker)**: Alertas nativas de escritorio disparadas el milisegundo exacto en que un canal favorito inicia directo con acceso directo al reproductor.
+- **Live / Offline Filter Toggle**: Filtro rápido en la barra lateral para aislar canales actualmente en directo.
 
 ---
 
-## 📋 Phase 5: v1.5.x — Interactive Rewards & Automation
-*Focus: Engaging with broadcast economies and peripheral integrations.*
+## 📋 Phase 5: v1.5.x — Media Archive Snipping, Auto-Drops & Gamer HUD Overlays [PLANNED]
+*Focus: Content archiving, background economy automations, and in-game transparent HUDs.*
 
 ### 🎨 UI & UX Improvements
-- **Native Glassmorphism Polls & Predictions Widget**: Interactive popup banners integrated directly into the video player window, enabling instantaneous prediction bets and voting without having to scroll or open the chatbox.
+- **Overlay Gamer Transparente (Click-Through Chat HUD)**: Mini-ventana semitransparente que se superpone sobre cualquier videojuego en pantalla completa con modo `click-through` (los clics del ratón atraviesan el chat sin interrumpir la partida).
+- **Audio Estéreo Separado en Multi-Stream (Binaural Mode)**: Posibilidad de enviar el canal 1 al auricular izquierdo y el canal 2 al derecho, o enrutar canales distintos a diferentes dispositivos de audio (ej. altavoces vs auriculares).
+- **Pronósticos y Encuestas en Pantalla (Native Predictions Widget)**: Banners emergentes integrados sobre el vídeo para votar y apostar puntos de canal al instante sin abrir el chat.
 
 ### ⚙️ Core Functionality
-- **Automated Twitch Drops Tracker & Claimer**: A clean background service monitoring active gaming campaign progress percentages and automatically executing inventory claims for in-game rewards.
-- **Stream Deck & Macro Integration**: Customizable global keyboard hotkeys and HTTP endpoints to bind scene switches, mute controls, or prediction redemptions directly to external physical keypads.
+- **Descargador de VODs y Clips con Recorte de Tiempo (Time-Range Snipping)**: Descarga directa en MP4 a máxima velocidad permitiendo seleccionar fragmentos específicos (ej. *minuto 45:00 al 52:30*) sin tener que descargar archivos masivos de 8 horas.
+- **Automated Twitch Drops Tracker & Inventory Claimer**: Servicio en segundo plano que monitoriza campañas activas de Drops de videojuegos, muestra el % de progreso y reclama las recompensas automáticamente.
+- **Alertas de Palabras Clave Personalizadas**: Definición de términos clave (*"sorteo"*, *"código"*, tu nombre) con sutiles avisos acústicos y pestaña prioritaria en el chat.
 
 ---
 
-## 🔮 Phase 6: v1.6.x — Smart Replays & Local Summaries
-*Focus: Advanced playback synchronization and lightweight on-device AI intelligence.*
+## 🔮 Phase 6: v1.6.x — Chat Translator, Discord & Prediction Automation [PLANNED]
+*Focus: Breaking language barriers, peripheral macros, and automated engagement.*
 
 ### 🎨 UI & UX Improvements
-- **Customizable Chat Badges & Fonts**: Ability to apply custom typography from Google Fonts, scale line heights, and override standard chat badges with local PNG/WebP assets.
-- **Bandwidth Saver Mode**: Automatic quality down-scaling (e.g., to 160p or Audio-Only) when the desktop window is minimized to the system tray to conserve bandwidth and CPU resources.
+- **Traductor en Vivo de Chat Multilingüe**: Botón en el chat para traducir mensajes entrantes en tiempo real de cualquier idioma (inglés, japonés, coreano, portugués) a español o idioma configurado.
+- **Customizable Chat Badges & Fonts**: Tipografías avanzadas de Google Fonts, escala de interlineado y reemplazo de insignias estándar con iconos locales de alta resolución.
+- **Bandwidth Saver Mode**: Reducción automática de calidad a 160p o Solo Audio cuando la ventana de BlinkStream se minimiza a la bandeja del sistema.
 
 ### ⚙️ Core Functionality
-- **Time-Synchronized Offline Chat Replay**: Full historical chat playback synced precisely to timestamps when watching archived VODs or past stream highlights.
-- **Local AI Stream Recap Engine**: Lightweight on-device processing (via Local LLM / Ollama bridges) to generate 3-bullet text summaries of stream highlights or intense chat segments missed while away from keyboard (AFK).
+- **Discord Rich Presence & Stream Deck Integration**:
+  - Estado interactivo en Discord mostrando canal, juego y tiempo con botón *"Ver en BlinkStream"*.
+  - Plugin oficial para Stream Deck (cambio de canal, mute, PiP, captura de pantalla y canjes con teclas físicas).
+- **Asistente Automatizado de Puntos de Canal**: Reglas de apuesta inteligentes para pronósticos (*ej. "apostar siempre 250 puntos a la opción más votada"*).
+- **Historial de Chat Sincronizado en VODs (Time-Synced Replay)**: Reproducción del chat original sincronizado al milisegundo al visualizar grabaciones o clips pasados.
 
 ---
 
-## 🌌 Phase 7: v2.0.0 — The Open Horizon (2027)
-*Focus: Ecosystem expansion, ultimate platform portability, and breaking language barriers.*
+## 🌌 Phase 7: v2.0.0 — On-Device AI Intelligence & Global Ecosystem [2027 HORIZON]
+*Focus: Lightweight on-device intelligence, climax analytics, and sandboxed plugin architectures.*
 
-### 🌐 Ecosystem & Platforms
-- **Universal Linux & macOS Apple Silicon Support**: Official verified distribution bundles for Linux (AppImage/Flatpak) and native ARM64 Apple M-series architectures.
-- **Mobile Wi-Fi Companion Remote**: Turn your smartphone or tablet into an instantaneous interactive wireless remote control for your living room BlinkStream desktop setup.
+### 🧠 On-Device AI & Analytics
+- **Resumen Inteligente "Me lo perdí" (AFK Catch-Up)**: Procesamiento local ligero (vía Ollama / LLM bridges on-device) para generar un resumen en 3 viñetas de lo ocurrido en el directo y en el chat tras regresar de una pausa.
+- **Detector de Momentos Épicos (Climax Heatmap)**: Análisis en tiempo real de la densidad de spam de emotes de emoción (`POGGERS`, `KEKW`, `LUL`) dibujando picos de clímax sobre la barra de tiempo.
+- **Subtítulos y Traducción de Voz en Directo con IA**: Transcripción de voz a texto a ultra-baja latencia (Whisper/Silero VAD) generando subtítulos neón flotantes sobre directos en idiomas extranjeros.
 
-### 🔌 Extensibility & Next-Gen AI
-- **Real-Time AI Live Translation & Subtitles Engine**: Advanced multi-lingual speech-to-text (Whisper/Silero VAD) and neural translation pipeline producing ultra-low-latency neon subtitle overlays directly over foreign broadcasts (e.g., English/Japanese ➔ Spanish).
-- **BlinkStream Plugin & Widget SDK**: Secure sandboxed API empowering external developers to build custom overlay extensions and bot integrations natively inside the client.
+### 🔌 Extensibility & Ecosystem
+- **BlinkStream Plugin & Widget SDK**: API segura y aislada (sandboxed) para que la comunidad desarrolle plugins, overlays y bots personalizados dentro del cliente.
+- **Distribución Universal Flatpak / Homebrew**: Soporte para repositorios oficiales de paquetes en los principales ecosistemas de escritorio.
 
 ---
 
