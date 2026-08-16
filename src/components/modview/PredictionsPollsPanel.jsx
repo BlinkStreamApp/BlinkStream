@@ -7,9 +7,10 @@ import {
   getPolls,
   createPoll,
   endPoll,
+  getUserIdByLogin,
 } from '../../utils/twitch'
 
-export function PredictionsPollsPanel({ broadcasterId, _userId, token, isLoggedIn = true, onLoginWithToken }) {
+export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, isLoggedIn = true, onLoginWithToken }) {
   const [subTab, setSubTab] = useState('predictions') // 'predictions' | 'polls'
   const [predictions, setPredictions] = useState([])
   const [polls, setPolls] = useState([])
@@ -73,13 +74,24 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, token, isLoggedI
     setActionPending(true)
     setStatusMessage('')
 
-    const res = await createPrediction(broadcasterId, predTitle, [predOutcome1, predOutcome2], predWindow, token)
+    let targetBroadcasterId = broadcasterId
+    if (!targetBroadcasterId && channel) {
+      targetBroadcasterId = await getUserIdByLogin(channel)
+    }
+
+    if (!targetBroadcasterId) {
+      setStatusMessage('Esperando identificador del canal...')
+      setActionPending(false)
+      return
+    }
+
+    const res = await createPrediction(targetBroadcasterId, predTitle, [predOutcome1, predOutcome2], predWindow, token)
     if (res.success) {
       setShowCreateModal(false)
       setPredTitle('')
       loadData()
     } else {
-      setStatusMessage(res.error?.message || 'Error al crear predicción')
+      setStatusMessage(res.error?.message || 'Error al crear predicción en este canal')
     }
     setActionPending(false)
   }
@@ -103,7 +115,18 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, token, isLoggedI
     setActionPending(true)
     setStatusMessage('')
 
-    const res = await createPoll(broadcasterId, pollTitle, validChoices, pollDuration, false, 100, token)
+    let targetBroadcasterId = broadcasterId
+    if (!targetBroadcasterId && channel) {
+      targetBroadcasterId = await getUserIdByLogin(channel)
+    }
+
+    if (!targetBroadcasterId) {
+      setStatusMessage('Esperando identificador del canal...')
+      setActionPending(false)
+      return
+    }
+
+    const res = await createPoll(targetBroadcasterId, pollTitle, validChoices, pollDuration, false, 100, token)
     if (res.success) {
       setShowCreateModal(false)
       setPollTitle('')
@@ -232,6 +255,20 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, token, isLoggedI
                   required
                 />
               </div>
+              {statusMessage && (
+                <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-[11px] flex items-center justify-between gap-1">
+                  <span>{statusMessage}</span>
+                  {onLoginWithToken && statusMessage.includes('renovar') && (
+                    <button
+                      type="button"
+                      onClick={onLoginWithToken}
+                      className="px-2 py-0.5 rounded bg-twitch hover:bg-twitch-dark text-white text-[10px] font-bold cursor-pointer transition-colors"
+                    >
+                      Renovar
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between pt-1">
                 <select
                   value={predWindow}
@@ -282,6 +319,20 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, token, isLoggedI
                   />
                 ))}
               </div>
+              {statusMessage && (
+                <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-[11px] flex items-center justify-between gap-1">
+                  <span>{statusMessage}</span>
+                  {onLoginWithToken && statusMessage.includes('renovar') && (
+                    <button
+                      type="button"
+                      onClick={onLoginWithToken}
+                      className="px-2 py-0.5 rounded bg-twitch hover:bg-twitch-dark text-white text-[10px] font-bold cursor-pointer transition-colors"
+                    >
+                      Renovar
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between pt-1">
                 <select
                   value={pollDuration}

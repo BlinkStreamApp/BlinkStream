@@ -401,6 +401,7 @@ export function ModView({
           )
         ) : rightPanelTab === 'predictions' ? (
           <PredictionsPollsPanel
+            channel={channel}
             broadcasterId={broadcasterId}
             userId={userId}
             token={twitchToken}
