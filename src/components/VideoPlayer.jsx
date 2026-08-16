@@ -824,37 +824,37 @@ export default function VideoPlayer({
         const errInfo = formatPlayerError(error, channel)
         if (errInfo?.isOffline) {
           return (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-md z-10 animate-fade-in">
-              <div className="text-center px-6 max-w-md flex flex-col items-center select-none">
-                <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-text-muted mb-3.5 shadow-2xl backdrop-blur-xl">
-                  <PhosphorIcon name="Television" size={32} className="text-white/40" weight="duotone" />
+            <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
+              <div className="text-center px-4 max-w-md flex flex-col items-center select-none">
+                <div className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-text-muted mb-2.5 shadow-2xl backdrop-blur-xl">
+                  <PhosphorIcon name="Television" size={28} className="text-white/40" weight="duotone" />
                 </div>
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
                   <span>OFFLINE</span>
                 </div>
-                <h3 className="text-base font-bold text-white mb-1.5">{errInfo.title}</h3>
-                <p className="text-xs text-text-muted max-w-xs leading-relaxed mb-5">
+                <h3 className="text-sm md:text-base font-bold text-white mb-1">{errInfo.title}</h3>
+                <p className="text-[11px] md:text-xs text-text-muted max-w-xs leading-relaxed mb-4">
                   {errInfo.desc}
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2 flex-wrap">
                   <button
                     onClick={() => fetchStream(channel)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer hover:scale-[1.02]"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer hover:scale-[1.02]"
                   >
                     <PhosphorIcon name="ArrowsClockwise" size={14} weight="bold" />
                     <span>Comprobar directo</span>
                   </button>
                   <button
                     onClick={() => setShowVods(true)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
                   >
                     <PhosphorIcon name="FilmStrip" size={14} />
                     <span>Ver VODs</span>
                   </button>
                   <button
                     onClick={() => setShowClips(true)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
                   >
                     <PhosphorIcon name="PlayCircle" size={14} />
                     <span>Clips</span>
@@ -866,7 +866,7 @@ export default function VideoPlayer({
         }
 
         return (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/85 backdrop-blur-sm z-10 animate-fade-in">
+          <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
             <div className="text-center px-6 max-w-sm flex flex-col items-center">
               <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3 shadow-xl">
                 <PhosphorIcon name="WarningCircle" size={26} weight="duotone" />
@@ -885,8 +885,9 @@ export default function VideoPlayer({
         )
       })()}
 
-      {}
-      <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
+      {/* Controls Bar (only shown when stream is active) */}
+      {!error && !loading && (
+        <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
         <div className="flex items-center gap-4 text-white">
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
           <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? t('player.unmute', 'Activar sonido') : t('player.mute', 'Silenciar')}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
@@ -941,6 +942,7 @@ export default function VideoPlayer({
           }} />
         </div>
       </div>
+      )}
 
       {showSettingsPanel && (
         <PlayerSettingsPanel
