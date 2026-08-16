@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { getUnbanRequests, resolveUnbanRequest } from '../../utils/twitch'
 
-export function UnbanRequestsPanel({ broadcasterId, userId, onInspectUser }) {
+export function UnbanRequestsPanel({ broadcasterId, userId, isLoggedIn = true, onLoginWithToken, onInspectUser }) {
   const [requests, setRequests] = useState([])
   const [statusFilter, setStatusFilter] = useState('pending') // 'pending' | 'approved' | 'denied'
   const [loading, setLoading] = useState(false)
@@ -12,7 +12,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, onInspectUser }) {
   const [errorMsg, setErrorMsg] = useState('')
 
   const loadRequests = useCallback(async () => {
-    if (!broadcasterId || !userId) return
+    if (!broadcasterId || !userId || !isLoggedIn) return
     setLoading(true)
     setErrorMsg('')
     try {
@@ -20,18 +20,19 @@ export function UnbanRequestsPanel({ broadcasterId, userId, onInspectUser }) {
       if (res.success) {
         setRequests(res.value || [])
       } else {
-        setErrorMsg(res.error?.message || 'Error al cargar solicitudes de desbaneo')
+        setErrorMsg(res.error?.message || 'Inicia sesión con tu cuenta de Twitch para consultar solicitudes')
       }
     } catch {
       setErrorMsg('Error de red al consultar solicitudes')
     }
     setLoading(false)
-  }, [broadcasterId, userId, statusFilter])
+  }, [broadcasterId, userId, statusFilter, isLoggedIn])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadRequests()
-  }, [loadRequests])
+    if (isLoggedIn && userId) {
+      loadRequests()
+    }
+  }, [loadRequests, isLoggedIn, userId])
 
   const handleResolve = async (reqId, status) => {
     if (!broadcasterId || !userId || !reqId) return
@@ -105,7 +106,26 @@ export function UnbanRequestsPanel({ broadcasterId, userId, onInspectUser }) {
 
       {/* Requests list */}
       <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
-        {loading ? (
+        {!isLoggedIn ? (
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center select-none">
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-300 mb-3">
+              <PhosphorIcon name="ChatCircleSlash" size={24} weight="duotone" />
+            </div>
+            <p className="text-xs font-bold text-white mb-1">Inicio de Sesión Requerido</p>
+            <p className="text-[11px] text-text-muted max-w-[240px] mb-4">
+              Inicia sesión con tu cuenta de moderador o creador para consultar y resolver apelaciones de desbaneo.
+            </p>
+            {onLoginWithToken && (
+              <button
+                onClick={onLoginWithToken}
+                className="px-4 py-2 bg-twitch hover:bg-twitch-glow text-white text-xs font-bold rounded-xl shadow-lg shadow-twitch/30 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <PhosphorIcon name="SignIn" size={15} weight="bold" />
+                <span>Iniciar sesión en Twitch</span>
+              </button>
+            )}
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center p-8 text-text-muted text-xs">
             <div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin mr-2" />
             <span>Cargando solicitudes...</span>

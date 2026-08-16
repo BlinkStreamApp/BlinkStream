@@ -2,12 +2,12 @@ import { useState } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { manageAutoModMessage } from '../../utils/twitch'
 
-export function AutoModQueue({ broadcasterId, userId, heldMessages = [], onRemoveMessage, onInspectUser }) {
+export function AutoModQueue({ broadcasterId, userId, isLoggedIn = true, onLoginWithToken, heldMessages = [], onRemoveMessage, onInspectUser }) {
   const [actionPending, setActionPending] = useState({})
   const [statusMessage, setStatusMessage] = useState('')
 
   const handleAction = async (msgId, action) => {
-    if (!broadcasterId || !userId || !msgId) return
+    if (!broadcasterId || !userId || !msgId || !isLoggedIn) return
     setActionPending(prev => ({ ...prev, [msgId]: true }))
     setStatusMessage('')
 
@@ -36,7 +36,26 @@ export function AutoModQueue({ broadcasterId, userId, heldMessages = [], onRemov
 
       {/* Messages list */}
       <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
-        {heldMessages.length === 0 ? (
+        {!isLoggedIn ? (
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center select-none">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-300 mb-3">
+              <PhosphorIcon name="ShieldCheck" size={24} weight="duotone" />
+            </div>
+            <p className="text-xs font-bold text-white mb-1">Inicio de Sesión Requerido</p>
+            <p className="text-[11px] text-text-muted max-w-[240px] mb-4">
+              Inicia sesión con tu cuenta de moderador o creador para revisar y liberar mensajes retenidos por AutoMod.
+            </p>
+            {onLoginWithToken && (
+              <button
+                onClick={onLoginWithToken}
+                className="px-4 py-2 bg-twitch hover:bg-twitch-glow text-white text-xs font-bold rounded-xl shadow-lg shadow-twitch/30 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <PhosphorIcon name="SignIn" size={15} weight="bold" />
+                <span>Iniciar sesión en Twitch</span>
+              </button>
+            )}
+          </div>
+        ) : heldMessages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-6 text-center text-text-muted select-none">
             <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-2 text-white/30">
               <PhosphorIcon name="ShieldCheck" size={20} weight="duotone" />

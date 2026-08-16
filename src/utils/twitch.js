@@ -50,6 +50,14 @@ function err(code, message, meta = {}, silent = false) {
 async function helixFetch(url, opts = {}, meta = {}, signal) {
   try {
     const headers = await getHeaders()
+    if (!headers['Authorization']) {
+      return err(
+        ErrorCode.MOD_ACTION_FAILED,
+        'Inicia sesión con tu cuenta de Twitch para usar esta función',
+        { ...meta, url, status: 401 },
+        true,
+      )
+    }
 
     const timeoutSignal = safeTimeout(5000)
     let combinedSignal = timeoutSignal
@@ -57,7 +65,6 @@ async function helixFetch(url, opts = {}, meta = {}, signal) {
       if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
         combinedSignal = AbortSignal.any([timeoutSignal, signal])
       } else if (!timeoutSignal.aborted && !signal.aborted) {
-
         const ctrl = new AbortController()
         const onAbort = () => ctrl.abort()
         timeoutSignal.addEventListener('abort', onAbort, { once: true })
@@ -73,23 +80,22 @@ async function helixFetch(url, opts = {}, meta = {}, signal) {
     const res = await measureFetch(url, finalOpts)
     const status = res.status
     if (!res.ok) {
-
       const msg =
-        status === 403 ? 'Sin permisos para esta accion' :
+        status === 401 ? 'Inicia sesión con tu cuenta de Twitch para usar esta función' :
+        status === 403 ? 'Sin permisos de moderador en este canal' :
         status === 404 ? 'Recurso no encontrado' :
         status === 429 ? 'Rate limit de Twitch alcanzado' :
         status >= 500 ? 'Error del servidor de Twitch' :
-        `Helix fallo (HTTP ${status})`
+        `Error de Twitch (HTTP ${status})`
       return err(ErrorCode.MOD_ACTION_FAILED, msg, { ...meta, url, status })
     }
 
     if (status === 204 || (opts.method || 'GET').toUpperCase() === 'DELETE') {
-      return ok( (null))
+      return ok(null)
     }
     const data = await res.json().catch(() => null)
-    return ok( (data))
+    return ok(data)
   } catch (e) {
-
     return err(
       ErrorCode.MOD_ACTION_FAILED,
       e?.name === 'AbortError' ? 'Timeout (5s) llamando a Twitch' : (e?.message || 'Fallo de red'),

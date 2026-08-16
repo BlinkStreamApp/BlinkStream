@@ -9,7 +9,7 @@ import {
   endPoll,
 } from '../../utils/twitch'
 
-export function PredictionsPollsPanel({ broadcasterId, _userId }) {
+export function PredictionsPollsPanel({ broadcasterId, _userId, isLoggedIn = true, onLoginWithToken }) {
   const [subTab, setSubTab] = useState('predictions') // 'predictions' | 'polls'
   const [predictions, setPredictions] = useState([])
   const [polls, setPolls] = useState([])
@@ -30,29 +30,30 @@ export function PredictionsPollsPanel({ broadcasterId, _userId }) {
   const [pollDuration, setPollDuration] = useState(60)
 
   const loadData = useCallback(async () => {
-    if (!broadcasterId) return
+    if (!broadcasterId || !isLoggedIn) return
     setLoading(true)
     setStatusMessage('')
     try {
       if (subTab === 'predictions') {
         const res = await getPredictions(broadcasterId)
         if (res.success) setPredictions(res.value || [])
-        else setStatusMessage(res.error?.message || 'Error cargando predicciones')
+        else setStatusMessage(res.error?.message || 'Inicia sesión con tu cuenta de Twitch para gestionar este panel')
       } else {
         const res = await getPolls(broadcasterId)
         if (res.success) setPolls(res.value || [])
-        else setStatusMessage(res.error?.message || 'Error cargando encuestas')
+        else setStatusMessage(res.error?.message || 'Inicia sesión con tu cuenta de Twitch para gestionar este panel')
       }
     } catch {
       setStatusMessage('Error de conexión al cargar datos')
     }
     setLoading(false)
-  }, [broadcasterId, subTab])
+  }, [broadcasterId, subTab, isLoggedIn])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData()
-  }, [loadData])
+    if (isLoggedIn) {
+      loadData()
+    }
+  }, [loadData, isLoggedIn])
 
   const handleCreatePrediction = async (e) => {
     e.preventDefault()
@@ -275,7 +276,26 @@ export function PredictionsPollsPanel({ broadcasterId, _userId }) {
 
       {/* List content */}
       <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5">
-        {loading ? (
+        {!isLoggedIn ? (
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center select-none">
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-300 mb-3">
+              <PhosphorIcon name="Coins" size={24} weight="duotone" />
+            </div>
+            <p className="text-xs font-bold text-white mb-1">Inicio de Sesión Requerido</p>
+            <p className="text-[11px] text-text-muted max-w-[240px] mb-4">
+              Inicia sesión con tu cuenta de moderador o creador para consultar y gestionar predicciones en tiempo real.
+            </p>
+            {onLoginWithToken && (
+              <button
+                onClick={onLoginWithToken}
+                className="px-4 py-2 bg-twitch hover:bg-twitch-glow text-white text-xs font-bold rounded-xl shadow-lg shadow-twitch/30 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <PhosphorIcon name="SignIn" size={15} weight="bold" />
+                <span>Iniciar sesión en Twitch</span>
+              </button>
+            )}
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center p-8 text-text-muted text-xs">
             <div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin mr-2" />
             <span>Cargando {subTab === 'predictions' ? 'predicciones' : 'encuestas'}...</span>

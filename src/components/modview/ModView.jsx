@@ -380,6 +380,8 @@ export function ModView({
             <AutoModQueue
               broadcasterId={broadcasterId}
               userId={userId}
+              isLoggedIn={isLoggedIn}
+              onLoginWithToken={onLoginWithToken}
               heldMessages={heldMessages}
               onRemoveMessage={handleRemoveHeldMessage}
               onInspectUser={handleSelectUser}
@@ -388,6 +390,8 @@ export function ModView({
             <UnbanRequestsPanel
               broadcasterId={broadcasterId}
               userId={userId}
+              isLoggedIn={isLoggedIn}
+              onLoginWithToken={onLoginWithToken}
               onInspectUser={handleSelectUser}
             />
           )
@@ -395,6 +399,8 @@ export function ModView({
           <PredictionsPollsPanel
             broadcasterId={broadcasterId}
             userId={userId}
+            isLoggedIn={isLoggedIn}
+            onLoginWithToken={onLoginWithToken}
           />
         ) : (
           <RewardsQueuePanel
