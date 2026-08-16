@@ -37,7 +37,7 @@ const DEFAULT_CLIENT_ID = PUBLIC_CLIENT_ID
 function loadCustomClientId() {
   try { return localStorage.getItem('blinkstream_custom_client_id') || '' } catch { return '' }
 }
-function saveCustomClientId(id) {
+function _saveCustomClientId(id) {
   try { localStorage.setItem('blinkstream_custom_client_id', id || '') } catch {  }
 }
 
@@ -600,8 +600,8 @@ export default function Chat({
   const [authCode, setAuthCode] = useState('')
   const [authError, setAuthError] = useState('')
   const [showLoginOptions, setShowLoginOptions] = useState(false)
-  const [customClientId, setCustomClientId] = useState(loadCustomClientId)
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [customClientId, _setCustomClientId] = useState(loadCustomClientId)
+  const [_showAdvanced, _setShowAdvanced] = useState(false)
   const [showEmoteMenu, setShowEmoteMenu] = useState(false)
   const [emoteSearch, setEmoteSearch] = useState('')
   const [emoteTab, setEmoteTab] = useState('all')
@@ -680,7 +680,7 @@ export default function Chat({
       }
     }
     return list
-  }, [channel, auth?.username, isBroadcaster, isModerator, isMod, isVip])
+  }, [channel, auth.username, isBroadcaster, isModerator, isMod, isVip])
 
   useEffect(() => {
     trieRef.current = buildEmoteTrie(emotes)
@@ -1555,7 +1555,7 @@ export default function Chat({
 
     setConnError(`Comando /${cmd} no soportado o requiere permisos especiales.`)
     setInputText('')
-  }, [channel, auth, broadcasterId, userId, isModerator, isBroadcaster])
+  }, [channel, auth, broadcasterId, userId, isModerator, isBroadcaster, getUserBadgesForSend])
 
   const sendMessage = async (e) => {
     e.preventDefault()

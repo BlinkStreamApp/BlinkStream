@@ -764,6 +764,8 @@ export default function VideoPlayer({
     };
   }, [togglePlay, toggleMute, captureSnapshot]);
 
+  const errInfo = error ? formatPlayerError(error, channel, t) : null
+  const handleRetry = useCallback(() => { fetchStream(channel) }, [channel, fetchStream])
   useEffect(() => {
     const handleKey = (e) => {
       const tag = e.target.tagName
@@ -876,52 +878,47 @@ export default function VideoPlayer({
         </div>
       )}
 
-      {error && !loading && (() => {
-        const errInfo = formatPlayerError(error, channel, t)
-        if (errInfo?.isOffline) {
-          return (
-            <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
-              <div className="text-center px-4 max-w-md flex flex-col items-center select-none">
-                <div className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-text-muted mb-2.5 shadow-2xl backdrop-blur-xl">
-                  <PhosphorIcon name="Television" size={28} className="text-white/40" weight="duotone" />
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                  <span>{t('player.offlineBadge', 'OFFLINE')}</span>
-                </div>
-                <h3 className="text-sm md:text-base font-bold text-white mb-1">{errInfo.title}</h3>
-                <p className="text-[11px] md:text-xs text-text-muted max-w-xs leading-relaxed mb-4">
-                  {errInfo.desc}
-                </p>
-                <div className="flex items-center justify-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => fetchStream(channel)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer hover:scale-[1.02]"
-                  >
-                    <PhosphorIcon name="ArrowsClockwise" size={14} weight="bold" />
-                    <span>{t('player.checkLive', 'Comprobar directo')}</span>
-                  </button>
-                  <button
-                    onClick={() => setShowVods(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
-                  >
-                    <PhosphorIcon name="FilmStrip" size={14} />
-                    <span>{t('player.watchVods', 'Ver VODs')}</span>
-                  </button>
-                  <button
-                    onClick={() => setShowClips(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
-                  >
-                    <PhosphorIcon name="PlayCircle" size={14} />
-                    <span>{t('player.clips', 'Clips')}</span>
-                  </button>
-                </div>
+      {error && !loading && (
+        errInfo?.isOffline ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
+            <div className="text-center px-4 max-w-md flex flex-col items-center select-none">
+              <div className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-text-muted mb-2.5 shadow-2xl backdrop-blur-xl">
+                <PhosphorIcon name="Television" size={28} className="text-white/40" weight="duotone" />
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                <span>{t('player.offlineBadge', 'OFFLINE')}</span>
+              </div>
+              <h3 className="text-sm md:text-base font-bold text-white mb-1">{errInfo.title}</h3>
+              <p className="text-[11px] md:text-xs text-text-muted max-w-xs leading-relaxed mb-4">
+                {errInfo.desc}
+              </p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <button
+                  onClick={handleRetry}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer hover:scale-[1.02]"
+                >
+                  <PhosphorIcon name="ArrowsClockwise" size={14} weight="bold" />
+                  <span>{t('player.checkLive', 'Comprobar directo')}</span>
+                </button>
+                <button
+                  onClick={() => setShowVods(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
+                >
+                  <PhosphorIcon name="FilmStrip" size={14} />
+                  <span>{t('player.watchVods', 'Ver VODs')}</span>
+                </button>
+                <button
+                  onClick={() => setShowClips(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-medium transition-all cursor-pointer"
+                >
+                  <PhosphorIcon name="PlayCircle" size={14} />
+                  <span>{t('player.clips', 'Clips')}</span>
+                </button>
               </div>
             </div>
-          )
-        }
-
-        return (
+          </div>
+        ) : (
           <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
             <div className="text-center px-6 max-w-sm flex flex-col items-center">
               <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3 shadow-xl">
@@ -930,7 +927,7 @@ export default function VideoPlayer({
               <p className="text-red-300 text-sm font-bold mb-1">{errInfo?.title || t('player.error', 'Error')}</p>
               <p className="text-xs text-text-muted break-words mb-4 leading-relaxed">{errInfo?.desc || error}</p>
               <button
-                onClick={() => fetchStream(channel)}
+                onClick={handleRetry}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer"
               >
                 <PhosphorIcon name="ArrowsClockwise" size={14} weight="bold" />
@@ -939,7 +936,7 @@ export default function VideoPlayer({
             </div>
           </div>
         )
-      })()}
+      )}
 
       {/* Controls Bar (only shown when stream is active) */}
       {!error && !loading && (

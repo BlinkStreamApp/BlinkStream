@@ -1,6 +1,6 @@
 import PhosphorIcon from '../icons/PhosphorIcon'
 
-export const DOCK_TABS = [
+const DOCK_TABS = [
   { id: 'audit', title: 'Mod Log', icon: 'ClockCounterClockwise', desc: 'Registro de auditoría de moderación en vivo con limpieza local.' },
   { id: 'users', title: 'Espectadores & Mods', icon: 'ChatsCircle', desc: 'Lista de espectadores activos en el chat, moderadores y VIPs.' },
   { id: 'activity', title: 'Fuente de Actividad', icon: 'Lightning', desc: 'Feed en tiempo real de suscripciones, raids, bits y canjes.' },
@@ -9,7 +9,7 @@ export const DOCK_TABS = [
   { id: 'rewards', title: 'Recompensas de Puntos', icon: 'Gift', desc: 'Cola de canjes de puntos de canal pendientes de cumplir.' },
 ]
 
-export const LAYOUT_PRESETS = [
+const LAYOUT_PRESETS = [
   { id: 'standard', label: 'Estándar (Vídeo | Chat | Herramientas)', desc: 'Distribución óptima de moderación con monitor a la izquierda y chat central.' },
   { id: 'chat_left', label: 'Chat a la Izquierda (Chat | Vídeo | Herramientas)', desc: 'Prioridad de lectura de chat en el lateral izquierdo.' },
   { id: 'no_player', label: 'Modo Solo Chat & Herramientas', desc: 'Oculta el reproductor para ahorrar rendimiento y concentrarse en el chat.' },

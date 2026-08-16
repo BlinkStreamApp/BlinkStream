@@ -20,7 +20,7 @@ const PATTERNS = [
   { id: 'window-open-tabnab',  re: /window\.open\(/,                                               desc: 'window.open sin noopener,noreferrer' },
   { id: 'gql-string-interp',   re: /user\(login:\s*"\$\{|channelName:\s*"\$\{/,                   desc: 'Interpolacion directa en GQL (CWE-94)' },
   { id: 'invoke-outside-guard',re: /^\s*invoke\(['"]/,                                            desc: 'invoke() sin guard isTauri()' },
-  { id: 'tw-legacy-mojibake',  re: /[Ã¡Ã©Ã­Ã³ÃºÃ±]/,                                               desc: 'Encoding UTF-8 mal decodificado' },
+  { id: 'tw-legacy-mojibake',  re: /(?:Ã¡|Ã©|Ã­|Ã³|Ãº|Ã±)/,                                        desc: 'Encoding UTF-8 mal decodificado' },
   { id: 'legacy-blob-preview', re: /URL\.createObjectURL/,                                         desc: 'Blob URL en preview live (rompe live streams)' },
   { id: 'thumbnailURL-mayus',  re: /thumbnailURL/,                                                 desc: 'Campo case-incorrecto en GQL' },
   { id: 'period-LAST_WEEK',    re: /period\s*:\s*\{\s*filter\s*:\s*LAST_WEEK/,                     desc: 'Enum GQL obsoleto (criterio de clips)' },

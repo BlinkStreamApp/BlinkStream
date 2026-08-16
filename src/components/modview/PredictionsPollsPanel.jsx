@@ -66,6 +66,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
 
   useEffect(() => {
     if (isLoggedIn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadData()
     }
   }, [loadData, isLoggedIn])

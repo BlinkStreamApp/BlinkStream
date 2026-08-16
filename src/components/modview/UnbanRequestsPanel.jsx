@@ -33,6 +33,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
 
   useEffect(() => {
     if (isLoggedIn && userId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadRequests()
     }
   }, [loadRequests, isLoggedIn, userId])
