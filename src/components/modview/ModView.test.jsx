@@ -6,7 +6,8 @@ import { ModActionFeed } from './ModActionFeed'
 import { AutoModQueue } from './AutoModQueue'
 import { ActivityFeed } from './ActivityFeed'
 import { RewardsQueuePanel } from './RewardsQueuePanel'
-import { ModWidgetWrapper } from './ModWidgetWrapper'
+import { ModViewLayoutDrawer } from './ModViewLayoutDrawer'
+
 
 describe('ModQuickActionsBar', () => {
   it('renders channel name and mode toggles correctly', () => {
@@ -317,37 +318,38 @@ describe('RewardsQueuePanel', () => {
   })
 })
 
-describe('ModWidgetWrapper', () => {
-  it('renders title, content, and moves or closes in edit mode', () => {
-    const onMoveRight = vi.fn()
+describe('ModViewLayoutDrawer', () => {
+  it('renders presets and handles toggling tabs and closing', () => {
+    const onChangeConfig = vi.fn()
     const onClose = vi.fn()
 
     render(
-      <ModWidgetWrapper
-        widgetId="test-widget"
-        title="Test Panel"
-        icon="Shield"
-        isEditMode={true}
-        canMoveRight={true}
-        onMoveRight={onMoveRight}
+      <ModViewLayoutDrawer
+        isOpen={true}
         onClose={onClose}
-      >
-        <div>Panel Body Content</div>
-      </ModWidgetWrapper>
+        config={{
+          preset: 'standard',
+          showPlayer: true,
+          showInspector: true,
+          enabledTabs: ['audit', 'users'],
+        }}
+        onChangeConfig={onChangeConfig}
+      />
     )
 
-    expect(screen.getByText('Test Panel')).toBeInTheDocument()
-    expect(screen.getByText('Panel Body Content')).toBeInTheDocument()
+    expect(screen.getByText('Personalizar Vista de Moderación')).toBeInTheDocument()
+    expect(screen.getByText('Estándar (Vídeo | Chat | Herramientas)')).toBeInTheDocument()
 
-    // Move right button
-    fireEvent.click(screen.getByTitle('Mover a columna derecha'))
-    expect(onMoveRight).toHaveBeenCalled()
+    // Toggle player
+    fireEvent.click(screen.getByText('Reproductor de Vídeo'))
+    expect(onChangeConfig).toHaveBeenCalledWith(expect.objectContaining({ showPlayer: false }))
 
     // Close button
-    fireEvent.click(screen.getByTitle('Ocultar panel'))
+    fireEvent.click(screen.getByText('Guardar & Cerrar'))
     expect(onClose).toHaveBeenCalled()
   })
 })
+
 
 
 
