@@ -160,8 +160,28 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, token, isLoggedI
       </div>
 
       {statusMessage && (
-        <div className="p-2 bg-purple-500/10 border-b border-purple-500/20 text-[11px] text-purple-300">
-          {statusMessage}
+        <div className="px-3 py-2 bg-purple-950/40 border-b border-purple-500/20 text-[11px] text-purple-200 flex items-center justify-between gap-2 animate-fade-in">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <PhosphorIcon name="Info" size={14} className="text-purple-400 shrink-0" />
+            <span className="truncate">{statusMessage}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onLoginWithToken && statusMessage.includes('renovar') && (
+              <button
+                onClick={onLoginWithToken}
+                className="px-2 py-0.5 rounded bg-twitch hover:bg-twitch-dark text-white text-[10px] font-bold cursor-pointer transition-colors"
+              >
+                Renovar
+              </button>
+            )}
+            <button
+              onClick={() => setStatusMessage('')}
+              className="text-white/40 hover:text-white transition-colors cursor-pointer"
+              title="Cerrar aviso"
+            >
+              <PhosphorIcon name="X" size={12} weight="bold" />
+            </button>
+          </div>
         </div>
       )}
 

@@ -581,7 +581,7 @@ function handleAuthRedirect(
   // no puede tener (no es mod / no es broadcaster); NO genera error.
   authUrl.searchParams.set(
     "scope",
-    "chat:read chat:edit user:edit:follows user:read:follows moderator:manage:chat_messages moderator:manage:banned_users moderator:manage:chat_settings moderation:read channel:read:redemptions channel:manage:redemptions channel:read:subscriptions",
+    "chat:read chat:edit user:edit:follows user:read:follows moderator:manage:chat_messages moderator:manage:banned_users moderator:manage:chat_settings moderation:read channel:read:redemptions channel:manage:redemptions channel:read:subscriptions channel:read:predictions channel:manage:predictions channel:read:polls channel:manage:polls moderator:read:automod_settings moderator:manage:automod moderator:read:unban_requests moderator:manage:unban_requests",
   );
   authUrl.searchParams.set("state", requestId);
   authUrl.searchParams.set("force_verify", "true");

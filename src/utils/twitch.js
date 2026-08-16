@@ -90,14 +90,27 @@ async function helixFetch(url, opts = {}, meta = {}, signal) {
     const res = await measureFetch(url, finalOpts)
     const status = res.status
     if (!res.ok) {
-      const msg =
-        status === 401 ? 'Inicia sesión con tu cuenta de Twitch para usar esta función' :
-        status === 403 ? 'Sin permisos de moderador en este canal' :
-        status === 404 ? 'Recurso no encontrado' :
-        status === 429 ? 'Rate limit de Twitch alcanzado' :
-        status >= 500 ? 'Error del servidor de Twitch' :
-        `Error de Twitch (HTTP ${status})`
-      return err(ErrorCode.MOD_ACTION_FAILED, msg, { ...meta, url, status })
+      const errData = await res.json().catch(() => null)
+      const twitchMsg = errData?.message || ''
+      const isMissingScope = twitchMsg.toLowerCase().includes('scope') || status === 401
+      const isForbidden = status === 403
+
+      let msg = `Error de Twitch (HTTP ${status})`
+      if (isMissingScope) {
+        msg = 'Permisos de predicciones/encuestas no autorizados en tu cuenta. Haz clic en Iniciar sesión para renovar permisos.'
+      } else if (isForbidden) {
+        msg = 'Sin permisos de moderador o creador en este canal.'
+      } else if (status === 404) {
+        msg = 'Recurso no encontrado en Twitch.'
+      } else if (status === 429) {
+        msg = 'Rate limit de Twitch alcanzado.'
+      } else if (status >= 500) {
+        msg = 'Error del servidor de Twitch.'
+      } else if (twitchMsg) {
+        msg = twitchMsg
+      }
+
+      return err(ErrorCode.MOD_ACTION_FAILED, msg, { ...meta, url, status, twitchMsg, isMissingScope, isForbidden })
     }
 
     if (status === 204 || (opts.method || 'GET').toUpperCase() === 'DELETE') {
