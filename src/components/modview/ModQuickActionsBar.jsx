@@ -1,0 +1,224 @@
+import { useState } from 'react'
+import PhosphorIcon from '../icons/PhosphorIcon'
+
+export function ModQuickActionsBar({
+  channel,
+  _isModerator,
+  _isBroadcaster,
+  activeModes = {},
+  onSetMode,
+  onClearChat,
+  onExit,
+  remainingActions = 20,
+  isRateLimited = false,
+}) {
+  const [showSlowMenu, setShowSlowMenu] = useState(false)
+  const [showFollowersMenu, setShowFollowersMenu] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [shieldActive, setShieldActive] = useState(false)
+
+  const handleSlowSelect = (secs) => {
+    setShowSlowMenu(false)
+    if (secs === 0) {
+      onSetMode?.('slowoff')
+    } else {
+      onSetMode?.('slow', String(secs))
+    }
+  }
+
+  const handleFollowersSelect = (mins) => {
+    setShowFollowersMenu(false)
+    if (mins === -1) {
+      onSetMode?.('followersoff')
+    } else {
+      onSetMode?.('followers', String(mins))
+    }
+  }
+
+  const toggleEmoteOnly = () => {
+    const active = !!activeModes.emoteonly
+    onSetMode?.(active ? 'emoteonlyoff' : 'emoteonly')
+  }
+
+  const toggleSubOnly = () => {
+    const active = !!activeModes.subscribers
+    onSetMode?.(active ? 'subscribersoff' : 'subscribers')
+  }
+
+  const handleShieldToggle = () => {
+    if (!shieldActive) {
+      // Enable extreme protection: Emote-only + Sub-only + Slow 30s
+      onSetMode?.('emoteonly')
+      onSetMode?.('subscribers')
+      onSetMode?.('slow', '30')
+      setShieldActive(true)
+    } else {
+      onSetMode?.('emoteonlyoff')
+      onSetMode?.('subscribersoff')
+      onSetMode?.('slowoff')
+      setShieldActive(false)
+    }
+  }
+
+  return (
+    <div className="shrink-0 bg-[#0e0e14]/95 border-b border-white/10 px-4 py-2.5 flex items-center justify-between gap-3 select-none backdrop-blur-xl z-20">
+      {/* Left: Channel and Mode Title */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-1.5 bg-twitch/15 text-twitch-glow border border-twitch/30 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
+          <PhosphorIcon name="ShieldCheck" size={16} weight="fill" className="text-twitch animate-pulse" />
+          <span>Mod View</span>
+        </div>
+        <div className="flex items-center gap-1.5 truncate">
+          <span className="text-xs font-bold text-white truncate">{channel}</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+        </div>
+      </div>
+
+      {/* Center: Quick Channel Actions */}
+      <div className="flex items-center gap-2 flex-wrap justify-center">
+        {/* Shield Mode */}
+        <button
+          onClick={handleShieldToggle}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all border ${
+            shieldActive
+              ? 'bg-red-500/20 border-red-500/60 text-red-300 shadow-lg shadow-red-500/20 animate-pulse'
+              : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10 hover:text-white'
+          }`}
+          title={shieldActive ? 'Desactivar Modo Escudo' : 'Activar Modo Escudo (Anti-Raid)'}
+        >
+          <PhosphorIcon name="Shield" size={15} weight={shieldActive ? 'fill' : 'bold'} />
+          <span>{shieldActive ? 'Escudo Activo' : 'Modo Escudo'}</span>
+        </button>
+
+        {/* Emote Only Toggle */}
+        <button
+          onClick={toggleEmoteOnly}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+            activeModes.emoteonly
+              ? 'bg-purple-500/20 border-purple-500/60 text-purple-300 shadow-sm shadow-purple-500/20'
+              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+          }`}
+          title="Solo Emotes"
+        >
+          <PhosphorIcon name="Smiley" size={15} weight={activeModes.emoteonly ? 'fill' : 'regular'} />
+          <span>Solo Emotes</span>
+        </button>
+
+        {/* Subscribers Only Toggle */}
+        <button
+          onClick={toggleSubOnly}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+            activeModes.subscribers
+              ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-sm shadow-amber-500/20'
+              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+          }`}
+          title="Solo Suscriptores"
+        >
+          <PhosphorIcon name="Sparkle" size={15} weight={activeModes.subscribers ? 'fill' : 'regular'} />
+          <span>Solo Subs</span>
+        </button>
+
+        {/* Slow Mode Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowSlowMenu(p => !p)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+              activeModes.slow
+                ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
+                : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
+            title="Modo Lento"
+          >
+            <PhosphorIcon name="ClockCounterClockwise" size={15} />
+            <span>{activeModes.slow ? `Lento (${activeModes.slow}s)` : 'Modo Lento'}</span>
+            <PhosphorIcon name="CaretDoubleRight" size={10} className="rotate-90 text-white/40" />
+          </button>
+
+          {showSlowMenu && (
+            <div className="absolute top-full mt-1.5 left-0 w-36 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs">
+              <button onClick={() => handleSlowSelect(0)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white">Desactivar</button>
+              <button onClick={() => handleSlowSelect(3)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">3 segundos</button>
+              <button onClick={() => handleSlowSelect(5)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">5 segundos</button>
+              <button onClick={() => handleSlowSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">10 segundos</button>
+              <button onClick={() => handleSlowSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">30 segundos</button>
+              <button onClick={() => handleSlowSelect(60)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">60 segundos</button>
+              <button onClick={() => handleSlowSelect(120)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">120 segundos</button>
+            </div>
+          )}
+        </div>
+
+        {/* Followers Mode Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowFollowersMenu(p => !p)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+              activeModes.followers !== undefined && activeModes.followers !== null && activeModes.followers !== false
+                ? 'bg-blue-500/20 border-blue-500/60 text-blue-300'
+                : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
+            title="Solo Seguidores"
+          >
+            <PhosphorIcon name="Heart" size={15} />
+            <span>{activeModes.followers !== undefined && activeModes.followers !== null && activeModes.followers !== false ? `Seguidores` : 'Seguidores'}</span>
+            <PhosphorIcon name="CaretDoubleRight" size={10} className="rotate-90 text-white/40" />
+          </button>
+
+          {showFollowersMenu && (
+            <div className="absolute top-full mt-1.5 left-0 w-40 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs">
+              <button onClick={() => handleFollowersSelect(-1)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white">Desactivar</button>
+              <button onClick={() => handleFollowersSelect(0)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">Cualquier seguidor</button>
+              <button onClick={() => handleFollowersSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; 10 minutos</button>
+              <button onClick={() => handleFollowersSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; 30 minutos</button>
+              <button onClick={() => handleFollowersSelect(1440)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; 1 día</button>
+            </div>
+          )}
+        </div>
+
+        {/* Clear Chat */}
+        {confirmClear ? (
+          <div className="flex items-center gap-1 bg-red-500/20 border border-red-500/40 rounded-lg p-0.5">
+            <span className="text-[11px] text-red-300 font-semibold px-1.5">¿Vaciar?</span>
+            <button
+              onClick={() => { setConfirmClear(false); onClearChat?.() }}
+              className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded cursor-pointer transition-colors"
+            >
+              Sí
+            </button>
+            <button
+              onClick={() => setConfirmClear(false)}
+              className="px-1.5 py-1 text-white/60 hover:text-white text-[10px] cursor-pointer"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmClear(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white/60 hover:text-red-400 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 cursor-pointer transition-all"
+            title="Vaciar Chat del Canal"
+          >
+            <PhosphorIcon name="Trash" size={15} />
+            <span>Limpiar</span>
+          </button>
+        )}
+      </div>
+
+      {/* Right: Telemetry & Exit Button */}
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-text-muted font-mono bg-white/5 border border-white/10 px-2 py-1 rounded-lg">
+          <span className={isRateLimited ? 'text-red-400 font-bold' : 'text-green-400 font-semibold'}>⚡ {remainingActions}/20</span>
+          <span className="text-white/40">acciones</span>
+        </div>
+
+        <button
+          onClick={onExit}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/25 cursor-pointer transition-all"
+          title="Salir de la Vista de Moderador (Esc / Ctrl+M)"
+        >
+          <PhosphorIcon name="X" size={14} weight="bold" />
+          <span>Salir</span>
+        </button>
+      </div>
+    </div>
+  )
+}

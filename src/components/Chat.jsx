@@ -343,7 +343,7 @@ function UserCardPopup({ username, position, onClose }) {
 
 let msgIdCounter = 0
 
-const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage, onContextMenu, isGridMode }) => {
+const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage, onContextMenu, isGridMode, onSelectUserForInspection, _isModerator }) => {
   const isSpecial = Boolean(msg.eventType || msg.isNotice || msg.isReward)
 
   if (isSpecial) {
@@ -378,7 +378,18 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
               style={{ color: adjustColorContrast(msg.color || '#adadb8') }}
               onClick={(e) => {
                 e.stopPropagation()
-                setUserCard(prev => prev?.username === msg.user ? null : { x: e.clientX, y: e.clientY, username: msg.user })
+                if (onSelectUserForInspection) {
+                  onSelectUserForInspection({
+                    username: msg.user,
+                    displayName: msg.displayName || msg.user,
+                    userId: msg.user_id || '',
+                    isMod: msg.badges?.some(b => b.set === 'moderator'),
+                    isVip: msg.badges?.some(b => b.set === 'vip'),
+                    isSub: msg.badges?.some(b => b.set === 'subscriber'),
+                  })
+                } else {
+                  setUserCard(prev => prev?.username === msg.user ? null : { x: e.clientX, y: e.clientY, username: msg.user })
+                }
               }}
             >
               {msg.user}
@@ -452,9 +463,29 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
   )
 })
 
-export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onOpenCPPanel, isModerator, isBroadcaster, viewerLogin, onLoginWithToken, isGridMode, isOverlay, onCloseOverlay }) {
+export default function Chat({
+  channel,
+  isLoggedIn,
+  twitchToken,
+  twitchUsername,
+  broadcasterId,
+  onOpenCPPanel,
+  isModerator,
+  isBroadcaster,
+  viewerLogin,
+  onLoginWithToken,
+  isGridMode,
+  isOverlay,
+  onCloseOverlay,
+  onSelectUserForInspection,
+  onMessagesUpdate,
+}) {
   const t = useT()
   const [messages, setMessages] = useState([])
+
+  useEffect(() => {
+    onMessagesUpdate?.(messages)
+  }, [messages, onMessagesUpdate])
   const [antiSpam, setAntiSpam] = useState(() => {
     return getItem(STORAGE_KEYS.ANTISPAM, 'false') === 'true'
   })
@@ -1736,6 +1767,8 @@ export default function Chat({ channel, isLoggedIn, twitchToken, twitchUsername,
                   renderMessage={renderMessage}
                   onContextMenu={isModerator ? handleContextMenu : undefined}
                   isGridMode={isGridMode}
+                  onSelectUserForInspection={onSelectUserForInspection}
+                  isModerator={isModerator}
                 />
               ))
             })()}

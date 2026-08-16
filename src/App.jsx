@@ -20,6 +20,7 @@ const AboutDialog = lazy(() => import('./components/AboutDialog'))
 const Onboarding = lazy(() => import('./components/Onboarding'))
 const CPPanel = lazy(() => import('./components/channelpoints/CPPanel'))
 const ModPanel = lazy(() => import('./components/moderation/ModPanel'))
+const ModView = lazy(() => import('./components/modview/ModView'))
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
@@ -179,6 +180,10 @@ function MainApp() {
           const input = document.querySelector('header input[type="text"]')
           if (input) input.focus()
         }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyM') {
+        e.preventDefault()
+        setViewMode(p => p === 'modview' ? 'normal' : 'modview')
       }
     }
     window.addEventListener('keydown', handleKey)
@@ -491,18 +496,21 @@ function MainApp() {
 
           {}
           <div className="flex items-center gap-1">
-            {}
-            {channel && roleState.isModerator && !roleState.loading && (
+            {/* Pro Mod View button */}
+            {channel && (roleState.isModerator || roleState.isBroadcaster) && !roleState.loading && (
               <button
-                onClick={() => setShowModPanel(p => !p)}
-                className={`p-2 rounded-lg cursor-pointer transition-colors btn-press ${
-                  showModPanel ? 'text-twitch bg-hover' : 'text-text-muted hover:text-text-primary hover:bg-hover'
+                onClick={() => setViewMode(p => p === 'modview' ? 'normal' : 'modview')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all text-xs font-bold border btn-press ${
+                  viewMode === 'modview'
+                    ? 'text-white bg-twitch border-twitch shadow-md shadow-twitch/30'
+                    : 'text-twitch-glow bg-twitch/10 hover:bg-twitch/20 border-twitch/30'
                 }`}
-                title="Herramientas de moderación"
-                aria-label="Abrir herramientas de moderación"
-                aria-pressed={showModPanel}
+                title="Pro Mod View (Ctrl+M)"
+                aria-label="Abrir Pro Mod View"
+                aria-pressed={viewMode === 'modview'}
               >
-                <PhosphorIcon name="Shield" size={20} weight="regular" />
+                <PhosphorIcon name="ShieldCheck" size={16} weight="fill" />
+                <span className="hidden sm:inline">Mod View</span>
               </button>
             )}
             <button
@@ -576,7 +584,24 @@ function MainApp() {
           )}
         </header>
 
-      {viewMode === 'multistream' ? (
+      {viewMode === 'modview' ? (
+        <Suspense fallback={<PlayerFallback />}>
+          <ModView
+            channel={channel}
+            broadcasterId={broadcasterId}
+            userId={viewerUserId}
+            isLoggedIn={isLoggedIn}
+            twitchToken={getTwitchToken()}
+            twitchUsername={username || localStorage.getItem('blinkstream_twitch_username')}
+            volume={volume}
+            onVolumeChange={setVolume}
+            quality={quality}
+            onQualityChange={setQuality}
+            onExit={() => setViewMode('normal')}
+            onLoginWithToken={loginWithToken}
+          />
+        </Suspense>
+      ) : viewMode === 'multistream' ? (
         <Suspense fallback={<PlayerFallback />}>
           <MultiStreamGrid
             initialChannel={channel}
