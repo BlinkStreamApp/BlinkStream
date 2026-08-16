@@ -167,7 +167,7 @@ export function ModView({
           </div>
         </div>
 
-        {/* Right Column: Audit Logs & Active Mod Team (Col span 3) */}
+        {/* Right Column: Audit Logs & Active Users / Team (Col span 3) */}
         <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0 bg-[#111119]/80 border border-white/10 rounded-2xl overflow-hidden shadow-xl backdrop-blur-xl">
           {/* Header Switcher */}
           <div className="shrink-0 p-2 border-b border-white/10 bg-white/5 flex items-center justify-between">
@@ -184,17 +184,29 @@ export function ModView({
                 <span>Mod Log</span>
               </button>
               <button
-                onClick={() => setRightPanelTab('team')}
+                onClick={() => setRightPanelTab('users')}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  rightPanelTab === 'team'
+                  rightPanelTab === 'users'
                     ? 'bg-twitch/20 text-twitch-glow border border-twitch/40 shadow-sm'
                     : 'text-white/60 hover:text-white'
                 }`}
+                title="Lista de Espectadores, Moderadores y VIPs"
               >
-                <PhosphorIcon name="Shield" size={14} />
-                <span>Equipo</span>
+                <PhosphorIcon name="ChatsCircle" size={14} />
+                <span>Espectadores y Mods</span>
               </button>
             </div>
+
+            {rightPanelTab === 'audit' && modState.auditLog.length > 0 && (
+              <button
+                onClick={modState.clearAuditLog}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/50 hover:text-red-300 border border-white/10 hover:border-red-500/30 text-[11px] font-medium transition-all cursor-pointer"
+                title="Vaciar registro local de acciones de moderación"
+              >
+                <PhosphorIcon name="Trash" size={13} />
+                <span>Limpiar Log</span>
+              </button>
+            )}
           </div>
 
           {/* Panel Content */}
@@ -203,6 +215,7 @@ export function ModView({
               <ModActionFeed
                 auditLog={modState.auditLog}
                 onInspectUser={handleSelectUser}
+                onClearLog={modState.clearAuditLog}
               />
             ) : (
               <ActiveModsPanel
