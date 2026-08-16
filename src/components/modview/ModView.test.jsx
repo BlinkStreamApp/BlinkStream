@@ -287,7 +287,7 @@ describe('RewardsQueuePanel', () => {
     )
 
     expect(screen.getByText('Canta una canción')).toBeInTheDocument()
-    expect(screen.getByText(/5000\s*pts/i)).toBeInTheDocument()
+    expect(screen.getByText(/5[,. ]?000\s*pts/i)).toBeInTheDocument()
     expect(screen.getByText('@music_lover')).toBeInTheDocument()
     expect(screen.getByText('"Canta Bohemian Rhapsody por favor"')).toBeInTheDocument()
 
