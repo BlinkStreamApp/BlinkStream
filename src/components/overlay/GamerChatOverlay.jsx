@@ -13,7 +13,7 @@ export default function GamerChatOverlay({ initialChannel = '' }) {
   })
   const [opacity, setOpacity] = useState(75) // 0 - 100
   const [isClickThrough, setIsClickThrough] = useState(false)
-  const [showConfig, setShowConfig] = useState(true)
+  const [showConfig, setShowConfig] = useState(false)
 
   // Listen for channel changes from main window
   useEffect(() => {
@@ -27,6 +27,22 @@ export default function GamerChatOverlay({ initialChannel = '' }) {
 
     return () => {
       if (unlisten) unlisten()
+    }
+  }, [])
+
+  const handleClose = useCallback(async () => {
+    if (isTauri()) {
+      try {
+        await invoke('close_gamer_overlay')
+      } catch {
+        try {
+          getCurrentWindow().close()
+        } catch {
+          window.close()
+        }
+      }
+    } else {
+      window.close()
     }
   }, [])
 
@@ -47,27 +63,20 @@ export default function GamerChatOverlay({ initialChannel = '' }) {
     }
   }, [isClickThrough])
 
-  // Global hotkey F9 to toggle Click-Through
+  // Global hotkeys: F9 (toggle click-through), Escape (close)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'F9') {
         e.preventDefault()
         toggleClickThrough()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        handleClose()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleClickThrough])
-
-  const handleClose = () => {
-    if (isTauri()) {
-      try {
-        getCurrentWindow().close()
-      } catch {
-        // Ignorar
-      }
-    }
-  }
+  }, [toggleClickThrough, handleClose])
 
   const bgAlpha = opacity / 100
 
@@ -80,24 +89,32 @@ export default function GamerChatOverlay({ initialChannel = '' }) {
     >
       {/* Top Drag & Config Bar */}
       <div
-        data-tauri-drag-region
-        className="flex items-center justify-between px-3 py-2 bg-black/60 border-b border-white/10 backdrop-blur-md shrink-0 cursor-move"
+        className="flex items-center justify-between px-3 py-2 bg-black/70 border-b border-white/10 backdrop-blur-md shrink-0"
       >
-        <div className="flex items-center gap-2" data-tauri-drag-region>
-          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
-          <span className="text-xs font-black text-white tracking-wider truncate">
+        {/* Dedicated Drag Handle */}
+        <div
+          data-tauri-drag-region
+          className="flex items-center gap-2 cursor-move flex-1 mr-2 py-0.5"
+        >
+          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+          <span className="text-xs font-black text-white tracking-wider truncate pointer-events-none">
             HUD: {channel || 'Chat'}
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-text-muted font-mono">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-text-muted font-mono shrink-0 pointer-events-none">
             F9 Lock
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Buttons Toolbar (No Drag Region to prevent click freezing) */}
+        <div className="flex items-center gap-1.5 shrink-0" data-tauri-drag-region="false">
           <button
             type="button"
-            onClick={() => setShowConfig(p => !p)}
-            className={`p-1 rounded-lg text-xs transition-colors cursor-pointer ${
+            data-tauri-drag-region="false"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowConfig(p => !p)
+            }}
+            className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
               showConfig ? 'bg-twitch text-white' : 'text-text-muted hover:text-white bg-white/5'
             }`}
             title="Ajustes de transparencia"
@@ -108,7 +125,11 @@ export default function GamerChatOverlay({ initialChannel = '' }) {
 
           <button
             type="button"
-            onClick={toggleClickThrough}
+            data-tauri-drag-region="false"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleClickThrough()
+            }}
             className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
               isClickThrough
                 ? 'bg-cyan-500 text-black shadow-[0_0_10px_rgba(6,182,212,0.6)]'
@@ -122,9 +143,14 @@ export default function GamerChatOverlay({ initialChannel = '' }) {
 
           <button
             type="button"
-            onClick={handleClose}
-            className="p-1 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/15 transition-colors cursor-pointer"
+            data-tauri-drag-region="false"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleClose()
+            }}
+            className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
             aria-label="Cerrar overlay"
+            title="Cerrar HUD (Esc)"
           >
             <PhosphorIcon name="X" size={14} weight="bold" />
           </button>
@@ -133,13 +159,17 @@ export default function GamerChatOverlay({ initialChannel = '' }) {
 
       {/* Quick Opacity settings drawer */}
       {showConfig && (
-        <div className="px-3 py-2 bg-black/80 border-b border-white/10 flex items-center justify-between text-xs text-text-muted gap-3 animate-fade-in shrink-0">
-          <span className="text-[11px]">Opacidad Fondo:</span>
+        <div
+          data-tauri-drag-region="false"
+          className="px-3 py-2 bg-black/85 border-b border-white/10 flex items-center justify-between text-xs text-text-muted gap-3 animate-fade-in shrink-0"
+        >
+          <span className="text-[11px] font-medium text-text-secondary shrink-0">Opacidad Fondo:</span>
           <input
             type="range"
             min="0"
             max="100"
             value={opacity}
+            data-tauri-drag-region="false"
             onChange={(e) => setOpacity(Number(e.target.value))}
             className="flex-1 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
             aria-label="Opacidad de fondo"

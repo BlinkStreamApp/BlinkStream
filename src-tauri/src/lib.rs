@@ -1703,6 +1703,14 @@ async fn set_click_through(app: AppHandle, label: String, ignore: bool) -> Resul
 }
 
 #[tauri::command]
+async fn close_gamer_overlay(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("gamer_overlay") {
+        let _ = window.close();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn open_gamer_overlay(app: AppHandle, channel: String) -> Result<(), String> {
     use tauri::Emitter;
     let label = "gamer_overlay";
@@ -1753,6 +1761,7 @@ pub fn run() {
             get_vod_manifest_url,
             download_media_range,
             set_click_through,
+            close_gamer_overlay,
             open_gamer_overlay,
             start_recording,
             stop_recording,

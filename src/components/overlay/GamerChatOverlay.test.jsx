@@ -55,9 +55,21 @@ describe('GamerChatOverlay', () => {
   it('updates opacity range slider', () => {
     render(<GamerChatOverlay initialChannel="shroud" />)
 
+    const configBtn = screen.getByRole('button', { name: 'Ajustes de transparencia' })
+    fireEvent.click(configBtn)
+
     const slider = screen.getByLabelText('Opacidad de fondo')
     fireEvent.change(slider, { target: { value: '40' } })
 
     expect(screen.getByText('40%')).toBeDefined()
+  })
+
+  it('closes overlay on close button click', () => {
+    render(<GamerChatOverlay initialChannel="shroud" />)
+
+    const closeBtn = screen.getByRole('button', { name: 'Cerrar overlay' })
+    fireEvent.click(closeBtn)
+
+    expect(invoke).toHaveBeenCalledWith('close_gamer_overlay')
   })
 })
