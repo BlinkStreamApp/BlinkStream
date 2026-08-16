@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { getUnbanRequests, resolveUnbanRequest } from '../../utils/twitch'
 
-export function UnbanRequestsPanel({ broadcasterId, userId, isLoggedIn = true, onLoginWithToken, onInspectUser }) {
+export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = true, onLoginWithToken, onInspectUser }) {
   const [requests, setRequests] = useState([])
   const [statusFilter, setStatusFilter] = useState('pending') // 'pending' | 'approved' | 'denied'
   const [loading, setLoading] = useState(false)
@@ -16,7 +16,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, isLoggedIn = true, o
     setLoading(true)
     setErrorMsg('')
     try {
-      const res = await getUnbanRequests(broadcasterId, userId, statusFilter)
+      const res = await getUnbanRequests(broadcasterId, userId, statusFilter, 50, token)
       if (res.success) {
         setRequests(res.value || [])
       } else {
@@ -26,7 +26,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, isLoggedIn = true, o
       setErrorMsg('Error de red al consultar solicitudes')
     }
     setLoading(false)
-  }, [broadcasterId, userId, statusFilter, isLoggedIn])
+  }, [broadcasterId, userId, statusFilter, isLoggedIn, token])
 
   useEffect(() => {
     if (isLoggedIn && userId) {
@@ -40,7 +40,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, isLoggedIn = true, o
     setErrorMsg('')
 
     const resolutionText = resolutionTextMap[reqId] || ''
-    const res = await resolveUnbanRequest(broadcasterId, userId, reqId, status, resolutionText)
+    const res = await resolveUnbanRequest(broadcasterId, userId, reqId, status, resolutionText, token)
     if (res.success) {
       // Remove from current list if looking at pending
       setRequests(prev => prev.filter(r => r.id !== reqId))

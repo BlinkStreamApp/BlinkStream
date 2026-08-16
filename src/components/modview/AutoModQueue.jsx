@@ -2,7 +2,7 @@ import { useState } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { manageAutoModMessage } from '../../utils/twitch'
 
-export function AutoModQueue({ broadcasterId, userId, isLoggedIn = true, onLoginWithToken, heldMessages = [], onRemoveMessage, onInspectUser }) {
+export function AutoModQueue({ broadcasterId, userId, token, isLoggedIn = true, onLoginWithToken, heldMessages = [], onRemoveMessage, onInspectUser }) {
   const [actionPending, setActionPending] = useState({})
   const [statusMessage, setStatusMessage] = useState('')
 
@@ -11,7 +11,7 @@ export function AutoModQueue({ broadcasterId, userId, isLoggedIn = true, onLogin
     setActionPending(prev => ({ ...prev, [msgId]: true }))
     setStatusMessage('')
 
-    const res = await manageAutoModMessage(broadcasterId, userId, msgId, action)
+    const res = await manageAutoModMessage(broadcasterId, userId, msgId, action, token)
     if (res.success) {
       onRemoveMessage?.(msgId)
       setStatusMessage(`Mensaje ${action === 'ALLOW' ? 'permitido' : 'denegado'} con éxito.`)

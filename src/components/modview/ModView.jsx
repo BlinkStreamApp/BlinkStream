@@ -200,6 +200,8 @@ export function ModView({
             broadcasterId={broadcasterId}
             userId={userId}
             isLoggedIn={isLoggedIn}
+            twitchToken={twitchToken}
+            twitchUsername={twitchUsername}
             isMod={true}
             isBroadcaster={roleState.isBroadcaster}
             viewerLogin={twitchUsername}
@@ -380,6 +382,7 @@ export function ModView({
             <AutoModQueue
               broadcasterId={broadcasterId}
               userId={userId}
+              token={twitchToken}
               isLoggedIn={isLoggedIn}
               onLoginWithToken={onLoginWithToken}
               heldMessages={heldMessages}
@@ -390,6 +393,7 @@ export function ModView({
             <UnbanRequestsPanel
               broadcasterId={broadcasterId}
               userId={userId}
+              token={twitchToken}
               isLoggedIn={isLoggedIn}
               onLoginWithToken={onLoginWithToken}
               onInspectUser={handleSelectUser}
@@ -399,6 +403,7 @@ export function ModView({
           <PredictionsPollsPanel
             broadcasterId={broadcasterId}
             userId={userId}
+            token={twitchToken}
             isLoggedIn={isLoggedIn}
             onLoginWithToken={onLoginWithToken}
           />

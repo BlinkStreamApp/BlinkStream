@@ -49,8 +49,18 @@ function err(code, message, meta = {}, silent = false) {
 
 async function helixFetch(url, opts = {}, meta = {}, signal) {
   try {
-    const headers = await getHeaders()
-    if (!headers['Authorization']) {
+    let headers = opts.headers || {}
+    let authHeader = headers['Authorization'] || (opts.token ? `Bearer ${opts.token.replace(/^oauth:/i, '')}` : null)
+
+    if (!authHeader) {
+      const fetchedHeaders = await getHeaders()
+      headers = { ...fetchedHeaders, ...headers }
+      authHeader = headers['Authorization']
+    } else {
+      headers = { 'Client-ID': getHelixClientId(), ...headers, Authorization: authHeader }
+    }
+
+    if (!authHeader) {
       return err(
         ErrorCode.MOD_ACTION_FAILED,
         'Inicia sesión con tu cuenta de Twitch para usar esta función',
@@ -74,7 +84,7 @@ async function helixFetch(url, opts = {}, meta = {}, signal) {
     }
     const finalOpts = {
       ...opts,
-      headers: { ...headers, ...(opts.headers || {}) },
+      headers: { ...headers },
       signal: combinedSignal,
     }
     const res = await measureFetch(url, finalOpts)
@@ -1097,7 +1107,7 @@ export async function getChatters(broadcasterId, moderatorId, first = 100) {
   return ok(result.value?.data || [])
 }
 
-export async function manageAutoModMessage(broadcasterId, moderatorId, msgId, action) {
+export async function manageAutoModMessage(broadcasterId, moderatorId, msgId, action, token = null) {
   if (!broadcasterId || !moderatorId || !msgId || !action) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId, msgId y action (ALLOW|DENY) requeridos', { action: 'manageAutoModMessage' })
   }
@@ -1106,6 +1116,7 @@ export async function manageAutoModMessage(broadcasterId, moderatorId, msgId, ac
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      token,
       body: JSON.stringify({
         user_id: moderatorId,
         msg_id: msgId,
@@ -1116,45 +1127,45 @@ export async function manageAutoModMessage(broadcasterId, moderatorId, msgId, ac
   )
 }
 
-export async function getUnbanRequests(broadcasterId, moderatorId, status = 'pending', first = 50) {
+export async function getUnbanRequests(broadcasterId, moderatorId, status = 'pending', first = 50, token = null) {
   if (!broadcasterId || !moderatorId) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y moderatorId requeridos', { action: 'getUnbanRequests' })
   }
   const result = await helixFetch(
     `https://api.twitch.tv/helix/moderation/unban_requests?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&status=${encodeURIComponent(status)}&first=${first}`,
-    { method: 'GET' },
+    { method: 'GET', token },
     { component: 'twitch', action: 'getUnbanRequests', broadcasterId, moderatorId, status },
   )
   if (!result.success) return result
   return ok(result.value?.data || [])
 }
 
-export async function resolveUnbanRequest(broadcasterId, moderatorId, unbanRequestId, status, resolutionText = '') {
+export async function resolveUnbanRequest(broadcasterId, moderatorId, unbanRequestId, status, resolutionText = '', token = null) {
   if (!broadcasterId || !moderatorId || !unbanRequestId || !status) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId, unbanRequestId y status (approved|denied) requeridos', { action: 'resolveUnbanRequest' })
   }
   const resParam = resolutionText ? `&resolution_text=${encodeURIComponent(resolutionText)}` : ''
   return helixFetch(
     `https://api.twitch.tv/helix/moderation/unban_requests?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&unban_request_id=${encodeURIComponent(unbanRequestId)}&status=${encodeURIComponent(status)}${resParam}`,
-    { method: 'PATCH' },
+    { method: 'PATCH', token },
     { component: 'twitch', action: 'resolveUnbanRequest', broadcasterId, moderatorId, unbanRequestId, status },
   )
 }
 
-export async function getPredictions(broadcasterId, first = 20) {
+export async function getPredictions(broadcasterId, first = 20, token = null) {
   if (!broadcasterId) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getPredictions' })
   }
   const result = await helixFetch(
     `https://api.twitch.tv/helix/predictions?broadcaster_id=${encodeURIComponent(broadcasterId)}&first=${first}`,
-    { method: 'GET' },
+    { method: 'GET', token },
     { component: 'twitch', action: 'getPredictions', broadcasterId },
   )
   if (!result.success) return result
   return ok(result.value?.data || [])
 }
 
-export async function createPrediction(broadcasterId, title, outcomes, predictionWindowSec = 120) {
+export async function createPrediction(broadcasterId, title, outcomes, predictionWindowSec = 120, token = null) {
   if (!broadcasterId || !title || !Array.isArray(outcomes) || outcomes.length < 2) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, title y mínimo 2 outcomes requeridos', { action: 'createPrediction' })
   }
@@ -1163,6 +1174,7 @@ export async function createPrediction(broadcasterId, title, outcomes, predictio
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      token,
       body: JSON.stringify({
         broadcaster_id: broadcasterId,
         title: title.slice(0, 45),
@@ -1174,7 +1186,7 @@ export async function createPrediction(broadcasterId, title, outcomes, predictio
   )
 }
 
-export async function resolvePrediction(broadcasterId, predictionId, status, winningOutcomeId) {
+export async function resolvePrediction(broadcasterId, predictionId, status, winningOutcomeId, token = null) {
   if (!broadcasterId || !predictionId || !status) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, predictionId y status (RESOLVED|CANCELED|LOCKED) requeridos', { action: 'resolvePrediction' })
   }
@@ -1191,26 +1203,27 @@ export async function resolvePrediction(broadcasterId, predictionId, status, win
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
+      token,
       body: JSON.stringify(body),
     },
     { component: 'twitch', action: 'resolvePrediction', broadcasterId, predictionId, status },
   )
 }
 
-export async function getPolls(broadcasterId, first = 20) {
+export async function getPolls(broadcasterId, first = 20, token = null) {
   if (!broadcasterId) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getPolls' })
   }
   const result = await helixFetch(
     `https://api.twitch.tv/helix/polls?broadcaster_id=${encodeURIComponent(broadcasterId)}&first=${first}`,
-    { method: 'GET' },
+    { method: 'GET', token },
     { component: 'twitch', action: 'getPolls', broadcasterId },
   )
   if (!result.success) return result
   return ok(result.value?.data || [])
 }
 
-export async function createPoll(broadcasterId, title, choices, durationSec = 60, channelPointsVotingEnabled = false, channelPointsPerVote = 100) {
+export async function createPoll(broadcasterId, title, choices, durationSec = 60, channelPointsVotingEnabled = false, channelPointsPerVote = 100, token = null) {
   if (!broadcasterId || !title || !Array.isArray(choices) || choices.length < 2) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, title y mínimo 2 choices requeridos', { action: 'createPoll' })
   }
@@ -1229,13 +1242,14 @@ export async function createPoll(broadcasterId, title, choices, durationSec = 60
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      token,
       body: JSON.stringify(body),
     },
     { component: 'twitch', action: 'createPoll', broadcasterId, title },
   )
 }
 
-export async function endPoll(broadcasterId, pollId, status = 'TERMINATED') {
+export async function endPoll(broadcasterId, pollId, status = 'TERMINATED', token = null) {
   if (!broadcasterId || !pollId) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y pollId requeridos', { action: 'endPoll' })
   }
@@ -1244,6 +1258,7 @@ export async function endPoll(broadcasterId, pollId, status = 'TERMINATED') {
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
+      token,
       body: JSON.stringify({
         broadcaster_id: broadcasterId,
         id: pollId,

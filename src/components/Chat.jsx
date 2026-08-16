@@ -598,7 +598,6 @@ export default function Chat({
   const [authCode, setAuthCode] = useState('')
   const [authError, setAuthError] = useState('')
   const [showLoginOptions, setShowLoginOptions] = useState(false)
-  const [manualToken, setManualToken] = useState('')
   const [customClientId, setCustomClientId] = useState(loadCustomClientId)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showEmoteMenu, setShowEmoteMenu] = useState(false)
@@ -878,64 +877,6 @@ export default function Chat({
   }, [channel])
 
   const getClientId = useCallback(() => customClientId || DEFAULT_CLIENT_ID, [customClientId])
-
-  const AUTH_URL = 'https://oncbojnqxpxctwnhehau.supabase.co/functions/v1/twitch-auth'
-  const [copiedUrl, setCopiedUrl] = useState(false)
-
-  const handleOpenTokenSite = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(AUTH_URL)
-      setCopiedUrl(true)
-      setTimeout(() => setCopiedUrl(false), 3000)
-    } catch (err) {
-      console.warn('[Auth] Error copiando URL:', err)
-    }
-  }, [])
-
-  const handleManualTokenSubmit = useCallback(async () => {
-    const raw = manualToken.trim()
-    if (!raw) return
-
-    setAuthing(true)
-    setAuthError('')
-
-    const cleanToken = raw.replace(/^oauth:/i, '')
-
-    try {
-      const clientId = getClientId()
-      const res = await fetch('https://api.twitch.tv/helix/users', {
-        headers: {
-          'Authorization': `Bearer ${cleanToken}`,
-          'Client-ID': clientId,
-        },
-      })
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.message || `Token inválido (HTTP ${res.status})`)
-      }
-
-      const data = await res.json()
-      const username = data.data?.[0]?.login
-
-      if (!username) {
-        throw new Error('No se pudo obtener el nombre de usuario')
-      }
-
-      if (onLoginWithToken) await onLoginWithToken(cleanToken)
-      setManualToken('')
-      setShowLoginOptions(false)
-    } catch (err) {
-      console.warn('Token validation error:', err)
-      if (err.message?.includes('Invalid client') || err.message?.includes('403')) {
-        setAuthError(`Token rechazado (${err.message}). Si usas un token de otro generador, configura tu propio Client-ID en "Avanzado".`)
-      } else {
-        setAuthError(err.message)
-      }
-    } finally {
-      setAuthing(false)
-    }
-  }, [manualToken, getClientId, onLoginWithToken])
 
   const handleDeviceCodeLogin = useCallback(async () => {
     setAuthing(true)
@@ -1702,89 +1643,35 @@ export default function Chat({
             </button>
 
             {showLoginOptions && !authing && (
-              <div className="absolute right-0 top-full mt-1 w-80 bg-bg-secondary border border-bg-tertiary/60 rounded-xl shadow-2xl z-50 p-3 animate-fade-in" onClick={e => e.stopPropagation()}>
-                <p className="text-[11px] font-semibold text-text-primary mb-2">Iniciar sesión en Twitch</p>
-
-                <div className="mb-2">
-                  <p className="text-[11px] text-text-muted mb-1.5 leading-relaxed">
-                    1. <button onClick={handleOpenTokenSite} className="text-twitch hover:underline cursor-pointer">
-                      {copiedUrl ? '✓ URL copiada' : 'Copiar URL del generador'}
-                    </button>
-                  </p>
-                  <p className="text-[9px] text-text-muted/60 mb-1 leading-relaxed">
-                    Pega la URL en tu navegador, ingresa tu Client ID y Secret, y obtén tu token:
-                  </p>
-                  <p className="text-[11px] text-text-muted mb-1.5">
-                    2. Pega el token aquí y haz clic en <strong className="text-text-secondary">Conectar</strong>:
-                  </p>
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      value={manualToken}
-                      onChange={e => setManualToken(e.target.value)}
-                      placeholder="Pega tu token aquí..."
-                      className="flex-1 px-2 py-1.5 rounded-lg bg-bg-tertiary text-text-primary placeholder-text-muted/40 text-[11px] border border-transparent focus:border-twitch focus:outline-none transition-colors"
-                      onKeyDown={e => { if (e.key === 'Enter') handleManualTokenSubmit() }}
-                    />
-                    <button
-                      onClick={handleManualTokenSubmit}
-                      disabled={authing || !manualToken.trim()}
-                      className="px-2.5 py-1 rounded-lg bg-twitch text-white text-[11px] font-medium cursor-pointer disabled:opacity-30 hover:bg-twitch-dark transition-colors shrink-0"
-                    >
-                      {authing ? '...' : 'Conectar'}
-                    </button>
+              <div className="absolute right-0 top-full mt-1 w-72 bg-bg-secondary border border-bg-tertiary/60 rounded-xl shadow-2xl z-50 p-3.5 animate-fade-in" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-twitch/20 flex items-center justify-center text-twitch shrink-0">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-text-primary">Iniciar sesión</p>
+                    <p className="text-[10px] text-text-muted">Conecta tu cuenta de Twitch</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 my-2">
-                  <div className="flex-1 h-px bg-bg-tertiary/50" />
-                  <span className="text-[9px] text-text-muted/40">o</span>
-                  <div className="flex-1 h-px bg-bg-tertiary/50" />
-                </div>
+                <p className="text-[11px] text-text-muted/80 mb-3 leading-relaxed">
+                  Inicia sesión de forma segura para enviar mensajes, usar emotes de canal y acceder a controles de moderación.
+                </p>
 
                 <button
-                  onClick={handleDeviceCodeLogin}
-                  className="w-full text-[11px] py-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-tertiary/80 text-text-secondary cursor-pointer transition-colors"
+                  onClick={() => {
+                    setShowLoginOptions(false)
+                    if (onLoginWithToken) {
+                      onLoginWithToken()
+                    } else {
+                      handleDeviceCodeLogin()
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer"
                 >
-                  Iniciar sesión con código de dispositivo
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
+                  <span>Iniciar sesión con Twitch</span>
                 </button>
-
-                <div className="mt-2">
-                  <button
-                    onClick={() => setShowAdvanced(p => !p)}
-                    className="text-[9px] text-text-muted/50 hover:text-text-muted cursor-pointer transition-colors"
-                  >
-                    {showAdvanced ? '− Ocultar opciones avanzadas' : '+ Opciones avanzadas'}
-                  </button>
-
-                  {showAdvanced && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-bg-tertiary/50 border border-bg-tertiary/60">
-                      <p className="text-[9px] text-text-muted mb-1 leading-relaxed">
-                        Si creaste tu propia app en{' '}
-                        <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noopener noreferrer" className="text-twitch hover:underline">dev.twitch.tv</a>
-                        {' '}(con redirect URI <code className="text-[8px] bg-bg-secondary px-1 rounded">/functions/v1/twitch-auth</code>),
-                        ingresa tu <strong className="text-text-secondary">Client-ID</strong>:
-                      </p>
-                      <div className="flex gap-1">
-                        <input
-                          type="text"
-                          value={customClientId}
-                          onChange={e => {
-                            setCustomClientId(e.target.value)
-                            saveCustomClientId(e.target.value)
-                          }}
-                          placeholder={DEFAULT_CLIENT_ID}
-                          className="flex-1 px-2 py-1 rounded-lg bg-bg-secondary text-text-primary placeholder-text-muted/30 text-[9px] border border-bg-tertiary focus:border-twitch focus:outline-none transition-colors"
-                        />
-                      </div>
-                      <p className="text-[8px] text-text-muted/40 mt-1">Se guarda automáticamente. Vacío = usa el Client-ID por defecto.</p>
-                    </div>
-                  )}
-                </div>
-
-                <p className="text-[9px] text-text-muted/40 mt-2 text-center">
-                  Token guardado localmente en tu PC
-                </p>
               </div>
             )}
           </div>

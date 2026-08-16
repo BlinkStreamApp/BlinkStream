@@ -9,7 +9,7 @@ import {
   endPoll,
 } from '../../utils/twitch'
 
-export function PredictionsPollsPanel({ broadcasterId, _userId, isLoggedIn = true, onLoginWithToken }) {
+export function PredictionsPollsPanel({ broadcasterId, _userId, token, isLoggedIn = true, onLoginWithToken }) {
   const [subTab, setSubTab] = useState('predictions') // 'predictions' | 'polls'
   const [predictions, setPredictions] = useState([])
   const [polls, setPolls] = useState([])
@@ -35,11 +35,11 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, isLoggedIn = tru
     setStatusMessage('')
     try {
       if (subTab === 'predictions') {
-        const res = await getPredictions(broadcasterId)
+        const res = await getPredictions(broadcasterId, 20, token)
         if (res.success) setPredictions(res.value || [])
         else setStatusMessage(res.error?.message || 'Inicia sesión con tu cuenta de Twitch para gestionar este panel')
       } else {
-        const res = await getPolls(broadcasterId)
+        const res = await getPolls(broadcasterId, 20, token)
         if (res.success) setPolls(res.value || [])
         else setStatusMessage(res.error?.message || 'Inicia sesión con tu cuenta de Twitch para gestionar este panel')
       }
@@ -47,7 +47,7 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, isLoggedIn = tru
       setStatusMessage('Error de conexión al cargar datos')
     }
     setLoading(false)
-  }, [broadcasterId, subTab, isLoggedIn])
+  }, [broadcasterId, subTab, isLoggedIn, token])
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -61,7 +61,7 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, isLoggedIn = tru
     setActionPending(true)
     setStatusMessage('')
 
-    const res = await createPrediction(broadcasterId, predTitle, [predOutcome1, predOutcome2], predWindow)
+    const res = await createPrediction(broadcasterId, predTitle, [predOutcome1, predOutcome2], predWindow, token)
     if (res.success) {
       setShowCreateModal(false)
       setPredTitle('')
@@ -75,7 +75,7 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, isLoggedIn = tru
   const handleResolvePrediction = async (predictionId, status, winningOutcomeId) => {
     setActionPending(true)
     setStatusMessage('')
-    const res = await resolvePrediction(broadcasterId, predictionId, status, winningOutcomeId)
+    const res = await resolvePrediction(broadcasterId, predictionId, status, winningOutcomeId, token)
     if (res.success) {
       loadData()
     } else {
@@ -91,7 +91,7 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, isLoggedIn = tru
     setActionPending(true)
     setStatusMessage('')
 
-    const res = await createPoll(broadcasterId, pollTitle, validChoices, pollDuration)
+    const res = await createPoll(broadcasterId, pollTitle, validChoices, pollDuration, false, 100, token)
     if (res.success) {
       setShowCreateModal(false)
       setPollTitle('')
@@ -104,7 +104,7 @@ export function PredictionsPollsPanel({ broadcasterId, _userId, isLoggedIn = tru
 
   const handleEndPoll = async (pollId) => {
     setActionPending(true)
-    const res = await endPoll(broadcasterId, pollId, 'TERMINATED')
+    const res = await endPoll(broadcasterId, pollId, 'TERMINATED', token)
     if (res.success) {
       loadData()
     } else {
