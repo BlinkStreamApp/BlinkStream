@@ -380,10 +380,11 @@ export default function VideoPlayer({
     const hls = new Hls({
       loader: TauriPlaylistLoader,
       lowLatencyMode: true,
-      backBufferLength: 8,
-      maxBufferLength: 6,
-      maxMaxBufferLength: 12,
-      maxBufferSize: 25 * 1000 * 1000,
+      startPosition: -1,
+      backBufferLength: 6,
+      maxBufferLength: 4,
+      maxMaxBufferLength: 8,
+      maxBufferSize: 20 * 1000 * 1000,
       capLevelToPlayerSize: true,
       abrEwmaDefaultEstimate: 5_000_000,
       abrBandWidthFactor: 0.95,
@@ -392,8 +393,8 @@ export default function VideoPlayer({
       fragLoadingTimeOut: 20000,
       manifestLoadingTimeOut: 15000,
       levelLoadingTimeOut: 15000,
-      liveSyncDurationCount: 1,
-      liveMaxLatencyDurationCount: 2.5,
+      liveSyncDurationCount: 0.5,
+      liveMaxLatencyDurationCount: 1.5,
       liveDurationInfinity: true,
       maxLiveSyncPlaybackRate: 1.25,
       highBufferWatchdogPeriod: 1,
@@ -440,19 +441,39 @@ export default function VideoPlayer({
     }
     video.addEventListener('error', handleVideoError)
 
+    let hasSeekedToLive = false
+
+    hls.on(Hls.Events.FRAG_BUFFERED, () => {
+      if (!hasSeekedToLive) {
+        hasSeekedToLive = true
+        const livePos = (typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0)
+          ? hls.liveSyncPosition
+          : (video.seekable.length ? video.seekable.end(video.seekable.length - 1) : 0)
+        if (livePos > 0) {
+          try { video.currentTime = livePos } catch {}
+        }
+      }
+    })
+
     hls.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
-      if (data?.details?.live && typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
-        const latency = hls.latency
-        if (typeof latency === 'number' && latency > 3.5) {
-          try { video.currentTime = hls.liveSyncPosition } catch {}
+      if (data?.details?.live) {
+        const livePos = (typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0)
+          ? hls.liveSyncPosition
+          : (video.seekable.length ? video.seekable.end(video.seekable.length - 1) : 0)
+        if (livePos > 0) {
+          const diff = livePos - video.currentTime
+          if (diff > 3.0) {
+            try { video.currentTime = livePos } catch {}
+          } else if (diff > 2.0) {
+            video.playbackRate = 1.2
+          } else {
+            video.playbackRate = 1.0
+          }
         }
       }
     })
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
-      if (typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
-        try { video.currentTime = hls.liveSyncPosition } catch {}
-      }
       const playPromise = video.play()
       if (playPromise !== undefined) {
         playPromise
