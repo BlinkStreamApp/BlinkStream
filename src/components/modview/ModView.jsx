@@ -182,7 +182,7 @@ export function ModView({
 
   // Center Column Component (Live Chat with Mod Header)
   const centerColumnNode = (
-    <div className={`col-span-12 ${config.preset === 'no_player' ? 'lg:col-span-8' : 'lg:col-span-5'} flex flex-col min-h-0 bg-[#111119]/80 border border-white/10 rounded-2xl overflow-hidden shadow-xl backdrop-blur-xl`}>
+    <div className={`col-span-12 ${config.preset === 'no_player' ? 'lg:col-span-7' : 'lg:col-span-4'} flex flex-col min-h-0 bg-[#111119]/80 border border-white/10 rounded-2xl overflow-hidden shadow-xl backdrop-blur-xl`}>
       <div className="shrink-0 p-2.5 bg-white/5 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <PhosphorIcon name="Chats" size={18} className="text-twitch-glow" weight="duotone" />
@@ -214,7 +214,7 @@ export function ModView({
 
   // Right Column Component (Multi-tool Command Dock)
   const rightColumnNode = (
-    <div className={`col-span-12 ${config.preset === 'no_player' ? 'lg:col-span-4' : 'lg:col-span-3'} flex flex-col min-h-0 bg-[#111119]/80 border border-white/10 rounded-2xl overflow-hidden shadow-xl backdrop-blur-xl`}>
+    <div className={`col-span-12 ${config.preset === 'no_player' ? 'lg:col-span-5' : 'lg:col-span-4'} flex flex-col min-h-0 bg-[#111119]/80 border border-white/10 rounded-2xl overflow-hidden shadow-xl backdrop-blur-xl`}>
       {/* Dock Tab Switcher Header */}
       <div className="shrink-0 p-2 border-b border-white/10 bg-white/5 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-1">
