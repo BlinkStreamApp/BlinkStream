@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../utils/tauriEnv'
 import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL } from '../utils/twitch'
 import PhosphorIcon from './icons/PhosphorIcon'
+import TimeRangeSnipper from './clips/TimeRangeSnipper'
 
 async function fetchClipUrl(slug) {
   if (!isTauri()) return null
@@ -13,6 +14,7 @@ function ClipVideo({ clip }) {
   const [videoUrl, setVideoUrl] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showSnipper, setShowSnipper] = useState(false)
   const slug = clip?.slug
 
   useEffect(() => {
@@ -44,8 +46,34 @@ function ClipVideo({ clip }) {
   )
 
   return (
-    <div className="relative w-full bg-black rounded-xl overflow-hidden border border-bg-tertiary/50" style={{ aspectRatio: '16/9' }}>
-      <video src={videoUrl} controls autoPlay playsInline className="absolute inset-0 w-full h-full object-contain" />
+    <div className="space-y-3">
+      <div className="relative w-full bg-black rounded-xl overflow-hidden border border-bg-tertiary/50" style={{ aspectRatio: '16/9' }}>
+        <video src={videoUrl} controls autoPlay playsInline className="absolute inset-0 w-full h-full object-contain" />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setShowSnipper(p => !p)}
+          className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+            showSnipper
+              ? 'bg-twitch text-white border-twitch shadow-md'
+              : 'bg-bg-tertiary hover:bg-white/10 border-white/10 text-text-primary'
+          }`}
+        >
+          <PhosphorIcon name="SlidersHorizontal" size={15} weight="bold" />
+          <span>{showSnipper ? 'Ocultar Recortador' : 'Recortar y Descargar Fragmento'}</span>
+        </button>
+      </div>
+
+      {showSnipper && (
+        <TimeRangeSnipper
+          mediaUrl={videoUrl}
+          maxDuration={clip.durationSeconds || 60}
+          title={clip.title}
+          onClose={() => setShowSnipper(false)}
+        />
+      )}
     </div>
   )
 }

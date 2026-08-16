@@ -1587,6 +1587,109 @@ async fn get_app_token() -> Result<serde_json::Value, String> {
     }))
 }
 
+#[tauri::command]
+async fn download_media_range(
+    app: AppHandle,
+    url: String,
+    start_time: f64,
+    end_time: f64,
+    output_name: Option<String>,
+) -> Result<String, String> {
+    if start_time < 0.0 || end_time <= start_time {
+        return Err("Rango de tiempo no válido: el tiempo final debe ser mayor al inicial.".into());
+    }
+
+    let ffmpeg_path = ensure_ffmpeg_path().ok_or_else(|| {
+        "FFmpeg no está instalado o no se encuentra en el sistema.".to_string()
+    })?;
+
+    let base_dir = app
+        .path()
+        .video_dir()
+        .or_else(|_| app.path().download_dir())
+        .unwrap_or_else(|_| std::env::temp_dir());
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let raw_name = output_name.unwrap_or_else(|| format!("blinkstream_clip_{timestamp}.mp4"));
+    let sanitized_name: String = raw_name
+        .chars()
+        .map(|c| if "<>:\"/\\|?*".contains(c) { '_' } else { c })
+        .collect();
+
+    let final_name = if sanitized_name.ends_with(".mp4") {
+        sanitized_name
+    } else {
+        format!("{sanitized_name}.mp4")
+    };
+
+    let output_file = base_dir.join(final_name);
+    let start_str = format!("{:.2}", start_time);
+    let duration_str = format!("{:.2}", end_time - start_time);
+
+    let output_file_str = output_file.to_string_lossy().to_string();
+    let url_clone = url.clone();
+    let ffmpeg_clone = ffmpeg_path.clone();
+
+    tokio::task::spawn_blocking(move || -> Result<(), String> {
+        let mut cmd = Command::new(&ffmpeg_clone);
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        cmd.arg("-y")
+            .arg("-ss")
+            .arg(&start_str)
+            .arg("-i")
+            .arg(&url_clone)
+            .arg("-t")
+            .arg(&duration_str)
+            .arg("-c")
+            .arg("copy")
+            .arg(&output_file_str);
+
+        let status = cmd
+            .status()
+            .map_err(|e| format!("Fallo al ejecutar FFmpeg: {e}"))?;
+
+        if !status.success() {
+            let mut fallback_cmd = Command::new(&ffmpeg_clone);
+            #[cfg(windows)]
+            fallback_cmd.creation_flags(CREATE_NO_WINDOW);
+
+            fallback_cmd
+                .arg("-y")
+                .arg("-ss")
+                .arg(&start_str)
+                .arg("-i")
+                .arg(&url_clone)
+                .arg("-t")
+                .arg(&duration_str)
+                .arg("-c:v")
+                .arg("libx264")
+                .arg("-preset")
+                .arg("veryfast")
+                .arg("-c:a")
+                .arg("aac")
+                .arg(&output_file_str);
+
+            let fallback_status = fallback_cmd
+                .status()
+                .map_err(|e| format!("Fallo re-codificando con FFmpeg: {e}"))?;
+            if !fallback_status.success() {
+                return Err("FFmpeg devolvió error al cortar el vídeo.".into());
+            }
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Error en tarea de recorte: {e}"))??;
+
+    Ok(output_file.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1608,6 +1711,7 @@ pub fn run() {
             fetch_segment,
             get_twitch_clip_url,
             get_vod_manifest_url,
+            download_media_range,
             start_recording,
             stop_recording,
             get_app_token,

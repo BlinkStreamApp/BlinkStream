@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../utils/tauriEnv'
 import Hls from 'hls.js'
 import PhosphorIcon from './icons/PhosphorIcon'
+import TimeRangeSnipper from './clips/TimeRangeSnipper'
 
 function parseDuration(dur) {
   if (!dur) return 0
@@ -52,6 +53,7 @@ function VodVideo({ video }) {
   const hlsRef = useRef(null)
   const [url, setUrl] = useState(null)
   const [error, setError] = useState(null)
+  const [showSnipper, setShowSnipper] = useState(false)
 
   useEffect(() => {
     let c = false
@@ -80,8 +82,34 @@ function VodVideo({ video }) {
   )
 
   return (
-    <video ref={videoRef} controls autoPlay playsInline className="w-full rounded-xl bg-black" style={{ aspectRatio: '16/9' }}
-      poster={video.thumbnailUrl?.replace('%{width}', '1280').replace('%{height}', '720')} />
+    <div className="space-y-3">
+      <video ref={videoRef} controls autoPlay playsInline className="w-full rounded-xl bg-black" style={{ aspectRatio: '16/9' }}
+        poster={video.thumbnailUrl?.replace('%{width}', '1280').replace('%{height}', '720')} />
+
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setShowSnipper(p => !p)}
+          className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+            showSnipper
+              ? 'bg-twitch text-white border-twitch shadow-md'
+              : 'bg-bg-tertiary hover:bg-white/10 border-white/10 text-text-primary'
+          }`}
+        >
+          <PhosphorIcon name="SlidersHorizontal" size={15} weight="bold" />
+          <span>{showSnipper ? 'Ocultar Recortador' : 'Recortar y Descargar Fragmento de VOD'}</span>
+        </button>
+      </div>
+
+      {showSnipper && (
+        <TimeRangeSnipper
+          mediaUrl={url}
+          maxDuration={video.lengthSeconds || 3600}
+          title={video.title}
+          onClose={() => setShowSnipper(false)}
+        />
+      )}
+    </div>
   )
 }
 
