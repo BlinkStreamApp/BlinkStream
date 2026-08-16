@@ -585,11 +585,16 @@ export default function VideoPlayer({
             bufferAhead = `${diff.toFixed(1)}s`
           }
 
+          const latVal = typeof hlsInst.latency === 'number' && !isNaN(hlsInst.latency) && hlsInst.latency >= 0
+            ? `${hlsInst.latency.toFixed(1)}s`
+            : 'En vivo'
+
           setStats({
             bitrate: bitrateStr,
             resolution: resolutionStr,
             dropped: droppedVal,
             buffer: bufferAhead,
+            latency: latVal,
           })
         }
         if (!cancelled) updateStats()
@@ -804,11 +809,12 @@ export default function VideoPlayer({
             </span>
             <span className="text-[11px] font-bold text-white/80 truncate max-w-[130px]">{channel}</span>
           </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
             <div className="truncate">⚡ <span className="text-white font-semibold ml-0.5">{stats.bitrate || 'Calculando...'}</span></div>
             <div className="truncate">📐 <span className="text-white font-semibold ml-0.5">{stats.resolution || 'Calculando...'}</span></div>
-            <div className="truncate">📉 <span className="text-white font-semibold ml-0.5">{stats.dropped} drops</span></div>
+            <div className="truncate">⏱️ <span className="text-white font-semibold ml-0.5">{stats.latency || 'En vivo'} latencia</span></div>
             <div className="truncate">🎞️ <span className="text-white font-semibold ml-0.5">{stats.buffer} buffer</span></div>
+            <div className="truncate col-span-2 text-text-muted text-[10px]">📉 <span className="text-white/80 font-medium ml-0.5">{stats.dropped} frames perdidos</span></div>
           </div>
         </div>
       )}
