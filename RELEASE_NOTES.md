@@ -1,31 +1,49 @@
-## 🚀 What's New in Version 1.3.7 (Critical Playback & HLS Engine Hotfix)
+## 🚀 What's New in Version 1.4.0 (Global Languages & Ultra-Low Latency Live Experience)
 
-A high-priority Hotfix release resolving critical video stream playback issues, HLS.js engine stability, and Content Security Policy compatibility across Windows, macOS, and Linux!
+Welcome to **BlinkStream v1.4.0**! This major update brings full internationalization across 8 languages, real-time Twitch badges and custom colors in your own chat messages, an ultra-low latency playback pipeline paired to live chat, and a revamped performance statistics overlay.
 
-### 🔧 v1.3.7 Hotfix & Engine Fixes
-- **Hls.js LoadStats Structure Fix (Black Screen Resolution):** Resolved an unhandled internal exception (`TypeError: Cannot set properties of undefined (setting 'start')`) in Hls.js's manifest parser. The custom `TauriPlaylistLoader` now properly mutates and passes the official `this.stats` (`LoadStats`) instance with all `loading`, `parsing`, and `bwEstimate` attributes, allowing segment downloads to schedule and play seamlessly.
-- **Enhanced Content Security Policy (CSP):** Upgraded `connect-src`, `media-src`, and `img-src` directives to support `https:` transport, enabling seamless loading from Twitch's dynamic multi-level CDN subdomains (e.g., `*.hls.ttvnw.net`, `*.cloudfront.hls.ttvnw.net`, and `*.akamaized.net`).
-- **Autoplay Resilience & Muted Fallback:** Implemented automatic muted playback fallback if host OS or browser policies restrict unmuted autoplay, ensuring immediate stream startup without stalling.
-- **Native MSE Decoder Optimization:** Removed extraneous `crossOrigin` attributes on the video element that could cause Chromium/WebView2 decoder checks to fail on local MediaSource blobs.
-- **Home Carousel & MultiStream Grid Fix:** Synchronized the robust playlist proxy and HLS handling across `VideoPlayer.jsx`, `StreamPreview.jsx`, and `GridCell.jsx`.
+---
 
-### 🌧️ Real-Time Emote Rain & Dynamic Combo Meters
-- **Live Emote Floating FX:** Emotes from Twitch, 7TV, BTTV, and FFZ bubble up across your video player in real-time. Engineered with strict RAM cap protections (max 20 active particles) to ensure **0% FPS drop or latency while gaming**.
-- **Neon Combo Breakers:** Automated high-frequency burst detection in chat triggers vibrant neon-charged alerts on screen: **HYPERS COMBO**, **SUPER COMBO**, and **GODLIKE COMBO**.
-- **Amber Mention Highlights:** Instantaneous millisecond detection of your username in chat, lighting up your personal mentions with an elegant golden glow.
+### 🌍 Full Multi-Language Support (8 Languages)
+- **100% Comprehensive Localization**: Complete, high-quality translations across the entire application for:
+  - 🇪🇸 **Spanish (`es`)**
+  - 🇬🇧 **English (`en`)**
+  - 🇫🇷 **French (`fr`)**
+  - 🇩🇪 **German (`de`)**
+  - 🇵🇹 **Portuguese (`pt`)**
+  - 🇯🇵 **Japanese (`ja`)**
+  - 🇰🇷 **Korean (`ko`)**
+  - 🇷🇺 **Russian (`ru`)**
+- Full coverage for Mod View, User Inspector, Theme Studio, Wi-Fi Remote, Offline Player states, VODs/Clips, and the Auto-Updater.
 
-### 🔔 Smart Chat Tabs & Multi-Stream Command Grid
-- **Intelligent Chat Navigation Bar:** Seamlessly filter and switch between **All Messages**, **@Mentions** (featuring a live unread badge counter), and **⭐ Featured Events** with a single click.
-- **Multi-Stream Grid:** Monitor up to 4 simultaneous live broadcasts with independent audio mixer controls—the ultimate layout for esports tournaments and speedrun restreaming.
+---
 
-### 🛡️ Verified Stability & Automated Update System
-- **100% Passing Test Suite:** Fully verified against our automated test harness (all frontend, release manifest, and security tests passing).
-- **OTA Auto-Updater Ready:** Configured with secure cryptographic signature verification via `updater.json` for background over-the-air updates.
+### 💬 Real-Time Twitch Badges & Chat Customization
+- **IRC `USERSTATE` Integration**: When sending messages in chat, your real badges (Subscriber, Moderator, VIP, Broadcaster, Prime, Turbo, Founder, etc.) and your custom Twitch username color are rendered immediately in optimistic UI.
+
+---
+
+### ⚡ Ultra-Low Latency Live Pipeline (LL-HLS)
+- **Rust Backend Streamlink Flags**: Streamlink now requests `--twitch-low-latency` and `--hls-live-edge 1` directly from Twitch edges.
+- **Aggressive HLS Live Edge Sync**:
+  - Starts instantly at the absolute live edge (`startPosition: -1` on first buffer).
+  - Smooth 1.2x auto-catchup when network hiccups occur to keep you synchronized with real-time chat.
+  - Interactive **`● LIVE`** badge in the player controls to resync to the live edge with 1 click.
+
+---
+
+### 📊 Real-Time Stream Performance Overlay
+- Press **Ctrl+D** or use Settings to open the updated stats card with dedicated metrics:
+  - ⏱️ **Live Latency**: Exact delay to the broadcaster in seconds.
+  - 🎞️ **RAM Buffer Ahead**: Pre-buffered video in memory to prevent stuttering.
+  - ⚡ **Bitrate**, 📐 **Resolution/FPS**, and 📉 **Dropped Frame counter**.
+
+---
 
 ### 💾 Available Downloads
-- ⭐ **`BlinkStream_1.3.7_Win_x64.exe`** *(Recommended — NSIS installer with automatic update support)*
-- **`BlinkStream_1.3.7_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
-- **`BlinkStream_1.3.7_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
-- **`BlinkStream_1.3.7_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
-- **`BlinkStream_1.3.7_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
-- **`BlinkStream_1.3.7_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*
+- ⭐ **`BlinkStream_1.4.0_Win_x64.exe`** *(Recommended — NSIS installer with automatic update support)*
+- **`BlinkStream_1.4.0_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
+- **`BlinkStream_1.4.0_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
+- **`BlinkStream_1.4.0_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
+- **`BlinkStream_1.4.0_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
+- **`BlinkStream_1.4.0_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*
