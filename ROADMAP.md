@@ -50,10 +50,16 @@ Below is our structured technical progression, detailing past milestones, our im
 
 ---
 
-## 📋 Phase 4: v1.4.x — Media Archive & Instant Notifications [NEXT MILESTONE]
-*Focus: Desktop OS integration and content saving offline.*
+## 📋 Phase 4: v1.4.x — Pro Mod View & Media Archive [NEXT MILESTONE]
+*Focus: Desktop OS integration, professional moderation command center, and offline media saving.*
 
 ### 🎨 UI & UX Improvements
+- **Pro Mod View (Centro de Mando para Moderadores)**: Workspace dedicado en cuadrícula multi-panel exclusivo para moderadores y broadcasters (`Ctrl + M` / Botón 🛡️):
+  - **Live Stream & Chat Integrado**: Monitor de transmisión a baja latencia junto a chat enriquecido con botones rápidos de sanción por línea.
+  - **Tarjeta de Inspección de Usuario (User Card Inspector)**: Al hacer clic en cualquier espectador se despliega historial de mensajes, antigüedad de cuenta, sanciones pasadas y botones de acción rápida (1s purga, 10m, 24h, Ban).
+  - **Barra Superior de Acciones Rápidas (Quick Channel Actions)**: Toggles de 1 clic para Modo Escudo (Shield Mode), Modo Lento (Slow Mode), Solo Emotes, Solo Seguidores, Solo Suscriptores y Limpieza de Chat.
+  - **Feed de Registro de Auditoría en Vivo (Mod Action Log)**: Registro cronológico en tiempo real de todas las acciones ejecutadas por otros moderadores y AutoMod.
+  - **Lista de Moderadores Conectados**: Panel con los moderadores del equipo activos en la sesión actual.
 - **Haptic Windows Toast Notifications (Smart Streamer Tracker)**: Real-time native OS desktop alerts triggered the exact millisecond a favorite channel goes live, featuring instant-click deep linking into the player.
 - **Live / Offline Filter Toggle**: One-click quick filter on the favorite streamer sidebar to instantly isolate channels currently broadcasting.
 
