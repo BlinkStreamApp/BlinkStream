@@ -1,6 +1,6 @@
 [package]
 name = "blinkstream"
-version = "1.3.5"
+version = "1.3.6"
 description = "BlinkStream - Cliente ultralight y de nueva generación de Twitch"
 authors = ["BlinkStream Team"]
 license = "MIT"
