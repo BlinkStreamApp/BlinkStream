@@ -19,6 +19,7 @@ import EmoteRainOverlay from './EmoteRainOverlay'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { useAudioCompressor } from '../hooks/useAudioCompressor'
 import { useLiveDVR } from '../hooks/useLiveDVR'
+import DropsModal from './drops/DropsModal'
 
 function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
@@ -243,6 +244,7 @@ export default function VideoPlayer({
   useEffect(() => { if (hlsDebug) {} }, [hlsDebug])
   const [availableQualities, setAvailableQualities] = useState(null)
   const [showClips, setShowClips] = useState(false)
+  const [showDrops, setShowDrops] = useState(false)
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
   const [isPiP, setIsPiP] = useState(false)
   const [showStats, setShowStats] = useState(false)
@@ -1020,6 +1022,9 @@ export default function VideoPlayer({
           <div className="flex items-center gap-3">
             <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.clips', 'Clips')} aria-label="Abrir clips"><ClipIcon/></button>
             <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.vods', 'VODs')} aria-label="Ver VODs"><VodIcon/></button>
+            <button onClick={() => setShowDrops(true)} className="hover:text-purple-400 transition-colors cursor-pointer" title="Twitch Drops & Recompensas" aria-label="Abrir Twitch Drops">
+              <PhosphorIcon name="Gift" size={18} weight="duotone" />
+            </button>
             <button onClick={async () => {
 
               if (recording) {
@@ -1115,6 +1120,13 @@ export default function VideoPlayer({
 
       {showClips && <ClipPlayer channel={channel} onClose={() => setShowClips(false)} />}
       {showVods && <VodPlayer channel={channel} onClose={() => setShowVods(false)} />}
+
+      {showDrops && (
+        <DropsModal
+          token={twitchToken}
+          onClose={() => setShowDrops(false)}
+        />
+      )}
 
       {showOverlayChat && (
         <div className="absolute top-6 right-6 z-40 w-[360px] h-[calc(100%-115px)] max-h-[660px] pointer-events-auto animate-fade-in shadow-2xl transition-all">
