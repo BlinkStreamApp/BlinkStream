@@ -1091,6 +1091,163 @@ export async function getChatters(broadcasterId, moderatorId, first = 100) {
   return ok(result.value?.data || [])
 }
 
+export async function manageAutoModMessage(broadcasterId, moderatorId, msgId, action) {
+  if (!broadcasterId || !moderatorId || !msgId || !action) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId, msgId y action (ALLOW|DENY) requeridos', { action: 'manageAutoModMessage' })
+  }
+  return helixFetch(
+    'https://api.twitch.tv/helix/moderation/automod/message',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: moderatorId,
+        msg_id: msgId,
+        action: action.toUpperCase(),
+      }),
+    },
+    { component: 'twitch', action: 'manageAutoModMessage', broadcasterId, moderatorId, msgId, modAction: action },
+  )
+}
+
+export async function getUnbanRequests(broadcasterId, moderatorId, status = 'pending', first = 50) {
+  if (!broadcasterId || !moderatorId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y moderatorId requeridos', { action: 'getUnbanRequests' })
+  }
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/moderation/unban_requests?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&status=${encodeURIComponent(status)}&first=${first}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getUnbanRequests', broadcasterId, moderatorId, status },
+  )
+  if (!result.success) return result
+  return ok(result.value?.data || [])
+}
+
+export async function resolveUnbanRequest(broadcasterId, moderatorId, unbanRequestId, status, resolutionText = '') {
+  if (!broadcasterId || !moderatorId || !unbanRequestId || !status) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, moderatorId, unbanRequestId y status (approved|denied) requeridos', { action: 'resolveUnbanRequest' })
+  }
+  const resParam = resolutionText ? `&resolution_text=${encodeURIComponent(resolutionText)}` : ''
+  return helixFetch(
+    `https://api.twitch.tv/helix/moderation/unban_requests?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&unban_request_id=${encodeURIComponent(unbanRequestId)}&status=${encodeURIComponent(status)}${resParam}`,
+    { method: 'PATCH' },
+    { component: 'twitch', action: 'resolveUnbanRequest', broadcasterId, moderatorId, unbanRequestId, status },
+  )
+}
+
+export async function getPredictions(broadcasterId, first = 20) {
+  if (!broadcasterId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getPredictions' })
+  }
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/predictions?broadcaster_id=${encodeURIComponent(broadcasterId)}&first=${first}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getPredictions', broadcasterId },
+  )
+  if (!result.success) return result
+  return ok(result.value?.data || [])
+}
+
+export async function createPrediction(broadcasterId, title, outcomes, predictionWindowSec = 120) {
+  if (!broadcasterId || !title || !Array.isArray(outcomes) || outcomes.length < 2) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, title y mínimo 2 outcomes requeridos', { action: 'createPrediction' })
+  }
+  return helixFetch(
+    'https://api.twitch.tv/helix/predictions',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        broadcaster_id: broadcasterId,
+        title: title.slice(0, 45),
+        outcomes: outcomes.map(o => ({ title: String(o).slice(0, 25) })),
+        prediction_window: predictionWindowSec,
+      }),
+    },
+    { component: 'twitch', action: 'createPrediction', broadcasterId, title },
+  )
+}
+
+export async function resolvePrediction(broadcasterId, predictionId, status, winningOutcomeId) {
+  if (!broadcasterId || !predictionId || !status) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, predictionId y status (RESOLVED|CANCELED|LOCKED) requeridos', { action: 'resolvePrediction' })
+  }
+  const body = {
+    broadcaster_id: broadcasterId,
+    id: predictionId,
+    status: status.toUpperCase(),
+  }
+  if (status.toUpperCase() === 'RESOLVED' && winningOutcomeId) {
+    body.winning_outcome_id = winningOutcomeId
+  }
+  return helixFetch(
+    'https://api.twitch.tv/helix/predictions',
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    { component: 'twitch', action: 'resolvePrediction', broadcasterId, predictionId, status },
+  )
+}
+
+export async function getPolls(broadcasterId, first = 20) {
+  if (!broadcasterId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId requerido', { action: 'getPolls' })
+  }
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/polls?broadcaster_id=${encodeURIComponent(broadcasterId)}&first=${first}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getPolls', broadcasterId },
+  )
+  if (!result.success) return result
+  return ok(result.value?.data || [])
+}
+
+export async function createPoll(broadcasterId, title, choices, durationSec = 60, channelPointsVotingEnabled = false, channelPointsPerVote = 100) {
+  if (!broadcasterId || !title || !Array.isArray(choices) || choices.length < 2) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId, title y mínimo 2 choices requeridos', { action: 'createPoll' })
+  }
+  const body = {
+    broadcaster_id: broadcasterId,
+    title: title.slice(0, 60),
+    choices: choices.map(c => ({ title: String(c).slice(0, 25) })),
+    duration: durationSec,
+    channel_points_voting_enabled: channelPointsVotingEnabled,
+  }
+  if (channelPointsVotingEnabled) {
+    body.channel_points_per_vote = channelPointsPerVote
+  }
+  return helixFetch(
+    'https://api.twitch.tv/helix/polls',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    { component: 'twitch', action: 'createPoll', broadcasterId, title },
+  )
+}
+
+export async function endPoll(broadcasterId, pollId, status = 'TERMINATED') {
+  if (!broadcasterId || !pollId) {
+    return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y pollId requeridos', { action: 'endPoll' })
+  }
+  return helixFetch(
+    'https://api.twitch.tv/helix/polls',
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        broadcaster_id: broadcasterId,
+        id: pollId,
+        status: status.toUpperCase(), // 'TERMINATED' | 'ARCHIVED'
+      }),
+    },
+    { component: 'twitch', action: 'endPoll', broadcasterId, pollId, status },
+  )
+}
+
 export async function getUserByLogin(login) {
   if (!login) {
     return err(ErrorCode.TWITCH_API_ERROR, 'login requerido', { action: 'getUserByLogin' })
@@ -1105,6 +1262,8 @@ export async function getUserByLogin(login) {
   const users = result.value?.data || []
   return ok(users[0] || null)
 }
+
+
 
 
 

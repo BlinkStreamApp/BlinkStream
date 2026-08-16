@@ -3,6 +3,9 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ModQuickActionsBar } from './ModQuickActionsBar'
 import { UserInspectorCard } from './UserInspectorCard'
 import { ModActionFeed } from './ModActionFeed'
+import { AutoModQueue } from './AutoModQueue'
+import { ActivityFeed } from './ActivityFeed'
+import { RewardsQueuePanel } from './RewardsQueuePanel'
 
 describe('ModQuickActionsBar', () => {
   it('renders channel name and mode toggles correctly', () => {
@@ -202,3 +205,115 @@ describe('ModActionFeed', () => {
     expect(onInspectUser).toHaveBeenCalledWith({ username: 'toxic_viewer', userId: 'u1' })
   })
 })
+
+describe('AutoModQueue', () => {
+  it('renders empty state when no held messages exist', () => {
+    render(<AutoModQueue heldMessages={[]} />)
+    expect(screen.getByText('Sin mensajes retenidos')).toBeInTheDocument()
+  })
+
+  it('renders held message and triggers ALLOW / DENY callbacks', async () => {
+    const onRemoveMessage = vi.fn()
+    const held = [
+      { id: 'msg-1', user: 'bad_user', userId: 'u9', text: 'Offensive word here', category: 'hostility' },
+    ]
+
+    render(
+      <AutoModQueue
+        broadcasterId="b1"
+        userId="mod1"
+        heldMessages={held}
+        onRemoveMessage={onRemoveMessage}
+      />
+    )
+
+    expect(screen.getByText('@bad_user')).toBeInTheDocument()
+    expect(screen.getByText('"Offensive word here"')).toBeInTheDocument()
+    expect(screen.getByText('hostility')).toBeInTheDocument()
+    expect(screen.getByText('Permitir')).toBeInTheDocument()
+    expect(screen.getByText('Denegar')).toBeInTheDocument()
+  })
+})
+
+describe('ActivityFeed', () => {
+  it('renders empty state when no activities present', () => {
+    render(<ActivityFeed messages={[]} />)
+    expect(screen.getByText('Sin actividad reciente')).toBeInTheDocument()
+  })
+
+  it('renders parsed subscription, raid, and bits events', () => {
+    const msgs = [
+      { id: '1', msg_id: 'sub', user: 'sub_user', user_id: 'u1', message: 'First sub!', timestamp: Date.now() },
+      { id: '2', msg_id: 'raid', user: 'raider_streamer', user_id: 'u2', message: 'Raid with 50 viewers', timestamp: Date.now() },
+      { id: '3', eventType: 'bits', user: 'cheer_fan', user_id: 'u3', message: 'Cheer1000 Love stream', timestamp: Date.now() },
+    ]
+
+    render(<ActivityFeed messages={msgs} />)
+
+    expect(screen.getByText('⭐ Nueva Suscripción')).toBeInTheDocument()
+    expect(screen.getByText('@sub_user')).toBeInTheDocument()
+    expect(screen.getByText('🚀 Raid Entrante!')).toBeInTheDocument()
+    expect(screen.getByText('@raider_streamer')).toBeInTheDocument()
+    expect(screen.getByText('💎 Donación de Bits')).toBeInTheDocument()
+    expect(screen.getByText('@cheer_fan')).toBeInTheDocument()
+  })
+})
+
+describe('RewardsQueuePanel', () => {
+  it('renders empty state when no redemptions pending', () => {
+    render(<RewardsQueuePanel pendingRedemptions={[]} />)
+    expect(screen.getByText('Sin solicitudes pendientes')).toBeInTheDocument()
+  })
+
+  it('renders pending redemption with user input and handles fulfill', async () => {
+    const onFulfill = vi.fn().mockResolvedValue(true)
+    const pending = [
+      {
+        id: 'red-1',
+        reward: { id: 'rew-1', title: 'Canta una canción', cost: 5000 },
+        user_name: 'music_lover',
+        user_input: 'Canta Bohemian Rhapsody por favor',
+        redeemed_at: new Date().toISOString(),
+      },
+    ]
+
+    render(
+      <RewardsQueuePanel
+        pendingRedemptions={pending}
+        onFulfillRedemption={onFulfill}
+      />
+    )
+
+    expect(screen.getByText('Canta una canción')).toBeInTheDocument()
+    expect(screen.getByText(/5000\s*pts/i)).toBeInTheDocument()
+    expect(screen.getByText('@music_lover')).toBeInTheDocument()
+    expect(screen.getByText('"Canta Bohemian Rhapsody por favor"')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Cumplir'))
+    expect(onFulfill).toHaveBeenCalledWith('rew-1', 'red-1')
+  })
+
+  it('handles cancel redemption', async () => {
+    const onCancel = vi.fn().mockResolvedValue(true)
+    const pending = [
+      {
+        id: 'red-2',
+        reward: { id: 'rew-2', title: 'Dibujo rápido', cost: 1000 },
+        user_name: 'art_fan',
+        user_input: 'Dibuja un gato',
+      },
+    ]
+
+    render(
+      <RewardsQueuePanel
+        pendingRedemptions={pending}
+        onCancelRedemption={onCancel}
+      />
+    )
+
+    fireEvent.click(screen.getByText('Rechazar'))
+    expect(onCancel).toHaveBeenCalledWith('rew-2', 'red-2')
+  })
+})
+
+

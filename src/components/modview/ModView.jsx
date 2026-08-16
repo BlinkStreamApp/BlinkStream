@@ -1,10 +1,16 @@
 import { useState, useEffect, useCallback, Suspense, lazy } from 'react'
 import { useModeration } from '../../hooks/useModeration'
 import { useChannelRole } from '../../hooks/useChannelRole'
+import { useManageRewards } from '../../hooks/useManageRewards'
 import { ModQuickActionsBar } from './ModQuickActionsBar'
 import { UserInspectorCard } from './UserInspectorCard'
 import { ModActionFeed } from './ModActionFeed'
 import { ActiveModsPanel } from './ActiveModsPanel'
+import { AutoModQueue } from './AutoModQueue'
+import { UnbanRequestsPanel } from './UnbanRequestsPanel'
+import { PredictionsPollsPanel } from './PredictionsPollsPanel'
+import { ActivityFeed } from './ActivityFeed'
+import { RewardsQueuePanel } from './RewardsQueuePanel'
 import PhosphorIcon from '../icons/PhosphorIcon'
 
 const VideoPlayer = lazy(() => import('../VideoPlayer'))
@@ -26,10 +32,13 @@ export function ModView({
 }) {
   const modState = useModeration({ broadcasterId, userId })
   const roleState = useChannelRole({ broadcasterId, userId, channel })
+  const rewardsState = useManageRewards({ broadcasterId, token: twitchToken })
 
   const [selectedUser, setSelectedUser] = useState(null)
-  const [rightPanelTab, setRightPanelTab] = useState('audit') // 'audit' | 'team'
+  const [rightPanelTab, setRightPanelTab] = useState('audit') // 'audit' | 'users' | 'activity' | 'automod' | 'predictions' | 'rewards'
+  const [automodSubTab, setAutomodSubTab] = useState('automod') // 'automod' | 'unban'
   const [chatMessages, setChatMessages] = useState([])
+  const [heldMessages, setHeldMessages] = useState([])
   const [activeModes, setActiveModes] = useState({})
 
   const { fetchChatSettings } = modState
@@ -68,55 +77,44 @@ export function ModView({
     const ok = await modState.setChatMode(mode, val)
     if (ok) {
       if (mode.endsWith('off')) {
-        const base = mode.replace('off', '')
-        setActiveModes(prev => ({ ...prev, [base]: false }))
+        const baseMode = mode.replace('off', '')
+        setActiveModes(prev => ({ ...prev, [baseMode]: false }))
       } else {
         setActiveModes(prev => ({ ...prev, [mode]: val || true }))
       }
     }
   }
 
-  const handleClearChat = async () => {
-    await modState.clearChat(channel)
-  }
+  const handleRemoveHeldMessage = useCallback((msgId) => {
+    setHeldMessages(prev => prev.filter(m => m.id !== msgId))
+  }, [])
 
   return (
-    <div className="flex flex-col w-full h-full bg-[#09090f] text-text-primary overflow-hidden font-sans select-none animate-fade-in">
+    <div className="flex flex-col h-full w-full bg-[#0a0a0f] text-white select-none overflow-hidden font-sans">
       {/* Top Quick Actions Bar */}
       <ModQuickActionsBar
         channel={channel}
-        isModerator={roleState.isModerator}
-        isBroadcaster={roleState.isBroadcaster}
         activeModes={activeModes}
         onSetMode={handleSetMode}
-        onClearChat={handleClearChat}
+        onClearChat={modState.clearChat}
         onExit={onExit}
         remainingActions={modState.remainingActions}
-        isRateLimited={modState.isRateLimited}
       />
 
-      {/* Main 3-Column Mod Grid Layout */}
+      {/* Grid Layout: 3 Columns */}
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 p-3 overflow-hidden">
-        {/* Left Column: Video Monitor & User Inspector (Col span 4) */}
+        {/* Left Column: Player & User Inspector (Col span 4) */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-3 min-h-0 overflow-hidden">
-          {/* Live Player Monitor */}
-          <div className="shrink-0 aspect-video bg-black rounded-2xl overflow-hidden border border-white/10 shadow-xl relative">
-            <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-black/60"><div className="w-6 h-6 border-2 border-twitch border-t-transparent rounded-full animate-spin" /></div>}>
+          {/* Live Player Container */}
+          <div className="h-[46%] min-h-[220px] rounded-2xl overflow-hidden bg-black/60 border border-white/10 relative shadow-xl backdrop-blur-xl">
+            <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-xs">Cargando reproductor...</div>}>
               <VideoPlayer
                 channel={channel}
-                quality={quality}
-                onQualityChange={onQualityChange}
                 volume={volume}
                 onVolumeChange={onVolumeChange}
-                theatreMode={false}
-                compact={true}
+                quality={quality}
+                onQualityChange={onQualityChange}
                 isLoggedIn={isLoggedIn}
-                twitchToken={twitchToken}
-                twitchUsername={twitchUsername}
-                broadcasterId={broadcasterId}
-                isModerator={roleState.isModerator}
-                isBroadcaster={roleState.isBroadcaster}
-                viewerLogin={twitchUsername}
                 onLoginWithToken={onLoginWithToken}
               />
             </Suspense>
@@ -144,19 +142,19 @@ export function ModView({
               <PhosphorIcon name="Chats" size={18} className="text-twitch-glow" weight="duotone" />
               <span className="text-xs font-bold text-white uppercase tracking-wider">Chat de Moderación</span>
             </div>
-            <span className="text-[10px] text-text-muted">Clic en usuario para inspeccionar</span>
+            <div className="flex items-center gap-2 text-[10px] text-text-muted">
+              <span>Clic en usuario para inspeccionar</span>
+            </div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-hidden">
-            <Suspense fallback={<div className="w-full h-full flex items-center justify-center"><div className="w-6 h-6 border-2 border-twitch border-t-transparent rounded-full animate-spin" /></div>}>
+            <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-xs">Cargando chat...</div>}>
               <Chat
                 channel={channel}
-                isLoggedIn={isLoggedIn}
-                twitchToken={twitchToken}
-                twitchUsername={twitchUsername}
                 broadcasterId={broadcasterId}
                 userId={userId}
-                isModerator={roleState.isModerator}
+                isLoggedIn={isLoggedIn}
+                isMod={true}
                 isBroadcaster={roleState.isBroadcaster}
                 viewerLogin={twitchUsername}
                 onLoginWithToken={onLoginWithToken}
@@ -167,47 +165,135 @@ export function ModView({
           </div>
         </div>
 
-        {/* Right Column: Audit Logs & Active Users / Team (Col span 3) */}
+        {/* Right Column: Multi-tab Operations Center (Col span 3) */}
         <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0 bg-[#111119]/80 border border-white/10 rounded-2xl overflow-hidden shadow-xl backdrop-blur-xl">
           {/* Header Switcher */}
-          <div className="shrink-0 p-2 border-b border-white/10 bg-white/5 flex items-center justify-between">
+          <div className="shrink-0 p-2 border-b border-white/10 bg-white/5 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setRightPanelTab('audit')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
                   rightPanelTab === 'audit'
                     ? 'bg-twitch/20 text-twitch-glow border border-twitch/40 shadow-sm'
                     : 'text-white/60 hover:text-white'
                 }`}
+                title="Mod Log de Auditoría"
               >
-                <PhosphorIcon name="ClockCounterClockwise" size={14} />
-                <span>Mod Log</span>
+                <PhosphorIcon name="ClockCounterClockwise" size={13} />
+                <span>Log</span>
               </button>
+
               <button
                 onClick={() => setRightPanelTab('users')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
                   rightPanelTab === 'users'
                     ? 'bg-twitch/20 text-twitch-glow border border-twitch/40 shadow-sm'
                     : 'text-white/60 hover:text-white'
                 }`}
-                title="Lista de Espectadores, Moderadores y VIPs"
+                title="Lista de Espectadores y Moderadores"
               >
-                <PhosphorIcon name="ChatsCircle" size={14} />
-                <span>Espectadores y Mods</span>
+                <PhosphorIcon name="ChatsCircle" size={13} />
+                <span>Usuarios</span>
+              </button>
+
+              <button
+                onClick={() => setRightPanelTab('activity')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                  rightPanelTab === 'activity'
+                    ? 'bg-twitch/20 text-twitch-glow border border-twitch/40 shadow-sm'
+                    : 'text-white/60 hover:text-white'
+                }`}
+                title="Fuente de Actividad (Subs, Raids, Bits)"
+              >
+                <PhosphorIcon name="Lightning" size={13} />
+                <span>Actividad</span>
+              </button>
+
+              <button
+                onClick={() => setRightPanelTab('automod')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                  rightPanelTab === 'automod'
+                    ? 'bg-twitch/20 text-twitch-glow border border-twitch/40 shadow-sm'
+                    : 'text-white/60 hover:text-white'
+                }`}
+                title="Cola de AutoMod y Solicitudes de Unban"
+              >
+                <PhosphorIcon name="ShieldCheck" size={13} />
+                <span>AutoMod</span>
+                {heldMessages.length > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                )}
+              </button>
+
+              <button
+                onClick={() => setRightPanelTab('predictions')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                  rightPanelTab === 'predictions'
+                    ? 'bg-twitch/20 text-twitch-glow border border-twitch/40 shadow-sm'
+                    : 'text-white/60 hover:text-white'
+                }`}
+                title="Predicciones y Encuestas"
+              >
+                <PhosphorIcon name="Coins" size={13} />
+                <span>Predicciones</span>
+              </button>
+
+              <button
+                onClick={() => setRightPanelTab('rewards')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                  rightPanelTab === 'rewards'
+                    ? 'bg-twitch/20 text-twitch-glow border border-twitch/40 shadow-sm'
+                    : 'text-white/60 hover:text-white'
+                }`}
+                title="Cola de Solicitudes de Puntos"
+              >
+                <PhosphorIcon name="Gift" size={13} />
+                <span>Puntos</span>
+                {rewardsState.pendingRedemptions?.length > 0 && (
+                  <span className="px-1 py-0.2 bg-twitch text-[9px] rounded-full font-bold">
+                    {rewardsState.pendingRedemptions.length}
+                  </span>
+                )}
               </button>
             </div>
 
             {rightPanelTab === 'audit' && modState.auditLog.length > 0 && (
               <button
                 onClick={modState.clearAuditLog}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/50 hover:text-red-300 border border-white/10 hover:border-red-500/30 text-[11px] font-medium transition-all cursor-pointer"
-                title="Vaciar registro local de acciones de moderación"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/50 hover:text-red-300 border border-white/10 hover:border-red-500/30 text-[10px] font-medium transition-all cursor-pointer shrink-0"
+                title="Vaciar registro local de acciones"
               >
-                <PhosphorIcon name="Trash" size={13} />
-                <span>Limpiar Log</span>
+                <PhosphorIcon name="Trash" size={11} />
+                <span>Limpiar</span>
               </button>
             )}
           </div>
+
+          {/* Sub-Header for AutoMod / Unban tab */}
+          {rightPanelTab === 'automod' && (
+            <div className="shrink-0 p-1.5 bg-black/40 border-b border-white/10 flex items-center gap-1">
+              <button
+                onClick={() => setAutomodSubTab('automod')}
+                className={`flex-1 py-1 rounded-lg text-xs font-bold text-center transition-colors cursor-pointer ${
+                  automodSubTab === 'automod'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                AutoMod ({heldMessages.length})
+              </button>
+              <button
+                onClick={() => setAutomodSubTab('unban')}
+                className={`flex-1 py-1 rounded-lg text-xs font-bold text-center transition-colors cursor-pointer ${
+                  automodSubTab === 'unban'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Solicitudes Unban
+              </button>
+            </div>
+          )}
 
           {/* Panel Content */}
           <div className="flex-1 min-h-0 overflow-hidden">
@@ -217,11 +303,46 @@ export function ModView({
                 onInspectUser={handleSelectUser}
                 onClearLog={modState.clearAuditLog}
               />
-            ) : (
+            ) : rightPanelTab === 'users' ? (
               <ActiveModsPanel
                 broadcasterId={broadcasterId}
                 userId={userId}
                 recentMessages={chatMessages}
+                onInspectUser={handleSelectUser}
+              />
+            ) : rightPanelTab === 'activity' ? (
+              <ActivityFeed
+                messages={chatMessages}
+                onInspectUser={handleSelectUser}
+              />
+            ) : rightPanelTab === 'automod' ? (
+              automodSubTab === 'automod' ? (
+                <AutoModQueue
+                  broadcasterId={broadcasterId}
+                  userId={userId}
+                  heldMessages={heldMessages}
+                  onRemoveMessage={handleRemoveHeldMessage}
+                  onInspectUser={handleSelectUser}
+                />
+              ) : (
+                <UnbanRequestsPanel
+                  broadcasterId={broadcasterId}
+                  userId={userId}
+                  onInspectUser={handleSelectUser}
+                />
+              )
+            ) : rightPanelTab === 'predictions' ? (
+              <PredictionsPollsPanel
+                broadcasterId={broadcasterId}
+                userId={userId}
+              />
+            ) : (
+              <RewardsQueuePanel
+                pendingRedemptions={rewardsState.pendingRedemptions}
+                onFulfillRedemption={rewardsState.fulfillRedemption}
+                onCancelRedemption={rewardsState.cancelRedemption}
+                loading={rewardsState.loading}
+                onRefresh={rewardsState.refresh}
                 onInspectUser={handleSelectUser}
               />
             )}
