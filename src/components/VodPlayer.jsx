@@ -67,7 +67,6 @@ function VodVideo({ video }) {
       hls.loadSource(url); hls.attachMedia(v)
     } else if (v.canPlayType('application/vnd.apple.mpegurl')) { v.src = url }
     else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError('HLS no soportado')
     }
     return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null } }

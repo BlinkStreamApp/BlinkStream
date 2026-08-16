@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.8-e94560" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.3.7-e94560" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
 </p>
@@ -35,7 +35,7 @@
 | 🎨 **Customization Studio** | Deep theme customization (AMOLED Black, Cyberpunk Gold, Emerald) with selectable Google Fonts |
 | 📊 **Pro Telemetry (Nerd Stats)** | Real-time live HUD measuring exact HTML5 frame rendering, FPS, network bitrate (Kbps), and buffer offset |
 | 🎮 **Glassmorphism Player** | Ergonomic quick-controls gear with centralized compact mode, audio-only toggles, and clean UI |
-| 🔒 **Hardened Security** | Strict Content Security Policy (CSP) with zero wildcards, rustls TLS, and secure keychain storage |
+| 🔒 **Hardened Security** | Strict Content Security Policy (CSP), rustls TLS, and secure keychain storage |
 | ⚡ **Zero Bloat & Lazy Load** | Optimized chunk splitting and circuit-breaker network sync for instantaneous offline/online resiliency |
 | 🔄 **Over-The-Air Updates** | Automated background checking and seamless self-updating via official GitHub Releases |
 
@@ -45,8 +45,8 @@
 
 ### Windows
 Download the official installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases). Existing installations update automatically:
-- ⭐ **`BlinkStream_1.3.8_Win_x64.exe`** *(Recommended — NSIS installer and automatic updates)*
-- `BlinkStream_1.3.8_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream_1.3.7_Win_x64.exe`** *(Recommended — NSIS installer and automatic updates)*
+- `BlinkStream_1.3.7_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
 > **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
@@ -62,13 +62,13 @@ Download the official installer from [GitHub Releases](https://github.com/BlinkS
 ### macOS
 ```bash
 brew install streamlink
-# Download BlinkStream_1.3.8_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
+# Download BlinkStream_1.3.7_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
 ```
 
 ### Linux (Debian / Ubuntu)
 ```bash
 sudo apt install streamlink
-# Download BlinkStream_1.3.8_Linux_x86_64.deb or .AppImage from Releases
+# Download BlinkStream_1.3.7_Linux_x86_64.deb or .AppImage from Releases
 ```
 
 ---
@@ -136,9 +136,9 @@ blinkstream/
 | Layer | Technology |
 |-------|------------|
 | **Desktop Shell** | Tauri v2.11 |
-| **Frontend Runtime** | React 19 + Tailwind CSS 3 |
+| **Frontend Runtime** | React 19 + Tailwind CSS |
 | **Backend Core** | Rust 1.88.0 (Async Tokio engine) |
-| **Module Bundler** | Vite 8 + pnpm workspaces |
+| **Module Bundler** | Vite + pnpm |
 | **Video Streaming** | HLS.js + Streamlink + FFmpeg |
 | **Authentication** | Supabase Edge Functions + Twitch OAuth 2.0 |
 | **Chat Transport** | WebSocket IRC (`wss://irc-ws.chat.twitch.tv`) |
@@ -146,25 +146,5 @@ blinkstream/
 
 ---
 
-## 📊 Performance & Security Metrics
-
-| Metric | Value |
-|--------|-------|
-| **Windows Installer Size** | ~4.2 MB |
-| **Initial Bundle Load** | ~366 KB minified (~112 KB gzip) |
-| **Security Auditing** | **0 known npm production vulnerabilities** |
-| **Automated Test Suite** | **291 frontend + 39 Rust tests** passing |
-| **Content Security Policy** | 9 restrictive directives, **0 wildcards allowed** |
-| **Supported Platforms** | Windows 10/11, macOS 13+ (Silicon & Intel), Ubuntu/Debian Linux |
-
----
-
 ## 📄 License
-
-MIT License © BlinkStream Team
-
----
-
-<p align="center">
-  <sub>Built with Tauri v2, React 19, and Rust. No cloud bloat. No compromise.</sub>
-</p>
+BlinkStream is distributed under the [MIT License](LICENSE).

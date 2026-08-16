@@ -1,33 +1,31 @@
-## 🚀 What's New in Version 1.3.2 (Hotfix & The Immersion Update)
+## 🚀 What's New in Version 1.3.7 (Critical Playback & HLS Engine Hotfix)
 
-A targeted Hotfix release addressing UI/UX improvements, resolution selector additions, and critical component fixes, building on top of our monumental Immersion & Command Center Update!
+A high-priority Hotfix release resolving critical video stream playback issues, HLS.js engine stability, and Content Security Policy compatibility across Windows, macOS, and Linux!
 
-### 🔧 v1.3.2 Hotfix & Bug Fixes
-- **OAuth & Helix Authentication Loop Fix:** Engineered a robust dynamic OAuth Client ID auto-discovery mechanism (`getHelixClientId`) utilizing Twitch's official token validation endpoint. This eliminates false-positive HTTP 401 errors during session validation and permanently prevents automatic session logouts when launching standalone build binaries.
-- **Channel Points Redeem Modal Z-Index Fix:** Resolved an issue where reward redemption modals appeared blurred or behind side panels by elevating modal layer stacking (`z-[999999]`) across `RedeemModal.jsx`, `RewardForm.jsx`, and `ActionModal.jsx`.
-- **Expanded Pro Resolution Support:** Added official native dropdown support for modern high-bitrate streaming resolutions including **1440p60 (2K)**, **963p60**, and **936p60**. Relocated and integrated the Quality Selector directly inside the Player Settings menu.
-- **Ultra-Compact eSports Player Settings Menu:** Complete UI overhaul of the video player settings gear panel (`w-64`, single-line rows, scrollable max-height) to prevent oversized layouts or cropped headers on smaller player windows.
-- **WiFi LAN Remote Responsive Alignment:** Fixed window wrapping and responsive layout clipping in the WiFi Remote Control pairing screen.
-- **Emote Rain & Metadata Correction:** Fixed bottom static positioning of floating emotes and restored robust Stream Live Metadata parsing across Twitch GQL endpoints.
+### 🔧 v1.3.7 Hotfix & Engine Fixes
+- **Hls.js LoadStats Structure Fix (Black Screen Resolution):** Resolved an unhandled internal exception (`TypeError: Cannot set properties of undefined (setting 'start')`) in Hls.js's manifest parser. The custom `TauriPlaylistLoader` now properly mutates and passes the official `this.stats` (`LoadStats`) instance with all `loading`, `parsing`, and `bwEstimate` attributes, allowing segment downloads to schedule and play seamlessly.
+- **Enhanced Content Security Policy (CSP):** Upgraded `connect-src`, `media-src`, and `img-src` directives to support `https:` transport, enabling seamless loading from Twitch's dynamic multi-level CDN subdomains (e.g., `*.hls.ttvnw.net`, `*.cloudfront.hls.ttvnw.net`, and `*.akamaized.net`).
+- **Autoplay Resilience & Muted Fallback:** Implemented automatic muted playback fallback if host OS or browser policies restrict unmuted autoplay, ensuring immediate stream startup without stalling.
+- **Native MSE Decoder Optimization:** Removed extraneous `crossOrigin` attributes on the video element that could cause Chromium/WebView2 decoder checks to fail on local MediaSource blobs.
+- **Home Carousel & MultiStream Grid Fix:** Synchronized the robust playlist proxy and HLS handling across `VideoPlayer.jsx`, `StreamPreview.jsx`, and `GridCell.jsx`.
 
 ### 🌧️ Real-Time Emote Rain & Dynamic Combo Meters
-- **Live Emote Floating FX:** Emotes from Twitch, 7TV, BTTV, and FFZ magically bubble up across your video player in real-time. Engineered with strict RAM cap protections (max 20 active particles) to ensure **0% FPS drop or latency while gaming**.
+- **Live Emote Floating FX:** Emotes from Twitch, 7TV, BTTV, and FFZ bubble up across your video player in real-time. Engineered with strict RAM cap protections (max 20 active particles) to ensure **0% FPS drop or latency while gaming**.
 - **Neon Combo Breakers:** Automated high-frequency burst detection in chat triggers vibrant neon-charged alerts on screen: **HYPERS COMBO**, **SUPER COMBO**, and **GODLIKE COMBO**.
-- **Amber Mention Highlights:** Instantaneous millisecond detection of your username in chat, lighting up your personal mentions with an elegant golden glow and warm drop-shadow.
+- **Amber Mention Highlights:** Instantaneous millisecond detection of your username in chat, lighting up your personal mentions with an elegant golden glow.
 
 ### 🔔 Smart Chat Tabs & Multi-Stream Command Grid
-- **Intelligent Chat Navigation Bar:** Seamlessly filter and switch between **All Messages**, **@Mentions** (featuring a live unread badges counter), and **⭐ Featured Events** with a single click.
+- **Intelligent Chat Navigation Bar:** Seamlessly filter and switch between **All Messages**, **@Mentions** (featuring a live unread badge counter), and **⭐ Featured Events** with a single click.
 - **Multi-Stream Grid:** Monitor up to 4 simultaneous live broadcasts with independent audio mixer controls—the ultimate layout for esports tournaments and speedrun restreaming.
 
 ### 🛡️ Verified Stability & Automated Update System
-- **100% Passing Test Suite:** Fully verified against our rigorous automated test harness (**296 tests passing** across moderation, encryption, recording, and chat engines).
+- **100% Passing Test Suite:** Fully verified against our automated test harness (all frontend, release manifest, and security tests passing).
 - **OTA Auto-Updater Ready:** Configured with secure cryptographic signature verification via `updater.json` for background over-the-air updates.
 
 ### 💾 Available Downloads
-- ⭐ **`BlinkStream-Setup_1.3.2_Custom.exe`** *(Recommended — 100% Custom Twitch-themed bootstrapper setup with Custom Directory Selector)*
-- **`BlinkStream_1.3.2_Win_x64.exe`** *(Standard silent NSIS setup)*
-- **`BlinkStream_1.3.2_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
-- **`BlinkStream_1.3.2_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
-- **`BlinkStream_1.3.2_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
-- **`BlinkStream_1.3.2_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
-- **`BlinkStream_1.3.2_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*
+- ⭐ **`BlinkStream_1.3.7_Win_x64.exe`** *(Recommended — NSIS installer with automatic update support)*
+- **`BlinkStream_1.3.7_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
+- **`BlinkStream_1.3.7_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
+- **`BlinkStream_1.3.7_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
+- **`BlinkStream_1.3.7_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
+- **`BlinkStream_1.3.7_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*

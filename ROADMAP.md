@@ -35,7 +35,7 @@ Below is our structured technical progression, detailing past milestones, our im
 
 ---
 
-## 🎯 Phase 3: v1.3.1 — The "Immersion & Command Center" Update (Hotfix) [CURRENT RELEASE]
+## 🎯 Phase 3: v1.3.7 — The "Immersion & Command Center" Update (Hotfix) [CURRENT RELEASE]
 *Focus: Multi-stream consumption, social chat interactivity, and dynamic glassmorphic player controls.*
 
 ### 🎨 UI & UX Improvements
