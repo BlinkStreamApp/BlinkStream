@@ -270,7 +270,7 @@ export async function getDirectStreamUrl(channel, quality = '1080p60', customSig
     allow_audio_only: 'true',
     allow_source: 'true',
     type: 'any',
-
+    fast_bread: 'true',
     p: String(secureRandomInt(1e7)),
   })
 

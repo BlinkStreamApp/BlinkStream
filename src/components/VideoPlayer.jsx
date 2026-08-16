@@ -250,6 +250,17 @@ export default function VideoPlayer({
 
   useEffect(() => { volumeRef.current = volume }, [volume])
 
+  const jumpToLive = useCallback(() => {
+    const video = videoRef.current
+    const hls = hlsRef.current
+    if (!video) return
+    if (hls && typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
+      video.currentTime = hls.liveSyncPosition
+    } else if (video.seekable && video.seekable.length > 0) {
+      video.currentTime = Math.max(0, video.seekable.end(video.seekable.length - 1) - 0.5)
+    }
+  }, [])
+
   useEffect(() => {
     if (streamUrl && channel && !recording && localStorage.getItem('blinkstream_rec_autostart') === 'true') {
       const timer = setTimeout(() => {
@@ -368,10 +379,11 @@ export default function VideoPlayer({
 
     const hls = new Hls({
       loader: TauriPlaylistLoader,
-      maxBufferLength: 60,
-      maxMaxBufferLength: 600,
-      maxBufferSize: 60 * 1000 * 1000,
-      backBufferLength: 30,
+      lowLatencyMode: true,
+      backBufferLength: 10,
+      maxBufferLength: 8,
+      maxMaxBufferLength: 16,
+      maxBufferSize: 30 * 1000 * 1000,
       capLevelToPlayerSize: true,
       abrEwmaDefaultEstimate: 5_000_000,
       abrBandWidthFactor: 0.95,
@@ -380,10 +392,12 @@ export default function VideoPlayer({
       fragLoadingTimeOut: 20000,
       manifestLoadingTimeOut: 15000,
       levelLoadingTimeOut: 15000,
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 10,
+      liveSyncDurationCount: 1,
+      liveMaxLatencyDurationCount: 2.5,
+      liveDurationInfinity: true,
+      maxLiveSyncPlaybackRate: 1.15,
       enableSoftwareAES: true,
-      debug: import.meta.env.DEV,
+      debug: false,
     })
     hlsRef.current = hls
     hls.loadSource(streamUrl)
@@ -426,6 +440,9 @@ export default function VideoPlayer({
     video.addEventListener('error', handleVideoError)
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
+      if (typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
+        try { video.currentTime = hls.liveSyncPosition } catch {}
+      }
       const playPromise = video.play()
       if (playPromise !== undefined) {
         playPromise
@@ -894,7 +911,7 @@ export default function VideoPlayer({
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
           <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? t('player.unmute', 'Activar sonido') : t('player.mute', 'Silenciar')}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
           <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={handleVolume} className="w-20 h-1 accent-twitch bg-white/20 rounded-lg appearance-none cursor-pointer" aria-label="Volumen" aria-valuemin="0" aria-valuemax="100" aria-valuenow={muted ? 0 : volume} />
-          <LiveBadge />
+          <LiveBadge onClick={jumpToLive} title={t('player.jumpToLive', 'Sincronizar con el directo')} />
         </div>
 
         <div className="flex items-center gap-3 text-white/60">
