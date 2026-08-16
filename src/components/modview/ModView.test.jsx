@@ -6,6 +6,7 @@ import { ModActionFeed } from './ModActionFeed'
 import { AutoModQueue } from './AutoModQueue'
 import { ActivityFeed } from './ActivityFeed'
 import { RewardsQueuePanel } from './RewardsQueuePanel'
+import { ModWidgetWrapper } from './ModWidgetWrapper'
 
 describe('ModQuickActionsBar', () => {
   it('renders channel name and mode toggles correctly', () => {
@@ -315,5 +316,38 @@ describe('RewardsQueuePanel', () => {
     expect(onCancel).toHaveBeenCalledWith('rew-2', 'red-2')
   })
 })
+
+describe('ModWidgetWrapper', () => {
+  it('renders title, content, and moves or closes in edit mode', () => {
+    const onMoveRight = vi.fn()
+    const onClose = vi.fn()
+
+    render(
+      <ModWidgetWrapper
+        widgetId="test-widget"
+        title="Test Panel"
+        icon="Shield"
+        isEditMode={true}
+        canMoveRight={true}
+        onMoveRight={onMoveRight}
+        onClose={onClose}
+      >
+        <div>Panel Body Content</div>
+      </ModWidgetWrapper>
+    )
+
+    expect(screen.getByText('Test Panel')).toBeInTheDocument()
+    expect(screen.getByText('Panel Body Content')).toBeInTheDocument()
+
+    // Move right button
+    fireEvent.click(screen.getByTitle('Mover a columna derecha'))
+    expect(onMoveRight).toHaveBeenCalled()
+
+    // Close button
+    fireEvent.click(screen.getByTitle('Ocultar panel'))
+    expect(onClose).toHaveBeenCalled()
+  })
+})
+
 
 

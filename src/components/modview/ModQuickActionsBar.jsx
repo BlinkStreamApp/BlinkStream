@@ -11,6 +11,7 @@ export function ModQuickActionsBar({
   onExit,
   remainingActions = 20,
   isRateLimited = false,
+  onOpenLayoutDrawer,
 }) {
   const [showSlowMenu, setShowSlowMenu] = useState(false)
   const [showFollowersMenu, setShowFollowersMenu] = useState(false)
@@ -203,12 +204,21 @@ export function ModQuickActionsBar({
         )}
       </div>
 
-      {/* Right: Telemetry & Exit Button */}
-      <div className="flex items-center gap-3 shrink-0">
-        <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-text-muted font-mono bg-white/5 border border-white/10 px-2 py-1 rounded-lg">
+      {/* Right: Telemetry, Layout Customize & Exit Button */}
+      <div className="flex items-center gap-2.5 shrink-0">
+        <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-text-muted font-mono bg-white/5 border border-white/10 px-2 py-1 rounded-lg">
           <span className={isRateLimited ? 'text-red-400 font-bold' : 'text-green-400 font-semibold'}>⚡ {remainingActions}/20</span>
           <span className="text-white/40">acciones</span>
         </div>
+
+        <button
+          onClick={onOpenLayoutDrawer}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-twitch/20 hover:bg-twitch/30 border border-twitch/40 hover:border-twitch/60 cursor-pointer transition-all shadow-sm"
+          title="Personalizar paneles y distribución de Mod View"
+        >
+          <PhosphorIcon name="SlidersHorizontal" size={14} weight="bold" className="text-twitch-glow" />
+          <span>Paneles</span>
+        </button>
 
         <button
           onClick={onExit}
