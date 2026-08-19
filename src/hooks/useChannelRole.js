@@ -78,6 +78,21 @@ export function useChannelRole({ broadcasterId, userId, channel } = {}) {
     return () => abortRef.current?.abort()
   }, [broadcasterId, userId, channel, fetchRole])
 
+  // Real-time role listener (fired from IRC USERSTATE on chat connect)
+  useEffect(() => {
+    const handleRoleEvent = (e) => {
+      const detail = e?.detail
+      if (detail && detail.channel && channel && detail.channel.toLowerCase() === channel.toLowerCase()) {
+        if (detail.role && detail.role !== 'unknown') {
+          setRole(detail.role)
+          setCached(broadcasterId, userId, channel, detail.role)
+        }
+      }
+    }
+    window.addEventListener('bs:user-role-detected', handleRoleEvent)
+    return () => window.removeEventListener('bs:user-role-detected', handleRoleEvent)
+  }, [channel, broadcasterId, userId])
+
   const refresh = useCallback(() => {
     if (channel || broadcasterId) {
       const key = `${broadcasterId || ''}:${userId || ''}:${channel || ''}`

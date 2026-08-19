@@ -505,7 +505,7 @@ function MainApp() {
           {}
           <div className="flex items-center gap-1">
             {/* Pro Mod View button */}
-            {channel && (roleState.isModerator || roleState.isBroadcaster) && (
+            {channel && (roleState.isModerator || roleState.isBroadcaster || (user?.username && user.username.toLowerCase() === channel.toLowerCase())) && (
               <button
                 onClick={() => setViewMode(p => p === 'modview' ? 'normal' : 'modview')}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all text-xs font-bold border btn-press ${

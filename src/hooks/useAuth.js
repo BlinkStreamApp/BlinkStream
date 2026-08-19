@@ -113,8 +113,10 @@ export function useAuth() {
           const storedUser = localStorage.getItem(LS_USERNAME) || 'twitch_user'
           const storedAvatar = localStorage.getItem(LS_AVATAR) || null
           if (storedAvatar) setAvatar(storedAvatar)
+          const storedUserId = localStorage.getItem('bs.twitch.viewer_userid') || null
           setUser({
             username: storedUser,
+            userId: storedUserId,
             identities: storedUser ? [{ provider: 'twitch', identity_data: { login: storedUser } }] : [],
           })
           logEvent('auth', 'session.restored', { username: storedUser })
@@ -127,6 +129,7 @@ export function useAuth() {
             if (userInfo.avatar) setAvatar(userInfo.avatar)
             setUser({
               username: userInfo.username,
+              userId: userInfo.userId || storedUserId,
               identities: [{ provider: 'twitch', identity_data: { login: userInfo.username } }],
             })
             localStorage.setItem(LS_USERNAME, userInfo.username)

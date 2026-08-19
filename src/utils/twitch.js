@@ -1007,7 +1007,18 @@ export async function getChannelRole(broadcasterId, userId, signal, channel) {
     return ok('unknown')
   }
 
-  // 2. Helix fallback
+  // 2. Check Helix moderated channels (official endpoint for moderators to verify channel privileges)
+  const modChannelsRes = await helixFetch(
+    `https://api.twitch.tv/helix/moderation/channels?user_id=${encodeURIComponent(userId)}&broadcaster_id=${encodeURIComponent(broadcasterId)}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getChannelRole.checkModChannels', silent: true },
+    signal,
+  )
+  if (modChannelsRes.success && modChannelsRes.value?.data?.length > 0) {
+    return ok('mod')
+  }
+
+  // 3. Helix moderators list fallback (broadcaster-only)
   const modRes = await helixFetch(
     `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
     { method: 'GET' },
@@ -1018,10 +1029,7 @@ export async function getChannelRole(broadcasterId, userId, signal, channel) {
     return ok('mod')
   }
 
-  if (!modRes.success && (modRes.error?.context?.status === 401 || modRes.error?.context?.status === 403)) {
-    return ok(modRes.error?.context?.status === 401 ? 'unknown' : 'viewer')
-  }
-
+  // 4. Helix VIPs check
   const vipRes = await helixFetch(
     `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${encodeURIComponent(broadcasterId)}&user_id=${encodeURIComponent(userId)}`,
     { method: 'GET' },

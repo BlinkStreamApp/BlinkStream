@@ -1194,6 +1194,25 @@ export default function Chat({
             if (parsed['display-name']) {
               userDisplayNameRef.current = parsed['display-name']
             }
+
+            // Real-time role detection from IRC USERSTATE
+            const badges = userBadgesRef.current || []
+            const isIrcBroadcaster = badges.some(b => b.set === 'broadcaster') || (auth.username && channel && auth.username.toLowerCase() === channel.toLowerCase())
+            const isIrcMod = parsed.mod === '1' || parsed['user-type'] === 'mod' || badges.some(b => b.set === 'moderator')
+            const isIrcVip = badges.some(b => b.set === 'vip')
+
+            const detectedRole = isIrcBroadcaster ? 'broadcaster' : isIrcMod ? 'mod' : isIrcVip ? 'vip' : 'viewer'
+            if (typeof window !== 'undefined' && channel) {
+              window.dispatchEvent(new CustomEvent('bs:user-role-detected', {
+                detail: {
+                  channel: channel.toLowerCase(),
+                  role: detectedRole,
+                  isModerator: isIrcMod || isIrcBroadcaster,
+                  isBroadcaster: isIrcBroadcaster,
+                  isVip: isIrcVip,
+                }
+              }))
+            }
             continue
           }
 
