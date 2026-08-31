@@ -1,7 +1,167 @@
 import { PUBLIC_CLIENT_ID } from './twitch'
 
-export async function fetchUserDropsInventory(token) {
+export async function fetchUserDropsInventory(token, channel = null) {
   if (!token) return { campaigns: [], inventory: [] }
+
+  const cleanChannel = typeof channel === 'string' ? channel.trim().toLowerCase() : null
+
+  const query = cleanChannel
+    ? `
+      query UserDropInventoryWithChannel($channelLogin: String!) {
+        currentUser {
+          id
+          inventory {
+            dropCampaignsInProgress {
+              id
+              name
+              status
+              game {
+                id
+                name
+                boxArtURL
+              }
+              timeBasedDrops {
+                id
+                name
+                requiredMinutesWatched
+                benefitEdges {
+                  benefit {
+                    id
+                    name
+                    imageAssetURL
+                  }
+                }
+                self {
+                  currentMinutesWatched
+                  isClaimed
+                  dropInstanceID
+                }
+              }
+            }
+          }
+          dropCampaignsInProgress {
+            id
+            name
+            status
+            game {
+              id
+              name
+              boxArtURL
+            }
+            timeBasedDrops {
+              id
+              name
+              requiredMinutesWatched
+              benefitEdges {
+                benefit {
+                  id
+                  name
+                  imageAssetURL
+                }
+              }
+              self {
+                currentMinutesWatched
+                isClaimed
+                dropInstanceID
+              }
+            }
+          }
+        }
+        user(login: $channelLogin) {
+          id
+          viewerDropCampaigns {
+            id
+            name
+            status
+            game {
+              id
+              name
+              boxArtURL
+            }
+            timeBasedDrops {
+              id
+              name
+              requiredMinutesWatched
+              benefitEdges {
+                benefit {
+                  id
+                  name
+                  imageAssetURL
+                }
+              }
+              self {
+                currentMinutesWatched
+                isClaimed
+                dropInstanceID
+              }
+            }
+          }
+        }
+      }
+    `
+    : `
+      query UserDropInventory {
+        currentUser {
+          id
+          inventory {
+            dropCampaignsInProgress {
+              id
+              name
+              status
+              game {
+                id
+                name
+                boxArtURL
+              }
+              timeBasedDrops {
+                id
+                name
+                requiredMinutesWatched
+                benefitEdges {
+                  benefit {
+                    id
+                    name
+                    imageAssetURL
+                  }
+                }
+                self {
+                  currentMinutesWatched
+                  isClaimed
+                  dropInstanceID
+                }
+              }
+            }
+          }
+          dropCampaignsInProgress {
+            id
+            name
+            status
+            game {
+              id
+              name
+              boxArtURL
+            }
+            timeBasedDrops {
+              id
+              name
+              requiredMinutesWatched
+              benefitEdges {
+                benefit {
+                  id
+                  name
+                  imageAssetURL
+                }
+              }
+              self {
+                currentMinutesWatched
+                isClaimed
+                dropInstanceID
+              }
+            }
+          }
+        }
+      }
+    `
 
   try {
     const res = await fetch('https://gql.twitch.tv/gql', {
@@ -12,48 +172,25 @@ export async function fetchUserDropsInventory(token) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        query: `
-          query UserDropInventory {
-            currentUser {
-              id
-              dropCampaignsInProgress {
-                id
-                name
-                game {
-                  id
-                  name
-                  boxArtURL
-                }
-                timeBasedDrops {
-                  id
-                  name
-                  requiredMinutesWatched
-                  benefitEdges {
-                    benefit {
-                      id
-                      name
-                      imageAssetURL
-                    }
-                  }
-                  self {
-                    currentMinutesWatched
-                    isClaimed
-                    dropInstanceID
-                  }
-                }
-              }
-            }
-          }
-        `,
+        query,
+        ...(cleanChannel ? { variables: { channelLogin: cleanChannel } } : {}),
       }),
       signal: AbortSignal.timeout(8000),
     })
 
     if (!res.ok) return { campaigns: [], inventory: [] }
     const data = await res.json()
-    const inProgress = data?.data?.currentUser?.dropCampaignsInProgress || []
 
-    const campaigns = inProgress.map(c => {
+    const inventoryCampaigns =
+      data?.data?.currentUser?.inventory?.dropCampaignsInProgress ||
+      data?.data?.currentUser?.dropCampaignsInProgress ||
+      []
+
+    const channelCampaigns = data?.data?.user?.viewerDropCampaigns || []
+
+    const campaignMap = new Map()
+
+    const parseCampaign = (c, isCurrentChannel = false) => {
       const drops = (c.timeBasedDrops || []).map(d => {
         const required = d.requiredMinutesWatched || 60
         const current = d.self?.currentMinutesWatched || 0
@@ -79,9 +216,30 @@ export async function fetchUserDropsInventory(token) {
         name: c.name,
         gameName: c.game?.name || '',
         boxArtUrl: c.game?.boxArtURL || '',
+        isCurrentChannel,
         drops,
       }
-    })
+    }
+
+    for (const c of inventoryCampaigns) {
+      if (c?.id) {
+        campaignMap.set(c.id, parseCampaign(c, false))
+      }
+    }
+
+    for (const c of channelCampaigns) {
+      if (c?.id) {
+        if (!campaignMap.has(c.id)) {
+          campaignMap.set(c.id, parseCampaign(c, true))
+        } else {
+          // Mark existing campaign as current channel active
+          const existing = campaignMap.get(c.id)
+          existing.isCurrentChannel = true
+        }
+      }
+    }
+
+    const campaigns = Array.from(campaignMap.values())
 
     return { campaigns }
   } catch (err) {

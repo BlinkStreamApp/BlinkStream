@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { useTwitchDrops } from '../../hooks/useTwitchDrops'
 
-export default function DropsModal({ token, onClose }) {
+export default function DropsModal({ token, channel, onClose }) {
   const {
     campaigns,
     loading,
@@ -12,7 +12,7 @@ export default function DropsModal({ token, onClose }) {
     claimingIds,
     claimableCount,
     refreshDrops,
-  } = useTwitchDrops(token)
+  } = useTwitchDrops(token, channel)
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -143,7 +143,14 @@ export default function DropsModal({ token, onClose }) {
                       </div>
                     )}
                     <div>
-                      <h4 className="text-sm font-bold text-white">{campaign.name}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white">{campaign.name}</h4>
+                        {campaign.isCurrentChannel && (
+                          <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold">
+                            En este canal
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-text-muted font-medium">{campaign.gameName}</p>
                     </div>
                   </div>

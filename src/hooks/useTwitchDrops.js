@@ -3,7 +3,7 @@ import { fetchUserDropsInventory, claimDropReward } from '../utils/drops'
 
 const AUTOCLAIM_KEY = 'blinkstream_drops_autoclaim'
 
-export function useTwitchDrops(token) {
+export function useTwitchDrops(token, channel = null) {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(false)
   const [autoClaim, setAutoClaim] = useState(() => {
@@ -28,14 +28,14 @@ export function useTwitchDrops(token) {
 
     try {
       setLoading(true)
-      const data = await fetchUserDropsInventory(token)
+      const data = await fetchUserDropsInventory(token, channel)
       setCampaigns(data.campaigns || [])
     } catch (err) {
       console.warn('[useTwitchDrops] Error refreshing drops:', err)
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, channel])
 
   const claimDrop = useCallback(async (dropInstanceId, benefitName = 'Recompensa') => {
     if (!token || !dropInstanceId || claimingIdsRef.current.has(dropInstanceId)) return

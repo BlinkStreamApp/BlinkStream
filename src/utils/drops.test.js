@@ -55,6 +55,96 @@ describe('drops utility', () => {
     expect(drop.dropInstanceId).toBe('inst_999')
   })
 
+  it('parses currentUser.inventory.dropCampaignsInProgress correctly', async () => {
+    const fakeData = {
+      data: {
+        currentUser: {
+          id: '12345',
+          inventory: {
+            dropCampaignsInProgress: [
+              {
+                id: 'camp_nested',
+                name: 'Call of Duty Modern Warfare Drop',
+                game: { name: 'Call of Duty', boxArtURL: 'https://cod.jpg' },
+                timeBasedDrops: [
+                  {
+                    id: 'drop_cod_1',
+                    name: 'Tactical Emblem',
+                    requiredMinutesWatched: 15,
+                    self: {
+                      currentMinutesWatched: 5,
+                      isClaimed: false,
+                      dropInstanceID: 'inst_cod',
+                    },
+                    benefitEdges: [{ benefit: { name: 'Tactical Emblem', imageAssetURL: 'https://emblem.jpg' } }],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    }
+
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => fakeData,
+    })
+
+    const result = await fetchUserDropsInventory('oauth_token')
+    expect(result.campaigns.length).toBe(1)
+    expect(result.campaigns[0].name).toBe('Call of Duty Modern Warfare Drop')
+    expect(result.campaigns[0].drops[0].currentMinutes).toBe(5)
+    expect(result.campaigns[0].drops[0].requiredMinutes).toBe(15)
+    expect(result.campaigns[0].drops[0].percent).toBe(33)
+  })
+
+  it('merges channel viewerDropCampaigns and sets isCurrentChannel to true', async () => {
+    const fakeData = {
+      data: {
+        currentUser: {
+          id: '12345',
+          inventory: {
+            dropCampaignsInProgress: [],
+          },
+        },
+        user: {
+          id: 'streamer_99',
+          viewerDropCampaigns: [
+            {
+              id: 'camp_channel_1',
+              name: 'MW4 Exclusive Drop',
+              game: { name: 'Call of Duty: Modern Warfare 4', boxArtURL: 'https://mw4.jpg' },
+              timeBasedDrops: [
+                {
+                  id: 'drop_channel_1',
+                  name: 'Get Tactical Emblem',
+                  requiredMinutesWatched: 15,
+                  self: {
+                    currentMinutesWatched: 0,
+                    isClaimed: false,
+                  },
+                  benefitEdges: [{ benefit: { name: 'Get Tactical Emblem', imageAssetURL: 'https://tactical.jpg' } }],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }
+
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => fakeData,
+    })
+
+    const result = await fetchUserDropsInventory('oauth_token', 'streamer_login')
+    expect(result.campaigns.length).toBe(1)
+    expect(result.campaigns[0].isCurrentChannel).toBe(true)
+    expect(result.campaigns[0].name).toBe('MW4 Exclusive Drop')
+    expect(result.campaigns[0].drops[0].name).toBe('Get Tactical Emblem')
+  })
+
   it('claims drop successfully with claimDropReward', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,

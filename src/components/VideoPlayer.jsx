@@ -1124,6 +1124,7 @@ export default function VideoPlayer({
       {showDrops && (
         <DropsModal
           token={twitchToken}
+          channel={channel}
           onClose={() => setShowDrops(false)}
         />
       )}
