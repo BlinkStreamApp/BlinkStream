@@ -92,12 +92,12 @@ export default function GridCell({
       const hls = new Hls({
         loader: TauriPlaylistLoader,
         lowLatencyMode: true,
-        backBufferLength: 10,
-        maxBufferLength: 8,
-        maxMaxBufferLength: 16,
-        liveSyncDurationCount: 1,
-        liveMaxLatencyDurationCount: 2.5,
-        maxLiveSyncPlaybackRate: 1.15,
+        backBufferLength: 15,
+        maxBufferLength: 10,
+        maxMaxBufferLength: 20,
+        liveSyncDurationCount: 2.5,
+        liveMaxLatencyDurationCount: 5,
+        maxLiveSyncPlaybackRate: 1.05,
         capLevelToPlayerSize: true,
         enableWorker: true,
       })
