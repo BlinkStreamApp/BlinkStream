@@ -110,10 +110,10 @@ export function TwitchChatPopout({
               <button
                 type="button"
                 onClick={() => setAlwaysOnTop(p => !p)}
-                className={`p-1 rounded-md text-xs transition-colors cursor-pointer ${
+                className={`p-1 rounded-md text-xs transition-all cursor-pointer border ${
                   alwaysOnTop
-                    ? 'bg-twitch text-white shadow-sm'
-                    : 'text-text-muted hover:text-white bg-white/5 hover:bg-white/10'
+                    ? 'bg-twitch/20 text-twitch-glow border-twitch/40'
+                    : 'text-text-muted hover:text-white bg-white/5 hover:bg-white/10 border-white/5'
                 }`}
                 title={alwaysOnTop ? 'Siempre encima activado para ventana flotante' : 'Fijar siempre encima al abrir ventana'}
                 aria-label="Toggle siempre encima"
