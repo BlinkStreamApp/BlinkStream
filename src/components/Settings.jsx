@@ -102,11 +102,21 @@ export default function Settings({ onClose }) {
   useEffect(() => {
     const handleKey = (e) => { if (e.code === 'Escape') onClose() }
     window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
+    window.dispatchEvent(new CustomEvent('bs:modal-state-change', { detail: { isModalOpen: true } }))
+    return () => {
+      window.removeEventListener('keydown', handleKey)
+      window.dispatchEvent(new CustomEvent('bs:modal-state-change', { detail: { isModalOpen: false } }))
+    }
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/65 backdrop-blur-md animate-fade-in" onClick={onClose}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      data-modal="true"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/65 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
       <div className="bg-[#12121a]/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.85)] w-full max-w-[880px] max-h-[88vh] flex flex-col overflow-hidden shrink-0" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] shrink-0">
           <div className="flex items-center gap-2">

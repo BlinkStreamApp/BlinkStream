@@ -30,6 +30,12 @@ export function TwitchChatPopout({
 
     const syncBounds = async (forceMount = false) => {
       if (!containerRef.current || !isMounted) return
+      const hasModal = isOverlayModalOpenRef.current || Boolean(document.querySelector('[role="dialog"], [data-modal="true"], .fixed.inset-0:not([data-ignore-modal="true"])'))
+      if (hasModal) {
+        await invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
+        return
+      }
+
       const rect = containerRef.current.getBoundingClientRect()
       if (rect.width <= 0 || rect.height <= 0) return
 
@@ -44,9 +50,6 @@ export function TwitchChatPopout({
             authToken: twitchToken || null,
             username: twitchUsername || null,
           })
-          if (isOverlayModalOpenRef.current) {
-            await invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
-          }
         } else {
           await invoke('set_embedded_twitch_chat_visible', {
             visible: true,
@@ -78,13 +81,15 @@ export function TwitchChatPopout({
       if (open) {
         invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
       } else {
-        syncBounds(false)
+        setTimeout(() => {
+          if (isMounted) syncBounds(false)
+        }, 50)
       }
     }
     window.addEventListener('bs:modal-state-change', handleModalEvent)
 
     const checkDomModal = () => {
-      const modalElement = document.querySelector('[role="dialog"], .fixed.inset-0.z-50, .fixed.inset-0.z-40')
+      const modalElement = document.querySelector('[role="dialog"], [data-modal="true"], .fixed.inset-0:not([data-ignore-modal="true"])')
       const hasModal = Boolean(modalElement)
       setIsOverlayModalOpen(prev => {
         if (prev !== hasModal) {
@@ -93,7 +98,7 @@ export function TwitchChatPopout({
           } else {
             setTimeout(() => {
               if (isMounted) syncBounds(false)
-            }, 30)
+            }, 50)
           }
         }
         return hasModal
