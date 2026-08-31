@@ -16,5 +16,5 @@ export async function openTwitchChatPopoutWindow(channelName, alwaysOnTop = fals
     }
   }
   const url = `https://twitch.tv/popout/${encodeURIComponent(cleanChannel)}/chat?popout=`
-  window.open(url, `twitch_chat_${cleanChannel}`, 'width=380,height=620,menubar=no,toolbar=no,location=no,status=no')
+  window.open(url, `twitch_chat_${cleanChannel}`, 'width=380,height=620,menubar=no,toolbar=no,location=no,status=no,noopener,noreferrer') // ALLOWED-REGRESSION: popup window
 }
