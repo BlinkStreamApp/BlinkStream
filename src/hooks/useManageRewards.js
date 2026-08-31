@@ -54,11 +54,14 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
     return []
   }, [broadcasterId, channel, effectiveToken])
 
+  const helixForbiddenRef = useRef(false)
+  useEffect(() => {
+    helixForbiddenRef.current = false
+  }, [broadcasterId, effectiveToken])
+
   const fetchRedemptions = useCallback(async (rewardsList) => {
     const list = rewardsList || []
-    if (!broadcasterId || list.length === 0) {
-      setPendingRedemptions([])
-      setFulfilledRedemptions([])
+    if (!broadcasterId || list.length === 0 || helixForbiddenRef.current) {
       return
     }
 
@@ -72,6 +75,12 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
     ])
 
     if (cancelledRef.current) return
+
+    const isForbidden = pendingResults.some(r => r.status === 'fulfilled' && (r.value?.error?.includes?.('403') || r.value?.code === 'FORBIDDEN')) ||
+      fulfilledResults.some(r => r.status === 'fulfilled' && (r.value?.error?.includes?.('403') || r.value?.code === 'FORBIDDEN'))
+    if (isForbidden) {
+      helixForbiddenRef.current = true
+    }
 
     const pendingAll = []
     pendingResults.forEach((settled, i) => {
