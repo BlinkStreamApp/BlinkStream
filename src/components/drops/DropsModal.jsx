@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { useTwitchDrops } from '../../hooks/useTwitchDrops'
 import { safeOpenUrl } from '../../utils/tauriEnv'
+import { openTwitchDropsWindow } from '../../utils/twitchPopout'
 
 export default function DropsModal({ token, channel, onClose }) {
   const {
@@ -128,11 +129,11 @@ export default function DropsModal({ token, channel, onClose }) {
               <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
                 <button
                   type="button"
-                  onClick={() => safeOpenUrl('https://www.twitch.tv/drops/inventory', true)}
+                  onClick={() => openTwitchDropsWindow()}
                   className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center gap-2"
                 >
                   <PhosphorIcon name="ArrowSquareOut" size={16} weight="bold" />
-                  <span>Abrir Inventario de Drops en Twitch</span>
+                  <span>Abrir Inventario de Drops</span>
                 </button>
                 <button
                   type="button"
