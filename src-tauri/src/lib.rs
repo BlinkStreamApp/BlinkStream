@@ -1599,9 +1599,8 @@ async fn download_media_range(
         return Err("Rango de tiempo no válido: el tiempo final debe ser mayor al inicial.".into());
     }
 
-    let ffmpeg_path = ensure_ffmpeg_path().ok_or_else(|| {
-        "FFmpeg no está instalado o no se encuentra en el sistema.".to_string()
-    })?;
+    let ffmpeg_path = ensure_ffmpeg_path()
+        .ok_or_else(|| "FFmpeg no está instalado o no se encuentra en el sistema.".to_string())?;
 
     let base_dir = app
         .path()
@@ -1627,8 +1626,9 @@ async fn download_media_range(
     };
 
     let output_file = base_dir.join(final_name);
-    let start_str = format!("{:.2}", start_time);
-    let duration_str = format!("{:.2}", end_time - start_time);
+    let start_str = format!("{start_time:.2}");
+    let duration = end_time - start_time;
+    let duration_str = format!("{duration:.2}");
 
     let output_file_str = output_file.to_string_lossy().to_string();
     let url_clone = url.clone();
@@ -1720,7 +1720,10 @@ async fn open_gamer_overlay(app: AppHandle, channel: String) -> Result<(), Strin
         return Ok(());
     }
 
-    let url_str = format!("index.html?overlay=true&channel={}", urlencoding::encode(&channel));
+    let url_str = format!(
+        "index.html?overlay=true&channel={}",
+        urlencoding::encode(&channel)
+    );
     let url = tauri::WebviewUrl::App(url_str.into());
 
     let _window = tauri::WebviewWindowBuilder::new(&app, label, url)
@@ -1803,14 +1806,20 @@ async fn open_twitch_popout_window(
     if let Some(existing) = app.get_webview_window(label) {
         let _ = existing.set_focus();
         let _ = existing.eval(TWITCH_CLEANUP_SCRIPT);
-        let url_str = format!("https://twitch.tv/popout/{}/chat?popout=", urlencoding::encode(&channel));
+        let url_str = format!(
+            "https://twitch.tv/popout/{}/chat?popout=",
+            urlencoding::encode(&channel)
+        );
         if let Ok(target_url) = url_str.parse::<tauri::Url>() {
             let _ = existing.navigate(target_url);
         }
         return Ok(());
     }
 
-    let url_str = format!("https://twitch.tv/popout/{}/chat?popout=", urlencoding::encode(&channel));
+    let url_str = format!(
+        "https://twitch.tv/popout/{}/chat?popout=",
+        urlencoding::encode(&channel)
+    );
     let parsed_url: tauri::Url = url_str
         .parse()
         .map_err(|e| format!("URL inválida para chat popout: {e}"))?;
@@ -1832,6 +1841,7 @@ async fn open_twitch_popout_window(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn mount_embedded_twitch_chat(
     app: AppHandle,
     channel: String,
@@ -1845,7 +1855,10 @@ async fn mount_embedded_twitch_chat(
     validate_channel(&channel)?;
     let label = "embedded_twitch_chat";
 
-    let url_str = format!("https://twitch.tv/popout/{}/chat?popout=", urlencoding::encode(&channel));
+    let url_str = format!(
+        "https://twitch.tv/popout/{}/chat?popout=",
+        urlencoding::encode(&channel)
+    );
     let parsed_url: tauri::Url = url_str
         .parse()
         .map_err(|e| format!("URL inválida para chat embebido: {e}"))?;
@@ -1859,11 +1872,14 @@ async fn mount_embedded_twitch_chat(
         return Ok(());
     }
 
-    let main_window = app.get_window("main").ok_or("Ventana principal no encontrada")?;
+    let main_window = app
+        .get_window("main")
+        .ok_or("Ventana principal no encontrada")?;
 
-    let webview_builder = tauri::WebviewBuilder::new(label, tauri::WebviewUrl::External(parsed_url))
-        .auto_resize()
-        .initialization_script(TWITCH_CLEANUP_SCRIPT);
+    let webview_builder =
+        tauri::WebviewBuilder::new(label, tauri::WebviewUrl::External(parsed_url))
+            .auto_resize()
+            .initialization_script(TWITCH_CLEANUP_SCRIPT);
 
     let _child = main_window
         .add_child(
