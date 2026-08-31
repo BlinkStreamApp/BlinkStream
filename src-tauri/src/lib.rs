@@ -1886,17 +1886,33 @@ async fn update_embedded_twitch_chat_bounds(
 ) -> Result<(), String> {
     let label = "embedded_twitch_chat";
     if let Some(webview) = app.get_webview(label) {
-        let _ = webview.set_position(tauri::LogicalPosition::new(x, y));
-        let _ = webview.set_size(tauri::LogicalSize::new(width, height));
+        if width > 0.0 && height > 0.0 {
+            let _ = webview.set_position(tauri::LogicalPosition::new(x, y));
+            let _ = webview.set_size(tauri::LogicalSize::new(width, height));
+            let _ = webview.show();
+        }
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn set_embedded_twitch_chat_visible(app: AppHandle, visible: bool) -> Result<(), String> {
+async fn set_embedded_twitch_chat_visible(
+    app: AppHandle,
+    visible: bool,
+    x: Option<f64>,
+    y: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+) -> Result<(), String> {
     let label = "embedded_twitch_chat";
     if let Some(webview) = app.get_webview(label) {
         if visible {
+            if let (Some(x_val), Some(y_val), Some(w_val), Some(h_val)) = (x, y, width, height) {
+                if w_val > 0.0 && h_val > 0.0 {
+                    let _ = webview.set_position(tauri::LogicalPosition::new(x_val, y_val));
+                    let _ = webview.set_size(tauri::LogicalSize::new(w_val, h_val));
+                }
+            }
             let _ = webview.show();
         } else {
             let _ = webview.hide();

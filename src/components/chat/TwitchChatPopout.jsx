@@ -48,7 +48,8 @@ export function TwitchChatPopout({
             await invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
           }
         } else {
-          await invoke('update_embedded_twitch_chat_bounds', {
+          await invoke('set_embedded_twitch_chat_visible', {
+            visible: true,
             x: Math.round(rect.left),
             y: Math.round(rect.top),
             width: Math.round(rect.width),
@@ -72,9 +73,13 @@ export function TwitchChatPopout({
     window.addEventListener('resize', handleResize)
 
     const handleModalEvent = (e) => {
-      const open = Boolean(e?.detail?.isModalOpen)
+      const open = Boolean(e?.detail?.isModalOpen ?? e?.detail?.open)
       setIsOverlayModalOpen(open)
-      invoke('set_embedded_twitch_chat_visible', { visible: !open }).catch(() => {})
+      if (open) {
+        invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
+      } else {
+        syncBounds(false)
+      }
     }
     window.addEventListener('bs:modal-state-change', handleModalEvent)
 
@@ -83,7 +88,13 @@ export function TwitchChatPopout({
       const hasModal = Boolean(modalElement)
       setIsOverlayModalOpen(prev => {
         if (prev !== hasModal) {
-          invoke('set_embedded_twitch_chat_visible', { visible: !hasModal }).catch(() => {})
+          if (hasModal) {
+            invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
+          } else {
+            setTimeout(() => {
+              if (isMounted) syncBounds(false)
+            }, 30)
+          }
         }
         return hasModal
       })
