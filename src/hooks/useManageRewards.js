@@ -14,9 +14,10 @@ import {
 
 const PENDING_STATUS = 'UNFULFILLED'
 
-export function useManageRewards({ broadcasterId, token, pollIntervalMs = 30000 } = {}) {
+export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 } = {}) {
   const [rewards, setRewards] = useState([])
   const [pendingRedemptions, setPendingRedemptions] = useState([])
+  const [fulfilledRedemptions, setFulfilledRedemptions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const timerRef = useRef(null)
@@ -42,24 +43,50 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 30000 
     return []
   }, [broadcasterId, token])
 
-  const fetchPending = useCallback(async (rewardsList) => {
+  const fetchRedemptions = useCallback(async (rewardsList) => {
     const list = rewardsList || []
     if (!broadcasterId || list.length === 0) {
       setPendingRedemptions([])
+      setFulfilledRedemptions([])
       return
     }
-    const results = await Promise.allSettled(
-      list.map(r => getRedemptions(broadcasterId, r.id, PENDING_STATUS, token, undefined, 50))
-    )
+
+    const [pendingResults, fulfilledResults] = await Promise.all([
+      Promise.allSettled(
+        list.map(r => getRedemptions(broadcasterId, r.id, PENDING_STATUS, token, undefined, 50))
+      ),
+      Promise.allSettled(
+        list.map(r => getRedemptions(broadcasterId, r.id, 'FULFILLED', token, undefined, 20))
+      ),
+    ])
+
     if (cancelledRef.current) return
-    const all = []
-    results.forEach((settled, i) => {
+
+    const pendingAll = []
+    pendingResults.forEach((settled, i) => {
       if (settled.status === 'fulfilled' && settled.value?.ok && settled.value.data?.data) {
-        all.push(...settled.value.data.data.map(rd => ({ ...rd, reward_title: list[i]?.title })))
+        pendingAll.push(...settled.value.data.data.map(rd => ({
+          ...rd,
+          reward_title: list[i]?.title || rd.reward?.title,
+          cost: list[i]?.cost || rd.reward?.cost || 0,
+        })))
       }
     })
-    all.sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at))
-    setPendingRedemptions(all)
+    pendingAll.sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at))
+    setPendingRedemptions(pendingAll)
+
+    const fulfilledAll = []
+    fulfilledResults.forEach((settled, i) => {
+      if (settled.status === 'fulfilled' && settled.value?.ok && settled.value.data?.data) {
+        fulfilledAll.push(...settled.value.data.data.map(rd => ({
+          ...rd,
+          reward_title: list[i]?.title || rd.reward?.title,
+          cost: list[i]?.cost || rd.reward?.cost || 0,
+        })))
+      }
+    })
+    fulfilledAll.sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at))
+    setFulfilledRedemptions(fulfilledAll)
   }, [broadcasterId, token])
 
   const refresh = useCallback(async () => {
@@ -68,18 +95,18 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 30000 
     try {
       const fresh = await fetchRewards()
       if (cancelledRef.current) return
-      await fetchPending(fresh)
+      await fetchRedemptions(fresh)
     } finally {
       if (!cancelledRef.current) setLoading(false)
     }
-  }, [fetchRewards, fetchPending])
+  }, [fetchRewards, fetchRedemptions])
 
   useEffect(() => {
     if (!broadcasterId || pollIntervalMs <= 0) return
     cancelledRef.current = false
     const tick = async () => {
       if (cancelledRef.current) return
-      await fetchPending(rewardsRef.current)
+      await fetchRedemptions(rewardsRef.current)
       if (cancelledRef.current) return
       timerRef.current = setTimeout(tick, pollIntervalMs)
     }
@@ -88,7 +115,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 30000 
       cancelledRef.current = true
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [broadcasterId, pollIntervalMs, fetchPending])
+  }, [broadcasterId, pollIntervalMs, fetchRedemptions])
 
   useEffect(() => {
     const refreshTimer = window.setTimeout(() => {
@@ -215,6 +242,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 30000 
   return {
     rewards,
     pendingRedemptions,
+    fulfilledRedemptions,
     loading,
     error,
     refresh,

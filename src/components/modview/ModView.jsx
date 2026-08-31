@@ -441,6 +441,7 @@ export function ModView({
         ) : rightPanelTab === 'activity' ? (
           <ActivityFeed
             messages={chatMessages}
+            recentRedemptions={rewardsState.fulfilledRedemptions}
             onInspectUser={handleSelectUser}
           />
         ) : rightPanelTab === 'automod' ? (
@@ -477,6 +478,7 @@ export function ModView({
         ) : (
           <RewardsQueuePanel
             pendingRedemptions={rewardsState.pendingRedemptions}
+            fulfilledRedemptions={rewardsState.fulfilledRedemptions}
             onFulfillRedemption={rewardsState.fulfillRedemption}
             onCancelRedemption={rewardsState.cancelRedemption}
             loading={rewardsState.loading}

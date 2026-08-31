@@ -1,12 +1,33 @@
 import { useState, useMemo } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 
-export function ActivityFeed({ messages = [], onInspectUser }) {
+export function ActivityFeed({ messages = [], recentRedemptions = [], onInspectUser }) {
   const [filter, setFilter] = useState('all') // 'all' | 'subs' | 'bits' | 'raids' | 'rewards'
 
-  // Extract special activity events from messages
+  // Extract special activity events from messages and redemptions
   const activities = useMemo(() => {
     const list = []
+    const seenIds = new Set()
+
+    // 1. Direct Twitch API Redemptions
+    for (const rd of recentRedemptions) {
+      const id = `rd-${rd.id}`
+      seenIds.add(id)
+      const username = rd.user_name || rd.user_login || 'Espectador'
+      const title = rd.reward_title || rd.reward?.title || 'Recompensa'
+      const cost = rd.cost || rd.reward?.cost || 0
+      list.push({
+        id,
+        type: 'rewards',
+        user: username,
+        userId: rd.user_id,
+        title: `🎁 ${username} ha canjeado ${title} (${cost.toLocaleString()} pts)`,
+        text: rd.user_input || '',
+        timestamp: rd.redeemed_at ? new Date(rd.redeemed_at).getTime() : Date.now(),
+      })
+    }
+
+    // 2. Real-time IRC chat messages
     for (const m of messages) {
       if (
         m.eventType === 'reward' ||
@@ -18,15 +39,19 @@ export function ActivityFeed({ messages = [], onInspectUser }) {
         (typeof m.message === 'string' && /canjeado|redeemed|\d+\s+points/i.test(m.message)) ||
         (typeof m.eventHeader === 'string' && (m.eventHeader.includes('Canje') || m.eventHeader.includes('canjeado') || m.eventHeader.includes('Puntos') || m.eventHeader.includes('recompensa') || m.eventHeader.includes('redeemed')))
       ) {
-        list.push({
-          id: m.id || m.timestamp,
-          type: 'rewards',
-          user: m.user || m.user_name || 'Espectador',
-          userId: m.user_id,
-          title: m.eventHeader || '🎁 Canje de Puntos',
-          text: m.message || '',
-          timestamp: m.timestamp || 0,
-        })
+        const id = m.id || m.timestamp
+        if (!seenIds.has(id)) {
+          seenIds.add(id)
+          list.push({
+            id,
+            type: 'rewards',
+            user: m.user || m.user_name || 'Espectador',
+            userId: m.user_id,
+            title: m.eventHeader || '🎁 Canje de Puntos',
+            text: m.message || '',
+            timestamp: m.timestamp || 0,
+          })
+        }
       } else if (m.eventType === 'bits' || (m.bits && parseInt(m.bits, 10) > 0)) {
         list.push({
           id: m.id || m.timestamp,
@@ -68,8 +93,8 @@ export function ActivityFeed({ messages = [], onInspectUser }) {
         })
       }
     }
-    return list.slice().reverse()
-  }, [messages])
+    return list.slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+  }, [messages, recentRedemptions])
 
   const filtered = activities.filter(a => {
     if (filter === 'all') return true
