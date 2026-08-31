@@ -88,7 +88,21 @@ export function ModView({
       }
     }
     window.addEventListener('message', handleBridgeMessage)
-    return () => window.removeEventListener('message', handleBridgeMessage)
+
+    const handlePubSubRedemption = (e) => {
+      if (e.detail) {
+        setChatMessages(prev => {
+          if (prev.some(m => m.id === e.detail.id)) return prev
+          return [e.detail, ...prev]
+        })
+      }
+    }
+    window.addEventListener('bs:pubsub-redemption', handlePubSubRedemption)
+
+    return () => {
+      window.removeEventListener('message', handleBridgeMessage)
+      window.removeEventListener('bs:pubsub-redemption', handlePubSubRedemption)
+    }
   }, [])
 
   // Load layout config from localStorage

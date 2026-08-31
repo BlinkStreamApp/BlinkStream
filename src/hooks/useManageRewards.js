@@ -148,6 +148,118 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
     }
   }, [broadcasterId, refresh])
 
+  // Real-time PubSub listener for community-points-channel-v1.<broadcasterId>
+  useEffect(() => {
+    if (!broadcasterId) return
+
+    let isSubscribed = true
+    let ws = null
+    let pingTimer = null
+    let reconnectTimer = null
+
+    const connectPubSub = () => {
+      if (!isSubscribed) return
+      try {
+        ws = new WebSocket('wss://pubsub-edge.twitch.tv/v1')
+
+        ws.onopen = () => {
+          if (!isSubscribed) {
+            try { ws.close() } catch { /* ignore */ }
+            return
+          }
+          const cleanToken = (effectiveToken || '').replace(/^oauth:/i, '')
+          const listenMsg = {
+            type: 'LISTEN',
+            nonce: 'bs_cp_' + Math.random().toString(36).slice(2, 10),
+            data: {
+              topics: [`community-points-channel-v1.${broadcasterId}`],
+              auth_token: cleanToken || undefined,
+            },
+          }
+          ws.send(JSON.stringify(listenMsg))
+
+          pingTimer = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'PING' }))
+            }
+          }, 3.5 * 60 * 1000)
+        }
+
+        ws.onmessage = (event) => {
+          if (!isSubscribed) return
+          try {
+            const data = JSON.parse(event.data)
+            if (data.type === 'MESSAGE' && data.data?.topic?.startsWith('community-points-channel-v1')) {
+              const msgData = typeof data.data.message === 'string' ? JSON.parse(data.data.message) : data.data.message
+              if (msgData?.type === 'reward-redeemed' && msgData.data?.redemption) {
+                const rd = msgData.data.redemption
+                const formattedRd = {
+                  id: rd.id,
+                  user_name: rd.user?.display_name || rd.user?.login || 'Espectador',
+                  user_login: rd.user?.login || '',
+                  user_id: rd.user?.id || '',
+                  user_input: rd.user_input || '',
+                  reward_title: rd.reward?.title || 'Recompensa',
+                  cost: rd.reward?.cost || 0,
+                  status: rd.status || 'FULFILLED',
+                  redeemed_at: rd.redeemed_at || new Date().toISOString(),
+                  reward: rd.reward,
+                }
+
+                if (formattedRd.status === 'UNFULFILLED') {
+                  setPendingRedemptions(prev => [formattedRd, ...prev.filter(p => p.id !== rd.id)])
+                } else {
+                  setFulfilledRedemptions(prev => [formattedRd, ...prev.filter(p => p.id !== rd.id)])
+                }
+
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('bs:pubsub-redemption', {
+                    detail: {
+                      id: rd.id,
+                      eventType: 'reward',
+                      isReward: true,
+                      user: formattedRd.user_name,
+                      user_id: formattedRd.user_id,
+                      eventHeader: `🎁 ${formattedRd.user_name} ha canjeado ${formattedRd.reward_title} (${formattedRd.cost} pts)`,
+                      message: formattedRd.user_input ? `"${formattedRd.user_input}"` : `${formattedRd.reward_title} (Canje de Puntos)`,
+                      timestamp: Date.now(),
+                    },
+                  }))
+                }
+              }
+            }
+          } catch {
+            // ignore malformed pubsub messages
+          }
+        }
+
+        ws.onclose = () => {
+          if (pingTimer) clearInterval(pingTimer)
+          if (isSubscribed) {
+            reconnectTimer = setTimeout(connectPubSub, 4000)
+          }
+        }
+
+        ws.onerror = () => {
+          // let onclose handle reconnect
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    connectPubSub()
+
+    return () => {
+      isSubscribed = false
+      if (pingTimer) clearInterval(pingTimer)
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      if (ws) {
+        try { ws.close() } catch { /* ignore */ }
+      }
+    }
+  }, [broadcasterId, effectiveToken])
+
   const createReward = useCallback(async (data) => {
     if (!broadcasterId) return { ok: false, error: 'No hay broadcaster activo' }
     const res = await createCustomReward(broadcasterId, data, ...(effectiveToken ? [effectiveToken] : []))
