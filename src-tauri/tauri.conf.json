@@ -54,7 +54,7 @@
       "endpoints": [
         "https://raw.githubusercontent.com/BlinkStreamApp/BlinkStream/master/updater.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJBMzg2RUY1NjY1QTI1OQpSV1Jab21WVzc0YWpBZ1pVQm42bU5mdmdKaktGV1BpYUY3dElpeGJQelcrU2dlazZmOXI4a2liYwo=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFMjA4OURCNEIzOEZDNDQKUldSRS9EaEwyNGtnZmxPWktHTnVjczY2aHhmU3N0dDRibURLK2F6Q0lsN2ZiNFNhNW43ek8zWjEK",
       "windows": {
         "installMode": "passive"
       }
