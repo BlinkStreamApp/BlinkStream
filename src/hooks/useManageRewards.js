@@ -5,6 +5,7 @@ import { logError } from '../utils/errors'
 import { logEvent } from '../utils/eventLog'
 import {
   getCustomRewards,
+  getCustomRewardsGQL,
   createCustomReward,
   updateCustomReward,
   deleteCustomReward,
@@ -14,7 +15,7 @@ import {
 
 const PENDING_STATUS = 'UNFULFILLED'
 
-export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 } = {}) {
+export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs = 15000 } = {}) {
   const [rewards, setRewards] = useState([])
   const [pendingRedemptions, setPendingRedemptions] = useState([])
   const [fulfilledRedemptions, setFulfilledRedemptions] = useState([])
@@ -35,15 +36,23 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
       setRewards([])
       return []
     }
-    const res = await getCustomRewards(broadcasterId, ...(effectiveToken ? [effectiveToken] : []))
+    let res = await getCustomRewards(broadcasterId, ...(effectiveToken ? [effectiveToken] : []))
+    if (!res.ok || !res.data || res.data.length === 0) {
+      if (channel) {
+        const gqlRes = await getCustomRewardsGQL(channel, effectiveToken)
+        if (gqlRes.ok && gqlRes.data?.length > 0) {
+          res = gqlRes
+        }
+      }
+    }
     if (cancelledRef.current) return []
     if (res.ok) {
-      setRewards(res.data)
-      return res.data
+      setRewards(res.data || [])
+      return res.data || []
     }
     setError(res.error || 'Error cargando recompensas')
     return []
-  }, [broadcasterId, effectiveToken])
+  }, [broadcasterId, channel, effectiveToken])
 
   const fetchRedemptions = useCallback(async (rewardsList) => {
     const list = rewardsList || []

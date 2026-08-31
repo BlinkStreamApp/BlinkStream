@@ -468,7 +468,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
 
 export default function Chat({
   channel,
-  isLoggedIn,
+  _isLoggedIn,
   twitchToken,
   twitchUsername,
   broadcasterId,
@@ -528,15 +528,14 @@ export default function Chat({
   // Chat puede montarse en tests aislados sin crashear.
   const moderationDialog = useModerationDialogSafe()
 
-  // Auth deriva directamente de las props que llegan del padre (App.jsx → keychain).
-  // Antes leíamos localStorage aquí, pero eso estaba ROTO: cuando keychain funciona
-  // el token NO está en localStorage, loadAuth() retornaba null y la sesión se perdía.
   const auth = useMemo(() => {
-    if (isLoggedIn && twitchToken && twitchUsername) {
-      return { token: twitchToken, username: twitchUsername }
+    const token = twitchToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('blinkstream_twitch_token') : null)
+    const username = twitchUsername || (typeof localStorage !== 'undefined' ? localStorage.getItem('blinkstream_twitch_username') : null)
+    if (token && username) {
+      return { token, username }
     }
     return { token: null, username: null }
-  }, [isLoggedIn, twitchToken, twitchUsername])
+  }, [twitchToken, twitchUsername])
 
   // WT-20260628-56: handler de click derecho sobre un mensaje.
   // Mapea el msg del state al `target` que espera MessageContextMenu
@@ -1159,7 +1158,8 @@ export default function Chat({
           ws.send('NICK justinfan12345')
         }
 
-        ws.send(`JOIN #${channel}`)
+        const ircChannel = (channel || '').toLowerCase().replace(/^#/, '')
+        ws.send(`JOIN #${ircChannel}`)
         setConnected(true)
         setConnError('')
       }

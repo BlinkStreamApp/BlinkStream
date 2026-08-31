@@ -58,7 +58,7 @@ export function ModView({
 
   const modState = useModeration({ broadcasterId: effectiveBroadcasterId, userId })
   const roleState = useChannelRole({ broadcasterId: effectiveBroadcasterId, userId, channel })
-  const rewardsState = useManageRewards({ broadcasterId: effectiveBroadcasterId, token: twitchToken })
+  const rewardsState = useManageRewards({ broadcasterId: effectiveBroadcasterId, channel, token: twitchToken })
 
   const [selectedUser, setSelectedUser] = useState(null)
   const [chatMessages, setChatMessages] = useState([])
