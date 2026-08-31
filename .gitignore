@@ -59,3 +59,4 @@ lint_output_*.txt
 .obsidian-vault/
 .gemini/
 .agents/
+scratch/
