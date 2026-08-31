@@ -1,5 +1,36 @@
 import { getHelixClientId, PUBLIC_CLIENT_ID, getStoredToken } from './twitch'
 
+export function parseCampaign(c, isCurrentChannel = false) {
+  const drops = (c.timeBasedDrops || []).map(d => {
+    const required = d.requiredMinutesWatched || 60
+    const current = d.self?.currentMinutesWatched || 0
+    const percent = Math.min(100, Math.floor((current / required) * 100))
+    const isReadyToClaim = percent >= 100 && !d.self?.isClaimed
+
+    return {
+      id: d.id,
+      name: d.name,
+      requiredMinutes: required,
+      currentMinutes: current,
+      percent,
+      isClaimed: Boolean(d.self?.isClaimed),
+      isReadyToClaim,
+      dropInstanceId: d.self?.dropInstanceID || null,
+      benefitName: d.benefitEdges?.[0]?.benefit?.name || d.name,
+      benefitImage: d.benefitEdges?.[0]?.benefit?.imageAssetURL || null,
+    }
+  })
+
+  return {
+    id: c.id,
+    name: c.name,
+    gameName: c.game?.name || '',
+    boxArtUrl: c.game?.boxArtURL || '',
+    isCurrentChannel,
+    drops,
+  }
+}
+
 export async function callTwitchGql({ query, variables, token, clientId }) {
   const isTauri = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
   if (isTauri) {
@@ -40,6 +71,26 @@ export async function callTwitchGql({ query, variables, token, clientId }) {
 }
 
 export async function fetchUserDropsInventory(token, _channel = null) {
+  const isTauri = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
+  if (isTauri) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const cached = await invoke('get_cached_drops_inventory')
+      const cachedList = cached?.campaigns || []
+      if (Array.isArray(cachedList) && cachedList.length > 0) {
+        const campaignMap = new Map()
+        for (const c of cachedList) {
+          if (c?.id) {
+            campaignMap.set(c.id, parseCampaign(c, false))
+          }
+        }
+        return { campaigns: Array.from(campaignMap.values()) }
+      }
+    } catch {
+      // Ignorar
+    }
+  }
+
   let cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
   if (!cleanToken) {
     const stored = await getStoredToken()
@@ -109,37 +160,6 @@ export async function fetchUserDropsInventory(token, _channel = null) {
 
       const campaignMap = new Map()
 
-      const parseCampaign = (c, isCurrentChannel = false) => {
-        const drops = (c.timeBasedDrops || []).map(d => {
-          const required = d.requiredMinutesWatched || 60
-          const current = d.self?.currentMinutesWatched || 0
-          const percent = Math.min(100, Math.floor((current / required) * 100))
-          const isReadyToClaim = percent >= 100 && !d.self?.isClaimed
-
-          return {
-            id: d.id,
-            name: d.name,
-            requiredMinutes: required,
-            currentMinutes: current,
-            percent,
-            isClaimed: Boolean(d.self?.isClaimed),
-            isReadyToClaim,
-            dropInstanceId: d.self?.dropInstanceID || null,
-            benefitName: d.benefitEdges?.[0]?.benefit?.name || d.name,
-            benefitImage: d.benefitEdges?.[0]?.benefit?.imageAssetURL || null,
-          }
-        })
-
-        return {
-          id: c.id,
-          name: c.name,
-          gameName: c.game?.name || '',
-          boxArtUrl: c.game?.boxArtURL || '',
-          isCurrentChannel,
-          drops,
-        }
-      }
-
       for (const c of inventoryCampaigns) {
         if (c?.id) {
           campaignMap.set(c.id, parseCampaign(c, false))
@@ -157,6 +177,17 @@ export async function fetchUserDropsInventory(token, _channel = null) {
 }
 
 export async function claimDropReward(dropInstanceId, token) {
+  const isTauri = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
+  if (isTauri && dropInstanceId) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('claim_twitch_drop', { dropInstanceId })
+      return { success: true, status: 'CLAIMED', dropInstanceId }
+    } catch {
+      // Ignorar y continuar
+    }
+  }
+
   let cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
   if (!cleanToken) {
     const stored = await getStoredToken()

@@ -5,7 +5,7 @@ use std::net::{TcpListener, UdpSocket};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompanionStateData {
@@ -43,6 +43,13 @@ pub struct CompanionServerState {
 }
 
 static SERVER_STATE: OnceLock<Arc<Mutex<CompanionServerState>>> = OnceLock::new();
+static DROPS_CACHE: OnceLock<Arc<Mutex<serde_json::Value>>> = OnceLock::new();
+
+fn get_drops_cache() -> Arc<Mutex<serde_json::Value>> {
+    DROPS_CACHE
+        .get_or_init(|| Arc::new(Mutex::new(json!({ "campaigns": [] }))))
+        .clone()
+}
 
 fn detect_local_ip() -> String {
     if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
@@ -273,6 +280,27 @@ fn handle_client_stream(
         return Ok(());
     }
 
+    if method == "POST" && path == "/api/drops_update" {
+        if let Some(body) = request_body(&req_str) {
+            if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body) {
+                let cache = get_drops_cache();
+                if let Ok(mut guard) = cache.lock() {
+                    *guard = json_val.clone();
+                }
+                let _ = app_handle.emit("twitch_drops_update", &json_val);
+            }
+        }
+        let ok_json = json!({"status": "ok"}).to_string();
+        let resp = format!(
+            "HTTP/1.1 200 OK\r\n{}Access-Control-Allow-Origin: *\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
+            response_headers,
+            ok_json.len(),
+            ok_json
+        );
+        stream.write_all(resp.as_bytes())?;
+        return Ok(());
+    }
+
     if method == "POST" && path == "/api/command" {
         if let Some(body) = request_body(&req_str) {
             if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body) {
@@ -324,6 +352,28 @@ pub fn get_companion_status() -> Result<serde_json::Value, String> {
 pub fn start_companion_server_cmd(app: AppHandle) -> Result<serde_json::Value, String> {
     init_and_start_companion_server(app)?;
     get_companion_status()
+}
+
+#[tauri::command]
+pub fn get_cached_drops_inventory() -> Result<serde_json::Value, String> {
+    let cache = get_drops_cache();
+    let guard = cache.lock().map_err(|e| format!("Lock error: {e}"))?;
+    Ok(guard.clone())
+}
+
+#[tauri::command]
+pub async fn claim_twitch_drop(app: AppHandle, drop_instance_id: String) -> Result<bool, String> {
+    let escaped_id = drop_instance_id.replace('"', "\\\"");
+    let script = format!(
+        "if (typeof window.__claimTwitchDrop === 'function') {{ window.__claimTwitchDrop(\"{escaped_id}\"); }}"
+    );
+    if let Some(watcher) = app.get_webview_window("twitch_drops_watcher") {
+        let _ = watcher.eval(&script);
+    }
+    if let Some(chat) = app.get_webview("embedded_twitch_chat") {
+        let _ = chat.eval(&script);
+    }
+    Ok(true)
 }
 
 #[tauri::command]

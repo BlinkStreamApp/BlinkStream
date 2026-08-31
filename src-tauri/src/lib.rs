@@ -1938,6 +1938,12 @@ async fn open_twitch_drops_window(
 
 const TWITCH_DROPS_WATCHER_SCRIPT: &str = r#"
 (function() {
+    try {
+        Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; } });
+        Object.defineProperty(document, 'hidden', { get: function() { return false; } });
+        window.addEventListener('visibilitychange', function(e) { e.stopImmediatePropagation(); }, true);
+    } catch(e) {}
+
     function keepPlaybackActive() {
         try {
             var videos = document.querySelectorAll('video');
@@ -1949,26 +1955,99 @@ const TWITCH_DROPS_WATCHER_SCRIPT: &str = r#"
                 }
             });
 
-            var matureButtons = document.querySelectorAll('[data-a-target="player-overlay-mature-accept"], button[data-a-target="content-classification-gate-overlay-start-watching-button"]');
+            var matureButtons = document.querySelectorAll('[data-a-target="player-overlay-mature-accept"], button[data-a-target="content-classification-gate-overlay-start-watching-button"], [data-a-target="tw-core-button-label-text"]');
             matureButtons.forEach(function(btn) {
-                try { btn.click(); } catch(e) {}
+                try {
+                    var txt = (btn.innerText || btn.textContent || '').toLowerCase();
+                    if (txt.includes('empezar') || txt.includes('start watching') || txt.includes('aceptar') || txt.includes('accept') || txt.includes('entendido')) {
+                        btn.click();
+                    }
+                } catch(e) {}
             });
 
-            var claimBtn = document.querySelector('button[aria-label*="Claim Bonus"], button[aria-label*="Reclamar bonificación"], .community-points-summary button');
-            if (claimBtn) {
-                try { claimBtn.click(); } catch(e) {}
+            var claimButtons = document.querySelectorAll('button[aria-label*="Claim"], button[aria-label*="Reclamar"], .community-points-summary button');
+            claimButtons.forEach(function(btn) {
+                try { btn.click(); } catch(e) {}
+            });
+        } catch(e) {}
+    }
+
+    async function syncDropsData() {
+        try {
+            var cookieStr = document.cookie || '';
+            var tokenCookie = cookieStr.split('; ').find(function(row) { return row.startsWith('auth-token='); });
+            var authToken = tokenCookie ? tokenCookie.split('=')[1] : null;
+            if (!authToken) {
+                try { authToken = localStorage.getItem('api_token') || localStorage.getItem('token'); } catch(e) {}
+            }
+            if (!authToken) return;
+
+            var query = "query DropsInventory { currentUser { id inventory { dropCampaignsInProgress { id name status game { id name boxArtURL } timeBasedDrops { id name requiredMinutesWatched benefitEdges { benefit { id name imageAssetURL } } self { currentMinutesWatched isClaimed dropInstanceID } } } } } }";
+
+            var res = await fetch('https://gql.twitch.tv/gql', {
+                method: 'POST',
+                headers: {
+                    'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko', // ALLOWED-REGRESSION: first-party web client for twitch drops gql inside webview
+                    'Authorization': 'OAuth ' + authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query: query })
+            });
+
+            if (res.ok) {
+                var json = await res.json();
+                var rawCampaigns = json?.data?.currentUser?.inventory?.dropCampaignsInProgress || [];
+                
+                fetch('http://127.0.0.1:9876/api/drops_update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ campaigns: rawCampaigns })
+                }).catch(function() {});
             }
         } catch(e) {}
     }
 
+    window.__claimTwitchDrop = async function(dropInstanceId) {
+        try {
+            var cookieStr = document.cookie || '';
+            var tokenCookie = cookieStr.split('; ').find(function(row) { return row.startsWith('auth-token='); });
+            var authToken = tokenCookie ? tokenCookie.split('=')[1] : null;
+            if (!authToken) return false;
+
+            var mutation = "mutation ClaimDrop($input: ClaimCommunityPointsDropInput!) { claimCommunityPointsDrop(input: $input) { dropInstanceID status } }";
+
+            var res = await fetch('https://gql.twitch.tv/gql', {
+                method: 'POST',
+                headers: {
+                    'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko', // ALLOWED-REGRESSION: first-party web client for twitch drops gql inside webview
+                    'Authorization': 'OAuth ' + authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query: mutation,
+                    variables: { input: { dropInstanceID: dropInstanceId } }
+                })
+            });
+            if (res.ok) {
+                syncDropsData();
+                return true;
+            }
+        } catch(e) {}
+        return false;
+    };
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             keepPlaybackActive();
-            setInterval(keepPlaybackActive, 3000);
+            setInterval(keepPlaybackActive, 2500);
+            setTimeout(syncDropsData, 3000);
+            setInterval(syncDropsData, 15000);
         });
     } else {
         keepPlaybackActive();
-        setInterval(keepPlaybackActive, 3000);
+        setInterval(keepPlaybackActive, 2500);
+        setTimeout(syncDropsData, 3000);
+        setInterval(syncDropsData, 15000);
     }
 })();
 "#;
@@ -1999,8 +2078,9 @@ async fn start_drops_watcher(
 
     let _window = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title("Twitch Drops Watcher")
-        .inner_size(320.0, 240.0)
-        .visible(false)
+        .inner_size(400.0, 300.0)
+        .position(-10000.0, -10000.0)
+        .visible(true)
         .decorations(false)
         .initialization_script(TWITCH_DROPS_WATCHER_SCRIPT)
         .build()
@@ -2176,6 +2256,8 @@ pub fn run() {
             companion::start_companion_server_cmd,
             companion::stop_companion_server_cmd,
             companion::update_companion_state,
+            companion::get_cached_drops_inventory,
+            companion::claim_twitch_drop,
         ])
         .setup(|app| {
             let mut labels_to_close = Vec::new();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchUserDropsInventory, claimDropReward } from '../utils/drops'
+import { fetchUserDropsInventory, claimDropReward, parseCampaign } from '../utils/drops'
 import { getStoredToken } from '../utils/twitch'
 
 const AUTOCLAIM_KEY = 'blinkstream_drops_autoclaim'
@@ -23,10 +23,6 @@ export function useTwitchDrops(token, channel = null) {
 
   const refreshDrops = useCallback(async () => {
     const effectiveToken = token || (await getStoredToken())
-    if (!effectiveToken) {
-      setCampaigns([])
-      return
-    }
 
     try {
       setLoading(true)
@@ -39,9 +35,38 @@ export function useTwitchDrops(token, channel = null) {
     }
   }, [token, channel])
 
+  // Listen to background watcher updates via Tauri event
+  useEffect(() => {
+    let unlisten = null
+    const isTauri = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
+    if (isTauri) {
+      import('@tauri-apps/api/event').then(({ listen }) => {
+        listen('twitch_drops_update', (event) => {
+          const rawList = event?.payload?.campaigns || []
+          if (Array.isArray(rawList)) {
+            const campaignMap = new Map()
+            for (const c of rawList) {
+              if (c?.id) {
+                campaignMap.set(c.id, parseCampaign(c, false))
+              }
+            }
+            const updated = Array.from(campaignMap.values())
+            if (updated.length > 0) {
+              setCampaigns(updated)
+            }
+          }
+        }).then(fn => { unlisten = fn })
+      }).catch(() => {})
+    }
+
+    return () => {
+      if (unlisten) unlisten()
+    }
+  }, [])
+
   const claimDrop = useCallback(async (dropInstanceId, benefitName = 'Recompensa') => {
     const effectiveToken = token || (await getStoredToken())
-    if (!effectiveToken || !dropInstanceId || claimingIdsRef.current.has(dropInstanceId)) return
+    if (!dropInstanceId || claimingIdsRef.current.has(dropInstanceId)) return
 
     try {
       claimingIdsRef.current.add(dropInstanceId)
@@ -68,7 +93,7 @@ export function useTwitchDrops(token, channel = null) {
     }
 
     check()
-    pollingTimerRef.current = setInterval(check, 60000)
+    pollingTimerRef.current = setInterval(check, 15000)
 
     return () => {
       active = false
