@@ -13,6 +13,8 @@ import { PredictionsPollsPanel } from './PredictionsPollsPanel'
 import { ActivityFeed } from './ActivityFeed'
 import { RewardsQueuePanel } from './RewardsQueuePanel'
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { TwitchChatPopout } from '../chat/TwitchChatPopout'
+import { openTwitchChatPopoutWindow } from '../../utils/twitchPopout'
 import { useT } from '../../utils/i18n'
 
 const VideoPlayer = lazy(() => import('../VideoPlayer'))
@@ -53,6 +55,13 @@ export function ModView({
   const [activeModes, setActiveModes] = useState({})
   const [isLayoutDrawerOpen, setIsLayoutDrawerOpen] = useState(false)
   const [automodSubTab, setAutomodSubTab] = useState('automod') // 'automod' | 'unban'
+  const [useTwitchPopoutInMod, setUseTwitchPopoutInMod] = useState(() => {
+    try {
+      return localStorage.getItem('bs.modview.use_twitch_popout') === 'true'
+    } catch {
+      return false
+    }
+  })
 
   // Load layout config from localStorage
   const [config, setConfig] = useState(() => {
@@ -185,33 +194,87 @@ export function ModView({
   // Center Column Component (Live Chat with Mod Header)
   const centerColumnNode = (
     <div className={`col-span-12 ${config.preset === 'no_player' ? 'lg:col-span-7' : 'lg:col-span-4'} flex flex-col min-h-0 bg-[#111119]/80 border border-white/10 rounded-2xl overflow-hidden shadow-xl backdrop-blur-xl`}>
-      <div className="shrink-0 p-2.5 bg-white/5 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <PhosphorIcon name="Chats" size={18} className="text-twitch-glow" weight="duotone" />
-          <span className="text-xs font-bold text-white uppercase tracking-wider">{t('mod.chat.title', 'Chat de Moderación')}</span>
+      <div className="shrink-0 p-2.5 bg-white/5 border-b border-white/10 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <PhosphorIcon name="Chats" size={18} className="text-twitch-glow shrink-0" weight="duotone" />
+          <span className="text-xs font-bold text-white uppercase tracking-wider truncate">
+            {useTwitchPopoutInMod ? 'Twitch Popout Chat' : t('mod.chat.title', 'Chat de Moderación')}
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-text-muted">
-          <span>{t('mod.chat.clickInspect', 'Clic en usuario para inspeccionar')}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {!useTwitchPopoutInMod && (
+            <span className="hidden xl:inline text-[10px] text-text-muted mr-1">
+              {t('mod.chat.clickInspect', 'Clic en usuario para inspeccionar')}
+            </span>
+          )}
+
+          {/* Toggle Popout / Light Chat */}
+          <button
+            type="button"
+            onClick={() => {
+              setUseTwitchPopoutInMod(prev => {
+                const next = !prev
+                try { localStorage.setItem('bs.modview.use_twitch_popout', String(next)) } catch { /* ignore */ }
+                return next
+              })
+            }}
+            className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95 ${
+              useTwitchPopoutInMod
+                ? 'border-twitch bg-twitch text-white shadow-twitch/30'
+                : 'border-twitch/40 bg-twitch/15 hover:bg-twitch/30 text-white'
+            }`}
+            title={useTwitchPopoutInMod ? 'Volver al Chat Ligero con Inspector' : 'Incrustar Chat Oficial de Twitch (Puntos de Canal, Emotes y Moderación Nativa)'}
+            aria-label="Toggle Twitch Popout Chat"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="shrink-0">
+              <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z" />
+            </svg>
+            <span>{useTwitchPopoutInMod ? 'Chat Ligero' : 'Popout'}</span>
+          </button>
+
+          {/* Open Floating Popout Window */}
+          <button
+            type="button"
+            onClick={() => openTwitchChatPopoutWindow(channel, false, twitchToken, twitchUsername)}
+            className="p-1 rounded-md text-text-muted hover:text-cyan-300 hover:bg-white/10 transition-colors cursor-pointer"
+            title="Abrir Chat de Twitch en Ventana Flotante (Multi-monitor)"
+            aria-label="Abrir Popout Flotante"
+          >
+            <PhosphorIcon name="ArrowSquareOut" size={14} weight="bold" />
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-xs">{t('mod.chat.loading', 'Cargando chat...')}</div>}>
-          <Chat
-            channel={channel}
-            broadcasterId={broadcasterId}
-            userId={userId}
-            isLoggedIn={isLoggedIn}
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        {useTwitchPopoutInMod ? (
+          <TwitchChatPopout
+            channelName={channel}
             twitchToken={twitchToken}
             twitchUsername={twitchUsername}
-            isMod={true}
-            isBroadcaster={roleState.isBroadcaster}
-            viewerLogin={twitchUsername}
-            onLoginWithToken={onLoginWithToken}
-            onSelectUserForInspection={handleSelectUser}
-            onMessagesUpdate={setChatMessages}
+            showControls={false}
+            onClose={() => {
+              setUseTwitchPopoutInMod(false)
+              try { localStorage.setItem('bs.modview.use_twitch_popout', 'false') } catch { /* ignore */ }
+            }}
           />
-        </Suspense>
+        ) : (
+          <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-xs">{t('mod.chat.loading', 'Cargando chat...')}</div>}>
+            <Chat
+              channel={channel}
+              broadcasterId={broadcasterId}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              twitchToken={twitchToken}
+              twitchUsername={twitchUsername}
+              isMod={true}
+              isBroadcaster={roleState.isBroadcaster}
+              viewerLogin={twitchUsername}
+              onLoginWithToken={onLoginWithToken}
+              onSelectUserForInspection={handleSelectUser}
+              onMessagesUpdate={setChatMessages}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   )
