@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchUserDropsInventory, claimDropReward } from '../utils/drops'
+import { getStoredToken } from '../utils/twitch'
 
 const AUTOCLAIM_KEY = 'blinkstream_drops_autoclaim'
 
@@ -21,14 +22,15 @@ export function useTwitchDrops(token, channel = null) {
   const pollingTimerRef = useRef(null)
 
   const refreshDrops = useCallback(async () => {
-    if (!token) {
+    const effectiveToken = token || (await getStoredToken())
+    if (!effectiveToken) {
       setCampaigns([])
       return
     }
 
     try {
       setLoading(true)
-      const data = await fetchUserDropsInventory(token, channel)
+      const data = await fetchUserDropsInventory(effectiveToken, channel)
       setCampaigns(data.campaigns || [])
     } catch (err) {
       console.warn('[useTwitchDrops] Error refreshing drops:', err)
@@ -38,13 +40,14 @@ export function useTwitchDrops(token, channel = null) {
   }, [token, channel])
 
   const claimDrop = useCallback(async (dropInstanceId, benefitName = 'Recompensa') => {
-    if (!token || !dropInstanceId || claimingIdsRef.current.has(dropInstanceId)) return
+    const effectiveToken = token || (await getStoredToken())
+    if (!effectiveToken || !dropInstanceId || claimingIdsRef.current.has(dropInstanceId)) return
 
     try {
       claimingIdsRef.current.add(dropInstanceId)
       setClaimingIds(new Set(claimingIdsRef.current))
 
-      await claimDropReward(dropInstanceId, token)
+      await claimDropReward(dropInstanceId, effectiveToken)
       setLastClaimedDrop({ id: dropInstanceId, name: benefitName, time: Date.now() })
       await refreshDrops()
     } catch (err) {
@@ -57,8 +60,6 @@ export function useTwitchDrops(token, channel = null) {
 
   // Periodic polling
   useEffect(() => {
-    if (!token) return
-
     let active = true
 
     const check = async () => {
@@ -73,11 +74,11 @@ export function useTwitchDrops(token, channel = null) {
       active = false
       if (pollingTimerRef.current) clearInterval(pollingTimerRef.current)
     }
-  }, [token, refreshDrops])
+  }, [refreshDrops])
 
   // Auto-claim trigger when campaigns change
   useEffect(() => {
-    if (!autoClaim || !token) return
+    if (!autoClaim) return
 
     for (const campaign of campaigns) {
       for (const drop of campaign.drops || []) {
@@ -87,7 +88,7 @@ export function useTwitchDrops(token, channel = null) {
         }
       }
     }
-  }, [campaigns, autoClaim, token, claimDrop])
+  }, [campaigns, autoClaim, claimDrop])
 
   const toggleAutoClaim = useCallback(() => {
     setAutoClaim(prev => {

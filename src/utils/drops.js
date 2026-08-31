@@ -1,4 +1,4 @@
-import { getHelixClientId, PUBLIC_CLIENT_ID } from './twitch'
+import { getHelixClientId, PUBLIC_CLIENT_ID, getStoredToken } from './twitch'
 
 export async function callTwitchGql({ query, variables, token, clientId }) {
   const isTauri = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
@@ -40,7 +40,13 @@ export async function callTwitchGql({ query, variables, token, clientId }) {
 }
 
 export async function fetchUserDropsInventory(token, _channel = null) {
-  const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
+  let cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
+  if (!cleanToken) {
+    const stored = await getStoredToken()
+    if (stored) {
+      cleanToken = stored.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim()
+    }
+  }
   if (!cleanToken) return { campaigns: [], inventory: [] }
 
   const query = `
@@ -151,7 +157,13 @@ export async function fetchUserDropsInventory(token, _channel = null) {
 }
 
 export async function claimDropReward(dropInstanceId, token) {
-  const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
+  let cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
+  if (!cleanToken) {
+    const stored = await getStoredToken()
+    if (stored) {
+      cleanToken = stored.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim()
+    }
+  }
   if (!dropInstanceId || !cleanToken) {
     throw new Error('ID de Drop o Token no proporcionado')
   }
