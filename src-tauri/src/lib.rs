@@ -1804,6 +1804,11 @@ async fn open_gamer_overlay(app: AppHandle, channel: String) -> Result<(), Strin
 const TWITCH_CLEANUP_SCRIPT: &str = r#"
 (function() {
     try {
+        if (!navigator.plugins) {
+            Object.defineProperty(navigator, 'plugins', { get: function() { return []; }, configurable: true });
+        }
+    } catch(e) {}
+    try {
         var badCookies = ["server_session", "twilight-user", "name", "login"];
         badCookies.forEach(function(c) {
             document.cookie = c + "=; domain=.twitch.tv; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -1938,6 +1943,11 @@ async fn open_twitch_drops_window(
 
 const TWITCH_DROPS_WATCHER_SCRIPT: &str = r#"
 (function() {
+    try {
+        if (!navigator.plugins) {
+            Object.defineProperty(navigator, 'plugins', { get: function() { return []; }, configurable: true });
+        }
+    } catch(e) {}
     try {
         Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; } });
         Object.defineProperty(document, 'hidden', { get: function() { return false; } });
