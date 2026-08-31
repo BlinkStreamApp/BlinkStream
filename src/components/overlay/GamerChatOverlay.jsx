@@ -3,10 +3,12 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isTauri } from '../../utils/tauriEnv'
+import { useAuth } from '../../hooks/useAuth'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import Chat from '../Chat'
 
 export default function GamerChatOverlay({ initialChannel = '' }) {
+  const { isLoggedIn, getTwitchToken, username, user } = useAuth()
   const [channel, setChannel] = useState(() => {
     const urlCh = new URLSearchParams(window.location.search).get('channel')
     return urlCh || initialChannel || ''
@@ -181,7 +183,14 @@ export default function GamerChatOverlay({ initialChannel = '' }) {
       {/* Chat Area */}
       <div className="flex-1 min-h-0 overflow-hidden relative">
         {channel ? (
-          <Chat channel={channel} isOverlay={true} />
+          <Chat
+            channel={channel}
+            isOverlay={true}
+            isLoggedIn={isLoggedIn}
+            twitchToken={getTwitchToken()}
+            twitchUsername={username || user?.username || localStorage.getItem('blinkstream_twitch_username')}
+            userId={user?.userId || localStorage.getItem('bs.twitch.viewer_userid')}
+          />
         ) : (
           <div className="flex-1 h-full flex items-center justify-center text-text-muted text-xs">
             Sin canal asignado

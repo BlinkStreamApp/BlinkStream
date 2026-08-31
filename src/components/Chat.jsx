@@ -1691,120 +1691,115 @@ export default function Chat({
 
   return (
     <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
-      <div className="shrink-0 px-3 py-2 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
-        <span className="text-xs text-text-secondary font-medium truncate">{channel}</span>
+      <div className="shrink-0 px-2.5 py-1.5 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center justify-between gap-1.5 select-none">
+        {/* Left: Channel indicator */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span className="text-xs text-text-primary font-bold truncate max-w-[100px] sm:max-w-[130px]">{channel}</span>
+        </div>
 
-        {isOverlay ? (
-          <span className="text-[10px] text-fuchsia-300 bg-fuchsia-500/20 border border-fuchsia-500/30 px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider">
-            {t('player.overlayTitle', 'Chat Superpuesto')}
-          </span>
-        ) : (
-          <span className="text-[10px] text-text-muted/60 bg-bg-tertiary/40 px-1.5 py-0.5 rounded">
-            {t('chat.title', 'Chat')}
-          </span>
-        )}
-
-        <div className="flex-1" />
-
-        {/* Toggle Twitch Popout embed */}
-        <button
-          type="button"
-          onClick={() => {
-            setUseTwitchPopout(true)
-            try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
-          }}
-          className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border border-twitch/40 bg-twitch/10 hover:bg-twitch/20 text-twitch-glow hover:text-white transition-all cursor-pointer"
-          title="Ver Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes nativos)"
-          aria-label="Ver Chat Oficial Twitch Popout"
-        >
-          <PhosphorIcon name="Coins" size={12} weight="fill" />
-          <span className="hidden sm:inline">Twitch Popout</span>
-        </button>
-
-        {/* Open Floating Popout Window */}
-        <button
-          type="button"
-          onClick={() => openTwitchChatPopoutWindow(channel, false)}
-          className="p-1 rounded-md text-text-muted hover:text-cyan-300 hover:bg-white/5 transition-colors cursor-pointer"
-          title="Abrir Chat de Twitch en Ventana Flotante (Popout)"
-          aria-label="Abrir Popout Flotante"
-        >
-          <PhosphorIcon name="ArrowSquareOut" size={14} weight="bold" />
-        </button>
-
-        <button
-          onClick={() => {
-            setAntiSpam(p => {
-              const n = !p
-              setItem(STORAGE_KEYS.ANTISPAM, n)
-              antiSpamRef.current = n
-              return n
-            })
-          }}
-          className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
-            antiSpam
-              ? 'bg-purple-600/20 text-purple-300 border-purple-500/60 shadow-sm shadow-purple-500/20'
-              : 'bg-white/[0.03] text-text-muted border-white/10 hover:border-white/20'
-          }`}
-          title={antiSpam ? t('chat.antispam.on', 'Anti-Spam Torneo activado: agrupa mensajes idénticos') : t('chat.antispam.off', 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos y spam)')}
-          aria-label="Toggle Anti-Spam Modo Torneo"
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${antiSpam ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
-          Anti-Spam
-        </button>
-
-        {isTauri() && !isOverlay && (
+        {/* Right: Action Buttons toolbar */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Popout Embed Toggle */}
           <button
             type="button"
-            onClick={async () => {
-              try {
-                await invoke('open_gamer_overlay', { channel })
-              } catch (err) {
-                console.warn('Failed to open gamer overlay:', err)
-              }
+            onClick={() => {
+              setUseTwitchPopout(true)
+              try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
             }}
-            className="p-1 rounded-md text-text-muted hover:text-cyan-400 hover:bg-white/5 transition-colors cursor-pointer"
-            title="Abrir Overlay Gamer Transparente (HUD sobre videojuegos)"
-            aria-label="Abrir Overlay Gamer Transparente"
+            className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border border-twitch/40 bg-twitch/10 hover:bg-twitch/25 text-twitch-glow hover:text-white transition-all cursor-pointer"
+            title="Ver Chat Oficial de Twitch (Puntos de Canal y Emotes)"
+            aria-label="Ver Chat Oficial Twitch Popout"
           >
-            <PhosphorIcon name="PictureInPicture" size={14} weight="duotone" />
+            <PhosphorIcon name="Coins" size={13} weight="fill" />
+            <span className="hidden md:inline">Popout</span>
           </button>
-        )}
 
-        {/* WT-20260628-48: el boton de ajustes (gear) se movio a la barra de input.
-            El popup con "Ocultar chat" vive ahora justo encima del boton Enviar. */}
+          {/* Popout Floating Window */}
+          <button
+            type="button"
+            onClick={() => openTwitchChatPopoutWindow(channel, false)}
+            className="p-1 rounded-md text-text-muted hover:text-cyan-300 hover:bg-white/5 transition-colors cursor-pointer"
+            title="Abrir Chat de Twitch en Ventana Flotante"
+            aria-label="Abrir Popout Flotante"
+          >
+            <PhosphorIcon name="ArrowSquareOut" size={13} weight="bold" />
+          </button>
 
-        {auth.token ? (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-twitch/80 font-medium truncate max-w-[80px]">
-              {auth.username || t('chat.connected', 'Conectado')}
-            </span>
-            <span className="text-[9px] text-green-400/60">✓</span>
-          </div>
-        ) : (
-          <div className="relative">
+          {/* Anti-Spam Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setAntiSpam(p => {
+                const n = !p
+                setItem(STORAGE_KEYS.ANTISPAM, n)
+                antiSpamRef.current = n
+                return n
+              })
+            }}
+            className={`flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md border transition-all cursor-pointer ${
+              antiSpam
+                ? 'bg-purple-600/20 text-purple-300 border-purple-500/60 shadow-sm shadow-purple-500/20'
+                : 'bg-white/[0.03] text-text-muted border-white/10 hover:border-white/20'
+            }`}
+            title={antiSpam ? t('chat.antispam.on', 'Anti-Spam Torneo activado: agrupa mensajes idénticos') : t('chat.antispam.off', 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos y spam)')}
+            aria-label="Toggle Anti-Spam Modo Torneo"
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${antiSpam ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
+            <span className="hidden xl:inline">Anti-Spam</span>
+          </button>
+
+          {/* Gamer Overlay Launcher */}
+          {isTauri() && !isOverlay && (
             <button
-              onClick={() => setShowLoginOptions(p => !p)}
-              disabled={authing}
-              className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-twitch/20 hover:bg-twitch/40 text-twitch cursor-pointer disabled:opacity-40 transition-colors"
+              type="button"
+              onClick={async () => {
+                try {
+                  await invoke('open_gamer_overlay', { channel })
+                } catch (err) {
+                  console.warn('Failed to open gamer overlay:', err)
+                }
+              }}
+              className="p-1 rounded-md text-text-muted hover:text-cyan-400 hover:bg-white/5 transition-colors cursor-pointer"
+              title="Abrir Overlay Gamer Transparente (HUD sobre videojuegos)"
+              aria-label="Abrir Overlay Gamer Transparente"
             >
-              {authing ? (
-                <>
-                  <span className="w-2.5 h-2.5 border border-twitch border-t-transparent rounded-full animate-spin" />
-                  {t('chat.connecting', 'Conectando…')}
-                </>
-              ) : (
-                t('chat.login', 'Iniciar sesión')
-              )}
+              <PhosphorIcon name="PictureInPicture" size={13} weight="duotone" />
             </button>
+          )}
 
-            {showLoginOptions && !authing && (
-              <div className="absolute right-0 top-full mt-1 w-72 bg-bg-secondary border border-bg-tertiary/60 rounded-xl shadow-2xl z-50 p-3.5 animate-fade-in" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-7 h-7 rounded-lg bg-twitch/20 flex items-center justify-center text-twitch shrink-0">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
-                  </div>
+          {/* User Auth status */}
+          {auth.token ? (
+            <div className="flex items-center gap-1 pl-1 border-l border-white/10 ml-0.5">
+              <span className="text-[11px] text-twitch/90 font-bold truncate max-w-[70px] sm:max-w-[100px]">
+                {auth.username || t('chat.connected', 'Conectado')}
+              </span>
+              <span className="text-[9px] text-green-400 font-bold">✓</span>
+            </div>
+          ) : (
+            <div className="relative pl-1 border-l border-white/10 ml-0.5">
+              <button
+                type="button"
+                onClick={() => setShowLoginOptions(p => !p)}
+                disabled={authing}
+                className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-twitch/20 hover:bg-twitch/40 text-twitch font-bold cursor-pointer disabled:opacity-40 transition-colors"
+              >
+                {authing ? (
+                  <>
+                    <span className="w-2.5 h-2.5 border border-twitch border-t-transparent rounded-full animate-spin" />
+                    <span className="hidden sm:inline">{t('chat.connecting', 'Conectando…')}</span>
+                  </>
+                ) : (
+                  t('chat.login', 'Iniciar sesión')
+                )}
+              </button>
+
+              {showLoginOptions && !authing && (
+                <div className="absolute right-0 top-full mt-1 w-72 bg-bg-secondary border border-bg-tertiary/60 rounded-xl shadow-2xl z-50 p-3.5 animate-fade-in" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-twitch/20 flex items-center justify-center text-twitch shrink-0">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
+                    </div>
                   <div>
                     <p className="text-xs font-bold text-text-primary">Iniciar sesión</p>
                     <p className="text-[10px] text-text-muted">Conecta tu cuenta de Twitch</p>
@@ -1846,6 +1841,7 @@ export default function Chat({
             <PhosphorIcon name="X" size={16} weight="bold" />
           </button>
         )}
+        </div>
       </div>
 
       {/* Selector de Pestañas de Chat (Todos | Menciones | Destacados) */}

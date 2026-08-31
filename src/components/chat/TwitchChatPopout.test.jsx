@@ -21,7 +21,8 @@ describe('TwitchChatPopout', () => {
 
     const iframe = screen.getByTitle('Twitch Chat - shroud')
     expect(iframe).toBeDefined()
-    expect(iframe.getAttribute('src')).toBe('https://twitch.tv/popout/shroud/chat?popout=')
+    expect(iframe.getAttribute('src')).toContain('https://www.twitch.tv/embed/shroud/chat?')
+    expect(iframe.getAttribute('src')).toContain('parent=')
     expect(iframe.getAttribute('sandbox')).toContain('allow-storage-access-by-user-activation')
     expect(iframe.getAttribute('sandbox')).toContain('allow-scripts')
     expect(iframe.getAttribute('sandbox')).toContain('allow-same-origin')
