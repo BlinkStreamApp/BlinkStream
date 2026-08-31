@@ -163,20 +163,77 @@ export async function fetchUserDropsInventory(token, channel = null) {
       }
     `
 
+  const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
+  const authHeader = cleanToken ? `OAuth ${cleanToken}` : null
+
+  const headers = {
+    'Client-ID': PUBLIC_CLIENT_ID,
+    'Content-Type': 'application/json',
+  }
+  if (authHeader) {
+    headers['Authorization'] = authHeader
+  }
+
   try {
-    const res = await fetch('https://gql.twitch.tv/gql', {
+    let res = await fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
-      headers: {
-        'Client-ID': PUBLIC_CLIENT_ID,
-        'Authorization': `OAuth ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         query,
         ...(cleanChannel ? { variables: { channelLogin: cleanChannel } } : {}),
       }),
       signal: AbortSignal.timeout(8000),
     })
+
+    // If authenticated request failed with 401 and we have a channel, retry channel-only public query
+    if (res.status === 401 && cleanChannel && authHeader) {
+      const publicQuery = `
+        query PublicChannelDrops($channelLogin: String!) {
+          user(login: $channelLogin) {
+            id
+            viewerDropCampaigns {
+              id
+              name
+              status
+              game {
+                id
+                name
+                boxArtURL
+              }
+              timeBasedDrops {
+                id
+                name
+                requiredMinutesWatched
+                benefitEdges {
+                  benefit {
+                    id
+                    name
+                    imageAssetURL
+                  }
+                }
+                self {
+                  currentMinutesWatched
+                  isClaimed
+                  dropInstanceID
+                }
+              }
+            }
+          }
+        }
+      `
+      res = await fetch('https://gql.twitch.tv/gql', {
+        method: 'POST',
+        headers: {
+          'Client-ID': PUBLIC_CLIENT_ID,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: publicQuery,
+          variables: { channelLogin: cleanChannel },
+        }),
+        signal: AbortSignal.timeout(8000),
+      })
+    }
 
     if (!res.ok) return { campaigns: [], inventory: [] }
     const data = await res.json()
@@ -249,7 +306,8 @@ export async function fetchUserDropsInventory(token, channel = null) {
 }
 
 export async function claimDropReward(dropInstanceId, token) {
-  if (!dropInstanceId || !token) {
+  const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
+  if (!dropInstanceId || !cleanToken) {
     throw new Error('ID de Drop o Token no proporcionado')
   }
 
@@ -258,7 +316,7 @@ export async function claimDropReward(dropInstanceId, token) {
       method: 'POST',
       headers: {
         'Client-ID': PUBLIC_CLIENT_ID,
-        'Authorization': `OAuth ${token}`,
+        'Authorization': `OAuth ${cleanToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
