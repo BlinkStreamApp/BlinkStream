@@ -1776,6 +1776,72 @@ async fn open_twitch_popout_window(
     Ok(())
 }
 
+#[tauri::command]
+async fn mount_embedded_twitch_chat(
+    app: AppHandle,
+    channel: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    validate_channel(&channel)?;
+    let label = "embedded_twitch_chat";
+
+    let url_str = format!("https://twitch.tv/popout/{}/chat?popout=", urlencoding::encode(&channel));
+    let parsed_url: tauri::Url = url_str
+        .parse()
+        .map_err(|e| format!("URL inválida para chat embebido: {e}"))?;
+
+    if let Some(existing_webview) = app.get_webview(label) {
+        let _ = existing_webview.set_position(tauri::LogicalPosition::new(x, y));
+        let _ = existing_webview.set_size(tauri::LogicalSize::new(width, height));
+        let _ = existing_webview.navigate(parsed_url);
+        let _ = existing_webview.show();
+        return Ok(());
+    }
+
+    let main_window = app.get_window("main").ok_or("Ventana principal no encontrada")?;
+
+    let webview_builder = tauri::WebviewBuilder::new(label, tauri::WebviewUrl::External(parsed_url))
+        .auto_resize();
+
+    let _child = main_window
+        .add_child(
+            webview_builder,
+            tauri::LogicalPosition::new(x, y),
+            tauri::LogicalSize::new(width, height),
+        )
+        .map_err(|e| format!("Error al crear sub-webview de chat: {e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn update_embedded_twitch_chat_bounds(
+    app: AppHandle,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let label = "embedded_twitch_chat";
+    if let Some(webview) = app.get_webview(label) {
+        let _ = webview.set_position(tauri::LogicalPosition::new(x, y));
+        let _ = webview.set_size(tauri::LogicalSize::new(width, height));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn unmount_embedded_twitch_chat(app: AppHandle) -> Result<(), String> {
+    let label = "embedded_twitch_chat";
+    if let Some(webview) = app.get_webview(label) {
+        let _ = webview.close();
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1802,6 +1868,9 @@ pub fn run() {
             close_gamer_overlay,
             open_gamer_overlay,
             open_twitch_popout_window,
+            mount_embedded_twitch_chat,
+            update_embedded_twitch_chat_bounds,
+            unmount_embedded_twitch_chat,
             start_recording,
             stop_recording,
             get_app_token,

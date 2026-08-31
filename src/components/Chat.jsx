@@ -1704,16 +1704,30 @@ export default function Chat({
         <div className="flex items-center gap-1 shrink-0">
           {!isOverlay && (
             <>
-              {/* Twitch Popout Button (Directly launches native floating popout window) */}
+              {/* Twitch Popout Button (Toggles Embedded Native Child Webview) */}
               <button
                 type="button"
-                onClick={() => openTwitchChatPopoutWindow(channel, false)}
+                onClick={() => {
+                  setUseTwitchPopout(true)
+                  try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
+                }}
                 className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border border-twitch/40 bg-twitch/10 hover:bg-twitch/25 text-twitch-glow hover:text-white transition-all cursor-pointer"
-                title="Abrir Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)"
-                aria-label="Abrir Popout Oficial de Twitch"
+                title="Incrustar Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)"
+                aria-label="Incrustar Popout Oficial de Twitch"
               >
                 <PhosphorIcon name="Coins" size={13} weight="fill" />
                 <span className="hidden sm:inline">Popout</span>
+              </button>
+
+              {/* Popout Floating Window Button */}
+              <button
+                type="button"
+                onClick={() => openTwitchChatPopoutWindow(channel, false)}
+                className="p-1 rounded-md text-text-muted hover:text-cyan-300 hover:bg-white/5 transition-colors cursor-pointer"
+                title="Abrir Chat de Twitch en Ventana Flotante"
+                aria-label="Abrir Popout Flotante"
+              >
+                <PhosphorIcon name="ArrowSquareOut" size={13} weight="bold" />
               </button>
 
               {/* Gamer Overlay Launcher */}
