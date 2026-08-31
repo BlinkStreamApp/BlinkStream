@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { useT } from '../../utils/i18n'
 
@@ -15,13 +15,48 @@ export function ModQuickActionsBar({
   onOpenLayoutDrawer,
 }) {
   const t = useT()
-  const [showSlowMenu, setShowSlowMenu] = useState(false)
-  const [showFollowersMenu, setShowFollowersMenu] = useState(false)
+  const [activeMenu, setActiveMenu] = useState(null) // 'slow' | 'followers' | null
   const [confirmClear, setConfirmClear] = useState(false)
   const [shieldActive, setShieldActive] = useState(false)
+  const menuContainerRef = useRef(null)
+
+  // Notify Webview to hide when a dropdown menu is open, and restore when closed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bs:modal-state-change', {
+        detail: { open: Boolean(activeMenu) }
+      }))
+    }
+  }, [activeMenu])
+
+  // Close menus on click outside or escape key
+  useEffect(() => {
+    if (!activeMenu && !confirmClear) return
+
+    const handlePointerDown = (e) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target)) {
+        setActiveMenu(null)
+        setConfirmClear(false)
+      }
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setActiveMenu(null)
+        setConfirmClear(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [activeMenu, confirmClear])
 
   const handleSlowSelect = (secs) => {
-    setShowSlowMenu(false)
+    setActiveMenu(null)
     if (secs === 0) {
       onSetMode?.('slowoff')
     } else {
@@ -30,7 +65,7 @@ export function ModQuickActionsBar({
   }
 
   const handleFollowersSelect = (mins) => {
-    setShowFollowersMenu(false)
+    setActiveMenu(null)
     if (mins === -1) {
       onSetMode?.('followersoff')
     } else {
@@ -39,16 +74,19 @@ export function ModQuickActionsBar({
   }
 
   const toggleEmoteOnly = () => {
+    setActiveMenu(null)
     const active = !!activeModes.emoteonly
     onSetMode?.(active ? 'emoteonlyoff' : 'emoteonly')
   }
 
   const toggleSubOnly = () => {
+    setActiveMenu(null)
     const active = !!activeModes.subscribers
     onSetMode?.(active ? 'subscribersoff' : 'subscribers')
   }
 
   const handleShieldToggle = () => {
+    setActiveMenu(null)
     if (!shieldActive) {
       // Enable extreme protection: Emote-only + Sub-only + Slow 30s
       onSetMode?.('emoteonly')
@@ -78,7 +116,7 @@ export function ModQuickActionsBar({
       </div>
 
       {/* Center: Quick Channel Actions */}
-      <div className="flex items-center gap-2 flex-wrap justify-center">
+      <div ref={menuContainerRef} className="flex items-center gap-2 flex-wrap justify-center">
         {/* Shield Mode */}
         <button
           onClick={handleShieldToggle}
@@ -124,9 +162,9 @@ export function ModQuickActionsBar({
         {/* Slow Mode Dropdown */}
         <div className="relative">
           <button
-            onClick={() => setShowSlowMenu(p => !p)}
+            onClick={() => setActiveMenu(p => p === 'slow' ? null : 'slow')}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
-              activeModes.slow
+              activeModes.slow || activeMenu === 'slow'
                 ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
                 : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
             }`}
@@ -134,17 +172,17 @@ export function ModQuickActionsBar({
           >
             <PhosphorIcon name="ClockCounterClockwise" size={15} />
             <span>{activeModes.slow ? `${t('mod.quick.slow', 'Lento')} (${activeModes.slow}s)` : t('mod.quick.slow', 'Modo Lento')}</span>
-            <PhosphorIcon name="CaretDoubleRight" size={10} className="rotate-90 text-white/40" />
+            <PhosphorIcon name="CaretDoubleRight" size={10} className={`transition-transform duration-150 ${activeMenu === 'slow' ? '-rotate-90 text-cyan-300' : 'rotate-90 text-white/40'}`} />
           </button>
 
-          {showSlowMenu && (
-            <div className="absolute top-full mt-1.5 left-0 w-36 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs">
-              <button onClick={() => handleSlowSelect(0)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white">{t('mod.quick.slowOff', 'Desactivar')}</button>
-              <button onClick={() => handleSlowSelect(3)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow3s', '3 segundos')}</button>
-              <button onClick={() => handleSlowSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow10s', '10 segundos')}</button>
-              <button onClick={() => handleSlowSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow30s', '30 segundos')}</button>
-              <button onClick={() => handleSlowSelect(60)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow60s', '60 segundos')}</button>
-              <button onClick={() => handleSlowSelect(120)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.slow120s', '120 segundos')}</button>
+          {activeMenu === 'slow' && (
+            <div className="absolute top-full mt-1.5 left-0 w-36 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs animate-fade-in backdrop-blur-xl">
+              <button onClick={() => handleSlowSelect(0)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slowOff', 'Desactivar')}</button>
+              <button onClick={() => handleSlowSelect(3)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow3s', '3 segundos')}</button>
+              <button onClick={() => handleSlowSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow10s', '10 segundos')}</button>
+              <button onClick={() => handleSlowSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow30s', '30 segundos')}</button>
+              <button onClick={() => handleSlowSelect(60)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow60s', '60 segundos')}</button>
+              <button onClick={() => handleSlowSelect(120)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow120s', '120 segundos')}</button>
             </div>
           )}
         </div>
@@ -152,9 +190,9 @@ export function ModQuickActionsBar({
         {/* Followers Mode Dropdown */}
         <div className="relative">
           <button
-            onClick={() => setShowFollowersMenu(p => !p)}
+            onClick={() => setActiveMenu(p => p === 'followers' ? null : 'followers')}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
-              activeModes.followers !== undefined && activeModes.followers !== null && activeModes.followers !== false
+              (activeModes.followers !== undefined && activeModes.followers !== null && activeModes.followers !== false) || activeMenu === 'followers'
                 ? 'bg-blue-500/20 border-blue-500/60 text-blue-300'
                 : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
             }`}
@@ -162,16 +200,16 @@ export function ModQuickActionsBar({
           >
             <PhosphorIcon name="Heart" size={15} />
             <span>{t('mod.quick.followers', 'Seguidores')}</span>
-            <PhosphorIcon name="CaretDoubleRight" size={10} className="rotate-90 text-white/40" />
+            <PhosphorIcon name="CaretDoubleRight" size={10} className={`transition-transform duration-150 ${activeMenu === 'followers' ? '-rotate-90 text-blue-300' : 'rotate-90 text-white/40'}`} />
           </button>
 
-          {showFollowersMenu && (
-            <div className="absolute top-full mt-1.5 left-0 w-40 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs">
-              <button onClick={() => handleFollowersSelect(-1)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white">{t('mod.quick.followersOff', 'Todos los usuarios')}</button>
-              <button onClick={() => handleFollowersSelect(0)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">{t('mod.quick.followers0m', 'Cualquier seguidor')}</button>
-              <button onClick={() => handleFollowersSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; {t('mod.quick.followers10m', '10 min')}</button>
-              <button onClick={() => handleFollowersSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; {t('mod.quick.followers30m', '30 min')}</button>
-              <button onClick={() => handleFollowersSelect(1440)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white">&gt; {t('mod.quick.followers1d', '1 día')}</button>
+          {activeMenu === 'followers' && (
+            <div className="absolute top-full mt-1.5 left-0 w-40 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs animate-fade-in backdrop-blur-xl">
+              <button onClick={() => handleFollowersSelect(-1)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.followersOff', 'Todos los usuarios')}</button>
+              <button onClick={() => handleFollowersSelect(0)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.followers0m', 'Cualquier seguidor')}</button>
+              <button onClick={() => handleFollowersSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">&gt; {t('mod.quick.followers10m', '10 min')}</button>
+              <button onClick={() => handleFollowersSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">&gt; {t('mod.quick.followers30m', '30 min')}</button>
+              <button onClick={() => handleFollowersSelect(1440)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">&gt; {t('mod.quick.followers1d', '1 día')}</button>
             </div>
           )}
         </div>
