@@ -1747,6 +1747,45 @@ const TWITCH_CLEANUP_SCRIPT: &str = r#"
             document.cookie = c + "=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         });
     } catch(e) {}
+
+    var seenEvents = new Set();
+    function scanAndBridge() {
+        try {
+            var lines = document.querySelectorAll('.chat-line__message, .chat-line__status, [data-a-target="chat-line-message"], .channel-points-reward-line');
+            lines.forEach(function(node) {
+                var text = (node.innerText || node.textContent || '').trim();
+                if (!text || seenEvents.has(text)) return;
+                
+                if (/canjeado|canjeó|canje|has redeemed|redeemed|puntos/i.test(text)) {
+                    seenEvents.add(text);
+                    var userElem = node.querySelector('.chat-author__display-name, [data-a-target="chat-message-username"]');
+                    var user = userElem ? userElem.innerText.trim() : (text.split(' ')[0] || 'Espectador');
+                    var payload = {
+                        id: 'tw-popout-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                        eventType: 'reward',
+                        isReward: true,
+                        user: user,
+                        eventHeader: text,
+                        message: text,
+                        timestamp: Date.now()
+                    };
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({ type: 'bs:chat-activity', payload: payload }, '*');
+                    }
+                }
+            });
+        } catch(e) {}
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            scanAndBridge();
+            setInterval(scanAndBridge, 600);
+        });
+    } else {
+        scanAndBridge();
+        setInterval(scanAndBridge, 600);
+    }
 })();
 "#;
 
@@ -1861,6 +1900,8 @@ async fn set_embedded_twitch_chat_visible(app: AppHandle, visible: bool) -> Resu
             let _ = webview.show();
         } else {
             let _ = webview.hide();
+            let _ = webview.set_size(tauri::LogicalSize::new(0.0, 0.0));
+            let _ = webview.set_position(tauri::LogicalPosition::new(-10000.0, -10000.0));
         }
     }
     Ok(())

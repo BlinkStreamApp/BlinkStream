@@ -74,6 +74,23 @@ export function ModView({
     }
   })
 
+  // Bridge real-time chat activities from embedded popout webview
+  useEffect(() => {
+    const handleBridgeMessage = (e) => {
+      if (e.data?.type === 'bs:chat-activity' && e.data?.payload) {
+        const item = e.data.payload
+        setChatMessages(prev => {
+          if (prev.some(m => m.id === item.id || (m.eventHeader && m.eventHeader === item.eventHeader && Math.abs((m.timestamp || 0) - item.timestamp) < 4000))) {
+            return prev
+          }
+          return [...prev, item]
+        })
+      }
+    }
+    window.addEventListener('message', handleBridgeMessage)
+    return () => window.removeEventListener('message', handleBridgeMessage)
+  }, [])
+
   // Load layout config from localStorage
   const [config, setConfig] = useState(() => {
     try {

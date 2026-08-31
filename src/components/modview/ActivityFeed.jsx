@@ -27,7 +27,7 @@ export function ActivityFeed({ messages = [], recentRedemptions = [], onInspectU
       })
     }
 
-    // 2. Real-time IRC chat messages
+    // 2. Real-time IRC and bridged Popout chat messages
     for (const m of messages) {
       if (
         m.eventType === 'reward' ||
@@ -36,19 +36,21 @@ export function ActivityFeed({ messages = [], recentRedemptions = [], onInspectU
         m.msg_id === 'highlighted-message' ||
         m.msg_id === 'custom-reward-redemption' ||
         m.msg_id === 'community-points-redemption' ||
-        (typeof m.message === 'string' && /canjeado|redeemed|\d+\s+points/i.test(m.message)) ||
-        (typeof m.eventHeader === 'string' && (m.eventHeader.includes('Canje') || m.eventHeader.includes('canjeado') || m.eventHeader.includes('Puntos') || m.eventHeader.includes('recompensa') || m.eventHeader.includes('redeemed')))
+        (typeof m.message === 'string' && /canjeado|canjeó|canje|has redeemed|redeemed|\d+\s+points/i.test(m.message)) ||
+        (typeof m.eventHeader === 'string' && /canjeado|canjeó|canje|has redeemed|redeemed|points|puntos|recompensa/i.test(m.eventHeader))
       ) {
         const id = m.id || m.timestamp
         if (!seenIds.has(id)) {
           seenIds.add(id)
+          const header = m.eventHeader || m.message || 'Canje de Puntos'
+          const formattedTitle = header.startsWith('🎁') ? header : `🎁 ${header}`
           list.push({
             id,
             type: 'rewards',
             user: m.user || m.user_name || 'Espectador',
             userId: m.user_id,
-            title: m.eventHeader || '🎁 Canje de Puntos',
-            text: m.message || '',
+            title: formattedTitle,
+            text: m.text || (m.message && m.message !== m.eventHeader ? m.message : ''),
             timestamp: m.timestamp || 0,
           })
         }
