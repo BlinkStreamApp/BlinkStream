@@ -220,8 +220,11 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
                       isReward: true,
                       user: formattedRd.user_name,
                       user_id: formattedRd.user_id,
+                      reward_title: formattedRd.reward_title,
+                      cost: formattedRd.cost,
                       eventHeader: `🎁 ${formattedRd.user_name} ha canjeado ${formattedRd.reward_title} (${formattedRd.cost} pts)`,
-                      message: formattedRd.user_input ? `"${formattedRd.user_input}"` : `${formattedRd.reward_title} (Canje de Puntos)`,
+                      message: formattedRd.user_input || '',
+                      text: formattedRd.user_input || '',
                       timestamp: Date.now(),
                     },
                   }))

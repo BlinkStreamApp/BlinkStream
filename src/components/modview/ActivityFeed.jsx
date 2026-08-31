@@ -39,18 +39,29 @@ export function ActivityFeed({ messages = [], recentRedemptions = [], onInspectU
         (typeof m.message === 'string' && /canjeado|canjeó|canje|has redeemed|redeemed|\d+\s+points/i.test(m.message)) ||
         (typeof m.eventHeader === 'string' && /canjeado|canjeó|canje|has redeemed|redeemed|points|puntos|recompensa/i.test(m.eventHeader))
       ) {
+        const rawUser = m.user || m.user_name || 'Espectador'
+        const cleanUser = rawUser.replace(/^@/, '')
+        const rawText = m.text || (m.message && m.message !== m.eventHeader ? m.message : '')
+        const cleanText = typeof rawText === 'string' ? rawText.trim().replace(/^["']|["']$/g, '').trim() : ''
+
+        const isDuplicate = list.some(item => 
+          item.type === 'rewards' &&
+          item.user.toLowerCase() === cleanUser.toLowerCase() &&
+          ((cleanText && item.text === cleanText) || (!cleanText && !item.text && Math.abs((m.timestamp || 0) - item.timestamp) < 5000))
+        )
+
         const id = m.id || m.timestamp
-        if (!seenIds.has(id)) {
+        if (!seenIds.has(id) && !isDuplicate) {
           seenIds.add(id)
           const header = m.eventHeader || m.message || 'Canje de Puntos'
           const formattedTitle = header.startsWith('🎁') ? header : `🎁 ${header}`
           list.push({
             id,
             type: 'rewards',
-            user: m.user || m.user_name || 'Espectador',
+            user: cleanUser,
             userId: m.user_id,
             title: formattedTitle,
-            text: m.text || (m.message && m.message !== m.eventHeader ? m.message : ''),
+            text: cleanText,
             timestamp: m.timestamp || 0,
           })
         }
@@ -177,9 +188,9 @@ export function ActivityFeed({ messages = [], recentRedemptions = [], onInspectU
                   </button>
                 </div>
 
-                {item.text && (
-                  <p className="text-xs opacity-85 break-words bg-black/30 p-2 rounded-lg border border-white/5">
-                    "{item.text}"
+                {item.text && item.text.trim() && (
+                  <p className="text-xs opacity-85 break-words bg-black/30 p-2 rounded-lg border border-white/5 font-normal">
+                    "{item.text.replace(/^["']|["']$/g, '')}"
                   </p>
                 )}
               </div>
