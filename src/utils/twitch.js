@@ -957,35 +957,67 @@ export async function getChannelRole(broadcasterId, userId, signal, channel) {
   const login = sanitizeChannelForGraphQL(channel)
   if (token && login) {
     try {
-      const cleanToken = token.replace(/^oauth:/i, '')
-      const gqlRes = await fetch('https://gql.twitch.tv/gql', {
-        method: 'POST',
-        headers: {
-          'Client-ID': getHelixClientId(),
-          'Authorization': `OAuth ${cleanToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: `
-            query CheckChannelRole($login: String!) {
-              user(login: $login) {
-                id
-                login
-                self {
-                  isModerator
-                  isVIP
-                  isEditor
+      let d = null
+      const isTauri = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
+      if (isTauri) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core')
+          d = await invoke('fetch_twitch_gql', {
+            query: `
+              query CheckChannelRole($login: String!) {
+                user(login: $login) {
+                  id
+                  login
+                  self {
+                    isModerator
+                    isVIP
+                    isEditor
+                  }
                 }
               }
-            }
-          `,
-          variables: { login },
-        }),
-        signal,
-      })
+            `,
+            variables: { login },
+            token,
+            clientId: getHelixClientId(),
+          })
+        } catch {
+          // fallback abajo
+        }
+      }
 
-      if (gqlRes.ok) {
-        const d = await gqlRes.json()
+      if (!d) {
+        const cleanToken = token.replace(/^oauth:/i, '')
+        const gqlRes = await fetch('https://gql.twitch.tv/gql', {
+          method: 'POST',
+          headers: {
+            'Client-ID': getHelixClientId(),
+            'Authorization': `OAuth ${cleanToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: `
+              query CheckChannelRole($login: String!) {
+                user(login: $login) {
+                  id
+                  login
+                  self {
+                    isModerator
+                    isVIP
+                    isEditor
+                  }
+                }
+              }
+            `,
+            variables: { login },
+          }),
+          signal,
+        })
+        if (gqlRes.ok) {
+          d = await gqlRes.json()
+        }
+      }
+
+      if (d) {
         const self = d?.data?.user?.self
         const targetUserId = d?.data?.user?.id
         if (targetUserId && userId && String(targetUserId) === String(userId)) {

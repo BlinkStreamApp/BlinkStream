@@ -1060,6 +1060,66 @@ async fn fetch_m3u8_content(url: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn fetch_twitch_gql(
+    query: String,
+    variables: Option<serde_json::Value>,
+    token: Option<String>,
+    client_id: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::builder()
+        .use_rustls_tls()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
+        .timeout(Duration::from_secs(12))
+        .build()
+        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
+
+    let target_client_id = client_id.unwrap_or_else(|| TWITCH_WEB_CLIENT_ID.to_string());
+
+    let mut body_map = serde_json::json!({
+        "query": query,
+    });
+    if let Some(vars) = variables {
+        if let Some(obj) = body_map.as_object_mut() {
+            obj.insert("variables".to_string(), vars);
+        }
+    }
+
+    let mut request = client
+        .post("https://gql.twitch.tv/gql")
+        .header("Client-ID", &target_client_id)
+        .header("Content-Type", "application/json");
+
+    if let Some(mut tok) = token {
+        tok = tok.trim().to_string();
+        if !tok.is_empty() {
+            let clean_tok = tok
+                .strip_prefix("oauth:")
+                .or_else(|| tok.strip_prefix("Bearer "))
+                .unwrap_or(&tok);
+            request = request.header("Authorization", format!("OAuth {clean_tok}"));
+        }
+    }
+
+    let response = request
+        .json(&body_map)
+        .send()
+        .await
+        .map_err(|e| format!("Error en fetch GQL: {e}"))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("Twitch GQL HTTP {status}"));
+    }
+
+    let json: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Error deserializando JSON de Twitch GQL: {e}"))?;
+
+    Ok(json)
+}
+
+#[tauri::command]
 async fn fetch_segment(url: String) -> Result<Vec<u8>, String> {
     if !url.starts_with("https://")
         || (!url.contains("ttvnw.net")
@@ -2100,6 +2160,7 @@ pub fn run() {
             open_twitch_drops_window,
             start_drops_watcher,
             stop_drops_watcher,
+            fetch_twitch_gql,
             mount_embedded_twitch_chat,
             update_embedded_twitch_chat_bounds,
             set_embedded_twitch_chat_visible,

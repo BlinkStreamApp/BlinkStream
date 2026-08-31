@@ -1,5 +1,44 @@
 import { getHelixClientId, PUBLIC_CLIENT_ID } from './twitch'
 
+export async function callTwitchGql({ query, variables, token, clientId }) {
+  const isTauri = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__)
+  if (isTauri) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      return await invoke('fetch_twitch_gql', {
+        query,
+        variables: variables || null,
+        token: token || null,
+        clientId: clientId || null,
+      })
+    } catch (err) {
+      console.warn('[drops] Tauri GQL invoke error, intentando fetch fallback:', err)
+    }
+  }
+
+  const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
+  const headers = {
+    'Client-ID': clientId || PUBLIC_CLIENT_ID,
+    'Content-Type': 'application/json',
+  }
+  if (cleanToken) {
+    headers['Authorization'] = `OAuth ${cleanToken}`
+  }
+
+  const res = await fetch('https://gql.twitch.tv/gql', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(8000),
+  })
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
+
+  return await res.json()
+}
+
 export async function fetchUserDropsInventory(token, _channel = null) {
   const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
   if (!cleanToken) return { campaigns: [], inventory: [] }
@@ -45,30 +84,15 @@ export async function fetchUserDropsInventory(token, _channel = null) {
 
   for (const clientId of clientIdsToTry) {
     try {
-      const headers = {
-        'Client-ID': clientId,
-        'Content-Type': 'application/json',
-      }
-      if (cleanToken) {
-        headers['Authorization'] = `OAuth ${cleanToken}`
-      }
-
-      const res = await fetch('https://gql.twitch.tv/gql', {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({ query }),
-        signal: AbortSignal.timeout(8000),
+      const data = await callTwitchGql({
+        query,
+        token: cleanToken,
+        clientId,
       })
 
-      if (!res.ok) {
-        console.warn(`[drops] GQL status ${res.status} con Client-ID ${clientId}`)
-        continue
-      }
-      const data = await res.json()
       console.log('[drops] GQL response:', data)
 
-      if (data.errors && data.errors.length > 0) {
+      if (data?.errors && data.errors.length > 0) {
         console.warn('[drops] GQL GraphQL errors:', data.errors)
       }
 
@@ -136,39 +160,24 @@ export async function claimDropReward(dropInstanceId, token) {
 
   for (const clientId of clientIdsToTry) {
     try {
-      const headers = {
-        'Client-ID': clientId,
-        'Content-Type': 'application/json',
-      }
-      if (cleanToken) {
-        headers['Authorization'] = `OAuth ${cleanToken}`
-      }
-
-      const res = await fetch('https://gql.twitch.tv/gql', {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({
-          query: `
-            mutation ClaimCommunityPointsDrop($input: ClaimCommunityPointsDropInput!) {
-              claimCommunityPointsDrop(input: $input) {
-                dropInstanceID
-                status
-              }
+      const data = await callTwitchGql({
+        query: `
+          mutation ClaimCommunityPointsDrop($input: ClaimCommunityPointsDropInput!) {
+            claimCommunityPointsDrop(input: $input) {
+              dropInstanceID
+              status
             }
-          `,
-          variables: {
-            input: {
-              dropInstanceID: dropInstanceId,
-            },
+          }
+        `,
+        variables: {
+          input: {
+            dropInstanceID: dropInstanceId,
           },
-        }),
-        signal: AbortSignal.timeout(8000),
+        },
+        token: cleanToken,
+        clientId,
       })
 
-      if (!res.ok) continue
-
-      const data = await res.json()
       const status = data?.data?.claimCommunityPointsDrop?.status
       return {
         success: true,
