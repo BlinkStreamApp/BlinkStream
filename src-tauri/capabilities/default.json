@@ -8,6 +8,12 @@
   "webviews": [
     "*"
   ],
+  "remote": {
+    "urls": [
+      "https://*.twitch.tv/**",
+      "https://twitch.tv/**"
+    ]
+  },
   "permissions": [
     "core:default",
     "core:webview:default",

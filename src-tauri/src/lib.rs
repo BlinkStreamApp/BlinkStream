@@ -1807,6 +1807,12 @@ const TWITCH_CLEANUP_SCRIPT: &str = r#"
         if (!navigator.plugins) {
             Object.defineProperty(navigator, 'plugins', { get: function() { return []; }, configurable: true });
         }
+        window.addEventListener('error', function(e) {
+            if (e && e.message && e.message.includes('plugins')) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+            }
+        }, true);
     } catch(e) {}
     try {
         var badCookies = ["server_session", "twilight-user", "name", "login"];
@@ -1947,6 +1953,12 @@ const TWITCH_DROPS_WATCHER_SCRIPT: &str = r#"
         if (!navigator.plugins) {
             Object.defineProperty(navigator, 'plugins', { get: function() { return []; }, configurable: true });
         }
+        window.addEventListener('error', function(e) {
+            if (e && e.message && e.message.includes('plugins')) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+            }
+        }, true);
     } catch(e) {}
     try {
         Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; } });
