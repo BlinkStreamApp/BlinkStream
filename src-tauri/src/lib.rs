@@ -1738,17 +1738,69 @@ async fn open_gamer_overlay(app: AppHandle, channel: String) -> Result<(), Strin
     Ok(())
 }
 
+fn get_twitch_auth_script(token_opt: Option<&str>, username_opt: Option<&str>) -> Option<String> {
+    let token = token_opt
+        .map(|t| t.trim().strip_prefix("oauth:").unwrap_or(t.trim()).to_string())
+        .or_else(|| {
+            Entry::new("blinkstream", "twitch_token")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+                .map(|t| t.trim().strip_prefix("oauth:").unwrap_or(t.trim()).to_string())
+        })
+        .filter(|t| !t.is_empty())?;
+
+    let username = username_opt
+        .map(|u| u.trim().to_string())
+        .or_else(|| {
+            Entry::new("blinkstream", "twitch_username")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+        })
+        .unwrap_or_default();
+
+    Some(format!(
+        r#"
+        (function() {{
+            try {{
+                var d = new Date();
+                d.setTime(d.getTime() + (365*24*60*60*1000));
+                var expires = "; expires=" + d.toUTCString();
+                document.cookie = "auth-token={token}; domain=.twitch.tv; path=/; SameSite=None; Secure" + expires;
+                document.cookie = "twilight-user={user}; domain=.twitch.tv; path=/; SameSite=None; Secure" + expires;
+                document.cookie = "login={user}; domain=.twitch.tv; path=/; SameSite=None; Secure" + expires;
+                document.cookie = "name={user}; domain=.twitch.tv; path=/; SameSite=None; Secure" + expires;
+                document.cookie = "server_session=true; domain=.twitch.tv; path=/; SameSite=None; Secure" + expires;
+                try {{
+                    localStorage.setItem('auth-token', '{token}');
+                    localStorage.setItem('login', '{user}');
+                }} catch(e) {{}}
+            }} catch(e) {{
+                console.error("[BlinkStream] Error inyectando cookies de sesion:", e);
+            }}
+        }})();
+        "#,
+        token = token,
+        user = username
+    ))
+}
+
 #[tauri::command]
 async fn open_twitch_popout_window(
     app: AppHandle,
     channel: String,
     always_on_top: Option<bool>,
+    auth_token: Option<String>,
+    username: Option<String>,
 ) -> Result<(), String> {
     validate_channel(&channel)?;
     let label = "twitch_chat_popout";
+    let auth_script = get_twitch_auth_script(auth_token.as_deref(), username.as_deref());
 
     if let Some(existing) = app.get_webview_window(label) {
         let _ = existing.set_focus();
+        if let Some(ref script) = auth_script {
+            let _ = existing.eval(script);
+        }
         let url_str = format!("https://twitch.tv/popout/{}/chat?popout=", urlencoding::encode(&channel));
         if let Ok(target_url) = url_str.parse::<tauri::Url>() {
             let _ = existing.navigate(target_url);
@@ -1763,13 +1815,19 @@ async fn open_twitch_popout_window(
 
     let url = tauri::WebviewUrl::External(parsed_url);
 
-    let _window = tauri::WebviewWindowBuilder::new(&app, label, url)
+    let mut builder = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title(format!("Twitch Chat - {channel}"))
         .inner_size(380.0, 620.0)
         .min_inner_size(260.0, 300.0)
         .resizable(true)
         .always_on_top(always_on_top.unwrap_or(false))
-        .decorations(true)
+        .decorations(true);
+
+    if let Some(ref script) = auth_script {
+        builder = builder.initialization_script(script);
+    }
+
+    let _window = builder
         .build()
         .map_err(|e| format!("Error al abrir ventana de chat popout: {e}"))?;
 
@@ -1784,9 +1842,12 @@ async fn mount_embedded_twitch_chat(
     y: f64,
     width: f64,
     height: f64,
+    auth_token: Option<String>,
+    username: Option<String>,
 ) -> Result<(), String> {
     validate_channel(&channel)?;
     let label = "embedded_twitch_chat";
+    let auth_script = get_twitch_auth_script(auth_token.as_deref(), username.as_deref());
 
     let url_str = format!("https://twitch.tv/popout/{}/chat?popout=", urlencoding::encode(&channel));
     let parsed_url: tauri::Url = url_str
@@ -1796,6 +1857,9 @@ async fn mount_embedded_twitch_chat(
     if let Some(existing_webview) = app.get_webview(label) {
         let _ = existing_webview.set_position(tauri::LogicalPosition::new(x, y));
         let _ = existing_webview.set_size(tauri::LogicalSize::new(width, height));
+        if let Some(ref script) = auth_script {
+            let _ = existing_webview.eval(script);
+        }
         let _ = existing_webview.navigate(parsed_url);
         let _ = existing_webview.show();
         return Ok(());
@@ -1803,8 +1867,12 @@ async fn mount_embedded_twitch_chat(
 
     let main_window = app.get_window("main").ok_or("Ventana principal no encontrada")?;
 
-    let webview_builder = tauri::WebviewBuilder::new(label, tauri::WebviewUrl::External(parsed_url))
+    let mut webview_builder = tauri::WebviewBuilder::new(label, tauri::WebviewUrl::External(parsed_url))
         .auto_resize();
+
+    if let Some(ref script) = auth_script {
+        webview_builder = webview_builder.initialization_script(script);
+    }
 
     let _child = main_window
         .add_child(

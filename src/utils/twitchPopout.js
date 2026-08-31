@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from './tauriEnv'
 
-export async function openTwitchChatPopoutWindow(channelName, alwaysOnTop = false) {
+export async function openTwitchChatPopoutWindow(channelName, alwaysOnTop = false, authToken = null, username = null) {
   if (!channelName) return
   const cleanChannel = channelName.trim().toLowerCase()
   if (isTauri()) {
@@ -9,6 +9,8 @@ export async function openTwitchChatPopoutWindow(channelName, alwaysOnTop = fals
       await invoke('open_twitch_popout_window', {
         channel: cleanChannel,
         alwaysOnTop,
+        authToken,
+        username,
       })
       return
     } catch (err) {

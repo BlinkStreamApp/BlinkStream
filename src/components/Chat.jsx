@@ -1680,6 +1680,8 @@ export default function Chat({
       <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)]' : 'bg-chat'}`}>
         <TwitchChatPopout
           channelName={channel}
+          twitchToken={auth.token}
+          twitchUsername={auth.username}
           onClose={() => {
             setUseTwitchPopout(false)
             try { localStorage.setItem('bs.chat.use_twitch_popout', 'false') } catch { /* ignore */ }
@@ -1722,7 +1724,7 @@ export default function Chat({
               {/* Popout Floating Window Button */}
               <button
                 type="button"
-                onClick={() => openTwitchChatPopoutWindow(channel, false)}
+                onClick={() => openTwitchChatPopoutWindow(channel, false, auth.token, auth.username)}
                 className="p-1 rounded-md text-text-muted hover:text-cyan-300 hover:bg-white/5 transition-colors cursor-pointer"
                 title="Abrir Chat de Twitch en Ventana Flotante"
                 aria-label="Abrir Popout Flotante"

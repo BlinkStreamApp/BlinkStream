@@ -40,7 +40,7 @@ describe('TwitchChatPopout', () => {
   })
 
   it('opens floating popout window via Tauri invoke when button is clicked', async () => {
-    render(<TwitchChatPopout channelName="shroud" />)
+    render(<TwitchChatPopout channelName="shroud" twitchToken="my_token" twitchUsername="albert" />)
 
     const floatingBtn = screen.getByRole('button', { name: 'Abrir ventana flotante' })
     fireEvent.click(floatingBtn)
@@ -48,6 +48,8 @@ describe('TwitchChatPopout', () => {
     expect(invoke).toHaveBeenCalledWith('open_twitch_popout_window', {
       channel: 'shroud',
       alwaysOnTop: true,
+      authToken: 'my_token',
+      username: 'albert',
     })
   })
 

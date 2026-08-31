@@ -7,6 +7,8 @@ import PhosphorIcon from '../icons/PhosphorIcon'
 export function TwitchChatPopout({
   channelName = '',
   className = '',
+  twitchToken = '',
+  twitchUsername = '',
   onClose,
   showControls = true,
 }) {
@@ -35,6 +37,8 @@ export function TwitchChatPopout({
             y: Math.round(rect.top),
             width: Math.round(rect.width),
             height: Math.round(rect.height),
+            authToken: twitchToken || null,
+            username: twitchUsername || null,
           })
         } else {
           await invoke('update_embedded_twitch_chat_bounds', {
@@ -69,18 +73,18 @@ export function TwitchChatPopout({
         invoke('unmount_embedded_twitch_chat').catch(() => {})
       }
     }
-  }, [cleanChannel])
+  }, [cleanChannel, twitchToken, twitchUsername])
 
   const handleOpenFloating = useCallback(async () => {
     if (!cleanChannel) return
     setIsOpeningWindow(true)
     try {
       if (onClose) onClose()
-      await openTwitchChatPopoutWindow(cleanChannel, alwaysOnTop)
+      await openTwitchChatPopoutWindow(cleanChannel, alwaysOnTop, twitchToken, twitchUsername)
     } finally {
       setIsOpeningWindow(false)
     }
-  }, [cleanChannel, alwaysOnTop, onClose])
+  }, [cleanChannel, alwaysOnTop, onClose, twitchToken, twitchUsername])
 
   if (!cleanChannel) {
     return (
