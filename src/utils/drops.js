@@ -42,8 +42,9 @@ export async function callTwitchGql({ query, variables, token, clientId }) {
         token: token || null,
         clientId: clientId || null,
       })
-    } catch (err) {
-      console.warn('[drops] Tauri GQL invoke error, intentando fetch fallback:', err)
+    } catch {
+      // Ignorar fallback para evitar ruido si no está autorizado
+      return null
     }
   }
 
@@ -86,8 +87,11 @@ export async function fetchUserDropsInventory(token, _channel = null) {
         }
         return { campaigns: Array.from(campaignMap.values()) }
       }
+      // Si la cache aún no tiene datos, forzamos al watcher a sincronizar
+      await invoke('force_refresh_drops_watcher').catch(() => {})
+      return { campaigns: [] }
     } catch {
-      // Ignorar
+      return { campaigns: [] }
     }
   }
 
@@ -147,11 +151,7 @@ export async function fetchUserDropsInventory(token, _channel = null) {
         clientId,
       })
 
-      console.log('[drops] GQL response:', data)
-
-      if (data?.errors && data.errors.length > 0) {
-        console.warn('[drops] GQL GraphQL errors:', data.errors)
-      }
+      if (!data) continue
 
       const inventoryCampaigns =
         data?.data?.currentUser?.inventory?.dropCampaignsInProgress ||

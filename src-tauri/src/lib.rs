@@ -1980,17 +1980,21 @@ const TWITCH_DROPS_WATCHER_SCRIPT: &str = r#"
             if (!authToken) {
                 try { authToken = localStorage.getItem('api_token') || localStorage.getItem('token'); } catch(e) {}
             }
-            if (!authToken) return;
 
             var query = "query DropsInventory { currentUser { id inventory { dropCampaignsInProgress { id name status game { id name boxArtURL } timeBasedDrops { id name requiredMinutesWatched benefitEdges { benefit { id name imageAssetURL } } self { currentMinutesWatched isClaimed dropInstanceID } } } } } }";
 
+            var headers = {
+                'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko', // ALLOWED-REGRESSION: first-party web client for twitch drops gql inside webview
+                'Content-Type': 'application/json'
+            };
+            if (authToken) {
+                headers['Authorization'] = 'OAuth ' + authToken;
+            }
+
             var res = await fetch('https://gql.twitch.tv/gql', {
                 method: 'POST',
-                headers: {
-                    'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko', // ALLOWED-REGRESSION: first-party web client for twitch drops gql inside webview
-                    'Authorization': 'OAuth ' + authToken,
-                    'Content-Type': 'application/json'
-                },
+                headers: headers,
+                credentials: 'include',
                 body: JSON.stringify({ query: query })
             });
 
@@ -1998,31 +2002,47 @@ const TWITCH_DROPS_WATCHER_SCRIPT: &str = r#"
                 var json = await res.json();
                 var rawCampaigns = json?.data?.currentUser?.inventory?.dropCampaignsInProgress || [];
                 
+                var postPayload = JSON.stringify({ campaigns: rawCampaigns });
                 fetch('http://127.0.0.1:9876/api/drops_update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ campaigns: rawCampaigns })
-                }).catch(function() {});
+                    body: postPayload
+                }).catch(function() {
+                    fetch('http://127.0.0.1:9877/api/drops_update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: postPayload
+                    }).catch(function() {});
+                });
             }
         } catch(e) {}
     }
+
+    window.__syncDropsData = syncDropsData;
 
     window.__claimTwitchDrop = async function(dropInstanceId) {
         try {
             var cookieStr = document.cookie || '';
             var tokenCookie = cookieStr.split('; ').find(function(row) { return row.startsWith('auth-token='); });
             var authToken = tokenCookie ? tokenCookie.split('=')[1] : null;
-            if (!authToken) return false;
+            if (!authToken) {
+                try { authToken = localStorage.getItem('api_token') || localStorage.getItem('token'); } catch(e) {}
+            }
 
             var mutation = "mutation ClaimDrop($input: ClaimCommunityPointsDropInput!) { claimCommunityPointsDrop(input: $input) { dropInstanceID status } }";
 
+            var headers = {
+                'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko', // ALLOWED-REGRESSION: first-party web client for twitch drops gql inside webview
+                'Content-Type': 'application/json'
+            };
+            if (authToken) {
+                headers['Authorization'] = 'OAuth ' + authToken;
+            }
+
             var res = await fetch('https://gql.twitch.tv/gql', {
                 method: 'POST',
-                headers: {
-                    'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko', // ALLOWED-REGRESSION: first-party web client for twitch drops gql inside webview
-                    'Authorization': 'OAuth ' + authToken,
-                    'Content-Type': 'application/json'
-                },
+                headers: headers,
+                credentials: 'include',
                 body: JSON.stringify({
                     query: mutation,
                     variables: { input: { dropInstanceID: dropInstanceId } }
@@ -2258,6 +2278,7 @@ pub fn run() {
             companion::update_companion_state,
             companion::get_cached_drops_inventory,
             companion::claim_twitch_drop,
+            companion::force_refresh_drops_watcher,
         ])
         .setup(|app| {
             let mut labels_to_close = Vec::new();

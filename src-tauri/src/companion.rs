@@ -377,6 +377,18 @@ pub async fn claim_twitch_drop(app: AppHandle, drop_instance_id: String) -> Resu
 }
 
 #[tauri::command]
+pub async fn force_refresh_drops_watcher(app: AppHandle) -> Result<bool, String> {
+    let script = "if (typeof window.__syncDropsData === 'function') { window.__syncDropsData(); }";
+    if let Some(watcher) = app.get_webview_window("twitch_drops_watcher") {
+        let _ = watcher.eval(script);
+    }
+    if let Some(chat) = app.get_webview("embedded_twitch_chat") {
+        let _ = chat.eval(script);
+    }
+    Ok(true)
+}
+
+#[tauri::command]
 pub fn stop_companion_server_cmd() -> Result<serde_json::Value, String> {
     let state_arc = get_server_state();
     let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
