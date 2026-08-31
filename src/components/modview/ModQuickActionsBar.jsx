@@ -159,12 +159,26 @@ export function ModQuickActionsBar({
           <span>{t('mod.quick.subs', 'Solo Subs')}</span>
         </button>
 
-        {/* Slow Mode Dropdown */}
-        <div className="relative">
+        {/* Slow Mode Inline Selector */}
+        {activeMenu === 'slow' ? (
+          <div className="flex items-center gap-1 bg-cyan-950/60 border border-cyan-500/50 rounded-lg p-0.5 animate-fade-in shadow-lg shadow-cyan-950/40">
+            <div className="flex items-center gap-1 text-cyan-300 px-1.5 py-0.5 text-xs font-semibold">
+              <PhosphorIcon name="ClockCounterClockwise" size={14} />
+              <span>{t('mod.quick.slow', 'Lento')}:</span>
+            </div>
+            <button onClick={() => handleSlowSelect(0)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${!activeModes.slow ? 'bg-cyan-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>{t('mod.quick.slowOff', 'Off')}</button>
+            <button onClick={() => handleSlowSelect(3)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.slow === '3' ? 'bg-cyan-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>3s</button>
+            <button onClick={() => handleSlowSelect(10)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.slow === '10' ? 'bg-cyan-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>10s</button>
+            <button onClick={() => handleSlowSelect(30)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.slow === '30' ? 'bg-cyan-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>30s</button>
+            <button onClick={() => handleSlowSelect(60)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.slow === '60' ? 'bg-cyan-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>60s</button>
+            <button onClick={() => handleSlowSelect(120)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.slow === '120' ? 'bg-cyan-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>120s</button>
+            <button onClick={() => setActiveMenu(null)} className="px-1.5 py-0.5 text-white/40 hover:text-white text-xs cursor-pointer ml-0.5" title="Cerrar"><PhosphorIcon name="X" size={12} /></button>
+          </div>
+        ) : (
           <button
-            onClick={() => setActiveMenu(p => p === 'slow' ? null : 'slow')}
+            onClick={() => setActiveMenu('slow')}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
-              activeModes.slow || activeMenu === 'slow'
+              activeModes.slow
                 ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
                 : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
             }`}
@@ -172,27 +186,29 @@ export function ModQuickActionsBar({
           >
             <PhosphorIcon name="ClockCounterClockwise" size={15} />
             <span>{activeModes.slow ? `${t('mod.quick.slow', 'Lento')} (${activeModes.slow}s)` : t('mod.quick.slow', 'Modo Lento')}</span>
-            <PhosphorIcon name="CaretDoubleRight" size={10} className={`transition-transform duration-150 ${activeMenu === 'slow' ? '-rotate-90 text-cyan-300' : 'rotate-90 text-white/40'}`} />
+            <PhosphorIcon name="CaretDoubleRight" size={10} className="rotate-90 text-white/40" />
           </button>
+        )}
 
-          {activeMenu === 'slow' && (
-            <div className="absolute top-full mt-1.5 left-0 w-36 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs animate-fade-in backdrop-blur-xl">
-              <button onClick={() => handleSlowSelect(0)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slowOff', 'Desactivar')}</button>
-              <button onClick={() => handleSlowSelect(3)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow3s', '3 segundos')}</button>
-              <button onClick={() => handleSlowSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow10s', '10 segundos')}</button>
-              <button onClick={() => handleSlowSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow30s', '30 segundos')}</button>
-              <button onClick={() => handleSlowSelect(60)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow60s', '60 segundos')}</button>
-              <button onClick={() => handleSlowSelect(120)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.slow120s', '120 segundos')}</button>
+        {/* Followers Mode Inline Selector */}
+        {activeMenu === 'followers' ? (
+          <div className="flex items-center gap-1 bg-blue-950/60 border border-blue-500/50 rounded-lg p-0.5 animate-fade-in shadow-lg shadow-blue-950/40">
+            <div className="flex items-center gap-1 text-blue-300 px-1.5 py-0.5 text-xs font-semibold">
+              <PhosphorIcon name="Heart" size={14} />
+              <span>{t('mod.quick.followers', 'Seguidores')}:</span>
             </div>
-          )}
-        </div>
-
-        {/* Followers Mode Dropdown */}
-        <div className="relative">
+            <button onClick={() => handleFollowersSelect(-1)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${(activeModes.followers === undefined || activeModes.followers === null || activeModes.followers === false || activeModes.followers === -1) ? 'bg-blue-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>{t('mod.quick.followersOff', 'Todos')}</button>
+            <button onClick={() => handleFollowersSelect(0)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.followers === '0' || activeModes.followers === 0 ? 'bg-blue-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>{t('mod.quick.followers0m', 'Seguidores')}</button>
+            <button onClick={() => handleFollowersSelect(10)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.followers === '10' || activeModes.followers === 10 ? 'bg-blue-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>10m</button>
+            <button onClick={() => handleFollowersSelect(30)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.followers === '30' || activeModes.followers === 30 ? 'bg-blue-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>30m</button>
+            <button onClick={() => handleFollowersSelect(1440)} className={`px-1.5 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-colors ${activeModes.followers === '1440' || activeModes.followers === 1440 ? 'bg-blue-500 text-black font-bold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>1d</button>
+            <button onClick={() => setActiveMenu(null)} className="px-1.5 py-0.5 text-white/40 hover:text-white text-xs cursor-pointer ml-0.5" title="Cerrar"><PhosphorIcon name="X" size={12} /></button>
+          </div>
+        ) : (
           <button
-            onClick={() => setActiveMenu(p => p === 'followers' ? null : 'followers')}
+            onClick={() => setActiveMenu('followers')}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
-              (activeModes.followers !== undefined && activeModes.followers !== null && activeModes.followers !== false) || activeMenu === 'followers'
+              (activeModes.followers !== undefined && activeModes.followers !== null && activeModes.followers !== false)
                 ? 'bg-blue-500/20 border-blue-500/60 text-blue-300'
                 : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
             }`}
@@ -200,19 +216,9 @@ export function ModQuickActionsBar({
           >
             <PhosphorIcon name="Heart" size={15} />
             <span>{t('mod.quick.followers', 'Seguidores')}</span>
-            <PhosphorIcon name="CaretDoubleRight" size={10} className={`transition-transform duration-150 ${activeMenu === 'followers' ? '-rotate-90 text-blue-300' : 'rotate-90 text-white/40'}`} />
+            <PhosphorIcon name="CaretDoubleRight" size={10} className="rotate-90 text-white/40" />
           </button>
-
-          {activeMenu === 'followers' && (
-            <div className="absolute top-full mt-1.5 left-0 w-40 bg-[#161724] border border-white/15 rounded-xl shadow-2xl z-50 py-1 text-xs animate-fade-in backdrop-blur-xl">
-              <button onClick={() => handleFollowersSelect(-1)} className="w-full text-left px-3 py-1.5 text-white/60 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.followersOff', 'Todos los usuarios')}</button>
-              <button onClick={() => handleFollowersSelect(0)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">{t('mod.quick.followers0m', 'Cualquier seguidor')}</button>
-              <button onClick={() => handleFollowersSelect(10)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">&gt; {t('mod.quick.followers10m', '10 min')}</button>
-              <button onClick={() => handleFollowersSelect(30)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">&gt; {t('mod.quick.followers30m', '30 min')}</button>
-              <button onClick={() => handleFollowersSelect(1440)} className="w-full text-left px-3 py-1.5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer">&gt; {t('mod.quick.followers1d', '1 día')}</button>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Clear Chat */}
         {confirmClear ? (
