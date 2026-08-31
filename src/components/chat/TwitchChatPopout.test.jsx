@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { TwitchChatPopout, openTwitchChatPopoutWindow } from './TwitchChatPopout'
+import { TwitchChatPopout } from './TwitchChatPopout'
+import { openTwitchChatPopoutWindow } from '../../utils/twitchPopout'
 import * as tauriEnv from '../../utils/tauriEnv'
 import { invoke } from '@tauri-apps/api/core'
 

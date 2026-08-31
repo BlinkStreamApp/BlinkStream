@@ -9,7 +9,8 @@ import { useT } from '../utils/i18n'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { safeOpenUrl, isTauri } from '../utils/tauriEnv'
 import { invoke } from '@tauri-apps/api/core'
-import { TwitchChatPopout, openTwitchChatPopoutWindow } from './chat/TwitchChatPopout'
+import { TwitchChatPopout } from './chat/TwitchChatPopout'
+import { openTwitchChatPopoutWindow } from '../utils/twitchPopout'
 
 async function gqlGetUserIdByLogin(channel) {
   const login = sanitizeChannelForGraphQL(channel)
