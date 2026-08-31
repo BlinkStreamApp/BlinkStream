@@ -53,8 +53,16 @@ export async function fetchUserDropsInventory(token, _channel = null) {
       signal: AbortSignal.timeout(8000),
     })
 
-    if (!res.ok) return { campaigns: [], inventory: [] }
+    if (!res.ok) {
+      console.warn('[drops] GQL HTTP error:', res.status)
+      return { campaigns: [], inventory: [] }
+    }
     const data = await res.json()
+    console.log('[drops] GQL response:', data)
+
+    if (data.errors && data.errors.length > 0) {
+      console.warn('[drops] GQL GraphQL errors:', data.errors)
+    }
 
     const inventoryCampaigns =
       data?.data?.currentUser?.inventory?.dropCampaignsInProgress ||
