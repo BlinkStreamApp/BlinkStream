@@ -1841,6 +1841,42 @@ async fn open_twitch_popout_window(
 }
 
 #[tauri::command]
+async fn open_twitch_drops_window(
+    app: AppHandle,
+    always_on_top: Option<bool>,
+) -> Result<(), String> {
+    let label = "twitch_drops_popout";
+
+    if let Some(existing) = app.get_webview_window(label) {
+        let _ = existing.set_focus();
+        let url_str = "https://www.twitch.tv/drops/inventory";
+        if let Ok(target_url) = url_str.parse::<tauri::Url>() {
+            let _ = existing.navigate(target_url);
+        }
+        return Ok(());
+    }
+
+    let url_str = "https://www.twitch.tv/drops/inventory";
+    let parsed_url: tauri::Url = url_str
+        .parse()
+        .map_err(|e| format!("URL inválida para drops: {e}"))?;
+
+    let url = tauri::WebviewUrl::External(parsed_url);
+
+    let _window = tauri::WebviewWindowBuilder::new(&app, label, url)
+        .title("Twitch Drops & Recompensas - BlinkStream")
+        .inner_size(520.0, 750.0)
+        .min_inner_size(360.0, 480.0)
+        .resizable(true)
+        .always_on_top(always_on_top.unwrap_or(false))
+        .decorations(true)
+        .build()
+        .map_err(|e| format!("Error al abrir ventana de Twitch Drops: {e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn mount_embedded_twitch_chat(
     app: AppHandle,
@@ -1974,6 +2010,7 @@ pub fn run() {
             close_gamer_overlay,
             open_gamer_overlay,
             open_twitch_popout_window,
+            open_twitch_drops_window,
             mount_embedded_twitch_chat,
             update_embedded_twitch_chat_bounds,
             set_embedded_twitch_chat_visible,
