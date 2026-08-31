@@ -246,7 +246,7 @@ export function ModView({
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden relative">
-        {useTwitchPopoutInMod ? (
+        {useTwitchPopoutInMod && (
           <TwitchChatPopout
             channelName={channel}
             twitchToken={twitchToken}
@@ -257,7 +257,8 @@ export function ModView({
               try { localStorage.setItem('bs.modview.use_twitch_popout', 'false') } catch { /* ignore */ }
             }}
           />
-        ) : (
+        )}
+        <div className={`h-full w-full ${useTwitchPopoutInMod ? 'invisible pointer-events-none absolute inset-0' : ''}`}>
           <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-xs">{t('mod.chat.loading', 'Cargando chat...')}</div>}>
             <Chat
               channel={channel}
@@ -274,7 +275,7 @@ export function ModView({
               onMessagesUpdate={setChatMessages}
             />
           </Suspense>
-        )}
+        </div>
       </div>
     </div>
   )
