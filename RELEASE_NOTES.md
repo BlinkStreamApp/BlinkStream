@@ -1,49 +1,42 @@
-## 🚀 What's New in Version 1.4.0 (Global Languages & Ultra-Low Latency Live Experience)
+## 🚀 What's New in Version 1.4.1 (Twitch PubSub Channel Points & Mod View Polish)
 
-Welcome to **BlinkStream v1.4.0**! This major update brings full internationalization across 8 languages, real-time Twitch badges and custom colors in your own chat messages, an ultra-low latency playback pipeline paired to live chat, and a revamped performance statistics overlay.
-
----
-
-### 🌍 Full Multi-Language Support (8 Languages)
-- **100% Comprehensive Localization**: Complete, high-quality translations across the entire application for:
-  - 🇪🇸 **Spanish (`es`)**
-  - 🇬🇧 **English (`en`)**
-  - 🇫🇷 **French (`fr`)**
-  - 🇩🇪 **German (`de`)**
-  - 🇵🇹 **Portuguese (`pt`)**
-  - 🇯🇵 **Japanese (`ja`)**
-  - 🇰🇷 **Korean (`ko`)**
-  - 🇷🇺 **Russian (`ru`)**
-- Full coverage for Mod View, User Inspector, Theme Studio, Wi-Fi Remote, Offline Player states, VODs/Clips, and the Auto-Updater.
+Welcome to **BlinkStream v1.4.1**! This patch release brings 100% Channel Points redemption detection via Twitch PubSub WebSocket, streamlined Mod Quick Actions with horizontal selectors, and robust native WebView2 lifecycle management.
 
 ---
 
-### 💬 Real-Time Twitch Badges & Chat Customization
-- **IRC `USERSTATE` Integration**: When sending messages in chat, your real badges (Subscriber, Moderator, VIP, Broadcaster, Prime, Turbo, Founder, etc.) and your custom Twitch username color are rendered immediately in optimistic UI.
+### 💎 100% Twitch PubSub Channel Points Detection
+- **Real-Time WebSocket Integration (`wss://pubsub-edge.twitch.tv/v1`)**:
+  - Subscribes directly to `community-points-channel-v1.<broadcasterId>`.
+  - Captures **all** custom channel point redemptions in real time, including textless rewards (sound alerts, emotes, hydrate, stretch) and text-input rewards (TTS, user messages).
+- **Activity Feed Integration**: Incoming redemptions are displayed seamlessly in Mod View's live activity feed with automatic deduplication.
+- **Helix 403 Circuit Breaker**: Gracefully stops failed queries when broadcaster OAuth scopes are absent.
 
 ---
 
-### ⚡ Ultra-Low Latency Live Pipeline (LL-HLS)
-- **Rust Backend Streamlink Flags**: Streamlink now requests `--twitch-low-latency` and `--hls-live-edge 1` directly from Twitch edges.
-- **Aggressive HLS Live Edge Sync**:
-  - Starts instantly at the absolute live edge (`startPosition: -1` on first buffer).
-  - Smooth 1.2x auto-catchup when network hiccups occur to keep you synchronized with real-time chat.
-  - Interactive **`● LIVE`** badge in the player controls to resync to the live edge with 1 click.
+### 🛡️ Mod Quick Actions Bar: Inline Pill Selectors
+- **Horizontal Pill Selectors for Slow Mode & Followers Mode**:
+  - Replaced vertical floating menus with sleek inline selectors directly in the top action bar (`[ ⏱️ Lento: (Off) (3s) (10s) (30s) (60s) (120s) ✕ ]`).
+  - Completely eliminates any menu occlusion or clipping by child WebViews.
+  - Auto-closes smoothly on click-outside or pressing `Escape`.
 
 ---
 
-### 📊 Real-Time Stream Performance Overlay
-- Press **Ctrl+D** or use Settings to open the updated stats card with dedicated metrics:
-  - ⏱️ **Live Latency**: Exact delay to the broadcaster in seconds.
-  - 🎞️ **RAM Buffer Ahead**: Pre-buffered video in memory to prevent stuttering.
-  - ⚡ **Bitrate**, 📐 **Resolution/FPS**, and 📉 **Dropped Frame counter**.
+### 🪟 Native Child WebView2 Fixes & Window Management
+- **Modal Lifecycle Coordination**:
+  - When opening Settings, About, or any overlay modal, the embedded Twitch chat window yields properly off-screen.
+  - On closing modals, the native WebView2 position `(x, y)` and size `(width, height)` are restored instantly, eliminating black screen bugs.
+
+---
+
+### 🌙 Video Player Enhancements
+- **Night Mode Icon**: Loaded missing PhosphorIcon `Moon` for the dynamic audio compressor/night mode toggle.
 
 ---
 
 ### 💾 Available Downloads
-- ⭐ **`BlinkStream_1.4.0_Win_x64.exe`** *(Recommended — NSIS installer with automatic update support)*
-- **`BlinkStream_1.4.0_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
-- **`BlinkStream_1.4.0_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
-- **`BlinkStream_1.4.0_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
-- **`BlinkStream_1.4.0_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
-- **`BlinkStream_1.4.0_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*
+- ⭐ **`BlinkStream_1.4.1_Win_x64.exe`** *(Recommended — NSIS installer with automatic update support)*
+- **`BlinkStream_1.4.1_Win_x64.msi`** *(Enterprise Windows MSI installer package)*
+- **`BlinkStream_1.4.1_macOS_arm64.dmg`** *(Apple Silicon macOS Universal DMG)*
+- **`BlinkStream_1.4.1_macOS_x64.dmg`** *(Intel macOS Universal DMG)*
+- **`BlinkStream_1.4.1_Linux_x86_64.deb`** *(Debian / Ubuntu Linux Package)*
+- **`BlinkStream_1.4.1_Linux_x86_64.AppImage`** *(Universal Linux AppImage)*
