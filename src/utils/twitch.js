@@ -961,7 +961,7 @@ export async function getChannelRole(broadcasterId, userId, signal, channel) {
       const gqlRes = await fetch('https://gql.twitch.tv/gql', {
         method: 'POST',
         headers: {
-          'Client-ID': PUBLIC_CLIENT_ID,
+          'Client-ID': getHelixClientId(),
           'Authorization': `OAuth ${cleanToken}`,
           'Content-Type': 'application/json',
         },

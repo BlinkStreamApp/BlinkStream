@@ -1,4 +1,4 @@
-import { PUBLIC_CLIENT_ID } from './twitch'
+import { getHelixClientId, PUBLIC_CLIENT_ID } from './twitch'
 
 export async function fetchUserDropsInventory(token, _channel = null) {
   const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
@@ -41,79 +41,84 @@ export async function fetchUserDropsInventory(token, _channel = null) {
     }
   `
 
-  try {
-    const res = await fetch('https://gql.twitch.tv/gql', {
-      method: 'POST',
-      headers: {
-        'Client-ID': PUBLIC_CLIENT_ID,
-        'Authorization': `OAuth ${cleanToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query }),
-      signal: AbortSignal.timeout(8000),
-    })
+  const clientIdsToTry = Array.from(new Set([getHelixClientId(), PUBLIC_CLIENT_ID])).filter(Boolean)
 
-    if (!res.ok) {
-      console.warn('[drops] GQL HTTP error:', res.status)
-      return { campaigns: [], inventory: [] }
-    }
-    const data = await res.json()
-    console.log('[drops] GQL response:', data)
-
-    if (data.errors && data.errors.length > 0) {
-      console.warn('[drops] GQL GraphQL errors:', data.errors)
-    }
-
-    const inventoryCampaigns =
-      data?.data?.currentUser?.inventory?.dropCampaignsInProgress ||
-      data?.data?.currentUser?.dropCampaignsInProgress ||
-      []
-
-    const campaignMap = new Map()
-
-    const parseCampaign = (c, isCurrentChannel = false) => {
-      const drops = (c.timeBasedDrops || []).map(d => {
-        const required = d.requiredMinutesWatched || 60
-        const current = d.self?.currentMinutesWatched || 0
-        const percent = Math.min(100, Math.floor((current / required) * 100))
-        const isReadyToClaim = percent >= 100 && !d.self?.isClaimed
-
-        return {
-          id: d.id,
-          name: d.name,
-          requiredMinutes: required,
-          currentMinutes: current,
-          percent,
-          isClaimed: Boolean(d.self?.isClaimed),
-          isReadyToClaim,
-          dropInstanceId: d.self?.dropInstanceID || null,
-          benefitName: d.benefitEdges?.[0]?.benefit?.name || d.name,
-          benefitImage: d.benefitEdges?.[0]?.benefit?.imageAssetURL || null,
-        }
+  for (const clientId of clientIdsToTry) {
+    try {
+      const res = await fetch('https://gql.twitch.tv/gql', {
+        method: 'POST',
+        headers: {
+          'Client-ID': clientId,
+          'Authorization': `OAuth ${cleanToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+        signal: AbortSignal.timeout(8000),
       })
 
-      return {
-        id: c.id,
-        name: c.name,
-        gameName: c.game?.name || '',
-        boxArtUrl: c.game?.boxArtURL || '',
-        isCurrentChannel,
-        drops,
+      if (!res.ok) {
+        console.warn(`[drops] GQL status ${res.status} con Client-ID ${clientId}`)
+        continue
       }
-    }
+      const data = await res.json()
+      console.log('[drops] GQL response:', data)
 
-    for (const c of inventoryCampaigns) {
-      if (c?.id) {
-        campaignMap.set(c.id, parseCampaign(c, false))
+      if (data.errors && data.errors.length > 0) {
+        console.warn('[drops] GQL GraphQL errors:', data.errors)
       }
-    }
 
-    const campaigns = Array.from(campaignMap.values())
-    return { campaigns }
-  } catch (err) {
-    console.warn('[drops] Error fetching user drops inventory:', err)
-    return { campaigns: [], inventory: [] }
+      const inventoryCampaigns =
+        data?.data?.currentUser?.inventory?.dropCampaignsInProgress ||
+        data?.data?.currentUser?.dropCampaignsInProgress ||
+        []
+
+      const campaignMap = new Map()
+
+      const parseCampaign = (c, isCurrentChannel = false) => {
+        const drops = (c.timeBasedDrops || []).map(d => {
+          const required = d.requiredMinutesWatched || 60
+          const current = d.self?.currentMinutesWatched || 0
+          const percent = Math.min(100, Math.floor((current / required) * 100))
+          const isReadyToClaim = percent >= 100 && !d.self?.isClaimed
+
+          return {
+            id: d.id,
+            name: d.name,
+            requiredMinutes: required,
+            currentMinutes: current,
+            percent,
+            isClaimed: Boolean(d.self?.isClaimed),
+            isReadyToClaim,
+            dropInstanceId: d.self?.dropInstanceID || null,
+            benefitName: d.benefitEdges?.[0]?.benefit?.name || d.name,
+            benefitImage: d.benefitEdges?.[0]?.benefit?.imageAssetURL || null,
+          }
+        })
+
+        return {
+          id: c.id,
+          name: c.name,
+          gameName: c.game?.name || '',
+          boxArtUrl: c.game?.boxArtURL || '',
+          isCurrentChannel,
+          drops,
+        }
+      }
+
+      for (const c of inventoryCampaigns) {
+        if (c?.id) {
+          campaignMap.set(c.id, parseCampaign(c, false))
+        }
+      }
+
+      const campaigns = Array.from(campaignMap.values())
+      return { campaigns }
+    } catch (err) {
+      console.warn(`[drops] Fallo con Client-ID ${clientId}:`, err)
+    }
   }
+
+  return { campaigns: [], inventory: [] }
 }
 
 export async function claimDropReward(dropInstanceId, token) {
@@ -122,45 +127,48 @@ export async function claimDropReward(dropInstanceId, token) {
     throw new Error('ID de Drop o Token no proporcionado')
   }
 
-  try {
-    const res = await fetch('https://gql.twitch.tv/gql', {
-      method: 'POST',
-      headers: {
-        'Client-ID': PUBLIC_CLIENT_ID,
-        'Authorization': `OAuth ${cleanToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: `
-          mutation ClaimCommunityPointsDrop($input: ClaimCommunityPointsDropInput!) {
-            claimCommunityPointsDrop(input: $input) {
-              dropInstanceID
-              status
-            }
-          }
-        `,
-        variables: {
-          input: {
-            dropInstanceID: dropInstanceId,
-          },
+  const clientIdsToTry = Array.from(new Set([getHelixClientId(), PUBLIC_CLIENT_ID])).filter(Boolean)
+
+  for (const clientId of clientIdsToTry) {
+    try {
+      const res = await fetch('https://gql.twitch.tv/gql', {
+        method: 'POST',
+        headers: {
+          'Client-ID': clientId,
+          'Authorization': `OAuth ${cleanToken}`,
+          'Content-Type': 'application/json',
         },
-      }),
-      signal: AbortSignal.timeout(8000),
-    })
+        body: JSON.stringify({
+          query: `
+            mutation ClaimCommunityPointsDrop($input: ClaimCommunityPointsDropInput!) {
+              claimCommunityPointsDrop(input: $input) {
+                dropInstanceID
+                status
+              }
+            }
+          `,
+          variables: {
+            input: {
+              dropInstanceID: dropInstanceId,
+            },
+          },
+        }),
+        signal: AbortSignal.timeout(8000),
+      })
 
-    if (!res.ok) {
-      throw new Error(`Fallo HTTP al reclamar Drop: ${res.status}`)
-    }
+      if (!res.ok) continue
 
-    const data = await res.json()
-    const status = data?.data?.claimCommunityPointsDrop?.status
-    return {
-      success: true,
-      status: status || 'CLAIMED',
-      dropInstanceId,
+      const data = await res.json()
+      const status = data?.data?.claimCommunityPointsDrop?.status
+      return {
+        success: true,
+        status: status || 'CLAIMED',
+        dropInstanceId,
+      }
+    } catch (err) {
+      console.warn(`[drops] Error al reclamar con Client-ID ${clientId}:`, err)
     }
-  } catch (err) {
-    console.error('[drops] Error claiming drop:', err)
-    throw err
   }
+
+  throw new Error('No se pudo reclamar el Drop en Twitch')
 }
