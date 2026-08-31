@@ -22,14 +22,15 @@
 | Feature | Description |
 |---------|-------------|
 | 🌍 **Global Localization** | 100% Comprehensive translations across 8 languages (ES, EN, FR, DE, PT, JA, KO, RU) |
+| 💬 **Twitch Popout Chat & Channel Points** | Official native Twitch popout chat integrated directly into the workspace or as an Always-on-Top floating window with full Channel Points, reward redemption, and emotes |
 | 🛡️ **Pro Mod View Workspace** | Dedicated multi-dock command center (`Ctrl+M`) with live mod logs, AutoMod queue, unban appeals, active viewers, predictions, and channel point redemptions |
 | ⚡ **Ultra-Low Latency (LL-HLS)** | Aggressive live edge sync with instant 0-delay playback, dynamic 1.2x catchup, and 1-click live resync |
 | 💬 **Rich IRC Chat & Badges** | Real-time chat with 7TV/BTTV/FFZ emotes, optimistic badge rendering (Sub, Mod, VIP, Founder, Turbo), and custom colors |
+| 🎮 **Gamer Chat Overlay (HUD)** | Transparent always-on-top HUD with click-through and opacity controls to read chat over full-screen games |
 | 🌧️ **Emote Rain & Combos** | Floating real-time emote particle overlays and dynamic neon Combo meter (HYPERS, SUPER, GODLIKE) |
 | 🔔 **Smart Chat Tabs** | Quick navigation bar filtering between All messages, @Mentions with live counter, and ⭐ Featured events |
 | 📺 **Live Streams** | Smooth Twitch stream playback using integrated Streamlink + FFmpeg engine |
 | 🎬 **Clips & VODs** | Dedicated video-on-demand and clip player with selectable multi-quality tiers |
-| 💎 **Channel Points** | Integrated channel point redemption tracking, custom reward execution, and live balance UI |
 | 📼 **Local Recording** | Built-in live recording system with automatic disk space monitoring and background encoding |
 | 🔐 **OAuth Authentication** | Secure Twitch login powered by Supabase Edge Functions with state-of-the-art token security |
 | ⭐ **Cloud Sync Favorites** | Synchronize favorite streamers and custom watchlists securely via cloud storage |

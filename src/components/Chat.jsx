@@ -473,7 +473,6 @@ export default function Chat({
   twitchUsername,
   broadcasterId,
   userId,
-  onOpenCPPanel,
   isModerator = false,
   isMod = false,
   isBroadcaster = false,
@@ -1713,23 +1712,25 @@ export default function Chat({
                   setUseTwitchPopout(true)
                   try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
                 }}
-                className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border border-twitch/40 bg-twitch/10 hover:bg-twitch/25 text-twitch-glow hover:text-white transition-all cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg border border-twitch/40 bg-twitch/15 hover:bg-twitch/30 text-white transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95"
                 title="Incrustar Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)"
                 aria-label="Incrustar Popout Oficial de Twitch"
               >
-                <PhosphorIcon name="Coins" size={13} weight="fill" />
-                <span className="hidden sm:inline">Popout</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-twitch shrink-0">
+                  <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z" />
+                </svg>
+                <span>Popout</span>
               </button>
 
               {/* Popout Floating Window Button */}
               <button
                 type="button"
                 onClick={() => openTwitchChatPopoutWindow(channel, false, auth.token, auth.username)}
-                className="p-1 rounded-md text-text-muted hover:text-cyan-300 hover:bg-white/5 transition-colors cursor-pointer"
-                title="Abrir Chat de Twitch en Ventana Flotante"
+                className="p-1.5 rounded-lg text-text-muted hover:text-cyan-300 hover:bg-white/10 transition-colors cursor-pointer"
+                title="Abrir Chat de Twitch en Ventana Flotante (Popout)"
                 aria-label="Abrir Popout Flotante"
               >
-                <PhosphorIcon name="ArrowSquareOut" size={13} weight="bold" />
+                <PhosphorIcon name="ArrowSquareOut" size={15} weight="bold" />
               </button>
 
               {/* Gamer Overlay Launcher */}
@@ -1743,38 +1744,15 @@ export default function Chat({
                       console.warn('Failed to open gamer overlay:', err)
                     }
                   }}
-                  className="p-1 rounded-md text-text-muted hover:text-cyan-400 hover:bg-white/5 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-text-muted hover:text-cyan-400 hover:bg-white/10 transition-colors cursor-pointer"
                   title="Abrir Overlay Gamer Transparente (HUD sobre videojuegos)"
                   aria-label="Abrir Overlay Gamer Transparente"
                 >
-                  <PhosphorIcon name="PictureInPicture" size={13} weight="duotone" />
+                  <PhosphorIcon name="PictureInPicture" size={15} weight="duotone" />
                 </button>
               )}
             </>
           )}
-
-          {/* Anti-Spam Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setAntiSpam(p => {
-                const n = !p
-                setItem(STORAGE_KEYS.ANTISPAM, n)
-                antiSpamRef.current = n
-                return n
-              })
-            }}
-            className={`flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md border transition-all cursor-pointer ${
-              antiSpam
-                ? 'bg-purple-600/20 text-purple-300 border-purple-500/60 shadow-sm shadow-purple-500/20'
-                : 'bg-white/[0.03] text-text-muted border-white/10 hover:border-white/20'
-            }`}
-            title={antiSpam ? t('chat.antispam.on', 'Anti-Spam Torneo activado: agrupa mensajes idénticos') : t('chat.antispam.off', 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos y spam)')}
-            aria-label="Toggle Anti-Spam Modo Torneo"
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${antiSpam ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
-            <span className="hidden xl:inline">Anti-Spam</span>
-          </button>
 
           {/* User Auth status */}
           {auth.token ? (
@@ -2030,15 +2008,38 @@ export default function Chat({
           </div>
         )}
         <form onSubmit={sendMessage} className="relative flex items-center gap-2 p-2.5 bg-gradient-to-b from-[#18181b] to-[#121215] border-t border-white/[0.06] shadow-[0_-4px_20px_rgba(0,0,0,0.4)]">
-          {/* WT-20260628-47: Emote picker a la izquierda */}
-          <div>
+          {/* Action buttons on left */}
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => { setShowEmoteMenu(p => !p); setEmoteSearch(''); if (!showEmoteMenu) setEmoteTab('all') }}
-              className={`shrink-0 p-2 rounded-xl cursor-pointer transition-all ${showEmoteMenu ? 'bg-twitch text-white shadow-lg shadow-twitch/40 scale-105' : 'text-text-muted hover:text-white hover:bg-white/10'}`}
+              className={`p-2 rounded-xl cursor-pointer transition-all ${showEmoteMenu ? 'bg-twitch text-white shadow-lg shadow-twitch/40 scale-105' : 'text-text-muted hover:text-white hover:bg-white/10'}`}
               title="Emotes"
+              aria-label="Selector de Emotes"
             >
-              <PhosphorIcon name="Smiley" size={22} weight="duotone" />
+              <PhosphorIcon name="Smiley" size={20} weight="duotone" />
+            </button>
+
+            {/* Anti-Spam Torneo Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setAntiSpam(p => {
+                  const n = !p
+                  setItem(STORAGE_KEYS.ANTISPAM, n)
+                  antiSpamRef.current = n
+                  return n
+                })
+              }}
+              className={`p-2 rounded-xl cursor-pointer transition-all border ${
+                antiSpam
+                  ? 'bg-purple-600/20 text-purple-300 border-purple-500/60 shadow-sm shadow-purple-500/20'
+                  : 'text-text-muted hover:text-white hover:bg-white/10 border-transparent'
+              }`}
+              title={antiSpam ? t('chat.antispam.on', 'Anti-Spam Torneo activado') : t('chat.antispam.off', 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos)')}
+              aria-label="Toggle Anti-Spam"
+            >
+              <PhosphorIcon name="ShieldCheck" size={20} weight={antiSpam ? 'fill' : 'duotone'} />
             </button>
           </div>
 
@@ -2199,19 +2200,6 @@ export default function Chat({
               </span>
             )}
           </div>
-
-          {/* WT-20260628-47: Botón de Channel Points */}
-          {broadcasterId && onOpenCPPanel && (
-            <button
-              type="button"
-              onClick={onOpenCPPanel}
-              className="shrink-0 p-2 rounded-xl text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/20 cursor-pointer transition-all shadow-md shadow-amber-500/10 hover:scale-105 active:scale-95 flex items-center justify-center"
-              title={t('chat.cpTitle', 'Recompensas y Puntos del canal')}
-              aria-label="Puntos del canal"
-            >
-              <PhosphorIcon name="Coins" size={22} weight="duotone" className="animate-pulse" />
-            </button>
-          )}
 
           <button
             type="submit"
