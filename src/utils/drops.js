@@ -45,13 +45,18 @@ export async function fetchUserDropsInventory(token, _channel = null) {
 
   for (const clientId of clientIdsToTry) {
     try {
+      const headers = {
+        'Client-ID': clientId,
+        'Content-Type': 'application/json',
+      }
+      if (cleanToken) {
+        headers['Authorization'] = `OAuth ${cleanToken}`
+      }
+
       const res = await fetch('https://gql.twitch.tv/gql', {
         method: 'POST',
-        headers: {
-          'Client-ID': clientId,
-          'Authorization': `OAuth ${cleanToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ query }),
         signal: AbortSignal.timeout(8000),
       })
@@ -131,13 +136,18 @@ export async function claimDropReward(dropInstanceId, token) {
 
   for (const clientId of clientIdsToTry) {
     try {
+      const headers = {
+        'Client-ID': clientId,
+        'Content-Type': 'application/json',
+      }
+      if (cleanToken) {
+        headers['Authorization'] = `OAuth ${cleanToken}`
+      }
+
       const res = await fetch('https://gql.twitch.tv/gql', {
         method: 'POST',
-        headers: {
-          'Client-ID': clientId,
-          'Authorization': `OAuth ${cleanToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({
           query: `
             mutation ClaimCommunityPointsDrop($input: ClaimCommunityPointsDropInput!) {
