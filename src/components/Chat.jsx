@@ -9,6 +9,7 @@ import { useT } from '../utils/i18n'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { safeOpenUrl, isTauri } from '../utils/tauriEnv'
 import { invoke } from '@tauri-apps/api/core'
+import { TwitchChatPopout, openTwitchChatPopoutWindow } from './chat/TwitchChatPopout'
 
 async function gqlGetUserIdByLogin(channel) {
   const login = sanitizeChannelForGraphQL(channel)
@@ -490,6 +491,14 @@ export default function Chat({
   useEffect(() => {
     onMessagesUpdate?.(messages)
   }, [messages, onMessagesUpdate])
+  const [useTwitchPopout, setUseTwitchPopout] = useState(() => {
+    try {
+      return localStorage.getItem('bs.chat.use_twitch_popout') === 'true'
+    } catch {
+      return false
+    }
+  })
+
   const [antiSpam, setAntiSpam] = useState(() => {
     return getItem(STORAGE_KEYS.ANTISPAM, 'false') === 'true'
   })
@@ -1665,6 +1674,20 @@ export default function Chat({
     };
   }, [isOverlay, handleSlashCommand, getUserBadgesForSend]);
 
+  if (useTwitchPopout) {
+    return (
+      <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)]' : 'bg-chat'}`}>
+        <TwitchChatPopout
+          channelName={channel}
+          onClose={() => {
+            setUseTwitchPopout(false)
+            try { localStorage.setItem('bs.chat.use_twitch_popout', 'false') } catch { /* ignore */ }
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
       <div className="shrink-0 px-3 py-2 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center gap-2">
@@ -1682,6 +1705,32 @@ export default function Chat({
         )}
 
         <div className="flex-1" />
+
+        {/* Toggle Twitch Popout embed */}
+        <button
+          type="button"
+          onClick={() => {
+            setUseTwitchPopout(true)
+            try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
+          }}
+          className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border border-twitch/40 bg-twitch/10 hover:bg-twitch/20 text-twitch-glow hover:text-white transition-all cursor-pointer"
+          title="Ver Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes nativos)"
+          aria-label="Ver Chat Oficial Twitch Popout"
+        >
+          <PhosphorIcon name="Coins" size={12} weight="fill" />
+          <span className="hidden sm:inline">Twitch Popout</span>
+        </button>
+
+        {/* Open Floating Popout Window */}
+        <button
+          type="button"
+          onClick={() => openTwitchChatPopoutWindow(channel, false)}
+          className="p-1 rounded-md text-text-muted hover:text-cyan-300 hover:bg-white/5 transition-colors cursor-pointer"
+          title="Abrir Chat de Twitch en Ventana Flotante (Popout)"
+          aria-label="Abrir Popout Flotante"
+        >
+          <PhosphorIcon name="ArrowSquareOut" size={14} weight="bold" />
+        </button>
 
         <button
           onClick={() => {

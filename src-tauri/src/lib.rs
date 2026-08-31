@@ -1738,6 +1738,44 @@ async fn open_gamer_overlay(app: AppHandle, channel: String) -> Result<(), Strin
     Ok(())
 }
 
+#[tauri::command]
+async fn open_twitch_popout_window(
+    app: AppHandle,
+    channel: String,
+    always_on_top: Option<bool>,
+) -> Result<(), String> {
+    validate_channel(&channel)?;
+    let label = "twitch_chat_popout";
+
+    if let Some(existing) = app.get_webview_window(label) {
+        let _ = existing.set_focus();
+        let url_str = format!("https://twitch.tv/popout/{}/chat?popout=", urlencoding::encode(&channel));
+        if let Ok(target_url) = url_str.parse::<tauri::Url>() {
+            let _ = existing.navigate(target_url);
+        }
+        return Ok(());
+    }
+
+    let url_str = format!("https://twitch.tv/popout/{}/chat?popout=", urlencoding::encode(&channel));
+    let parsed_url: tauri::Url = url_str
+        .parse()
+        .map_err(|e| format!("URL inválida para chat popout: {e}"))?;
+
+    let url = tauri::WebviewUrl::External(parsed_url);
+
+    let _window = tauri::WebviewWindowBuilder::new(&app, label, url)
+        .title(format!("Twitch Chat - {channel}"))
+        .inner_size(380.0, 620.0)
+        .min_inner_size(260.0, 300.0)
+        .resizable(true)
+        .always_on_top(always_on_top.unwrap_or(false))
+        .decorations(true)
+        .build()
+        .map_err(|e| format!("Error al abrir ventana de chat popout: {e}"))?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1763,6 +1801,7 @@ pub fn run() {
             set_click_through,
             close_gamer_overlay,
             open_gamer_overlay,
+            open_twitch_popout_window,
             start_recording,
             stop_recording,
             get_app_token,

@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://id.twitch.tv https://clips.twitch.tv https://player.twitch.tv; child-src 'self' https://*.twitch.tv https://player.twitch.tv; worker-src 'self' blob:; connect-src 'self' http://ipc.localhost http://tauri.localhost https: wss://irc-ws.chat.twitch.tv:443 wss://irc.chat.twitch.tv:443; img-src 'self' https: data:; media-src 'self' https: blob:; font-src 'self' data:;"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://twitch.tv https://id.twitch.tv https://clips.twitch.tv https://player.twitch.tv https://*.gql.twitch.tv; child-src 'self' https://*.twitch.tv https://twitch.tv https://player.twitch.tv; worker-src 'self' blob:; connect-src 'self' http://ipc.localhost http://tauri.localhost https: wss://irc-ws.chat.twitch.tv:443 wss://irc.chat.twitch.tv:443; img-src 'self' https: data:; media-src 'self' https: blob:; font-src 'self' data:;"
     }
   },
   "bundle": {
