@@ -20,6 +20,7 @@ import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { useAudioCompressor } from '../hooks/useAudioCompressor'
 import { useLiveDVR } from '../hooks/useLiveDVR'
 import DropsModal from './drops/DropsModal'
+import { startDropsWatcher, stopDropsWatcher } from '../utils/dropsWatcher'
 
 function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
@@ -313,6 +314,15 @@ export default function VideoPlayer({
       return () => clearTimeout(timer)
     }
   }, [streamUrl, channel, recording, startRecording])
+
+  useEffect(() => {
+    if (channel) {
+      startDropsWatcher(channel).catch(() => {})
+    }
+    return () => {
+      stopDropsWatcher().catch(() => {})
+    }
+  }, [channel])
 
   const fetchStream = useCallback(async (ch, q) => {
     if (!ch) return

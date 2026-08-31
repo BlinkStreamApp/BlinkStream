@@ -1876,6 +1876,93 @@ async fn open_twitch_drops_window(
     Ok(())
 }
 
+const TWITCH_DROPS_WATCHER_SCRIPT: &str = r#"
+(function() {
+    function keepPlaybackActive() {
+        try {
+            var videos = document.querySelectorAll('video');
+            videos.forEach(function(v) {
+                v.muted = true;
+                v.volume = 0;
+                if (v.paused) {
+                    v.play().catch(function() {});
+                }
+            });
+
+            var matureButtons = document.querySelectorAll('[data-a-target="player-overlay-mature-accept"], button[data-a-target="content-classification-gate-overlay-start-watching-button"]');
+            matureButtons.forEach(function(btn) {
+                try { btn.click(); } catch(e) {}
+            });
+
+            var claimBtn = document.querySelector('button[aria-label*="Claim Bonus"], button[aria-label*="Reclamar bonificación"], .community-points-summary button');
+            if (claimBtn) {
+                try { claimBtn.click(); } catch(e) {}
+            }
+        } catch(e) {}
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            keepPlaybackActive();
+            setInterval(keepPlaybackActive, 3000);
+        });
+    } else {
+        keepPlaybackActive();
+        setInterval(keepPlaybackActive, 3000);
+    }
+})();
+"#;
+
+#[tauri::command]
+async fn start_drops_watcher(
+    app: AppHandle,
+    channel: String,
+) -> Result<(), String> {
+    validate_channel(&channel)?;
+    let label = "twitch_drops_watcher";
+
+    let url_str = format!(
+        "https://www.twitch.tv/{}",
+        urlencoding::encode(&channel)
+    );
+    let parsed_url: tauri::Url = url_str
+        .parse()
+        .map_err(|e| format!("URL inválida para drops watcher: {e}"))?;
+
+    if let Some(existing) = app.get_webview_window(label) {
+        let _ = existing.eval(TWITCH_DROPS_WATCHER_SCRIPT);
+        let _ = existing.navigate(parsed_url);
+        return Ok(());
+    }
+
+    let url = tauri::WebviewUrl::External(parsed_url);
+
+    let _window = tauri::WebviewWindowBuilder::new(&app, label, url)
+        .title("Twitch Drops Watcher")
+        .inner_size(320.0, 240.0)
+        .visible(false)
+        .decorations(false)
+        .initialization_script(TWITCH_DROPS_WATCHER_SCRIPT)
+        .build()
+        .map_err(|e| format!("Error al iniciar drops watcher: {e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn stop_drops_watcher(
+    app: AppHandle,
+) -> Result<(), String> {
+    let label = "twitch_drops_watcher";
+    if let Some(existing) = app.get_webview_window(label) {
+        if let Ok(blank_url) = "about:blank".parse::<tauri::Url>() {
+            let _ = existing.navigate(blank_url);
+        }
+        let _ = existing.close();
+    }
+    Ok(())
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn mount_embedded_twitch_chat(
@@ -2011,6 +2098,8 @@ pub fn run() {
             open_gamer_overlay,
             open_twitch_popout_window,
             open_twitch_drops_window,
+            start_drops_watcher,
+            stop_drops_watcher,
             mount_embedded_twitch_chat,
             update_embedded_twitch_chat_bounds,
             set_embedded_twitch_chat_visible,
