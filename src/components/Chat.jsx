@@ -1284,6 +1284,15 @@ export default function Chat({
                 eventType = 'ritual'
                 eventHeader = `👋 ${sysMsg || `${displayName} está en el chat por primera vez`}`
                 eventColorClass = 'from-indigo-950/80 to-purple-950/40 border-indigo-500/60 border-l-indigo-400 text-indigo-300 shadow-indigo-950/50'
+              } else if (
+                msgId === 'custom-reward-redemption' ||
+                msgId === 'community-points-redemption' ||
+                parsed['custom-reward-id'] ||
+                /canjeado|redeemed/i.test(sysMsg)
+              ) {
+                eventType = 'reward'
+                eventHeader = `🎁 ${sysMsg || `${displayName} ha canjeado una recompensa de puntos`}`
+                eventColorClass = 'from-purple-950/80 via-fuchsia-950/60 to-purple-900/40 border-purple-500/60 border-l-fuchsia-400 text-fuchsia-300 shadow-purple-950/50'
               } else {
                 eventType = 'notice'
                 eventHeader = `📢 ${sysMsg || `${displayName}: evento del canal`}`
@@ -1303,6 +1312,8 @@ export default function Chat({
               emotes: parsed['emotes'] || '',
               badges: badgeList,
               isNotice: true,
+              isReward: eventType === 'reward',
+              custom_reward_id: parsed['custom-reward-id'] || '',
               eventType,
               eventHeader,
               eventColorClass,

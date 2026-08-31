@@ -243,11 +243,12 @@ describe('ActivityFeed', () => {
     expect(screen.getByText('Sin actividad reciente')).toBeInTheDocument()
   })
 
-  it('renders parsed subscription, raid, and bits events', () => {
+  it('renders parsed subscription, raid, bits, and channel point reward events', () => {
     const msgs = [
       { id: '1', msg_id: 'sub', user: 'sub_user', user_id: 'u1', message: 'First sub!', timestamp: Date.now() },
       { id: '2', msg_id: 'raid', user: 'raider_streamer', user_id: 'u2', message: 'Raid with 50 viewers', timestamp: Date.now() },
       { id: '3', eventType: 'bits', user: 'cheer_fan', user_id: 'u3', message: 'Cheer1000 Love stream', timestamp: Date.now() },
+      { id: '4', eventType: 'reward', user: 'AlbertPlayXD', user_id: 'u4', eventHeader: '🎁 AlbertPlayXD ha canjeado Estiiiiiiiiira 🐸 250', message: '', timestamp: Date.now() },
     ]
 
     render(<ActivityFeed messages={msgs} />)
@@ -258,6 +259,8 @@ describe('ActivityFeed', () => {
     expect(screen.getByText('@raider_streamer')).toBeInTheDocument()
     expect(screen.getByText('💎 Donación de Bits')).toBeInTheDocument()
     expect(screen.getByText('@cheer_fan')).toBeInTheDocument()
+    expect(screen.getByText('🎁 AlbertPlayXD ha canjeado Estiiiiiiiiira 🐸 250')).toBeInTheDocument()
+    expect(screen.getByText('@AlbertPlayXD')).toBeInTheDocument()
   })
 })
 

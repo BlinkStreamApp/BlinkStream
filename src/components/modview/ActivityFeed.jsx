@@ -15,12 +15,12 @@ export function ActivityFeed({ messages = [], onInspectUser }) {
         m.msg_id === 'highlighted-message' ||
         m.msg_id === 'custom-reward-redemption' ||
         m.msg_id === 'community-points-redemption' ||
-        (typeof m.message === 'string' && /redeemed\s+(.+)\s+\(\d+\s+points\)/i.test(m.message)) ||
-        (typeof m.eventHeader === 'string' && (m.eventHeader.includes('Canje') || m.eventHeader.includes('Puntos')))
+        (typeof m.message === 'string' && /canjeado|redeemed|\d+\s+points/i.test(m.message)) ||
+        (typeof m.eventHeader === 'string' && (m.eventHeader.includes('Canje') || m.eventHeader.includes('canjeado') || m.eventHeader.includes('Puntos') || m.eventHeader.includes('recompensa') || m.eventHeader.includes('redeemed')))
       ) {
         list.push({
           id: m.id || m.timestamp,
-          type: 'reward',
+          type: 'rewards',
           user: m.user || m.user_name || 'Espectador',
           userId: m.user_id,
           title: m.eventHeader || '🎁 Canje de Puntos',
