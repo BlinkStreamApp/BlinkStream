@@ -24,7 +24,7 @@ log = "0.4"
 # del event loop). Tauri 2 ya depende transitivamente de tokio, pero
 # necesitamos declararlo para usar `spawn_blocking` desde este crate.
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
-tauri = { version = "2.11.2", features = ["unstable"] }
+tauri = { version = "2.11.2", features = ["unstable", "macos-private-api"] }
 tauri-plugin-log = "2"
 tauri-plugin-process = "2"
 tauri-plugin-opener = "2"
