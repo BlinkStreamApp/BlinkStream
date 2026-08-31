@@ -492,6 +492,7 @@ export default function Chat({
     onMessagesUpdate?.(messages)
   }, [messages, onMessagesUpdate])
   const [useTwitchPopout, setUseTwitchPopout] = useState(() => {
+    if (isMod) return false
     try {
       return localStorage.getItem('bs.chat.use_twitch_popout') === 'true'
     } catch {
@@ -1147,7 +1148,7 @@ export default function Chat({
       ws.onopen = () => {
         if (cancelled) { ws.close(); return }
         retryDelay = 1000
-        ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands')
+        ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership')
 
         if (auth.token && auth.username) {
           const cleanToken = auth.token.replace(/^oauth:/i, '')
@@ -1287,11 +1288,14 @@ export default function Chat({
               } else if (
                 msgId === 'custom-reward-redemption' ||
                 msgId === 'community-points-redemption' ||
+                msgId === 'highlighted-message' ||
                 parsed['custom-reward-id'] ||
-                /canjeado|redeemed/i.test(sysMsg)
+                parsed['msg-param-custom-reward-id'] ||
+                /canjeado|canjeó|canje|redeemed|points/i.test(sysMsg) ||
+                /canjeado|canjeó|canje|redeemed|points/i.test(userMsg)
               ) {
                 eventType = 'reward'
-                eventHeader = `🎁 ${sysMsg || `${displayName} ha canjeado una recompensa de puntos`}`
+                eventHeader = `🎁 ${sysMsg || userMsg || `${displayName} ha canjeado una recompensa`}`
                 eventColorClass = 'from-purple-950/80 via-fuchsia-950/60 to-purple-900/40 border-purple-500/60 border-l-fuchsia-400 text-fuchsia-300 shadow-purple-950/50'
               } else {
                 eventType = 'notice'
@@ -1313,7 +1317,7 @@ export default function Chat({
               badges: badgeList,
               isNotice: true,
               isReward: eventType === 'reward',
-              custom_reward_id: parsed['custom-reward-id'] || '',
+              custom_reward_id: parsed['custom-reward-id'] || parsed['msg-param-custom-reward-id'] || '',
               eventType,
               eventHeader,
               eventColorClass,
@@ -1343,11 +1347,18 @@ export default function Chat({
           let eventHeader = null
           let eventColorClass = null
 
-          if (parsed['custom-reward-id']) {
+          if (
+            parsed['custom-reward-id'] ||
+            parsed['msg-param-custom-reward-id'] ||
+            parsed['msg-id'] === 'highlighted-message' ||
+            parsed['msg-id'] === 'custom-reward-redemption' ||
+            parsed['msg-id'] === 'community-points-redemption' ||
+            /canjeado|canjeó|canje|redeemed/i.test(message)
+          ) {
             isReward = true
             eventType = 'reward'
-            const rewardTitle = parsed['custom-reward-title'] || 'Canje de Puntos de Canal'
-            eventHeader = `🎁 Canje de Recompensa: ${rewardTitle}`
+            const rewardTitle = parsed['custom-reward-title'] || (parsed['msg-id'] === 'highlighted-message' ? 'Mensaje Destacado' : (/canjeado|canjeó|canje/i.test(message) ? message : 'Canje de Puntos de Canal'))
+            eventHeader = `🎁 ${rewardTitle}`
             eventColorClass = 'from-purple-950/80 via-fuchsia-950/60 to-purple-900/40 border-purple-500/60 border-l-fuchsia-400 text-fuchsia-300 shadow-purple-950/50'
           } else if (parsed['bits'] && parseInt(parsed['bits'], 10) > 0) {
             eventType = 'bits'
@@ -1685,9 +1696,9 @@ export default function Chat({
     };
   }, [isOverlay, handleSlashCommand, getUserBadgesForSend]);
 
-  if (useTwitchPopout) {
-    return (
-      <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)]' : 'bg-chat'}`}>
+  return (
+    <div className={`h-full flex flex-col relative transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
+      {!isMod && useTwitchPopout && (
         <TwitchChatPopout
           channelName={channel}
           twitchToken={auth.token}
@@ -1697,20 +1708,16 @@ export default function Chat({
             try { localStorage.setItem('bs.chat.use_twitch_popout', 'false') } catch { /* ignore */ }
           }}
         />
-      </div>
-    )
-  }
-
-  return (
-    <div className={`h-full flex flex-col transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
-      <div className="shrink-0 px-2.5 py-1.5 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center justify-between gap-1.5 select-none">
-        {/* Left: Channel indicator */}
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-xs text-text-primary font-bold truncate max-w-[100px] sm:max-w-[130px]">
-            {isOverlay ? 'Chat' : channel}
-          </span>
-        </div>
+      )}
+      <div className={`h-full flex flex-col ${!isMod && useTwitchPopout ? 'invisible pointer-events-none absolute inset-0' : ''}`}>
+        <div className="shrink-0 px-2.5 py-1.5 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center justify-between gap-1.5 select-none">
+          {/* Left: Channel indicator */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-xs text-text-primary font-bold truncate max-w-[100px] sm:max-w-[130px]">
+              {isOverlay ? 'Chat' : channel}
+            </span>
+          </div>
 
         {/* Right: Action Buttons toolbar */}
         <div className="flex items-center gap-1 shrink-0">
@@ -2220,6 +2227,7 @@ export default function Chat({
             {t('chat.sendBtn', 'Enviar')}
           </button>
         </form>
+      </div>
       </div>
 
       {userCard && (
