@@ -1,13 +1,14 @@
 import { PUBLIC_CLIENT_ID } from './twitch'
 
 export async function fetchUserDropsInventory(token, channel = null) {
-  if (!token) return { campaigns: [], inventory: [] }
+  const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
+  if (!cleanToken) return { campaigns: [], inventory: [] }
 
   const cleanChannel = typeof channel === 'string' ? channel.trim().toLowerCase() : null
 
   const query = cleanChannel
     ? `
-      query UserDropInventoryWithChannel($channelLogin: String!) {
+      query InventoryWithChannel($channelLogin: String!) {
         currentUser {
           id
           inventory {
@@ -36,33 +37,6 @@ export async function fetchUserDropsInventory(token, channel = null) {
                   isClaimed
                   dropInstanceID
                 }
-              }
-            }
-          }
-          dropCampaignsInProgress {
-            id
-            name
-            status
-            game {
-              id
-              name
-              boxArtURL
-            }
-            timeBasedDrops {
-              id
-              name
-              requiredMinutesWatched
-              benefitEdges {
-                benefit {
-                  id
-                  name
-                  imageAssetURL
-                }
-              }
-              self {
-                currentMinutesWatched
-                isClaimed
-                dropInstanceID
               }
             }
           }
@@ -100,7 +74,7 @@ export async function fetchUserDropsInventory(token, channel = null) {
       }
     `
     : `
-      query UserDropInventory {
+      query Inventory {
         currentUser {
           id
           inventory {
@@ -132,108 +106,24 @@ export async function fetchUserDropsInventory(token, channel = null) {
               }
             }
           }
-          dropCampaignsInProgress {
-            id
-            name
-            status
-            game {
-              id
-              name
-              boxArtURL
-            }
-            timeBasedDrops {
-              id
-              name
-              requiredMinutesWatched
-              benefitEdges {
-                benefit {
-                  id
-                  name
-                  imageAssetURL
-                }
-              }
-              self {
-                currentMinutesWatched
-                isClaimed
-                dropInstanceID
-              }
-            }
-          }
         }
       }
     `
 
-  const cleanToken = token ? token.replace(/^oauth:/i, '').replace(/^Bearer\s+/i, '').trim() : null
-  const authHeader = cleanToken ? `OAuth ${cleanToken}` : null
-
-  const headers = {
-    'Client-ID': PUBLIC_CLIENT_ID,
-    'Content-Type': 'application/json',
-  }
-  if (authHeader) {
-    headers['Authorization'] = authHeader
-  }
-
   try {
-    let res = await fetch('https://gql.twitch.tv/gql', {
+    const res = await fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
-      headers,
+      headers: {
+        'Client-ID': PUBLIC_CLIENT_ID,
+        'Authorization': `OAuth ${cleanToken}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         query,
         ...(cleanChannel ? { variables: { channelLogin: cleanChannel } } : {}),
       }),
       signal: AbortSignal.timeout(8000),
     })
-
-    // If authenticated request failed with 401 and we have a channel, retry channel-only public query
-    if (res.status === 401 && cleanChannel && authHeader) {
-      const publicQuery = `
-        query PublicChannelDrops($channelLogin: String!) {
-          user(login: $channelLogin) {
-            id
-            viewerDropCampaigns {
-              id
-              name
-              status
-              game {
-                id
-                name
-                boxArtURL
-              }
-              timeBasedDrops {
-                id
-                name
-                requiredMinutesWatched
-                benefitEdges {
-                  benefit {
-                    id
-                    name
-                    imageAssetURL
-                  }
-                }
-                self {
-                  currentMinutesWatched
-                  isClaimed
-                  dropInstanceID
-                }
-              }
-            }
-          }
-        }
-      `
-      res = await fetch('https://gql.twitch.tv/gql', {
-        method: 'POST',
-        headers: {
-          'Client-ID': PUBLIC_CLIENT_ID,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: publicQuery,
-          variables: { channelLogin: cleanChannel },
-        }),
-        signal: AbortSignal.timeout(8000),
-      })
-    }
 
     if (!res.ok) return { campaigns: [], inventory: [] }
     const data = await res.json()
@@ -289,7 +179,6 @@ export async function fetchUserDropsInventory(token, channel = null) {
         if (!campaignMap.has(c.id)) {
           campaignMap.set(c.id, parseCampaign(c, true))
         } else {
-          // Mark existing campaign as current channel active
           const existing = campaignMap.get(c.id)
           existing.isCurrentChannel = true
         }
@@ -297,7 +186,6 @@ export async function fetchUserDropsInventory(token, channel = null) {
     }
 
     const campaigns = Array.from(campaignMap.values())
-
     return { campaigns }
   } catch (err) {
     console.warn('[drops] Error fetching user drops inventory:', err)
