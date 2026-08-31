@@ -23,6 +23,8 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
   const timerRef = useRef(null)
   const cancelledRef = useRef(false)
 
+  const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('blinkstream_twitch_token') : null)
+
   const rewardsRef = useRef([])
   useEffect(() => {
     rewardsRef.current = rewards
@@ -33,7 +35,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
       setRewards([])
       return []
     }
-    const res = await getCustomRewards(broadcasterId, ...(token ? [token] : []))
+    const res = await getCustomRewards(broadcasterId, ...(effectiveToken ? [effectiveToken] : []))
     if (cancelledRef.current) return []
     if (res.ok) {
       setRewards(res.data)
@@ -41,7 +43,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
     }
     setError(res.error || 'Error cargando recompensas')
     return []
-  }, [broadcasterId, token])
+  }, [broadcasterId, effectiveToken])
 
   const fetchRedemptions = useCallback(async (rewardsList) => {
     const list = rewardsList || []
@@ -53,10 +55,10 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
 
     const [pendingResults, fulfilledResults] = await Promise.all([
       Promise.allSettled(
-        list.map(r => getRedemptions(broadcasterId, r.id, PENDING_STATUS, token, undefined, 50))
+        list.map(r => getRedemptions(broadcasterId, r.id, PENDING_STATUS, effectiveToken, undefined, 50))
       ),
       Promise.allSettled(
-        list.map(r => getRedemptions(broadcasterId, r.id, 'FULFILLED', token, undefined, 20))
+        list.map(r => getRedemptions(broadcasterId, r.id, 'FULFILLED', effectiveToken, undefined, 20))
       ),
     ])
 
@@ -87,7 +89,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
     })
     fulfilledAll.sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at))
     setFulfilledRedemptions(fulfilledAll)
-  }, [broadcasterId, token])
+  }, [broadcasterId, effectiveToken])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -130,25 +132,25 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
 
   const createReward = useCallback(async (data) => {
     if (!broadcasterId) return { ok: false, error: 'No hay broadcaster activo' }
-    const res = await createCustomReward(broadcasterId, data, ...(token ? [token] : []))
+    const res = await createCustomReward(broadcasterId, data, ...(effectiveToken ? [effectiveToken] : []))
     if (res.ok) {
       setRewards(prev => [...prev, res.data])
       return { ok: true, data: res.data }
     }
     logError(new Error(res.error || 'create failed'), { context: 'useManageRewards', action: 'createReward' })
     return { ok: false, error: res.error }
-  }, [broadcasterId, token])
+  }, [broadcasterId, effectiveToken])
 
   const updateReward = useCallback(async (id, data) => {
     if (!broadcasterId) return { ok: false, error: 'No hay broadcaster activo' }
-    const res = await updateCustomReward(broadcasterId, id, data, ...(token ? [token] : []))
+    const res = await updateCustomReward(broadcasterId, id, data, ...(effectiveToken ? [effectiveToken] : []))
     if (res.ok) {
       setRewards(prev => prev.map(r => r.id === id ? { ...r, ...res.data } : r))
       return { ok: true, data: res.data }
     }
     logError(new Error(res.error || 'update failed'), { context: 'useManageRewards', action: 'updateReward' })
     return { ok: false, error: res.error }
-  }, [broadcasterId, token])
+  }, [broadcasterId, effectiveToken])
 
   const toggleReward = useCallback(async (id, isEnabled) => {
     return updateReward(id, { is_enabled: isEnabled })
@@ -156,7 +158,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
 
   const archiveReward = useCallback(async (id) => {
     if (!broadcasterId) return { ok: false, error: 'No hay broadcaster activo' }
-    const res = await deleteCustomReward(broadcasterId, id, ...(token ? [token] : []))
+    const res = await deleteCustomReward(broadcasterId, id, ...(effectiveToken ? [effectiveToken] : []))
     if (res.ok) {
       setRewards(prev => prev.filter(r => r.id !== id))
       setPendingRedemptions(prev => prev.filter(rd => rd.reward_id !== id))
@@ -164,32 +166,32 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
     }
     logError(new Error(res.error || 'delete failed'), { context: 'useManageRewards', action: 'archiveReward' })
     return { ok: false, error: res.error }
-  }, [broadcasterId, token])
+  }, [broadcasterId, effectiveToken])
 
   const fulfillRedemption = useCallback(async (id) => {
     const pending = pendingRedemptions.find(p => p.id === id)
     if (!broadcasterId || !pending) return { ok: false, error: 'Redencion no encontrada' }
-    const res = await updateRedemptionStatus(broadcasterId, pending.reward_id, [id], 'FULFILLED', ...(token ? [token] : []))
+    const res = await updateRedemptionStatus(broadcasterId, pending.reward_id, [id], 'FULFILLED', ...(effectiveToken ? [effectiveToken] : []))
     if (res.ok) {
       setPendingRedemptions(prev => prev.filter(p => p.id !== id))
       logEvent('channel_points', 'redemption.fulfilled', { broadcasterId, rewardId: pending.reward_id })
       return { ok: true }
     }
     return { ok: false, error: res.error }
-  }, [broadcasterId, pendingRedemptions, token])
+  }, [broadcasterId, pendingRedemptions, effectiveToken])
 
   const cancelRedemption = useCallback(async (id, _reason) => {
     void _reason
     const pending = pendingRedemptions.find(p => p.id === id)
     if (!broadcasterId || !pending) return { ok: false, error: 'Redencion no encontrada' }
-    const res = await updateRedemptionStatus(broadcasterId, pending.reward_id, [id], 'CANCELED', ...(token ? [token] : []))
+    const res = await updateRedemptionStatus(broadcasterId, pending.reward_id, [id], 'CANCELED', ...(effectiveToken ? [effectiveToken] : []))
     if (res.ok) {
       setPendingRedemptions(prev => prev.filter(p => p.id !== id))
       logEvent('channel_points', 'redemption.canceled', { broadcasterId, rewardId: pending.reward_id })
       return { ok: true }
     }
     return { ok: false, error: res.error }
-  }, [broadcasterId, pendingRedemptions, token])
+  }, [broadcasterId, pendingRedemptions, effectiveToken])
 
   const bulkFulfill = useCallback(async (ids) => {
     if (!broadcasterId || ids.length === 0) return { ok: true }
@@ -202,7 +204,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
     })
     const results = await Promise.all(
       [...byReward.entries()].map(([rewardId, rids]) =>
-        updateRedemptionStatus(broadcasterId, rewardId, rids, 'FULFILLED', ...(token ? [token] : []))
+        updateRedemptionStatus(broadcasterId, rewardId, rids, 'FULFILLED', ...(effectiveToken ? [effectiveToken] : []))
       )
     )
     const allOk = results.every(r => r.ok)
@@ -213,7 +215,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
     }
     const firstErr = results.find(r => !r.ok)
     return { ok: false, error: firstErr?.error }
-  }, [broadcasterId, pendingRedemptions, token])
+  }, [broadcasterId, pendingRedemptions, effectiveToken])
 
   const bulkCancel = useCallback(async (ids) => {
     if (!broadcasterId || ids.length === 0) return { ok: true }
@@ -226,7 +228,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
     })
     const results = await Promise.all(
       [...byReward.entries()].map(([rewardId, rids]) =>
-        updateRedemptionStatus(broadcasterId, rewardId, rids, 'CANCELED', ...(token ? [token] : []))
+        updateRedemptionStatus(broadcasterId, rewardId, rids, 'CANCELED', ...(effectiveToken ? [effectiveToken] : []))
       )
     )
     const allOk = results.every(r => r.ok)
@@ -237,7 +239,7 @@ export function useManageRewards({ broadcasterId, token, pollIntervalMs = 15000 
     }
     const firstErr = results.find(r => !r.ok)
     return { ok: false, error: firstErr?.error }
-  }, [broadcasterId, pendingRedemptions, token])
+  }, [broadcasterId, pendingRedemptions, effectiveToken])
 
   return {
     rewards,

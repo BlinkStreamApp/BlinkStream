@@ -15,6 +15,7 @@ import { RewardsQueuePanel } from './RewardsQueuePanel'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { TwitchChatPopout } from '../chat/TwitchChatPopout'
 import { openTwitchChatPopoutWindow } from '../../utils/twitchPopout'
+import { getUserIdByLogin } from '../../utils/twitch'
 import { useT } from '../../utils/i18n'
 
 const VideoPlayer = lazy(() => import('../VideoPlayer'))
@@ -23,10 +24,7 @@ const Chat = lazy(() => import('../Chat'))
 const CONFIG_STORAGE_KEY = 'bs.modview.config.v4'
 
 const DEFAULT_CONFIG = {
-  preset: 'standard', // 'standard' | 'chat_left' | 'no_player'
-  showPlayer: true,
-  showInspector: true,
-  enabledTabs: ['audit', 'users', 'activity', 'automod', 'predictions', 'rewards'],
+  preset: 'mod_focus', // 'classic' | 'mod_focus' | 'chat_only' | 'no_player'
   activeTab: 'audit',
 }
 
@@ -45,9 +43,22 @@ export function ModView({
   onLoginWithToken,
 }) {
   const t = useT()
-  const modState = useModeration({ broadcasterId, userId })
-  const roleState = useChannelRole({ broadcasterId, userId, channel })
-  const rewardsState = useManageRewards({ broadcasterId, token: twitchToken })
+
+  const [resolvedBroadcasterId, setResolvedBroadcasterId] = useState(null)
+  useEffect(() => {
+    if (broadcasterId || !channel) return
+    let cancelled = false
+    getUserIdByLogin(channel).then(id => {
+      if (!cancelled && id) setResolvedBroadcasterId(id)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [channel, broadcasterId])
+
+  const effectiveBroadcasterId = broadcasterId || resolvedBroadcasterId
+
+  const modState = useModeration({ broadcasterId: effectiveBroadcasterId, userId })
+  const roleState = useChannelRole({ broadcasterId: effectiveBroadcasterId, userId, channel })
+  const rewardsState = useManageRewards({ broadcasterId: effectiveBroadcasterId, token: twitchToken })
 
   const [selectedUser, setSelectedUser] = useState(null)
   const [chatMessages, setChatMessages] = useState([])
@@ -433,7 +444,7 @@ export function ModView({
           />
         ) : rightPanelTab === 'users' ? (
           <ActiveModsPanel
-            broadcasterId={broadcasterId}
+            broadcasterId={effectiveBroadcasterId}
             userId={userId}
             recentMessages={chatMessages}
             onInspectUser={handleSelectUser}
@@ -441,13 +452,13 @@ export function ModView({
         ) : rightPanelTab === 'activity' ? (
           <ActivityFeed
             messages={chatMessages}
-            recentRedemptions={rewardsState.fulfilledRedemptions}
+            recentRedemptions={[...rewardsState.pendingRedemptions, ...rewardsState.fulfilledRedemptions]}
             onInspectUser={handleSelectUser}
           />
         ) : rightPanelTab === 'automod' ? (
           automodSubTab === 'automod' ? (
             <AutoModQueue
-              broadcasterId={broadcasterId}
+              broadcasterId={effectiveBroadcasterId}
               userId={userId}
               token={twitchToken}
               isLoggedIn={isLoggedIn}
@@ -458,7 +469,7 @@ export function ModView({
             />
           ) : (
             <UnbanRequestsPanel
-              broadcasterId={broadcasterId}
+              broadcasterId={effectiveBroadcasterId}
               userId={userId}
               token={twitchToken}
               isLoggedIn={isLoggedIn}
@@ -469,7 +480,7 @@ export function ModView({
         ) : rightPanelTab === 'predictions' ? (
           <PredictionsPollsPanel
             channel={channel}
-            broadcasterId={broadcasterId}
+            broadcasterId={effectiveBroadcasterId}
             userId={userId}
             token={twitchToken}
             isLoggedIn={isLoggedIn}

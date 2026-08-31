@@ -23,7 +23,7 @@ export function ActivityFeed({ messages = [], recentRedemptions = [], onInspectU
         userId: rd.user_id,
         title: `🎁 ${username} ha canjeado ${title} (${cost.toLocaleString()} pts)`,
         text: rd.user_input || '',
-        timestamp: rd.redeemed_at ? new Date(rd.redeemed_at).getTime() : Date.now(),
+        timestamp: rd.redeemed_at ? new Date(rd.redeemed_at).getTime() : 0,
       })
     }
 
