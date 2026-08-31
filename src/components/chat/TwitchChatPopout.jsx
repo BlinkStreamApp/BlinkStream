@@ -16,6 +16,10 @@ export function TwitchChatPopout({
   const [isOpeningWindow, setIsOpeningWindow] = useState(false)
   const containerRef = useRef(null)
 
+  const [isOverlayModalOpen, setIsOverlayModalOpen] = useState(false)
+  const isOverlayModalOpenRef = useRef(false)
+  useEffect(() => { isOverlayModalOpenRef.current = isOverlayModalOpen }, [isOverlayModalOpen])
+
   const cleanChannel = (channelName || '').trim().toLowerCase()
 
   // Native Child Webview Lifecycle in Tauri
@@ -40,6 +44,9 @@ export function TwitchChatPopout({
             authToken: twitchToken || null,
             username: twitchUsername || null,
           })
+          if (isOverlayModalOpenRef.current) {
+            await invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
+          }
         } else {
           await invoke('update_embedded_twitch_chat_bounds', {
             x: Math.round(rect.left),
@@ -64,11 +71,34 @@ export function TwitchChatPopout({
     const handleResize = () => syncBounds(false)
     window.addEventListener('resize', handleResize)
 
+    const handleModalEvent = (e) => {
+      const open = Boolean(e?.detail?.isModalOpen)
+      setIsOverlayModalOpen(open)
+      invoke('set_embedded_twitch_chat_visible', { visible: !open }).catch(() => {})
+    }
+    window.addEventListener('bs:modal-state-change', handleModalEvent)
+
+    const checkDomModal = () => {
+      const modalElement = document.querySelector('[role="dialog"], .fixed.inset-0.z-50, .fixed.inset-0.z-40')
+      const hasModal = Boolean(modalElement)
+      setIsOverlayModalOpen(prev => {
+        if (prev !== hasModal) {
+          invoke('set_embedded_twitch_chat_visible', { visible: !hasModal }).catch(() => {})
+        }
+        return hasModal
+      })
+    }
+
+    const domObserver = new MutationObserver(checkDomModal)
+    domObserver.observe(document.body, { childList: true, subtree: true, attributes: true })
+
     return () => {
       isMounted = false
       clearTimeout(timer)
       if (observer) observer.disconnect()
+      domObserver.disconnect()
       window.removeEventListener('resize', handleResize)
+      window.removeEventListener('bs:modal-state-change', handleModalEvent)
       if (isTauri()) {
         invoke('unmount_embedded_twitch_chat').catch(() => {})
       }

@@ -173,6 +173,22 @@ function MainApp() {
     setShowOnboarding(false)
   }
 
+  const isAnyModalOpen = Boolean(
+    showSettings ||
+    showAbout ||
+    showCompanionModal ||
+    showOnboarding ||
+    showLogoutConfirm ||
+    showCPPanel ||
+    showModPanel
+  )
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bs:modal-state-change', { detail: { isModalOpen: isAnyModalOpen } }))
+    }
+  }, [isAnyModalOpen])
+
   useEffect(() => {
     const handleKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyK' || e.code === 'KeyP')) {

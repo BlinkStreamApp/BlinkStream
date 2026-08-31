@@ -1854,6 +1854,19 @@ async fn update_embedded_twitch_chat_bounds(
 }
 
 #[tauri::command]
+async fn set_embedded_twitch_chat_visible(app: AppHandle, visible: bool) -> Result<(), String> {
+    let label = "embedded_twitch_chat";
+    if let Some(webview) = app.get_webview(label) {
+        if visible {
+            let _ = webview.show();
+        } else {
+            let _ = webview.hide();
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn unmount_embedded_twitch_chat(app: AppHandle) -> Result<(), String> {
     let label = "embedded_twitch_chat";
     if let Some(webview) = app.get_webview(label) {
@@ -1890,6 +1903,7 @@ pub fn run() {
             open_twitch_popout_window,
             mount_embedded_twitch_chat,
             update_embedded_twitch_chat_bounds,
+            set_embedded_twitch_chat_visible,
             unmount_embedded_twitch_chat,
             start_recording,
             stop_recording,
