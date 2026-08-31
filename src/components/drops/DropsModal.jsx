@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { useTwitchDrops } from '../../hooks/useTwitchDrops'
+import { safeOpenUrl } from '../../utils/tauriEnv'
 
 export default function DropsModal({ token, channel, onClose }) {
   const {
@@ -113,14 +114,34 @@ export default function DropsModal({ token, channel, onClose }) {
               <p className="text-xs text-text-muted">Consultando campañas de Drops activas...</p>
             </div>
           ) : campaigns.length === 0 ? (
-            <div className="text-center py-16 px-4 space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-white/5 mx-auto flex items-center justify-center text-text-muted">
-                <PhosphorIcon name="Gift" size={28} weight="duotone" />
+            <div className="text-center py-12 px-4 space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 mx-auto flex items-center justify-center text-purple-400 shadow-lg shadow-purple-500/5">
+                <PhosphorIcon name="Gift" size={32} weight="duotone" />
               </div>
-              <h4 className="text-sm font-bold text-white">No hay Drops en progreso</h4>
-              <p className="text-xs text-text-muted max-w-sm mx-auto">
-                No tienes ninguna campaña de Drops activa actualmente. Mira canales con Drops habilitados para comenzar a progresar.
-              </p>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-white">No hay Drops en progreso detectados</h4>
+                <p className="text-xs text-text-muted max-w-md mx-auto leading-relaxed">
+                  Mira canales con la etiqueta <span className="text-purple-300 font-semibold">Drops activados</span> o consulta tu inventario oficial y campañas activas directamente en Twitch.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => safeOpenUrl('https://www.twitch.tv/drops/inventory', true)}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <PhosphorIcon name="ArrowSquareOut" size={16} weight="bold" />
+                  <span>Abrir Inventario de Drops en Twitch</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => safeOpenUrl('https://www.twitch.tv/drops/campaigns', true)}
+                  className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-text-muted hover:text-white border border-white/10 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>Todas las Campañas</span>
+                </button>
+              </div>
             </div>
           ) : (
             campaigns.map((campaign) => (
