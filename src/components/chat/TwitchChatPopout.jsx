@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { isTauri } from '../../utils/tauriEnv'
 import { openTwitchChatPopoutWindow } from '../../utils/twitchPopout'
 import PhosphorIcon from '../icons/PhosphorIcon'
@@ -9,22 +9,10 @@ export function TwitchChatPopout({
   onClose,
   showControls = true,
 }) {
-  const [iframeKey, setIframeKey] = useState(0)
-  const [alwaysOnTop, setAlwaysOnTop] = useState(false)
+  const [alwaysOnTop, setAlwaysOnTop] = useState(true)
   const [isOpeningWindow, setIsOpeningWindow] = useState(false)
-  const iframeRef = useRef(null)
 
   const cleanChannel = (channelName || '').trim().toLowerCase()
-
-  // Build official Twitch embed URL with parent parameters for iframes
-  const parentDomains = ['localhost', 'tauri.localhost', '127.0.0.1']
-  if (typeof window !== 'undefined' && window.location.hostname && !parentDomains.includes(window.location.hostname)) {
-    parentDomains.push(window.location.hostname)
-  }
-  const parentParams = parentDomains.map(p => `parent=${encodeURIComponent(p)}`).join('&')
-  const embedUrl = cleanChannel
-    ? `https://www.twitch.tv/embed/${encodeURIComponent(cleanChannel)}/chat?${parentParams}&darkpopout=true`
-    : ''
 
   const handleOpenFloating = useCallback(async () => {
     if (!cleanChannel) return
@@ -36,10 +24,6 @@ export function TwitchChatPopout({
     }
   }, [cleanChannel, alwaysOnTop])
 
-  const handleReload = () => {
-    setIframeKey(k => k + 1)
-  }
-
   if (!cleanChannel) {
     return (
       <div className={`w-full h-full flex flex-col items-center justify-center text-text-muted text-xs p-4 ${className}`}>
@@ -50,11 +34,11 @@ export function TwitchChatPopout({
   }
 
   return (
-    <div className={`w-full h-full flex flex-col min-h-[300px] bg-bg-primary overflow-hidden ${className}`}>
+    <div className={`w-full h-full flex flex-col min-h-[340px] bg-bg-primary overflow-hidden select-none ${className}`}>
       {/* Top Header / Action Bar */}
       {showControls && (
-        <div className="shrink-0 px-2.5 py-2 bg-bg-secondary/90 border-b border-white/10 flex items-center justify-between gap-2 backdrop-blur-md select-none text-xs">
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div className="shrink-0 px-3 py-2 bg-bg-secondary/90 border-b border-white/10 flex items-center justify-between gap-2 backdrop-blur-md text-xs">
+          <div className="flex items-center gap-2 min-w-0">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" className="text-twitch shrink-0">
               <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z" />
             </svg>
@@ -64,70 +48,87 @@ export function TwitchChatPopout({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {isTauri() && (
-              <button
-                type="button"
-                onClick={() => setAlwaysOnTop(p => !p)}
-                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                  alwaysOnTop
-                    ? 'bg-twitch text-white shadow-sm'
-                    : 'text-text-muted hover:text-white bg-white/5 hover:bg-white/10'
-                }`}
-                title={alwaysOnTop ? 'Siempre encima activado' : 'Fijar siempre encima al abrir ventana'}
-                aria-label="Toggle siempre encima"
-              >
-                <PhosphorIcon name="PushPin" size={13} weight={alwaysOnTop ? 'fill' : 'regular'} />
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={handleOpenFloating}
-              disabled={isOpeningWindow}
-              className="px-2 py-1 rounded-lg text-xs font-bold text-twitch-glow hover:text-white bg-twitch/15 hover:bg-twitch/30 border border-twitch/30 transition-all cursor-pointer flex items-center gap-1"
-              title="Abrir en ventana flotante nativa independiente (recomendado para puntos y emotes)"
-              aria-label="Abrir ventana flotante"
-            >
-              <PhosphorIcon name="ArrowSquareOut" size={13} weight="bold" />
-              <span>Ventana</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleReload}
-              className="p-1.5 rounded-lg text-text-muted hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-              title="Recargar chat popout"
-              aria-label="Recargar chat"
-            >
-              <PhosphorIcon name="ArrowsClockwise" size={13} />
-            </button>
-
             {onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors cursor-pointer"
                 title="Volver al chat ligero BlinkStream"
                 aria-label="Volver a chat ligero"
               >
-                Chat Ligero
+                Volver a Chat Ligero
               </button>
             )}
           </div>
         </div>
       )}
 
-      {/* Popout WebView Iframe with Fallback Prompt */}
-      <div className="flex-1 w-full h-full min-h-0 relative bg-[#0e0e10]">
-        <iframe
-          key={iframeKey}
-          ref={iframeRef}
-          src={embedUrl}
-          className="w-full h-full border-0 absolute inset-0"
-          title={`Twitch Chat - ${cleanChannel}`}
-          allow="autoplay; fullscreen"
-          sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
-        />
+      {/* Popout Launcher Hub */}
+      <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-5 text-center bg-gradient-to-b from-[#181824] to-[#0d0e14] overflow-y-auto">
+        <div className="relative mb-3 flex items-center justify-center">
+          <div className="absolute w-20 h-20 bg-twitch/20 rounded-full blur-xl animate-pulse" />
+          <div className="w-14 h-14 rounded-2xl bg-twitch/15 border border-twitch/40 flex items-center justify-center text-twitch shadow-lg shadow-twitch/20 relative z-10">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z" />
+            </svg>
+          </div>
+        </div>
+
+        <h3 className="text-base font-extrabold text-white mb-1 tracking-wide">
+          Chat Oficial de Twitch
+        </h3>
+        <p className="text-xs text-twitch-glow font-bold mb-4">
+          Canal: #{cleanChannel}
+        </p>
+
+        <p className="text-xs text-text-muted max-w-[280px] mb-5 leading-relaxed">
+          Abre el chat nativo de Twitch en ventana flotante independiente para interactuar con tus puntos de canal, recompensas y predicciones.
+        </p>
+
+        {/* Action Button */}
+        <div className="w-full max-w-[280px] flex flex-col gap-2.5 mb-5">
+          <button
+            type="button"
+            onClick={handleOpenFloating}
+            disabled={isOpeningWindow}
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-twitch via-purple-600 to-indigo-600 hover:from-twitch-dark hover:via-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-lg shadow-twitch/30 hover:shadow-twitch/50 hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            aria-label="Abrir ventana flotante"
+          >
+            <PhosphorIcon name="ArrowSquareOut" size={16} weight="bold" />
+            <span>{isOpeningWindow ? 'Abriendo ventana…' : 'Abrir Ventana Popout'}</span>
+          </button>
+
+          {isTauri() && (
+            <button
+              type="button"
+              onClick={() => setAlwaysOnTop(p => !p)}
+              className={`w-full py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                alwaysOnTop
+                  ? 'bg-twitch/15 text-twitch-glow border-twitch/40 shadow-sm'
+                  : 'bg-white/5 text-text-muted border-white/10 hover:border-white/20'
+              }`}
+            >
+              <PhosphorIcon name="PushPin" size={13} weight={alwaysOnTop ? 'fill' : 'regular'} />
+              <span>{alwaysOnTop ? 'Always on Top: Activado' : 'Always on Top: Desactivado'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Features Checklist */}
+        <div className="w-full max-w-[280px] bg-white/[0.03] border border-white/[0.07] rounded-xl p-3 text-left flex flex-col gap-2 text-[11px] text-text-muted">
+          <div className="flex items-center gap-2 text-text-primary font-medium">
+            <span className="text-amber-400">🪙</span>
+            <span>Puntos de canal y cofres de bonificación</span>
+          </div>
+          <div className="flex items-center gap-2 text-text-primary font-medium">
+            <span className="text-purple-400">🎯</span>
+            <span>Predicciones y encuestas en directo</span>
+          </div>
+          <div className="flex items-center gap-2 text-text-primary font-medium">
+            <span className="text-cyan-400">💎</span>
+            <span>Emotes oficiales y suscripciones</span>
+          </div>
+        </div>
       </div>
     </div>
   )

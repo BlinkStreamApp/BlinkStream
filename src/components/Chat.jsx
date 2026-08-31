@@ -1695,36 +1695,47 @@ export default function Chat({
         {/* Left: Channel indicator */}
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`w-2 h-2 rounded-full shrink-0 ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-xs text-text-primary font-bold truncate max-w-[100px] sm:max-w-[130px]">{channel}</span>
+          <span className="text-xs text-text-primary font-bold truncate max-w-[100px] sm:max-w-[130px]">
+            {isOverlay ? 'Chat' : channel}
+          </span>
         </div>
 
         {/* Right: Action Buttons toolbar */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* Popout Embed Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setUseTwitchPopout(true)
-              try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
-            }}
-            className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border border-twitch/40 bg-twitch/10 hover:bg-twitch/25 text-twitch-glow hover:text-white transition-all cursor-pointer"
-            title="Ver Chat Oficial de Twitch (Puntos de Canal y Emotes)"
-            aria-label="Ver Chat Oficial Twitch Popout"
-          >
-            <PhosphorIcon name="Coins" size={13} weight="fill" />
-            <span className="hidden md:inline">Popout</span>
-          </button>
+          {!isOverlay && (
+            <>
+              {/* Twitch Popout Button (Directly launches native floating popout window) */}
+              <button
+                type="button"
+                onClick={() => openTwitchChatPopoutWindow(channel, false)}
+                className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border border-twitch/40 bg-twitch/10 hover:bg-twitch/25 text-twitch-glow hover:text-white transition-all cursor-pointer"
+                title="Abrir Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)"
+                aria-label="Abrir Popout Oficial de Twitch"
+              >
+                <PhosphorIcon name="Coins" size={13} weight="fill" />
+                <span className="hidden sm:inline">Popout</span>
+              </button>
 
-          {/* Popout Floating Window */}
-          <button
-            type="button"
-            onClick={() => openTwitchChatPopoutWindow(channel, false)}
-            className="p-1 rounded-md text-text-muted hover:text-cyan-300 hover:bg-white/5 transition-colors cursor-pointer"
-            title="Abrir Chat de Twitch en Ventana Flotante"
-            aria-label="Abrir Popout Flotante"
-          >
-            <PhosphorIcon name="ArrowSquareOut" size={13} weight="bold" />
-          </button>
+              {/* Gamer Overlay Launcher */}
+              {isTauri() && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await invoke('open_gamer_overlay', { channel })
+                    } catch (err) {
+                      console.warn('Failed to open gamer overlay:', err)
+                    }
+                  }}
+                  className="p-1 rounded-md text-text-muted hover:text-cyan-400 hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Abrir Overlay Gamer Transparente (HUD sobre videojuegos)"
+                  aria-label="Abrir Overlay Gamer Transparente"
+                >
+                  <PhosphorIcon name="PictureInPicture" size={13} weight="duotone" />
+                </button>
+              )}
+            </>
+          )}
 
           {/* Anti-Spam Toggle */}
           <button
@@ -1748,25 +1759,6 @@ export default function Chat({
             <span className={`w-1.5 h-1.5 rounded-full ${antiSpam ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
             <span className="hidden xl:inline">Anti-Spam</span>
           </button>
-
-          {/* Gamer Overlay Launcher */}
-          {isTauri() && !isOverlay && (
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await invoke('open_gamer_overlay', { channel })
-                } catch (err) {
-                  console.warn('Failed to open gamer overlay:', err)
-                }
-              }}
-              className="p-1 rounded-md text-text-muted hover:text-cyan-400 hover:bg-white/5 transition-colors cursor-pointer"
-              title="Abrir Overlay Gamer Transparente (HUD sobre videojuegos)"
-              aria-label="Abrir Overlay Gamer Transparente"
-            >
-              <PhosphorIcon name="PictureInPicture" size={13} weight="duotone" />
-            </button>
-          )}
 
           {/* User Auth status */}
           {auth.token ? (

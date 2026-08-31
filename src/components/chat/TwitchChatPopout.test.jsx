@@ -16,16 +16,13 @@ describe('TwitchChatPopout', () => {
     invoke.mockResolvedValue(undefined)
   })
 
-  it('renders iframe with correct twitch popout URL and sandbox', () => {
+  it('renders Twitch Chat Popout launcher hub with channel and features', () => {
     render(<TwitchChatPopout channelName="shroud" />)
 
-    const iframe = screen.getByTitle('Twitch Chat - shroud')
-    expect(iframe).toBeDefined()
-    expect(iframe.getAttribute('src')).toContain('https://www.twitch.tv/embed/shroud/chat?')
-    expect(iframe.getAttribute('src')).toContain('parent=')
-    expect(iframe.getAttribute('sandbox')).toContain('allow-storage-access-by-user-activation')
-    expect(iframe.getAttribute('sandbox')).toContain('allow-scripts')
-    expect(iframe.getAttribute('sandbox')).toContain('allow-same-origin')
+    expect(screen.getByText('Chat Oficial de Twitch')).toBeDefined()
+    expect(screen.getByText('Canal: #shroud')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Abrir ventana flotante' })).toBeDefined()
+    expect(screen.getByText('Puntos de canal y cofres de bonificación')).toBeDefined()
   })
 
   it('renders empty message when channel name is missing', () => {
@@ -34,7 +31,7 @@ describe('TwitchChatPopout', () => {
     expect(screen.getByText(/Sin canal asignado para Twitch Popout/i)).toBeDefined()
   })
 
-  it('triggers onClose when "Chat Ligero" button is clicked', () => {
+  it('triggers onClose when "Volver a Chat Ligero" button is clicked', () => {
     const onCloseMock = vi.fn()
     render(<TwitchChatPopout channelName="shroud" onClose={onCloseMock} />)
 
@@ -44,7 +41,7 @@ describe('TwitchChatPopout', () => {
     expect(onCloseMock).toHaveBeenCalledTimes(1)
   })
 
-  it('opens floating popout window via Tauri invoke when floating button is clicked', async () => {
+  it('opens floating popout window via Tauri invoke when button is clicked', async () => {
     render(<TwitchChatPopout channelName="shroud" />)
 
     const floatingBtn = screen.getByRole('button', { name: 'Abrir ventana flotante' })
@@ -52,7 +49,7 @@ describe('TwitchChatPopout', () => {
 
     expect(invoke).toHaveBeenCalledWith('open_twitch_popout_window', {
       channel: 'shroud',
-      alwaysOnTop: false,
+      alwaysOnTop: true,
     })
   })
 
