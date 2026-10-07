@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.4.1-e94560" alt="Version">
+  <img src="https://img.shields.io/badge/source_version-1.4.2-e94560" alt="Source version 1.4.2">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
   <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
@@ -19,12 +19,33 @@
 
 ## ✨ Features
 
+### v1.4.2 — Twitch reliability and integrated Drops (release preparation)
+
+The source version is **1.4.2**; the latest published release remains **1.4.1**.
+A source push does not publish installers or enable an update to 1.4.2.
+
+- **Integrated Drops:** native progress and official Twitch inventory share one panel, without a
+  separate claim window. The panel and polish were accepted in a Windows user session. Claims
+  still require Twitch integrity checks and any game-account linkage.
+- **Experimental watch reporting:** opt-in reports measure actual native playback and pause when
+  playback stops or the app is hidden. Only Twitch-confirmed inventory counts as earned progress;
+  accepted reports alone do not prove credit. No second official player is opened.
+- **Safer Auto-Claim:** uncertain claims persistently pause automation instead of reopening windows.
+  General panel acceptance is not separate proof of automatic clicking in every campaign.
+- **EventSub rewards:** custom redemption events replace retired PubSub, with creator authorization,
+  connection states, deduplication and cleanup. A real authorized redemption test remains pending.
+- **UI reliability:** stale search responses cannot reopen dismissed results; player shortcuts respect
+  interactive controls/modals; Drops restores React focus and highlights the active pane.
+
+See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
+[updater verification](docs/guides/UPDATER_VERIFICATION.md) for validation limits and release blockers.
+
 | Feature | Description |
 |---------|-------------|
-| 🌍 **Global Localization** | 100% Comprehensive translations across 8 languages (ES, EN, FR, DE, PT, JA, KO, RU) |
+| 🌍 **Global Localization** | Core interface supports 8 languages (ES, EN, FR, DE, PT, JA, KO, RU); new experimental screens may still contain Spanish copy |
 | 💬 **Twitch Popout Chat & Channel Points** | Official native Twitch popout chat integrated directly into the workspace or as an Always-on-Top floating window with full Channel Points, reward redemption, and emotes |
 | 🛡️ **Pro Mod View Workspace** | Dedicated multi-dock command center (`Ctrl+M`) with live mod logs, AutoMod queue, unban appeals, active viewers, predictions, and channel point redemptions |
-| ⚡ **Ultra-Low Latency (LL-HLS)** | Aggressive live edge sync with instant 0-delay playback, dynamic 1.2x catchup, and 1-click live resync |
+| ⚡ **Low Latency (LL-HLS)** | Live-edge synchronization, dynamic catchup and one-click live resync; latency depends on stream/network conditions |
 | 💬 **Rich IRC Chat & Badges** | Real-time chat with 7TV/BTTV/FFZ emotes, optimistic badge rendering (Sub, Mod, VIP, Founder, Turbo), and custom colors |
 | 🎮 **Gamer Chat Overlay (HUD)** | Transparent always-on-top HUD with click-through and opacity controls to read chat over full-screen games |
 | 🌧️ **Emote Rain & Combos** | Floating real-time emote particle overlays and dynamic neon Combo meter (HYPERS, SUPER, GODLIKE) |
@@ -38,38 +59,34 @@
 | 📊 **Pro Telemetry (Nerd Stats)** | Real-time live HUD measuring exact live broadcast delay, RAM buffer ahead, bitrate, resolution, FPS, and dropped frames |
 | 📱 **Mobile Wi-Fi Remote** | Control playback, channel switching, and volume wirelessly from any smartphone or tablet |
 | 🔒 **Hardened Security** | Strict Content Security Policy (CSP), rustls TLS, and secure OS keychain storage |
-| 🔄 **Over-The-Air Updates** | Automated background checking and seamless self-updating via official GitHub Releases |
+| 🔄 **Over-The-Air Updates** | Background/manual checks, user-confirmed installation and signature verification via GitHub Releases; signing compatibility currently blocks release readiness |
 
 ---
 
 ## 📦 Installation
 
 ### Windows
-Download the official installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases). Existing installations update automatically:
-- ⭐ **`BlinkStream_1.4.0_Win_x64.exe`** *(Recommended — NSIS installer and automatic updates)*
-- `BlinkStream_1.4.0_Win_x64.msi` *(Enterprise MSI installer)*
+Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
+Version 1.4.2 is not published yet. Updates require a compatible signing key and your confirmation.
+
+- ⭐ **`BlinkStream_1.4.1_Win_x64.exe`** *(NSIS installer)*
+- `BlinkStream_1.4.1_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
-> **Important Note Regarding Windows Defender / SmartScreen Notifications (False Positives):**  
-> Because BlinkStream is an independent, free open-source software project distributed without costly commercial EV (Extended Validation) code signing certificates ($300+/year), Microsoft Defender may occasionally flag brand-new compiled builds with machine learning heuristics warnings upon initial download (such as `Trojan:Win32/Wacatac.B!ml` or SmartScreen screen blocks).  
-> 
-> **Why does this happen?** The `!ml` suffix stands for *Machine Learning*. When downloading unsigned executables that perform legitimate installation procedures (creating shortcuts, registering uninstall entries), automated predictive heuristic models may temporarily flag newly released binaries simply due to their initial "zero reputation" score in cloud databases.  
-> 
-> **How to proceed:**  
-> - **Windows Security / Defender:** Open the threat log and select **Actions** ➔ **Allow on device** (or *Restore*).  
-> - **Windows SmartScreen Prompt:** Click **More info** ➔ **Run anyway**.  
-> - *Transparency guarantee:* Every single BlinkStream binary is compiled directly within public, highly monitored GitHub Actions cloud runner infrastructure with automated security auditing. Users are encouraged to inspect source workflows or compile binaries locally using our build instructions below!
+> **Windows trust warnings:** binaries are not Authenticode-signed. Updater signatures do not replace
+> Windows code signing. A Defender detection must not be assumed to be a false positive: keep
+> protection enabled and investigate the file and its provenance before running it.
 
 ### macOS
 ```bash
 brew install streamlink
-# Download BlinkStream_1.4.0_macOS_arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
+# Download the published macOS arm64.dmg (Silicon) or x64.dmg (Intel) from Releases
 ```
 
 ### Linux (Debian / Ubuntu)
 ```bash
 sudo apt install streamlink
-# Download BlinkStream_1.4.0_Linux_x86_64.deb or .AppImage from Releases
+# Download the published Linux x86_64.deb or .AppImage from Releases
 ```
 
 ---
