@@ -24,7 +24,7 @@
 - Logout clears recent history and session caches, closes playback and returns to the guest welcome.
 - Twitch follows refresh independently from account-scoped pinned favorites, including unfollows.
 - New approved logo across desktop icons, welcome, favicon and website; matching name colors.
-- User-validated Windows logout/welcome; follow/unfollow refresh covered by automated tests.
+- User-validated Windows logout/welcome and live Twitch follow/unfollow refresh.
   Signed cross-platform publication is pending CI. Downloads below still point to the published 1.4.2.
 
 Small fixes increment the patch number: `1.4.2` → `1.4.3`, not `1.4.2-a`.

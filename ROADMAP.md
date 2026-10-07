@@ -11,7 +11,7 @@ We strictly follow sequential Semantic Versioning (SemVer).
 The historical phases below describe product direction, not proof of a published release.
 Source is `1.4.3`; latest published release remains `1.4.2` until the hotfix passes CI.
 The hotfix includes account-scoped favorites/follows, logout cleanup and approved branding.
-Windows logout/welcome were accepted by the user; real Twitch follow/unfollow acceptance remains pending.
+Windows logout/welcome and real Twitch follow/unfollow refresh were accepted by the user.
 Small corrections use patch releases; see [hotfix policy](docs/guides/HOTFIX_RELEASES.md).
 Implementation, real-session validation and publication are separate gates.
 The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.md](docs/EXECUTION_PLAN.md).

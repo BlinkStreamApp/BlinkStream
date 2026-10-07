@@ -24,10 +24,10 @@ Date: 2026-10-08.
 
 ## Validation and limits
 
-- Windows logout and the classic welcome/logo were accepted by the user.
+- Windows logout, the classic welcome/logo and live Twitch follow/unfollow refresh were accepted by the user.
 - 542 frontend tests pass, one skipped; lint and frontend build pass locally.
 - 11 release/signature tests and 56 Rust Windows tests pass; fmt and Clippy pass.
-- Live Twitch follow/unfollow confirmation remains pending; automated tests cover its refresh flow.
+- Automated regressions also cover follow/unfollow refresh, account changes and stale responses.
 - Cross-platform signed builds, installer smoke and updater signatures are publication gates in CI.
 - Signing trust remains unchanged. This hotfix does not deploy Supabase or change database schemas.
 - Historical trust migration, authenticated GUI upgrades and automatic Drops claim validation
