@@ -6,7 +6,7 @@ Status: active
 ## Objective
 
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
-Publicar el hotfix 1.4.3 de sesión y marca con artefactos firmados en las tres plataformas.
+Consolidar la fiabilidad Twitch tras publicar el hotfix 1.4.3 de sesión y marca.
 
 ## Stack
 
@@ -40,7 +40,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Decisions
 
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
-- DEC-002 — Fuente 1.4.3 candidata; publicada/latest 1.4.2 hasta pasar CI y verificar el nuevo manifiesto.
+- DEC-002 — Fuente/publicada/latest 1.4.3; cuatro builds firmados y manifiesto validados por CI.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
 - DEC-005 — Favoritos autorizados mediante identidad auth confiable, no metadata editable.
@@ -57,10 +57,10 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
-- Hotfix 1.4.3 autorizado: candidato `758c464` pasó los seis jobs de CI `37694946505` (calidad, cuatro builds firmados y manifiesto). Tag `v1.4.3` creado/pusheado sobre ese SHA; workflow del tag pendiente de publicación. Procedimiento reutilizable: `docs/guides/HOTFIX_RELEASES.md`.
+- Hotfix 1.4.3 publicado/latest: tag sobre `758c464`; candidato CI `37694946505` y tag CI `37696597017` correctos. Release pública con 15 assets y updater de master en 1.4.3. Roadmap/web actualizados a la entrega; guía reutilizable: `docs/guides/HOTFIX_RELEASES.md`.
 - Logout/recientes y bienvenida clásica/logo aceptados por el usuario en Windows. Blink blanco y Stream violeta→fucsia igual que cabecera; sin nuevos CTAs. Iconos desktop, favicon, web y README usan el logo elegido.
 - Follows separados de pins por cuenta; refresh visible cada 60 s y al volver/online, abort/timeout y descarte de respuestas obsoletas. Logout limpia recientes/caché de portada, cierra stream y no permite restauraciones auth tardías. El usuario confirma que follow/unfollow real funciona; regresiones automatizadas cubren el flujo.
-- Validación local: 542 frontend pasan/1 omitido, 11 release/firma y 56 Rust Windows; lint/fmt/Clippy y build Windows correctos. Candidato CI multiplataforma firmado correcto; publicación del tag y verificación de bytes públicos pendientes. Nada instalado ni desplegado en Supabase.
+- Validación local: 542 frontend pasan/1 omitido, 11 release/firma y 56 Rust Windows; lint/fmt/Clippy y build Windows correctos. CI firmado multiplataforma y smoke NSIS correctos; verificación independiente de bytes públicos del hotfix no repetida. Nada instalado ni desplegado en Supabase.
 - Limpieza aislada publicada en `master` (`13d2685`): hero/Vite/sprite social sin consumidores. Favicon SVG antiguo retirado ahora que el hotfix referencia PNG.
 - Base publicada 1.4.2: tag `c53c209`, CI `37678585652` completo; cuatro artefactos updater y firmas públicas verificados. Windows smoke NSIS install/reinstall/restart correcto. Evidencias históricas: `docs/guides/UPDATER_VERIFICATION.md`.
 - Drops: progreso remoto y reclamo manual observados; no equivalen a validación independiente de Auto-Claim, sesiones/vinculación ni desktop de otras plataformas.

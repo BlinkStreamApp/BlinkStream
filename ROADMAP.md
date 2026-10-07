@@ -6,10 +6,11 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 
 We strictly follow sequential Semantic Versioning (SemVer).
 
-## Execution status — 2026-10-08 / v1.4.3 hotfix candidate
+## Execution status — 2026-10-08 / v1.4.3 hotfix released
 
 The historical phases below describe product direction, not proof of a published release.
-Source is `1.4.3`; latest published release remains `1.4.2` until the hotfix passes CI.
+Source and latest published release are [1.4.3](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.3).
+Signed builds are available for Windows x64, macOS Intel/Apple Silicon and Linux x64.
 The hotfix includes account-scoped favorites/follows, logout cleanup and approved branding.
 Windows logout/welcome and real Twitch follow/unfollow refresh were accepted by the user.
 Small corrections use patch releases; see [hotfix policy](docs/guides/HOTFIX_RELEASES.md).
@@ -18,6 +19,7 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 
 | Capability | Local status | Remaining validation |
 | --- | --- | --- |
+| Session cleanup / follows / branding | Released in 1.4.3; Windows logout, welcome and live follow/unfollow refresh accepted by the user | Broader cross-platform desktop session checks |
 | Gamer HUD, night audio compressor, predictions/polls, media trimming | Implementation exists | Permissions, real desktop behavior and integration regression checks |
 | Live DVR | Seeks within the available player range | Buffer bounds, discontinuities and return to live; no full-stream rewind guarantee |
 | Drops inventory | Native sync and embedded official inventory; panel/polish accepted by Windows user on 2026-10-07 | Other platforms and separate login/linking scenarios |
@@ -25,10 +27,10 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Custom reward events | EventSub implemented; automated lifecycle tests pass | Authorized creator session, real redemption and native CSP |
 | Keyboard shortcuts / Drops focus | Interactive-control/modal isolation and focus regressions pass; Drops polish accepted by user | Other dialogs, screen readers and configurable/OS-global shortcuts |
 | Channel search | Stale-response cancellation and dismissal regressions pass | Broader keyboard/accessibility coverage |
-| Auto-updater | 1.4.2 published; four platform signatures and live manifest verified; Windows install/reinstall/restart passes | Historical trust migration and authenticated settings persistence remain limited; Linux integrated updates require AppImage |
+| Auto-updater | 1.4.3 published/latest; four signed platform builds and manifest pass release CI; Windows install/reinstall/restart smoke passes | Historical trust migration and authenticated settings persistence remain limited; Linux integrated updates require AppImage |
 | Dependency security | Six original alerts closed by GitHub; npm audit clean; GLib backport passes optimized regressions and Linux bundles | Retire vendor when upstream compatibility permits (ADR-014) |
 
-Validation: 514 frontend tests pass, one skipped; lint passes; latest backend verification:
+Validation: 542 frontend tests pass, one skipped; lint passes; latest backend verification:
 56 Rust tests, 11 release/security tests, fmt/Clippy and Windows build pass. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
 Now: Twitch reliability and keyboard. Next: VOD resume/bookmarks and workspace profiles.

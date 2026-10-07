@@ -1,8 +1,10 @@
 # Auto-updater verification
 
-Hotfix candidate: 1.4.3 (2026-10-08), publication authorized; CI and public-artifact
-verification pending. Trust/endpoint are unchanged. The evidence below is for the
-published 1.4.2 and must not be confused with proof of the new candidate.
+Hotfix 1.4.3 published/latest (2026-10-08): candidate CI `37694946505` and tag CI
+`37696597017` pass quality, four signed builds, NSIS smoke and manifest verification.
+Public release contains 15 assets; master updater is 1.4.3. Trust/endpoint are unchanged.
+Independent local verification of the hotfix's downloaded public bytes has not been repeated.
+The detailed historical evidence below is for 1.4.2, not a new authenticated GUI upgrade test.
 
 Checked: 2026-10-07. Source/published/latest: 1.4.2.
 Verdict: **release and live updater manifest verified; Windows installer/restart tested; historical GUI upgrade remains limited**.
