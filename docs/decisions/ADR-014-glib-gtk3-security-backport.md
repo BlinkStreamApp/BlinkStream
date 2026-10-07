@@ -12,7 +12,7 @@ La rama oficial 0.18 aún contiene el fallo de `VariantStrIter` descrito en
 
 ## Decision
 
-Vendorizar el paquete registry GLib 0.18.5 y aplicar únicamente el arreglo oficial de
+Vendorizar el paquete registry GLib 0.18.5 y aplicar el arreglo oficial de
 [gtk-rs-core#1343](https://github.com/gtk-rs/gtk-rs-core/pull/1343), merge
 `05dff0ee696f9bcd8617cd48c4b812d046d440cb`: puntero mutable y argumento `&mut p`.
 Cargo usa `[patch.crates-io]`; no falsificamos la versión del paquete ni cambiamos su API.
@@ -20,7 +20,11 @@ Se conservan sus 121 archivos, COPYRIGHT y licencia MIT.
 
 SHA-256 del `.crate` original, contrastado con Cargo.lock antes de parchear:
 `233daaf6e83ae6a12a52055f568f9d7cf4671dabb78ff9560ab6da230ce00ee5`.
-La copia solo difiere en `src/variant_iter.rs`. `scripts/verify-glib-backport.mjs`
+La corrección funcional solo modifica `src/variant_iter.rs`. El CI estricto con Rust moderno
+también exige explicitar dos lifetimes ya inferidos como `'a`: `StashMut<'a, P, Self>` en
+`translate.rs` y `FromValue<'a>` en `value.rs`. No cambian API ni comportamiento y no se
+desactivan advertencias. Esas son las únicas tres diferencias de archivos respecto al registry.
+`scripts/verify-glib-backport.mjs`
 comprueba la huella exacta del árbol parcheado; `.gitattributes` conserva sus bytes.
 CI ejecuta regresiones de iteración en Linux con optimizaciones de release, además del
 build real de GTK/Tauri y las pruebas normales. Windows/macOS no incorporan GLib al target.

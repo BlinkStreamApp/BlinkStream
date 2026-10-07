@@ -3,9 +3,9 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-// Registry glib 0.18.5 + exactly gtk-rs/gtk-rs-core#1343; see ADR-014.
+// Registry glib 0.18.5 + upstream security fix + two explicit lifetimes; see ADR-014.
 const EXPECTED_FILES = 121
-const EXPECTED_TREE = 'dc636683ec2dc59965b298d4b166fa296eb6022265d7e27d2f6d8f01ee9c7d6e'
+const EXPECTED_TREE = '6a710a7a136a4a1a53e1ca3ec6f17e3efd48ae34bf54e7145ee0e59599e2c09b'
 
 export function verifyGLibBackport(root = fileURLToPath(new URL('../src-tauri/vendor/glib/', import.meta.url))) {
   root = resolve(root)

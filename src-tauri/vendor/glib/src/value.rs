@@ -542,7 +542,7 @@ impl Value {
     ///
     /// Returns `Ok` if the type is correct.
     #[inline]
-    pub fn get<'a, T>(&'a self) -> Result<T, <<T as FromValue>::Checker as ValueTypeChecker>::Error>
+    pub fn get<'a, T>(&'a self) -> Result<T, <<T as FromValue<'a>>::Checker as ValueTypeChecker>::Error>
     where
         T: FromValue<'a>,
     {
