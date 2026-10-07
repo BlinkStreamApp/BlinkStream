@@ -1,7 +1,7 @@
 # Auto-updater verification
 
-Checked: 2026-10-07. Source: 1.4.2. Published: 1.4.1.
-Verdict: **signed candidate validated on all targets; tag publication pending; legacy trust migration remains limited**.
+Checked: 2026-10-07. Source/published/latest: 1.4.2.
+Verdict: **release and live updater manifest verified; Windows installer/restart tested; historical GUI upgrade remains limited**.
 
 ## Verified flow
 
@@ -9,10 +9,14 @@ Verdict: **signed candidate validated on all targets; tag publication pending; l
 - Installation requires user confirmation/action, calls `downloadAndInstall`, then relaunches.
 - Native updater plugin, restart permission and HTTPS manifest endpoint are configured.
 - Tauri verifies the downloaded artifact against the configured public key before installation.
-- The endpoint responds with version 1.4.1 and four platform entries whose assets exist in the release.
-  The Windows installer was downloaded only into memory for verification, not run or installed.
+- The configured HTTPS endpoint responds with version 1.4.2 and four platform entries.
+  Downloaded published artifacts verify with the unchanged configured public key, including all
+  detached signatures (NSIS/MSI, AppImage/deb and both macOS update archives).
+  Release and master manifests match. Nothing was installed/executed on the user's PC.
 - Windows uses NSIS, macOS uses `.app.tar.gz`, Linux uses `.AppImage`.
   The installed Tauri updater accepts raw AppImage bytes as well as the archive format.
+  Linux `.deb` installations need manual/package-manager updates; the integrated updater targets
+  [AppImage](https://v2.tauri.app/plugin/updater/).
 - Four UI contract tests simulate no-update, check failure, explicit installation and rejected
   signature/installation; they verify no premature download/relaunch and no relaunch on failure.
 - Local 1.4.2 checks: 514 frontend tests pass/1 skipped, 11 release/security tests, 56 Rust tests,
@@ -82,7 +86,7 @@ signature before extracting/executing it. This avoids an observed APT installati
   This is installer-mode validation, not proof of historical
   key migration, user settings persistence or a complete GUI check/download/relaunch flow.
 
-## Before a release
+## Published release evidence and follow-ups
 
 Five of the original six Dependabot findings are fixed in source: rustls `0.23.45`,
 source-map-js `1.2.2`, brace-expansion `5.0.12`, vitest/@vitest/mocker `4.1.11`.
@@ -112,7 +116,15 @@ against the configured key without executing any installer on the user's PC.
 The runner's `/etc/apt/apt-mirrors.txt` URI now resolves directly to the official HTTPS archive;
 this was the remaining APT timeout cause. Signing secrets exist only in bundle-building steps.
 The public-key diagnostic `37668124715` succeeded using the verified official utility.
-No release/tag or installation on the user's PC was performed.
+Tag `v1.4.2` at `c53c209` passed every job in
+[release CI 37678585652](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37678585652).
+The public release is latest/non-prerelease, with all 15 assets; the live updater endpoint is 1.4.2.
+Downloaded public release bytes/signatures were rechecked locally after publication and agree
+with master. No candidate or published installer was executed on the user's PC.
+
+Read-only inspection of the maintainer's installed Windows executable reports product version
+1.4.1 and contains the current encoded public key. This is compatibility evidence, not proof of
+a GUI check/download/install/relaunch or session persistence on that installation.
 
 1. Current signer/config pair is verified. Verify newly built real artifacts and inventory installed-client trust;
    document a manual transition for incompatible clients before promising automatic upgrade.
@@ -125,3 +137,11 @@ No release/tag or installation on the user's PC was performed.
 
 The user explicitly authorized publication of 1.4.2 after validation on all three platforms,
 but not installing anything on their PC. A source push alone is not release validation.
+
+## Delivery rollback
+
+If a critical post-release regression appears, withdraw 1.4.2 from the updater by restoring the
+previous production manifest, mark the release draft and restore the previous latest release.
+This stops offering the update; it does not downgrade installed clients. Preserve the current
+public key and security fixes: never fabricate signatures, bypass verification or revert the
+GLib backport merely to hide an alert. Historical signing incompatibility remains a known limit.

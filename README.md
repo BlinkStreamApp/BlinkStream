@@ -19,10 +19,11 @@
 
 ## ✨ Features
 
-### v1.4.2 — Twitch reliability and integrated Drops (release preparation)
+### v1.4.2 — Twitch reliability and integrated Drops
 
-The source version is **1.4.2**; the latest published release remains **1.4.1**.
-A source push does not publish installers or enable an update to 1.4.2.
+Version **1.4.2** is [published](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.2)
+for Windows x64, macOS Apple Silicon/Intel and Linux x64. CI and downloaded release artifacts
+passed signature verification; Windows install/reinstall/process-restart passed on a disposable runner.
 
 - **Integrated Drops:** native progress and official Twitch inventory share one panel, without a
   separate claim window. The panel and polish were accepted in a Windows user session. Claims
@@ -43,7 +44,7 @@ A source push does not publish installers or enable an update to 1.4.2.
   GLib security backport without changing its API; optimized Linux regression tests pass.
 
 See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
-[updater verification](docs/guides/UPDATER_VERIFICATION.md) for validation limits and release blockers.
+[updater verification](docs/guides/UPDATER_VERIFICATION.md) for evidence and validation limits.
 
 | Feature | Description |
 |---------|-------------|
@@ -72,10 +73,10 @@ See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 
 ### Windows
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-Version 1.4.2 is not published yet. Updates require a compatible signing key and your confirmation.
+Version 1.4.2 is available. Updates require a compatible signing key and your confirmation.
 
-- ⭐ **`BlinkStream_1.4.1_Win_x64.exe`** *(NSIS installer)*
-- `BlinkStream_1.4.1_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream_1.4.2_Win_x64.exe`** *(NSIS installer)*
+- `BlinkStream_1.4.2_Win_x64.msi` *(Enterprise MSI installer)*
 
 > [!NOTE]  
 > **Windows trust warnings:** binaries are not Authenticode-signed. Updater signatures do not replace
@@ -93,6 +94,8 @@ brew install streamlink
 sudo apt install streamlink
 # Download the published Linux x86_64.deb or .AppImage from Releases
 ```
+Integrated Linux updates use AppImage. Installations from `.deb` require a manual/package update;
+the native updater does not replace the system package manager.
 
 ---
 

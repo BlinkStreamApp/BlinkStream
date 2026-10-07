@@ -40,7 +40,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Decisions
 
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
-- DEC-002 — Fuente 1.4.2; publicada 1.4.1 hasta completar el release firmado.
+- DEC-002 — Fuente/publicada/latest 1.4.2; publicada tras validar cuatro targets y el manifiesto real.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
 - DEC-005 — Favoritos autorizados mediante identidad auth confiable, no metadata editable.
@@ -57,13 +57,13 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
-- Candidato `2bd66ec`: CI `37675590056` completo y correcto en cuatro targets, Windows install/reinstall/restart y firmas; verificación local de sus bytes también correcta. Preparar tag/publicación 1.4.2 autorizados tras validar.
+- Release 1.4.2 publicado/latest: tag `c53c209`, CI `37678585652` completo; candidato previo `37675590056` también correcto. Cuatro targets, Windows install/reinstall/restart y firmas de bytes públicos verificados localmente. Endpoint HTTPS real y manifest de release/master coinciden en 1.4.2.
 - Evidencia: 514 frontend/1 omitido, 11 release/seguridad, 56 Rust Windows; Linux 57 unitarios + 2 regresiones GLib en debug/release; 44 Deno. Lint/fmt/Clippy/builds correctos; audit JS y alertas Dependabot abiertos: cero.
-- No se ha instalado ni ejecutado ningún candidato en el PC del usuario. El manifiesto de producción sigue en 1.4.1 hasta publicar.
+- Nada instalado/ejecutado en el PC del usuario. Su binario instalado informa 1.4.1 y contiene la clave pública actual (lectura sin ejecución); upgrade GUI y persistencia autenticada aún sin prueba.
 - Panel Drops/pulido aceptados por el usuario. Progreso remoto 0→33 minutos y reclamo manual observados; esto no valida por separado clic automático, aislamiento de sesiones o login/vinculación.
 
 NEXT:
-- Publicar tag tras finalizar notas; verificar release, assets y endpoint de updater.
+- Prueba GUI voluntaria desde 1.4.1 y de conservación de settings/sesión, sin instalar automáticamente en el PC del usuario. Linux updater integrado requiere AppImage; `.deb` se actualiza manualmente/mediante paquetes.
 - Validar canje EventSub real, Auto-Claim independiente y pausa/aislamiento del reporte nativo.
 - VOD resume/bookmarks, perfiles de workspace y audio principal multistream.
 - Supabase: desplegar funciones/migración solo con autorización aparte.

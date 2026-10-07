@@ -6,10 +6,10 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 
 We strictly follow sequential Semantic Versioning (SemVer).
 
-## Execution status — 2026-10-07 / v1.4.2 release preparation
+## Execution status — 2026-10-07 / v1.4.2 released
 
 The historical phases below describe product direction, not proof of a published release.
-The source version is `1.4.2`; the latest published release remains `1.4.1`.
+The source and latest published release are `1.4.2`; signed builds cover all four desktop targets.
 Implementation, real-session validation and publication are separate gates.
 The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.md](docs/EXECUTION_PLAN.md).
 
@@ -22,7 +22,7 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Custom reward events | EventSub implemented; automated lifecycle tests pass | Authorized creator session, real redemption and native CSP |
 | Keyboard shortcuts / Drops focus | Interactive-control/modal isolation and focus regressions pass; Drops polish accepted by user | Other dialogs, screen readers and configurable/OS-global shortcuts |
 | Channel search | Stale-response cancellation and dismissal regressions pass | Broader keyboard/accessibility coverage |
-| Auto-updater | Signed candidate passes all four targets and local signature checks; Windows install/reinstall/restart passes | Tag publication pending; historical trust migration and authenticated settings persistence remain limited |
+| Auto-updater | 1.4.2 published; four platform signatures and live manifest verified; Windows install/reinstall/restart passes | Historical trust migration and authenticated settings persistence remain limited; Linux integrated updates require AppImage |
 | Dependency security | Six original alerts closed by GitHub; npm audit clean; GLib backport passes optimized regressions and Linux bundles | Retire vendor when upstream compatibility permits (ADR-014) |
 
 Validation: 514 frontend tests pass, one skipped; lint passes; latest backend verification:
