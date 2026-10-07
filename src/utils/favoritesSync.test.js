@@ -13,11 +13,57 @@ vi.mock('./supabase', async () => {
   }
 })
 
-const { mergeFavorites, fetchCloudFavorites, addCloudFavorite, removeCloudFavorite, clearAuthBrokenFlag } =
+const { mergeFavorites, fetchCloudFavorites, addCloudFavorite, removeCloudFavorite, clearAuthBrokenFlag, fetchFollowedChannels } =
   await import('./favoritesSync')
 
 beforeEach(() => {
   clearAuthBrokenFlag()
+})
+
+describe('fetchFollowedChannels', () => {
+  it('recorre más de 500 follows sin truncarlos', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(mockResponse({
+      ok: true, json: async () => ({ data: [{ id: 'alice-id' }] }),
+    }))
+    for (let page = 0; page < 6; page++) {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ ok: true, json: async () => ({
+        data: Array.from({ length: 100 }, (_, i) => ({ broadcaster_login: `channel_${page * 100 + i}` })),
+        pagination: page < 5 ? { cursor: `page-${page + 1}` } : {},
+      }) }))
+    }
+    expect(await fetchFollowedChannels('oauth:token')).toHaveLength(600)
+    expect(fetchSpy.mock.calls[1][1].headers.Authorization).toBe('Bearer token')
+  })
+
+  it('no presenta errores ni páginas parciales como una lista vacía o completa', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockResponse({ ok: true, json: async () => ({ data: [{ id: 'alice-id' }] }) }))
+      .mockResolvedValueOnce(mockResponse({ ok: true, json: async () => ({ data: [{ broadcaster_login: 'a' }], pagination: { cursor: 'next' } }) }))
+      .mockResolvedValueOnce(mockResponse({ ok: false, status: 403 }))
+    await expect(fetchFollowedChannels('token')).rejects.toThrow('HTTP 403')
+  })
+
+  it('aborta una consulta pendiente cuando cambia la sesión', async () => {
+    const controller = new AbortController()
+    let requestSignal
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url, options) => new Promise((_resolve, reject) => {
+      requestSignal = options.signal
+      options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true })
+    }))
+    const pending = fetchFollowedChannels('token', { signal: controller.signal })
+    const assertion = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    controller.abort()
+    await assertion
+    expect(requestSignal.aborted).toBe(true)
+  })
+
+  it('un cursor repetido falla sin entrar en un bucle de requests', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(mockResponse({ ok: true, json: async () => ({ data: [{ id: 'alice-id' }] }) }))
+      .mockResolvedValue(mockResponse({ ok: true, json: async () => ({ data: [], pagination: { cursor: 'same' } }) }))
+    await expect(fetchFollowedChannels('token')).rejects.toThrow('repitió el cursor')
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
 })
 
 describe('fetchCloudFavorites', () => {

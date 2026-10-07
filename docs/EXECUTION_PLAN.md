@@ -1,6 +1,6 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-10-07. Estado: fuente 1.4.2; firmante actual verificado, release pendiente de builds/upgrade y revisión GLib/Linux.
+Actualizado: 2026-10-08. Estado: 1.4.2 publicada; hotfix 1.4.3 autorizado, candidato pendiente de CI firmado multiplataforma. Incluye sesión/follows y marca, sin ampliar el roadmap funcional.
 
 ## Objetivo y reglas
 

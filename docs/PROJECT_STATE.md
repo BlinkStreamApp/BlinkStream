@@ -1,12 +1,12 @@
 # PROJECT_STATE
 
-Updated: 2026-10-07
+Updated: 2026-10-08
 Status: active
 
 ## Objective
 
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
-Cerrar la 1.4.2 con artefactos firmados y updater fiable en Windows, macOS y Linux.
+Publicar el hotfix 1.4.3 de sesión y marca con artefactos firmados en las tres plataformas.
 
 ## Stack
 
@@ -40,7 +40,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Decisions
 
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
-- DEC-002 — Fuente/publicada/latest 1.4.2; publicada tras validar cuatro targets y el manifiesto real.
+- DEC-002 — Fuente 1.4.3 candidata; publicada/latest 1.4.2 hasta pasar CI y verificar el nuevo manifiesto.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
 - DEC-005 — Favoritos autorizados mediante identidad auth confiable, no metadata editable.
@@ -57,10 +57,13 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
-- Release 1.4.2 publicado/latest: tag `c53c209`, CI `37678585652` completo; candidato previo `37675590056` también correcto. Cuatro targets, Windows install/reinstall/restart y firmas de bytes públicos verificados localmente. Endpoint HTTPS real y manifest de release/master coinciden en 1.4.2.
-- Evidencia: 514 frontend/1 omitido, 11 release/seguridad, 56 Rust Windows; Linux 57 unitarios + 2 regresiones GLib en debug/release; 44 Deno. Lint/fmt/Clippy/builds correctos; audit JS y alertas Dependabot abiertos: cero.
-- Nada instalado/ejecutado en el PC del usuario. Su binario instalado informa 1.4.1 y contiene la clave pública actual (lectura sin ejecución); upgrade GUI y persistencia autenticada aún sin prueba.
-- Panel Drops/pulido aceptados por el usuario. Progreso remoto 0→33 minutos y reclamo manual observados; esto no valida por separado clic automático, aislamiento de sesiones o login/vinculación.
+- Hotfix 1.4.3 autorizado: fixes de sesión/follows y marca aprobada. Mantener código/config/versiones alineados; primero candidato CI, después tag y publicación firmada. Procedimiento reutilizable: `docs/guides/HOTFIX_RELEASES.md`.
+- Logout/recientes y bienvenida clásica/logo aceptados por el usuario en Windows. Blink blanco y Stream violeta→fucsia igual que cabecera; sin nuevos CTAs. Iconos desktop, favicon, web y README usan el logo elegido.
+- Follows separados de pins por cuenta; refresh visible cada 60 s y al volver/online, abort/timeout y descarte de respuestas obsoletas. Logout limpia recientes/caché de portada, cierra stream y no permite restauraciones auth tardías. Follow/unfollow real pendiente de aceptación; mocks cubren el flujo.
+- Validación local del hotfix: 542 frontend pasan/1 omitido, 11 release/firma y 56 Rust Windows; lint/fmt/Clippy y build frontend correctos. Bundle firmado/CI multiplataforma pendiente; nada instalado ni desplegado en Supabase.
+- Limpieza aislada publicada en `master` (`13d2685`): hero/Vite/sprite social sin consumidores. Favicon SVG antiguo retirado ahora que el hotfix referencia PNG.
+- Base publicada 1.4.2: tag `c53c209`, CI `37678585652` completo; cuatro artefactos updater y firmas públicas verificados. Windows smoke NSIS install/reinstall/restart correcto. Evidencias históricas: `docs/guides/UPDATER_VERIFICATION.md`.
+- Drops: progreso remoto y reclamo manual observados; no equivalen a validación independiente de Auto-Claim, sesiones/vinculación ni desktop de otras plataformas.
 
 NEXT:
 - Prueba GUI voluntaria desde 1.4.1 y de conservación de settings/sesión, sin instalar automáticamente en el PC del usuario. Linux updater integrado requiere AppImage; `.deb` se actualiza manualmente/mediante paquetes.
@@ -74,6 +77,7 @@ LATER:
 
 ## Known Risks
 
+- La lista legacy mezclaba follows/pins sin procedencia. Se archiva recuperablemente (`blinkstream_favorites_legacy`), solo se migra a su propietario conocido y se excluyen follows observados del import cloud. Un follow antiguo ya eliminado antes de esta migración no puede distinguirse automáticamente de un pin; no se borran filas cloud ni preferencias/cookies.
 - Firmas históricas 1.4.1 usan otro ID; clientes con una clave antigua no recuperable necesitan transición manual verificada. El smoke actual no prueba una migración histórica ni persistencia autenticada.
 - Upgrades durante grabación activa y GUI instalada end-to-end siguen sin validar.
 - Firma updater no sustituye Authenticode/notarización; pueden aparecer avisos Windows/macOS.
@@ -91,6 +95,7 @@ LATER:
 
 ## Constraints
 
+- Hotfix 1.4.3 autorizado el 2026-10-08; PATCH estable en lugar de 1.4.2-a (prerelease anterior). Guía: `docs/guides/HOTFIX_RELEASES.md`.
 - Publicación 1.4.2 autorizada el 2026-10-07 tras validar las tres plataformas; no excluir Linux.
 - No instalar nada en el PC del usuario ni desplegar Supabase sin autorización.
 - Sin ventanas aparte/segundo player para Drops; conservar controles oficiales de integridad/vinculación.
@@ -99,6 +104,7 @@ LATER:
 
 ## Invariants
 
+- Follows de Twitch no se suben como favoritos automáticamente; pins/cache de cuenta no se muestran al invitado ni a otra cuenta. Logout invalida auth pendiente y serializa borrado tras escrituras de token en curso.
 - Todo proceso Streamlink/FFmpeg debe disponer de cleanup; cambiar/cerrar stream no debe dejar huérfanos.
 - UI no contiene privilegios nativos específicos del OS; código compartido mantiene tres plataformas.
 - Credenciales/cookies Twitch no se entregan a React, no se registran ni se borran al montar chat.

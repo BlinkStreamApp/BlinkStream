@@ -127,38 +127,43 @@ export async function mergeFavorites(localFavorites, username) {
   return merged
 }
 
-export async function fetchFollowedChannels(token) {
+export async function fetchFollowedChannels(token, { signal } = {}) {
   if (!token) return []
-  try {
-    const userRes = await fetch('https://api.twitch.tv/helix/users', {
-      headers: {
-        'Client-ID': getHelixClientId(),
-        'Authorization': `Bearer ${token}`,
-      },
-    })
-    if (!userRes.ok) return []
-    const userData = await userRes.json()
-    const userId = userData?.data?.[0]?.id
-    if (!userId) return []
-
-    const follows = []
-    let cursor = null
-    for (let i = 0; i < 5; i++) {
-      const url = `https://api.twitch.tv/helix/channels/followed?user_id=${userId}&first=100${cursor ? `&after=${cursor}` : ''}`
-      const followRes = await fetch(url, {
-        headers: {
-          'Client-ID': getHelixClientId(),
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (!followRes.ok) break
-      const followData = await followRes.json()
-      if (followData.data) {
-        follows.push(...followData.data.map(f => f.broadcaster_login))
-      }
-      if (!followData.pagination?.cursor) break
-      cursor = followData.pagination.cursor
+  const headers = {
+    'Client-ID': getHelixClientId(),
+    'Authorization': `Bearer ${token.replace(/^oauth:/i, '')}`,
+  }
+  const request = async (url) => {
+    const controller = new AbortController()
+    const onAbort = () => controller.abort()
+    const timer = setTimeout(onAbort, 10000)
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted) onAbort()
+    try {
+      const res = await fetch(url, { headers, signal: controller.signal })
+      if (!res.ok) throw new Error(`No se pudieron actualizar los follows de Twitch (HTTP ${res.status})`)
+      return await res.json()
+    } finally {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
     }
-    return follows
-  } catch { return [] }
+  }
+  const userData = await request('https://api.twitch.tv/helix/users')
+  const userId = userData?.data?.[0]?.id
+  if (!userId) throw new Error('Twitch no devolvió la identidad de la cuenta')
+
+  const follows = []
+  let cursor = null
+  const cursors = new Set()
+  do {
+    const url = `https://api.twitch.tv/helix/channels/followed?user_id=${encodeURIComponent(userId)}&first=100${cursor ? `&after=${encodeURIComponent(cursor)}` : ''}`
+    const followData = await request(url)
+    if (!Array.isArray(followData.data)) throw new Error('Respuesta de follows de Twitch inválida')
+    follows.push(...followData.data.map(f => f.broadcaster_login))
+    if (!followData.pagination?.cursor) break
+    cursor = followData.pagination.cursor
+    if (cursors.has(cursor)) throw new Error('Twitch repitió el cursor de follows')
+    cursors.add(cursor)
+  } while (cursor)
+  return [...new Set(follows)]
 }

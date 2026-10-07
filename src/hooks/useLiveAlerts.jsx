@@ -1,6 +1,6 @@
 
 
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL } from '../utils/twitch'
@@ -18,6 +18,7 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     if (!favorites.length) return
 
     const checkLive = async () => {
@@ -48,6 +49,7 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
         })
         if (!res.ok) return
         const json = await res.json()
+        if (cancelled) return
         if (json?.errors) return
 
         const current = {}
@@ -126,7 +128,6 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
 
     checkLive()
 
-    let cancelled = false
     const schedulePoll = () => {
       timerRef.current = setTimeout(() => {
         if (cancelled) return
@@ -142,5 +143,9 @@ export function useLiveAlerts(favorites, intervalMs = 30000) {
     }
   }, [favorites, intervalMs])
 
-  return { alerts, dismissAlert, liveFavorites }
+  const visible = useMemo(() => ({
+    alerts: alerts.filter(a => favorites.includes(a.channel)),
+    liveFavorites: liveFavorites.filter(f => favorites.includes(f.name)),
+  }), [alerts, liveFavorites, favorites])
+  return { ...visible, dismissAlert }
 }

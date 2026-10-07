@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/source_version-1.4.2-e94560" alt="Source version 1.4.2">
+  <img src="https://img.shields.io/badge/source_version-1.4.3-e94560" alt="Source version 1.4.3">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
   <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
@@ -18,6 +18,17 @@
 ---
 
 ## ✨ Features
+
+### v1.4.3 — Session and branding hotfix (candidate)
+
+- Logout clears recent history and session caches, closes playback and returns to the guest welcome.
+- Twitch follows refresh independently from account-scoped pinned favorites, including unfollows.
+- New approved logo across desktop icons, welcome, favicon and website; matching name colors.
+- User-validated Windows logout/welcome; follow/unfollow refresh covered by automated tests.
+  Signed cross-platform publication is pending CI. Downloads below still point to the published 1.4.2.
+
+Small fixes increment the patch number: `1.4.2` → `1.4.3`, not `1.4.2-a`.
+See the reusable [hotfix guide](docs/guides/HOTFIX_RELEASES.md).
 
 ### v1.4.2 — Twitch reliability and integrated Drops
 

@@ -1,5 +1,9 @@
 # Auto-updater verification
 
+Hotfix candidate: 1.4.3 (2026-10-08), publication authorized; CI and public-artifact
+verification pending. Trust/endpoint are unchanged. The evidence below is for the
+published 1.4.2 and must not be confused with proof of the new candidate.
+
 Checked: 2026-10-07. Source/published/latest: 1.4.2.
 Verdict: **release and live updater manifest verified; Windows installer/restart tested; historical GUI upgrade remains limited**.
 

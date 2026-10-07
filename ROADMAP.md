@@ -6,10 +6,13 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 
 We strictly follow sequential Semantic Versioning (SemVer).
 
-## Execution status — 2026-10-07 / v1.4.2 released
+## Execution status — 2026-10-08 / v1.4.3 hotfix candidate
 
 The historical phases below describe product direction, not proof of a published release.
-The source and latest published release are `1.4.2`; signed builds cover all four desktop targets.
+Source is `1.4.3`; latest published release remains `1.4.2` until the hotfix passes CI.
+The hotfix includes account-scoped favorites/follows, logout cleanup and approved branding.
+Windows logout/welcome were accepted by the user; real Twitch follow/unfollow acceptance remains pending.
+Small corrections use patch releases; see [hotfix policy](docs/guides/HOTFIX_RELEASES.md).
 Implementation, real-session validation and publication are separate gates.
 The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.md](docs/EXECUTION_PLAN.md).
 

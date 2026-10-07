@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import ChannelSearch from './components/ChannelSearch'
 import StreamInfo from './components/StreamInfo'
 import ConfirmDialog from './components/ConfirmDialog'
@@ -32,7 +32,7 @@ const DebugPanel = import.meta.env.DEV
 
 import { useAuth } from './hooks/useAuth'
 import { useChannelRole } from './hooks/useChannelRole'
-import { mergeFavorites, addCloudFavorite, removeCloudFavorite, fetchFollowedChannels } from './utils/favoritesSync'
+import { useFavoriteChannels } from './hooks/useFavoriteChannels'
 import { useLiveAlerts } from './hooks/useLiveAlerts'
 import { Toast } from './hooks/useLiveAlerts.Toast'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -106,7 +106,6 @@ function saveTo(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)) } catch {  }
 }
 
-function loadFavorites() { return loadFrom('blinkstream_favorites', []).filter(f => typeof f === 'string') }
 function loadRecent() { return loadFrom('blinkstream_recent', []).filter(f => typeof f === 'string') }
 function loadVolume() { const v = Number(localStorage.getItem('blinkstream_volume')); return isNaN(v) ? 100 : v }
 function loadTheatre() { return localStorage.getItem('blinkstream_theatre') === 'true' }
@@ -129,7 +128,6 @@ function MainApp() {
   const [viewMode, setViewMode] = useState('normal')
   const [channel, setChannel] = useState('')
   const [quality, setQuality] = useState('best')
-  const [favorites, setFavorites] = useState(loadFavorites)
   const [recentChannels, setRecentChannels] = useState(loadRecent)
   const [volume, setVolume] = useState(loadVolume)
   const [theatreMode, setTheatreMode] = useState(loadTheatre)
@@ -210,7 +208,21 @@ function MainApp() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [theatreMode])
 
-  const { isLoggedIn, user, avatar, loading: authLoading, login, logout, getTwitchToken, loginWithToken } = useAuth()
+  const { isLoggedIn, user, avatar, authing, loading: authLoading, login, logout, getTwitchToken, loginWithToken } = useAuth()
+  const username = user?.username || user?.identities?.[0]?.identity_data?.login || null
+  const { favorites, pinnedFavorites, followsError, toggleFavorite } = useFavoriteChannels({
+    username, token: getTwitchToken(), loading: authLoading,
+  })
+  const handleLogout = useCallback(() => {
+    setRecentChannels([])
+    setChannel('')
+    setViewMode('normal')
+    setTheatreMode(false)
+    setShowCPPanel(false)
+    setShowModPanel(false)
+    setShowUserMenu(false)
+    return logout()
+  }, [logout])
 
   useEffect(() => {
     let cancelled = false
@@ -221,13 +233,13 @@ function MainApp() {
       const valid = await validateToken(token)
       if (!cancelled && !valid) {
         await clearStoredToken()
-        logout()
+        handleLogout()
       }
       if (!cancelled) timer = setTimeout(check, 10 * 60 * 1000)
     }
     check()
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [isLoggedIn, getTwitchToken, logout])
+  }, [isLoggedIn, getTwitchToken, handleLogout])
 
   useEffect(() => {
     if (!isTauri()) return
@@ -266,7 +278,6 @@ function MainApp() {
     if (windowWidth < CHAT_BREAKPOINT) setShowChat(false)
   }, [windowWidth])
 
-  useEffect(() => { saveTo('blinkstream_favorites', favorites) }, [favorites])
   useEffect(() => { saveTo('blinkstream_recent', recentChannels) }, [recentChannels])
   useEffect(() => { localStorage.setItem('blinkstream_quality', quality) }, [quality])
   useEffect(() => { localStorage.setItem('blinkstream_volume', String(volume)) }, [volume])
@@ -298,11 +309,11 @@ function MainApp() {
   }, [channel])
 
   useEffect(() => {
-    if (user?.userId && user.userId !== viewerUserId) {
+    if (!isLoggedIn || (user?.userId && user.userId !== viewerUserId)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setViewerUserId(user.userId)
+      setViewerUserId(isLoggedIn ? user.userId : null)
     }
-  }, [user?.userId, viewerUserId])
+  }, [isLoggedIn, user?.userId, viewerUserId])
 
   useEffect(() => {
     if (!isLoggedIn || viewerUserId) return
@@ -323,45 +334,6 @@ function MainApp() {
       .catch(() => {})
     return () => { cancelled = true }
   }, [isLoggedIn, viewerUserId, getTwitchToken])
-
-  const username = user?.username || user?.identities?.[0]?.identity_data?.login || null
-
-  const favoritesRef = useRef(favorites)
-  useEffect(() => { favoritesRef.current = favorites }, [favorites])
-
-  useEffect(() => {
-    let cancelled = false
-    const runSync = () => {
-      if (cancelled) return
-      const u = username || localStorage.getItem('blinkstream_twitch_username')
-      if (!u) return
-      const token = getTwitchToken()
-      if (!token) return
-      const localFavs = favoritesRef.current
-
-      Promise.all([
-        mergeFavorites(localFavs, u),
-        fetchFollowedChannels(token),
-      ]).then(([merged, follows]) => {
-        if (cancelled) return
-        const allChannels = [...new Set([...merged, ...follows])]
-        if (JSON.stringify(allChannels) !== JSON.stringify(favoritesRef.current)) {
-          setFavorites(allChannels)
-        }
-      }).catch(() => {
-        if (import.meta.env.DEV) {
-          console.warn('[App] Sincronización con la nube no disponible. Usando favoritos en modo local.')
-        }
-      })
-    }
-
-    runSync()
-    window.addEventListener('blinkstream_auth_updated', runSync)
-    return () => {
-      cancelled = true
-      window.removeEventListener('blinkstream_auth_updated', runSync)
-    }
-  }, [username, getTwitchToken])
 
   const selectChannel = useCallback((name) => {
     setViewMode('normal')
@@ -448,17 +420,6 @@ function MainApp() {
       }).catch(() => {});
     } catch {  }
   }, [channel, volume, viewMode, liveFavorites, favorites, companionAvatar]);
-
-  const toggleFavorite = useCallback((name) => {
-    setFavorites(prev => {
-      const isRemoving = prev.includes(name)
-      if (username) {
-        if (isRemoving) { removeCloudFavorite(username, name) }
-        else { addCloudFavorite(username, name) }
-      }
-      return isRemoving ? prev.filter(f => f !== name) : [...prev, name]
-    })
-  }, [username])
 
   const removeRecent = useCallback((name) => {
     setRecentChannels(prev => prev.filter(c => c !== name))
@@ -645,7 +606,7 @@ function MainApp() {
           <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden animate-fade-in">
             {channel ? (
               <>
-                {!theatreMode && <StreamInfo channel={channel} isFavorite={favorites.includes(channel)} onToggleFavorite={() => toggleFavorite(channel)} />}
+                    {!theatreMode && <StreamInfo channel={channel} isFavorite={pinnedFavorites.includes(channel)} onToggleFavorite={() => toggleFavorite(channel)} />}
                 <div className={`flex-1 min-h-0 flex items-center justify-center ${theatreMode ? '' : 'p-3'}`}>
                 <Suspense fallback={<PlayerFallback />}>
                   <VideoPlayer
@@ -679,9 +640,12 @@ function MainApp() {
                   onSelect={selectChannel}
                   onToggleFavorite={toggleFavorite}
                   favorites={favorites}
+                  pinnedFavorites={pinnedFavorites}
+                  followsError={followsError}
                   recentChannels={recentChannels}
                   onRemoveRecent={removeRecent}
                   onShowAbout={() => setShowAbout(true)}
+                  authing={authing}
                 />
               </Suspense>
             )}
@@ -739,7 +703,7 @@ function MainApp() {
           title={t('nav.logout', 'Cerrar sesión')}
           message={t('nav.logoutConfirmDesc', '¿Estás seguro de que quieres cerrar sesión? Tus favoritos en la nube se conservarán.')}
           confirmText={t('nav.logout', 'Cerrar sesión')}
-          onConfirm={() => { setShowLogoutConfirm(false); logout() }}
+          onConfirm={() => { setShowLogoutConfirm(false); handleLogout() }}
           onCancel={() => setShowLogoutConfirm(false)}
         />
       )}

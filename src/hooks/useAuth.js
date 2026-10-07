@@ -5,6 +5,7 @@ import { SUPABASE_URL, pollAuthToken, clearBlinkstreamToken } from '../utils/sup
 import { getHelixClientId } from '../utils/twitch'
 import { measureInvoke } from '../utils/perf'
 import { logEvent } from '../utils/eventLog'
+import { archiveLegacyFavorites } from './useFavoriteChannels'
 
 const EDGE_FN_URL = `${SUPABASE_URL}/functions/v1/twitch-auth`
 const LS_TOKEN = 'blinkstream_twitch_token'
@@ -29,12 +30,10 @@ async function fetchUserInfo(token) {
         const valData = await valRes.json()
         if (valData?.client_id) {
           clientId = valData.client_id
-          try { localStorage.setItem(LS_CLIENT_ID, clientId) } catch {  }
         }
         if (valData?.login) username = valData.login
         if (valData?.user_id) {
           userId = valData.user_id
-          try { localStorage.setItem('bs.twitch.viewer_userid', userId) } catch {  }
         }
       }
     } catch {  }
@@ -55,20 +54,24 @@ async function fetchUserInfo(token) {
         const displayName = userData.display_name || null
         if (userData.id) {
           userId = userData.id
-          try { localStorage.setItem('bs.twitch.viewer_userid', userId) } catch {  }
         }
-        if (avatar) localStorage.setItem(LS_AVATAR, avatar)
-        if (username) localStorage.setItem(LS_USERNAME, username)
-        return { username, avatar, displayName, userId }
+        return { username, avatar, displayName, userId, clientId }
       }
     }
 
     if (username) {
-      localStorage.setItem(LS_USERNAME, username)
-      return { username, avatar: null, displayName: username, userId }
+      return { username, avatar: null, displayName: username, userId, clientId }
     }
   } catch {  }
   return null
+}
+
+function persistUserInfo(info) {
+  if (!info) return
+  if (info.username) localStorage.setItem(LS_USERNAME, info.username)
+  if (info.avatar) localStorage.setItem(LS_AVATAR, info.avatar)
+  if (info.clientId) localStorage.setItem(LS_CLIENT_ID, info.clientId)
+  if (info.userId) localStorage.setItem('bs.twitch.viewer_userid', info.userId)
 }
 
 async function openSystemBrowser(url) {
@@ -91,23 +94,39 @@ export function useAuth() {
     try { return localStorage.getItem(LS_TOKEN) || null } catch { return null }
   })
   const abortRef = useRef(null)
+  const sessionVersion = useRef(null)
+  const secretQueue = useRef(Promise.resolve())
+  const writeSecret = useCallback((command, args) => {
+    // A slow login write must finish before logout deletes its credentials.
+    const next = secretQueue.current.catch(() => {}).then(() => measureInvoke(command, args))
+    secretQueue.current = next
+    return next
+  }, [])
 
   useEffect(() => {
+    const version = {}
+    sessionVersion.current = version
+    const current = () => version === sessionVersion.current
     const init = async () => {
+      // Capture the legacy owner before validation can replace the stored login.
+      archiveLegacyFavorites()
       try {
 
         let token = await measureInvoke('get_secret', { key: 'twitch_token' })
+        if (!current()) return
 
         if (!token) {
           token = localStorage.getItem(LS_TOKEN) || ''
           if (token) {
             try {
-              await measureInvoke('store_secret', { key: 'twitch_token', value: token })
+              await writeSecret('store_secret', { key: 'twitch_token', value: token })
+              if (!current()) return
               localStorage.removeItem(LS_TOKEN)
             } catch {  }
           }
         }
 
+        if (!current()) return
         if (token) {
           setCachedToken(token)
           const storedUser = localStorage.getItem(LS_USERNAME) || 'twitch_user'
@@ -122,10 +141,12 @@ export function useAuth() {
           logEvent('auth', 'session.restored', { username: storedUser })
 
           const userInfo = await fetchUserInfo(token)
+          if (!current()) return
           if (userInfo?.invalid) {
 
             logEvent('auth', 'session.invalid', {})
           } else if (userInfo?.username && userInfo.username !== 'twitch_user') {
+            persistUserInfo(userInfo)
             if (userInfo.avatar) setAvatar(userInfo.avatar)
             setUser({
               username: userInfo.username,
@@ -141,6 +162,7 @@ export function useAuth() {
           return
         }
       } catch (err) { 
+        if (!current()) return
         logEvent('auth', 'session.restore.failed', { err: err?.message || String(err) })
         try {
           const token = localStorage.getItem(LS_TOKEN)
@@ -160,11 +182,15 @@ export function useAuth() {
     init()
 
     return () => {
+      sessionVersion.current = null
       abortRef.current?.abort()
     }
-  }, [])
+  }, [writeSecret])
 
   const login = useCallback(async () => {
+    const version = {}
+    sessionVersion.current = version
+    const current = () => version === sessionVersion.current
     setAuthing(true)
     setError(null)
 
@@ -179,24 +205,30 @@ export function useAuth() {
 
     try {
       const result = await pollAuthToken(requestId, { signal: abortController.signal, interval: 1500 })
+      if (!current()) return
 
       if (result?.access_token) {
 
         try {
-          await measureInvoke('store_secret', { key: 'twitch_token', value: result.access_token })
+          await writeSecret('store_secret', { key: 'twitch_token', value: result.access_token })
         } catch {
+          if (!current()) return
           localStorage.setItem(LS_TOKEN, result.access_token)
         }
+        if (!current()) return
         setCachedToken(result.access_token)
         logEvent('auth', 'login.success', { username: result.username || 'unknown' })
 
         const userInfo = await fetchUserInfo(result.access_token).catch(() => null)
+        if (!current()) return
+        persistUserInfo(userInfo)
         const finalUsername = userInfo?.username && userInfo.username !== 'twitch_user' ? userInfo.username : (result.username || 'twitch_user')
         if (userInfo?.avatar) setAvatar(userInfo.avatar)
 
         localStorage.setItem(LS_USERNAME, finalUsername)
         setUser({
           username: finalUsername,
+          userId: userInfo?.userId || null,
           identities: [{ provider: 'twitch', identity_data: { login: finalUsername } }],
         })
 
@@ -205,6 +237,7 @@ export function useAuth() {
         setError(null)
       }
     } catch (err) {
+      if (!current()) return
       if (err?.name !== 'AbortError') {
         setError(err.message || 'Error al conectar con Twitch')
         setAuthing(false)
@@ -212,52 +245,66 @@ export function useAuth() {
       }
     }
 
-    setAuthing(false)
-  }, [])
+    if (current()) setAuthing(false)
+  }, [writeSecret])
 
   const loginWithToken = useCallback(async (token) => {
     if (!token) return
+    const version = {}
+    sessionVersion.current = version
+    const current = () => version === sessionVersion.current
+    abortRef.current?.abort()
     setAuthing(true)
     setError(null)
 
     const cleanToken = token.replace(/^oauth:/i, '')
     try {
       const userInfo = await fetchUserInfo(cleanToken)
+      if (!current()) return
       if (!userInfo?.username) throw new Error('Token inválido')
 
       const username = userInfo.username
 
       try {
-        await measureInvoke('store_secret', { key: 'twitch_token', value: cleanToken })
+        await writeSecret('store_secret', { key: 'twitch_token', value: cleanToken })
       } catch {
+        if (!current()) return
         localStorage.setItem(LS_TOKEN, cleanToken)
       }
+      if (!current()) return
+      persistUserInfo(userInfo)
       setCachedToken(cleanToken)
       localStorage.setItem(LS_USERNAME, username)
       if (userInfo.avatar) setAvatar(userInfo.avatar)
 
       setUser({
         username,
+        userId: userInfo.userId || null,
         identities: [{ provider: 'twitch', identity_data: { login: username } }],
       })
       setAuthing(false)
       setError(null)
     } catch (err) {
+      if (!current()) return
       setError(err.message || 'Error al validar token')
       setAuthing(false)
     }
-  }, [])
+  }, [writeSecret])
 
   const logout = useCallback(async () => {
-    try {
-      await measureInvoke('delete_secret', { key: 'twitch_token' })
-    } catch {  }
+    sessionVersion.current = null
+    abortRef.current?.abort()
+    archiveLegacyFavorites()
     localStorage.removeItem(LS_TOKEN)
     localStorage.removeItem(LS_USERNAME)
     localStorage.removeItem(LS_CLIENT_ID)
     logEvent('auth', 'logout', null)
 
     localStorage.removeItem(LS_AVATAR)
+    localStorage.removeItem('bs.twitch.viewer_userid')
+    localStorage.removeItem('blinkstream_recent')
+    sessionStorage.removeItem('blinkstream_live_status_v1')
+    sessionStorage.removeItem('blinkstream_logos_v1')
 
     clearBlinkstreamToken()
     setCachedToken(null)
@@ -265,7 +312,11 @@ export function useAuth() {
     setError(null)
     setAuthing(false)
     setAvatar(null)
-  }, [])
+    setLoading(false)
+    try {
+      await writeSecret('delete_secret', { key: 'twitch_token' })
+    } catch {  }
+  }, [writeSecret])
 
   const getTwitchToken = useCallback(() => {
     return cachedToken

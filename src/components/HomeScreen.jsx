@@ -7,6 +7,7 @@ import LiveBadge from './LiveBadge'
 import PhosphorIcon from './icons/PhosphorIcon'
 import StreamPreview from './StreamPreview'
 import { useT } from '../utils/i18n'
+import WelcomeScreen from './WelcomeScreen'
 
 function exactViewers(n) {
   if (n == null) return null
@@ -383,7 +384,7 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
   )
 })
 
-export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onShowAbout, favorites, recentChannels = [], onRemoveRecent }) {
+export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onShowAbout, authing, favorites, pinnedFavorites = favorites, followsError, recentChannels = [], onRemoveRecent }) {
   const t = useT()
 
   const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
@@ -418,7 +419,8 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
   const [gameStreams, setGameStreams] = useState([])
   const [gameLoading, setGameLoading] = useState(false)
 
-  const fetchLiveStatus = useCallback(async () => {
+  const fetchLiveStatus = useCallback(async (canApply = () => true) => {
+    if (!isLoggedIn) return
     const allNames = [...new Set([...favorites, ...recentChannels])]
     if (!allNames.length) {
       setLiveStatus({})
@@ -512,6 +514,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
       if (!statusMap[key]) statusMap[key] = { live: false, logo: logoMap[key] }
     })
 
+    if (!canApply()) return
     cacheSet(CACHE_KEY_STATUS, statusMap)
     cacheSet(CACHE_KEY_LOGOS, logoMap)
 
@@ -519,7 +522,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
     setChannelLogos(logoMap)
     cachedStatusRef.current = statusMap
     cachedLogosRef.current = logoMap
-  }, [favorites, recentChannels])
+  }, [isLoggedIn, favorites, recentChannels])
 
   useEffect(() => {
     const cachedStatus = cacheGet(CACHE_KEY_STATUS, STATUS_TTL_MS)
@@ -536,26 +539,28 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
       cachedLogosRef.current = cachedLogos
     }
 
-    fetchLiveStatus()
     let cancelled = false
+    const load = () => fetchLiveStatus(() => !cancelled)
+    load()
     let timer
     const pollStatus = () => {
       timer = setTimeout(() => {
         if (cancelled) return
-        fetchLiveStatus()
+        load()
         if (!cancelled) pollStatus()
       }, 60000)
     }
     pollStatus()
-    window.addEventListener('blinkstream_auth_updated', fetchLiveStatus)
+    window.addEventListener('blinkstream_auth_updated', load)
     return () => { 
       cancelled = true
       clearTimeout(timer)
-      window.removeEventListener('blinkstream_auth_updated', fetchLiveStatus)
+      window.removeEventListener('blinkstream_auth_updated', load)
     }
   }, [fetchLiveStatus])
 
   useEffect(() => {
+    if (!isLoggedIn) return
     let c = false
     const fetchTopGames = async () => {
       const headers = await getHeaders()
@@ -563,6 +568,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
         const r = await fetch(`https://api.twitch.tv/helix/games/top?first=12`, { headers, signal: AbortSignal.timeout(8000) })
         if (!c && r.ok) {
           const d = await r.json()
+          if (c) return
           if (d?.data) setTopGames(d.data.map(g => ({
             id: g.id, name: g.name, boxArt: g.box_art_url?.replace('{width}','285').replace('{height}','380') || '',
           })))
@@ -630,12 +636,12 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
           </button>
         </div>
 
-        {favorites.length > 0 && (
+        {isLoggedIn && favorites.length > 0 && (
           <div className="mb-4">
             {!miniDock ? (
               <div className="flex items-center justify-between px-3 mb-2">
                 <span className="text-[12px] font-bold text-text-primary tracking-wide">
-                  {t('favChannels', 'Canales Favoritos')}
+                  {isLoggedIn ? t('followedAndFavorites', 'Seguidos y favoritos') : t('favChannels', 'Canales Favoritos')}
                 </span>
                 <div className="flex items-center gap-0.5">
                   <button
@@ -674,7 +680,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
                   name={name}
                   status={{ ...base, logo: base.logo || channelLogos[name.toLowerCase()] }}
                   onSelect={onSelect}
-                  onRemove={!miniDock ? onToggleFavorite : null}
+                  onRemove={!miniDock && pinnedFavorites.includes(name) ? onToggleFavorite : null}
                   miniDock={miniDock}
                 />
               )
@@ -691,7 +697,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
           </div>
         )}
 
-        {recentChannels.length > 0 && (
+        {isLoggedIn && recentChannels.length > 0 && (
           <div className="mb-4">
             {!miniDock && (
               <div className="px-3 mb-2">
@@ -745,26 +751,9 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
       <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
         <div className="w-full min-w-0 px-4 sm:px-6 lg:px-8 pt-5 pb-16">
 
-          {!isLoggedIn && favorites.length === 0 && recentChannels.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center animate-fade-in">
-              <div className="w-20 h-20 rounded-2xl bg-twitch/10 flex items-center justify-center mb-6">
-                <svg width="42" height="42" viewBox="0 0 24 24" fill="currentColor" className="text-twitch"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
-              </div>
-              <h2 className="text-white text-xl font-bold mb-3">Descubre BlinkStream</h2>
-              <p className="text-text-secondary text-[14px] max-w-md leading-relaxed mb-8">
-                Inicia sesión con Twitch para ver tus canales favoritos, seguidos y descubrir nuevo contenido.
-              </p>
-              <div className="flex flex-wrap justify-center gap-4 mb-10">
-                {['Sin anuncios','Chat con emotes','Favoritos en la nube','Notificaciones live'].map((f,i) => (
-                  <div key={i} className="flex items-center gap-2 text-[12px] text-text-muted bg-bg-secondary/50 px-3 py-1.5 rounded-full border border-bg-tertiary/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-twitch/60" />{f}
-                  </div>
-                ))}
-              </div>
-              <p className="text-text-muted/50 text-[12px]">
-                Usa el botón <strong className="text-twitch">Twitch</strong> en la esquina superior derecha para conectarte.
-              </p>
-            </div>
+          {isLoggedIn && followsError && <p role="status" className="text-sm text-yellow-400 px-4 py-2">{followsError}. Se conserva la última lista válida.</p>}
+          {!isLoggedIn ? (
+            <WelcomeScreen authing={authing} />
           ) : (
             <>
               {isLoggedIn && favorites.length === 0 && recentChannels.length === 0 && (

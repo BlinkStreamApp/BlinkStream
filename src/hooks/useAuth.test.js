@@ -73,6 +73,11 @@ describe('useAuth', () => {
     })
     localStorage.setItem('blinkstream_twitch_username', 'alice')
     localStorage.setItem('blinkstream_twitch_avatar', 'https://example.com/avatar.png')
+    localStorage.setItem('bs.twitch.viewer_userid', 'alice-id')
+    localStorage.setItem('blinkstream_favorites', '["alice_follow"]')
+    localStorage.setItem('blinkstream_recent', '["alice_recent"]')
+    sessionStorage.setItem('blinkstream_live_status_v1', 'cached_status')
+    sessionStorage.setItem('blinkstream_logos_v1', 'cached_logos')
 
     const { result } = renderHook(() => useAuth())
 
@@ -90,6 +95,64 @@ describe('useAuth', () => {
     expect(result.current.avatar).toBeNull()
     expect(localStorage.getItem('blinkstream_twitch_username')).toBeNull()
     expect(localStorage.getItem('blinkstream_twitch_avatar')).toBeNull()
+    expect(localStorage.getItem('bs.twitch.viewer_userid')).toBeNull()
+    expect(localStorage.getItem('blinkstream_favorites')).toBeNull()
+    expect(JSON.parse(localStorage.getItem('blinkstream_favorites_legacy')).owner).toBe('alice')
+    expect(localStorage.getItem('blinkstream_recent')).toBeNull()
+    expect(sessionStorage.getItem('blinkstream_live_status_v1')).toBeNull()
+    expect(sessionStorage.getItem('blinkstream_logos_v1')).toBeNull()
+  })
+
+  it('una restauración pendiente no recupera la sesión después de logout', async () => {
+    let resolveSecret
+    invokeMock.mockImplementation(cmd => cmd === 'get_secret'
+      ? new Promise(resolve => { resolveSecret = resolve }) : Promise.resolve(null))
+    const { result } = renderHook(() => useAuth())
+    await act(async () => { await result.current.logout() })
+    await act(async () => { resolveSecret('old-token') })
+    expect(result.current.isLoggedIn).toBe(false)
+    expect(result.current.getTwitchToken()).toBeNull()
+    expect(result.current.user).toBeNull()
+  })
+
+  it('un login pendiente no vuelve a guardar identidad después de cerrar sesión', async () => {
+    let resolveValidate
+    vi.spyOn(globalThis, 'fetch').mockImplementation(url => url.includes('/validate')
+      ? new Promise(resolve => { resolveValidate = resolve })
+      : Promise.resolve(mockResponse({ ok: true, json: async () => ({ data: [{ login: 'old_alice', id: 'old-id' }] }) })))
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let loginPromise
+    act(() => { loginPromise = result.current.loginWithToken('old-token') })
+    await act(async () => { await result.current.logout() })
+    await act(async () => {
+      resolveValidate(mockResponse({ ok: true, json: async () => ({ login: 'old_alice', user_id: 'old-id', client_id: 'client' }) }))
+      await loginPromise
+    })
+    expect(result.current.isLoggedIn).toBe(false)
+    expect(localStorage.getItem('blinkstream_twitch_username')).toBeNull()
+    expect(localStorage.getItem('bs.twitch.viewer_userid')).toBeNull()
+    expect(invokeMock).not.toHaveBeenCalledWith('store_secret', expect.anything())
+  })
+
+  it('logout espera a una escritura nativa pendiente y después elimina el token', async () => {
+    let resolveStore
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse({
+      ok: true, json: async () => ({ data: [{ login: 'alice', id: 'alice-id' }] }),
+    }))
+    invokeMock.mockImplementation(cmd => cmd === 'store_secret'
+      ? new Promise(resolve => { resolveStore = resolve }) : Promise.resolve(null))
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let loginPromise
+    act(() => { loginPromise = result.current.loginWithToken('token') })
+    await waitFor(() => expect(resolveStore).toBeTypeOf('function'))
+    let logoutPromise
+    act(() => { logoutPromise = result.current.logout() })
+    expect(invokeMock).not.toHaveBeenCalledWith('delete_secret', { key: 'twitch_token' })
+    await act(async () => { resolveStore(); await loginPromise; await logoutPromise })
+    expect(invokeMock).toHaveBeenCalledWith('delete_secret', { key: 'twitch_token' })
+    expect(result.current.isLoggedIn).toBe(false)
   })
 
   it('loginWithToken con token invalido: marca error, no loguea', async () => {
