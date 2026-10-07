@@ -19,40 +19,6 @@
 
 ## ✨ Features
 
-### v1.4.3 — Session and branding hotfix (candidate)
-
-- Logout clears recent history and session caches, closes playback and returns to the guest welcome.
-- Twitch follows refresh independently from account-scoped pinned favorites, including unfollows.
-- New approved logo across desktop icons, welcome, favicon and website; matching name colors.
-- User-validated Windows logout/welcome and live Twitch follow/unfollow refresh.
-  Signed cross-platform publication is pending CI. Downloads below still point to the published 1.4.2.
-
-Small fixes increment the patch number: `1.4.2` → `1.4.3`, not `1.4.2-a`.
-See the reusable [hotfix guide](docs/guides/HOTFIX_RELEASES.md).
-
-### v1.4.2 — Twitch reliability and integrated Drops
-
-Version **1.4.2** is [published](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.2)
-for Windows x64, macOS Apple Silicon/Intel and Linux x64. CI and downloaded release artifacts
-passed signature verification; Windows install/reinstall/process-restart passed on a disposable runner.
-
-- **Integrated Drops:** native progress and official Twitch inventory share one panel, without a
-  separate claim window. The panel and polish were accepted in a Windows user session. Claims
-  still require Twitch integrity checks and any game-account linkage.
-- **Experimental watch reporting:** opt-in reports measure actual native playback and pause when
-  playback stops or the app is hidden. Only Twitch-confirmed inventory counts as earned progress;
-  accepted reports alone do not prove credit. No second official player is opened.
-- **Safer Auto-Claim:** uncertain claims persistently pause automation instead of reopening windows.
-  General panel acceptance is not separate proof of automatic clicking in every campaign.
-- **EventSub rewards:** custom redemption events replace retired PubSub, with creator authorization,
-  connection states, deduplication and cleanup. A real authorized redemption test remains pending.
-- **UI reliability:** stale search responses cannot reopen dismissed results; player shortcuts respect
-  interactive controls/modals; Drops restores React focus and highlights the active pane.
-- **Update safeguards:** CI verifies every updater artifact and its trusted comment before publishing
-  a complete release. The current signing key matches configured trust; historical installers still
-  require migration/upgrade validation. No key has been replaced.
-- **Security maintenance:** JavaScript audit is clean and rustls is patched. GTK3 uses a reviewed
-  GLib security backport without changing its API; optimized Linux regression tests pass.
 
 See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 [updater verification](docs/guides/UPDATER_VERIFICATION.md) for evidence and validation limits.
