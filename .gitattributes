@@ -1,2 +1,3 @@
 # Preserve upstream vendor bytes so integrity checks are identical on every OS.
 /src-tauri/vendor/glib/** -text
+/scripts/*.sh text eol=lf

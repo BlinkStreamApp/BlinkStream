@@ -15,7 +15,7 @@ Verdict: **current signer verified; release/legacy-upgrade validation still pend
   The installed Tauri updater accepts raw AppImage bytes as well as the archive format.
 - Four UI contract tests simulate no-update, check failure, explicit installation and rejected
   signature/installation; they verify no premature download/relaunch and no relaunch on failure.
-- Local 1.4.2 checks: 513 frontend tests pass/1 skipped, 8 release/security tests, 56 Rust tests,
+- Local 1.4.2 checks: 514 frontend tests pass/1 skipped, 11 release/security tests, 56 Rust tests,
   lint/fmt/Clippy pass. Compilation is checked separately; no real installation was attempted.
 
 ## Current signer and historical incompatibility
@@ -71,6 +71,15 @@ signature before extracting/executing it. This avoids an observed APT installati
   release publication and a Git commit are not a cross-service atomic transaction.
 - Removed the standalone portable executable misleadingly named `Custom Setup` from future bundles.
 - Signing keys, production manifest and external secrets have not been changed.
+- The build wrapper removes only whitespace around/wrapping the outer Base64 signing secret.
+  Tauri previously rejected a newline (symbol 10 at offset 348); the key bytes and password
+  remain unchanged and never enter command-line arguments or logs.
+- Linux setup replaces the stalled Azure HTTP mirror with Ubuntu's official HTTPS archive;
+  repository signature checks remain active, with bounded network retries/timeouts.
+- Windows CI verifies the newly signed installer before executing it on a disposable runner,
+  installs into a unique runner-temp path, checks the version, then reinstalls with the actual
+  Tauri passive flags `/P /R /UPDATE`. This is installer-mode validation, not proof of historical
+  key migration, user settings persistence or a complete GUI check/download/relaunch flow.
 
 ## Before a release
 
@@ -80,19 +89,21 @@ The local npm audit found one additional nanoid advisory; nanoid is now `3.3.18`
 `pnpm audit` reports zero vulnerabilities. After push `02bbadb`, GitHub's scan closed all five
 original patched findings; only the GLib advisory remains open.
 
-GLib `0.18.5` remains through Tauri/GTK/WebKit on Linux. Its
+GLib `0.18.5` is required by Tauri/GTK/WebKit on Linux. Its
 [upstream advisory](https://github.com/advisories/GHSA-wrw7-89jp-8q8g) is fixed from `0.20.0`,
 but current GTK3 crates require the incompatible `0.18` family. No direct application use of
 `VariantStrIter` was found; that is not proof of absence in transitive paths. It is not in the
 Windows target tree. Do not hide the alert or force a second unrelated GLib version as a fake fix.
-Linux release readiness needs a reviewed upstream-compatible backport or dependency migration,
-with Linux build/runtime checks; neither has been validated here.
+The registry package is now vendored with exactly the two-line upstream fix from
+[gtk-rs-core#1343](https://github.com/gtk-rs/gtk-rs-core/pull/1343), without a fake version change.
+The source-tree integrity gate passes; CI must run optimized Linux iteration regressions and
+build the real GTK/Tauri AppImage. See [ADR-014](../decisions/ADR-014-glib-gtk3-security-backport.md).
+The alert may remain open because scanners identify the old version rather than its patched code.
 
-The hardening push reached master at `02bbadb`; diagnostic bootstrap fix is `4698c0d`. The
-[Release Build CI](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37667316122)
-is running; signed multi-platform success is not confirmed. The original APT diagnostic was
-cancelled and replaced by successful run `37668124715` using the verified official utility.
-No release/tag/installation was performed.
+Signing/GLib/installer corrections reached master at `607e375`; the APT correction is `0cae839`.
+New CI validation is pending; signed multi-platform success is not confirmed yet.
+The public-key diagnostic `37668124715` succeeded using the verified official utility.
+No release/tag or installation on the user's PC was performed.
 
 1. Current signer/config pair is verified. Verify newly built real artifacts and inventory installed-client trust;
    document a manual transition for incompatible clients before promising automatic upgrade.
@@ -101,4 +112,5 @@ No release/tag/installation was performed.
 4. Verify artifact and manifest availability before exposing the release as latest.
 5. Test check/download/verification/install/relaunch and settings persistence in a disposable installation.
 
-A source push does not authorize a release tag or installing an update.
+The user explicitly authorized publication of 1.4.2 after validation on all three platforms,
+but not installing anything on their PC. A source push alone is not release validation.

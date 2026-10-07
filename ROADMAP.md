@@ -23,10 +23,10 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Keyboard shortcuts / Drops focus | Interactive-control/modal isolation and focus regressions pass; Drops polish accepted by user | Other dialogs, screen readers and configurable/OS-global shortcuts |
 | Channel search | Stale-response cancellation and dismissal regressions pass | Broader keyboard/accessibility coverage |
 | Auto-updater | Four-platform artifact/signature gate; recovered current signer matches configured trust and validates probe | New signed multi-platform builds and installed-upgrade test pending; historical signatures use another key |
-| Dependency security | Five original alerts patched, additional nanoid patch; npm audit clean | Linux GTK/GLib advisory remains blocked by upstream version compatibility |
+| Dependency security | Five original alerts patched, nanoid patched; npm audit clean; exact upstream GLib fix backported for GTK3 | Optimized Linux regression/build pending; retire vendor when upstream compatibility permits (ADR-014) |
 
-Validation: 513 frontend tests pass, one skipped; lint passes; latest backend verification:
-56 Rust tests, 8 release/security tests, fmt/Clippy and Windows build pass. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
+Validation: 514 frontend tests pass, one skipped; lint passes; latest backend verification:
+56 Rust tests, 11 release/security tests, fmt/Clippy and Windows build pass. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
 Now: Twitch reliability and keyboard. Next: VOD resume/bookmarks and workspace profiles.
 Then: resource saving, selective alerts, replay buffer and a local media library.

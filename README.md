@@ -39,8 +39,8 @@ A source push does not publish installers or enable an update to 1.4.2.
 - **Update safeguards:** CI verifies every updater artifact and its trusted comment before publishing
   a complete release. The current signing key matches configured trust; historical installers still
   require migration/upgrade validation. No key has been replaced.
-- **Security maintenance:** JavaScript audit is clean and rustls is patched. The Linux GTK/GLib
-  advisory still requires an upstream-compatible fix; see the verification guide.
+- **Security maintenance:** JavaScript audit is clean and rustls is patched. GTK3 uses a reviewed
+  GLib security backport without changing its API; optimized Linux validation is pending in CI.
 
 See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 [updater verification](docs/guides/UPDATER_VERIFICATION.md) for validation limits and release blockers.
@@ -64,7 +64,7 @@ See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 | 📊 **Pro Telemetry (Nerd Stats)** | Real-time live HUD measuring exact live broadcast delay, RAM buffer ahead, bitrate, resolution, FPS, and dropped frames |
 | 📱 **Mobile Wi-Fi Remote** | Control playback, channel switching, and volume wirelessly from any smartphone or tablet |
 | 🔒 **Hardened Security** | Strict Content Security Policy (CSP), rustls TLS, and secure OS keychain storage |
-| 🔄 **Over-The-Air Updates** | Background/manual checks, user-confirmed installation and signature verification via GitHub Releases; signing compatibility currently blocks release readiness |
+| 🔄 **Over-The-Air Updates** | Background/manual checks, user-confirmed installation and signature verification via GitHub Releases; legacy clients with a different trusted key need a manual transition |
 
 ---
 

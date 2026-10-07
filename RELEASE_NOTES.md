@@ -24,13 +24,14 @@ Status: release preparation, 2026-10-07. No 1.4.2 installers or update manifest 
 - Remote Twitch views do not inherit application IPC capabilities; authentication stays native.
 - Update publication now verifies all four real artifacts against the configured Minisign key,
   including trusted comments, and rejects incomplete releases before publishing assets/manifests.
-- Patched rustls, Vitest/mocker, source-map-js, brace-expansion and nanoid. npm audit is clean;
-  the Linux GTK/GLib compatibility advisory remains open.
+- Patched rustls, Vitest/mocker, source-map-js, brace-expansion and nanoid. npm audit is clean.
+  GTK3 uses an exact upstream GLib security backport with a reproducible integrity check;
+  Dependabot may still flag the old version label. See ADR-014 for scope and removal criteria.
 
 ## Validation and release blockers
 
 - The Windows user accepted the integrated Drops panel and subsequent polish.
-- 513 frontend tests pass, one skipped; lint and 8 release/security tests pass. Backend: 56 Rust tests,
+- 514 frontend tests pass, one skipped; lint and 11 release/security tests pass. Backend: 56 Rust tests,
   fmt/Clippy and local Windows build pass. Other desktop platforms are not certified by those checks.
 - An authorized EventSub redemption, separate automatic-click confirmation, and isolated
   native-watch pause/session tests remain outstanding.
