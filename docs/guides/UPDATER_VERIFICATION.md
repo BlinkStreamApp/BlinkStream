@@ -47,6 +47,8 @@ only into a mode-0600 temporary file on the runner, removed in `finally`, never 
 No new key is generated and no repository secret is modified. Recovery is not a trust migration:
 the recovered public key still needs comparison with real artifacts and installed-client trust.
 Run it with `gh workflow run updater-key-check.yml`; it does not publish a release.
+The diagnostic bootstraps pinned Minisign 0.12 from its official archive, verifying its upstream
+signature before extracting/executing it. This avoids an observed APT installation stall.
 
 ## Pipeline review
 
@@ -67,7 +69,8 @@ Run it with `gh workflow run updater-key-check.yml`; it does not publish a relea
 Five of the original six Dependabot findings are fixed in source: rustls `0.23.45`,
 source-map-js `1.2.2`, brace-expansion `5.0.12`, vitest/@vitest/mocker `4.1.11`.
 The local npm audit found one additional nanoid advisory; nanoid is now `3.3.18`.
-`pnpm audit` reports zero vulnerabilities. GitHub alert closure depends on its next scan.
+`pnpm audit` reports zero vulnerabilities. After push `02bbadb`, GitHub's scan closed all five
+original patched findings; only the GLib advisory remains open.
 
 GLib `0.18.5` remains through Tauri/GTK/WebKit on Linux. Its
 [upstream advisory](https://github.com/advisories/GHSA-wrw7-89jp-8q8g) is fixed from `0.20.0`,
@@ -77,9 +80,11 @@ Windows target tree. Do not hide the alert or force a second unrelated GLib vers
 Linux release readiness needs a reviewed upstream-compatible backport or dependency migration,
 with Linux build/runtime checks; neither has been validated here.
 
-The previous code push reached master at `24e7785`. Its
-[Release Build CI](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37665215273)
-was still installing Linux dependencies at this check; its success is not confirmed.
+The hardening push reached master at `02bbadb`. Its
+[Release Build CI](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37667316122)
+is running; signed multi-platform success is not confirmed. The separate
+[public-key diagnostic](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37667316323)
+is also running, last observed installing Minisign. No release/tag/installation was performed.
 
 1. Resolve signing continuity; verify a real artifact using the key trusted by installed clients.
 2. Run frontend/lint, Rust fmt/Clippy/tests, release-manifest tests and CI.

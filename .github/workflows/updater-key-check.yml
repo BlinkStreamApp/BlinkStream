@@ -14,8 +14,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
-      - name: Install official Minisign utility
-        run: sudo apt-get update && sudo apt-get install -y minisign
+      - name: Verify and prepare official Minisign utility
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            import { join } from "node:path";
+            import { verifyUpdaterArtifact } from "./scripts/build-updater-manifest.mjs";
+            const url = "https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-linux.tar.gz";
+            const [binary, detached] = await Promise.all([url, `${url}.minisig`].map(
+              address => fetch(address, { signal: AbortSignal.timeout(60000) })));
+            if (!binary.ok || !detached.ok) throw new Error("Minisign download failed");
+            const bytes = Buffer.from(await binary.arrayBuffer());
+            const signature = Buffer.from(await detached.text()).toString("base64");
+            const publicKey = Buffer.from("untrusted comment: Minisign release key\n" +
+              "RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3\n").toString("base64");
+            verifyUpdaterArtifact(bytes, signature, publicKey);
+            writeFileSync(join(process.env.RUNNER_TEMP, "minisign.tar.gz"), bytes);
+          '
+          tar -xzf "$RUNNER_TEMP/minisign.tar.gz" -C "$RUNNER_TEMP" minisign-linux/x86_64/minisign
+          chmod 700 "$RUNNER_TEMP/minisign-linux/x86_64/minisign"
+          echo "$RUNNER_TEMP/minisign-linux/x86_64" >> "$GITHUB_PATH"
       - name: Recover public key and verify probe
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
