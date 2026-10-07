@@ -15,10 +15,25 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
   const [selectedIdx, setSelectedIdx] = useState(-1)
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
+  const requestRef = useRef(0)
   const containerRef = useRef(null)
+
+  const cancelSearch = useCallback(() => {
+    requestRef.current += 1
+    clearTimeout(debounceRef.current)
+    debounceRef.current = null
+  }, [])
+
+  const dismissSuggestions = useCallback(() => {
+    cancelSearch()
+    setSearching(false)
+    setShowSuggestions(false)
+    setSelectedIdx(-1)
+  }, [cancelSearch])
 
   useEffect(() => {
     const handleKey = (e) => {
+      if (e.defaultPrevented || e.repeat || e.altKey || e.shiftKey) return
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') {
         e.preventDefault(); inputRef.current?.focus()
       }
@@ -29,49 +44,53 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
 
   useEffect(() => {
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (currentChannel) { setInput(''); setSuggestions([]) }
-  }, [currentChannel])
+    if (currentChannel) {
+      cancelSearch()
+      // Reset the header search when navigation changes the active channel.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInput(''); setSuggestions([]); setShowSuggestions(false); setSearching(false); setSelectedIdx(-1)
+    }
+  }, [currentChannel, cancelSearch])
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
     const val = input.trim()
-    if (val.length < 2) {
-
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSuggestions([]); return
-    }
+    if (val.length < 2) return
+    const request = ++requestRef.current
 
     debounceRef.current = setTimeout(async () => {
+      debounceRef.current = null
+      if (request !== requestRef.current) return
       setSearching(true)
       try {
         const results = await searchChannels(val)
+        if (request !== requestRef.current) return
         setSuggestions(results.filter(r => r.login !== currentChannel).slice(0, 6))
         setShowSuggestions(true)
         setSelectedIdx(-1)
-      } catch { setSuggestions([]) }
-      finally { setSearching(false) }
+      } catch { if (request === requestRef.current) setSuggestions([]) }
+      finally { if (request === requestRef.current) setSearching(false) }
     }, 250)
 
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [input, currentChannel])
+    // Completed requests can still arrive after a new query, dismissal or unmount.
+    return cancelSearch
+  }, [input, currentChannel, cancelSearch])
 
   useEffect(() => {
     const handleClick = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) setShowSuggestions(false)
+      if (containerRef.current && !containerRef.current.contains(e.target)) dismissSuggestions()
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+  }, [dismissSuggestions])
 
   const selectChannel = useCallback((name) => {
+    dismissSuggestions()
     setError('')
     setInput('')
     setSuggestions([])
-    setShowSuggestions(false)
     onSelect(name)
     inputRef.current?.blur()
-  }, [onSelect])
+  }, [onSelect, dismissSuggestions])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -82,6 +101,13 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
   }
 
   const handleKeyDown = (e) => {
+    if (e.nativeEvent.isComposing) return
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      dismissSuggestions()
+      return
+    }
     if (!showSuggestions || !suggestions.length) return
     switch (e.key) {
       case 'ArrowDown': e.preventDefault(); setSelectedIdx(i => Math.min(i + 1, suggestions.length - 1)); break
@@ -89,7 +115,6 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
       case 'Enter':
         if (selectedIdx >= 0) { e.preventDefault(); selectChannel(suggestions[selectedIdx].login) }
         break
-      case 'Escape': setShowSuggestions(false); break
     }
   }
 
@@ -101,7 +126,12 @@ export default function ChannelSearch({ onSelect, currentChannel }) {
           ref={inputRef}
           type="text"
           value={input}
-          onChange={(e) => { setInput(e.target.value); setError('') }}
+          onChange={(e) => {
+            dismissSuggestions()
+            setSuggestions([])
+            setInput(e.target.value)
+            setError('')
+          }}
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           placeholder={t('nav.searchPlaceholder', 'Buscar canal…')}
           maxLength={25}
