@@ -48,9 +48,15 @@ $installedHash = Assert-InstalledVersion
 Invoke-CheckedInstaller -InstallerArguments @('/P', '/R', '/UPDATE', "/D=$installRoot")
 if ((Assert-InstalledVersion) -ne $installedHash) { throw 'Reinstall changed the packaged application bytes' }
 
+$smokeProcesses = @()
+for ($attempt = 0; $attempt -lt 30 -and $smokeProcesses.Count -eq 0; $attempt++) {
+    Start-Sleep -Milliseconds 500
+    $smokeProcesses = @(Get-Process -Name blinkstream -ErrorAction SilentlyContinue | Where-Object {
+        $_.Path -eq (Join-Path $installRoot 'blinkstream.exe')
+    })
+}
+if ($smokeProcesses.Count -eq 0) { throw 'Passive updater mode did not restart the installed application' }
 # Stop only the smoke installation, never another application with the same name.
-Get-Process -Name blinkstream -ErrorAction SilentlyContinue | Where-Object {
-    $_.Path -eq (Join-Path $installRoot 'blinkstream.exe')
-} | Stop-Process
-Write-Host "Verified signed NSIS install and passive updater-mode reinstall: $($config.version)"
+$smokeProcesses | Stop-Process
+Write-Host "Verified signed NSIS install, passive updater-mode reinstall and process restart: $($config.version)"
 Write-Host 'This is not a historical 1.4.1 trust-migration or GUI end-to-end test.'

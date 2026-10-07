@@ -40,7 +40,7 @@ A source push does not publish installers or enable an update to 1.4.2.
   a complete release. The current signing key matches configured trust; historical installers still
   require migration/upgrade validation. No key has been replaced.
 - **Security maintenance:** JavaScript audit is clean and rustls is patched. GTK3 uses a reviewed
-  GLib security backport without changing its API; optimized Linux validation is pending in CI.
+  GLib security backport without changing its API; optimized Linux regression tests pass.
 
 See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 [updater verification](docs/guides/UPDATER_VERIFICATION.md) for validation limits and release blockers.

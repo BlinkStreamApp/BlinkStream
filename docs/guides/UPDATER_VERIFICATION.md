@@ -78,7 +78,8 @@ signature before extracting/executing it. This avoids an observed APT installati
   repository signature checks remain active, with bounded network retries/timeouts.
 - Windows CI verifies the newly signed installer before executing it on a disposable runner,
   installs into a unique runner-temp path, checks the version, then reinstalls with the actual
-  Tauri passive flags `/P /R /UPDATE`. This is installer-mode validation, not proof of historical
+  Tauri passive flags `/P /R /UPDATE`, then requires the installed process to restart.
+  This is installer-mode validation, not proof of historical
   key migration, user settings persistence or a complete GUI check/download/relaunch flow.
 
 ## Before a release
@@ -86,8 +87,9 @@ signature before extracting/executing it. This avoids an observed APT installati
 Five of the original six Dependabot findings are fixed in source: rustls `0.23.45`,
 source-map-js `1.2.2`, brace-expansion `5.0.12`, vitest/@vitest/mocker `4.1.11`.
 The local npm audit found one additional nanoid advisory; nanoid is now `3.3.18`.
-`pnpm audit` reports zero vulnerabilities. After push `02bbadb`, GitHub's scan closed all five
-original patched findings; only the GLib advisory remains open.
+`pnpm audit` reports zero vulnerabilities. GitHub closed the first five patched findings and,
+after the local GLib backport, also marked alert #2 fixed. No findings remain open; no alert was
+manually dismissed. This does not mean the registry's original GLib 0.18.5 is fixed.
 
 GLib `0.18.5` is required by Tauri/GTK/WebKit on Linux. Its
 [upstream advisory](https://github.com/advisories/GHSA-wrw7-89jp-8q8g) is fixed from `0.20.0`,
@@ -96,12 +98,18 @@ but current GTK3 crates require the incompatible `0.18` family. No direct applic
 Windows target tree. Do not hide the alert or force a second unrelated GLib version as a fake fix.
 The registry package is now vendored with exactly the two-line upstream fix from
 [gtk-rs-core#1343](https://github.com/gtk-rs/gtk-rs-core/pull/1343), without a fake version change.
-The source-tree integrity gate passes; CI must run optimized Linux iteration regressions and
-build the real GTK/Tauri AppImage. See [ADR-014](../decisions/ADR-014-glib-gtk3-security-backport.md).
-The alert may remain open because scanners identify the old version rather than its patched code.
+The source-tree integrity gate passes. Linux CI passed both iteration regressions in debug and
+optimized release mode, 57 native unit tests, frontend/lint/build, strict Clippy and 44 Deno tests.
+The actual GTK/Tauri AppImage build remains pending.
+See [ADR-014](../decisions/ADR-014-glib-gtk3-security-backport.md).
+Other scanners may still flag the old version label rather than the patched code.
 
 Signing/GLib/installer corrections reached master at `607e375`; the APT correction is `0cae839`.
-New CI validation is pending; signed multi-platform success is not confirmed yet.
+The quality job in [CI 37672251656](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37672251656)
+passed, as did Windows (signed installer/reinstall smoke) and both macOS targets.
+Linux bundle setup timed out because the runner also uses `/etc/apt/apt-mirrors.txt`;
+the dependency script now rewrites that mirror-file URI to the direct official HTTPS archive.
+All-platform artifact verification is still pending, so publication remains blocked.
 The public-key diagnostic `37668124715` succeeded using the verified official utility.
 No release/tag or installation on the user's PC was performed.
 

@@ -23,7 +23,7 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Keyboard shortcuts / Drops focus | Interactive-control/modal isolation and focus regressions pass; Drops polish accepted by user | Other dialogs, screen readers and configurable/OS-global shortcuts |
 | Channel search | Stale-response cancellation and dismissal regressions pass | Broader keyboard/accessibility coverage |
 | Auto-updater | Four-platform artifact/signature gate; recovered current signer matches configured trust and validates probe | New signed multi-platform builds and installed-upgrade test pending; historical signatures use another key |
-| Dependency security | Five original alerts patched, nanoid patched; npm audit clean; exact upstream GLib fix backported for GTK3 | Optimized Linux regression/build pending; retire vendor when upstream compatibility permits (ADR-014) |
+| Dependency security | Six original alerts closed by GitHub; npm audit clean; GLib backport passes optimized Linux regressions | Retire vendor when upstream compatibility permits (ADR-014); platform bundles pending |
 
 Validation: 514 frontend tests pass, one skipped; lint passes; latest backend verification:
 56 Rust tests, 11 release/security tests, fmt/Clippy and Windows build pass. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).

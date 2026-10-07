@@ -94,10 +94,6 @@ jobs:
             artifact: windows-x64
 
     runs-on: ${{ matrix.os }}
-    env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -125,6 +121,9 @@ jobs:
 
       - name: Build Linux bundles
         if: runner.os == 'Linux'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: node scripts/build-signed-release.mjs --target ${{ matrix.target }} --bundles deb,appimage
 
       - name: Rename Linux bundles
@@ -150,6 +149,9 @@ jobs:
 
       - name: Build macOS bundles
         if: runner.os == 'macOS'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: node scripts/build-signed-release.mjs --target ${{ matrix.target }} --bundles app,dmg
 
       - name: Rename macOS bundles
@@ -176,6 +178,9 @@ jobs:
 
       - name: Build Windows bundles
         if: runner.os == 'Windows'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: node scripts/build-signed-release.mjs --target ${{ matrix.target }} --bundles msi,nsis
 
       - name: Rename Windows bundles
