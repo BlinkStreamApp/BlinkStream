@@ -22,15 +22,21 @@ Status: release preparation, 2026-10-07. No 1.4.2 installers or update manifest 
 - Player shortcuts respect interactive controls and visible modals. Drops restores focus, cycles Tab
   through visible React controls, consumes Escape and highlights the active pane.
 - Remote Twitch views do not inherit application IPC capabilities; authentication stays native.
+- Update publication now verifies all four real artifacts against the configured Minisign key,
+  including trusted comments, and rejects incomplete releases before publishing assets/manifests.
+- Patched rustls, Vitest/mocker, source-map-js, brace-expansion and nanoid. npm audit is clean;
+  the Linux GTK/GLib compatibility advisory remains open.
 
 ## Validation and release blockers
 
 - The Windows user accepted the integrated Drops panel and subsequent polish.
-- 513 frontend tests pass, one skipped; lint and 4 release-manifest tests pass. Backend: 56 Rust tests,
+- 513 frontend tests pass, one skipped; lint and 8 release/security tests pass. Backend: 56 Rust tests,
   fmt/Clippy and local Windows build pass. Other desktop platforms are not certified by those checks.
 - An authorized EventSub redemption, separate automatic-click confirmation, and isolated
   native-watch pause/session tests remain outstanding.
 - Auto-updater verification found incompatible signing keys in the configured/public release chain.
+  A post-key-change CI artifact still uses the incompatible signer; public-key recovery is prepared
+  without rotating keys or exporting the private secret.
   A source push is not a signed release and does not make 1.4.2 downloadable.
 - Before publication: resolve signing continuity, verify signed artifacts for supported platforms,
   and test an actual upgrade from an existing installation.

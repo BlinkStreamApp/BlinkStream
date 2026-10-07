@@ -1,0 +1,33 @@
+name: Updater signing key diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Install official Minisign utility
+        run: sudo apt-get update && sudo apt-get install -y minisign
+      - name: Recover public key and verify probe
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: node scripts/recover-updater-public-key.mjs public-key-evidence
+      - name: Upload public evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-public-key-evidence
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            public-key-evidence/updater.pub
+            public-key-evidence/probe.txt
+            public-key-evidence/probe.txt.sig

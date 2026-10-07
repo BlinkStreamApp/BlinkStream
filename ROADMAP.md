@@ -22,10 +22,11 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Custom reward events | EventSub implemented; automated lifecycle tests pass | Authorized creator session, real redemption and native CSP |
 | Keyboard shortcuts / Drops focus | Interactive-control/modal isolation and focus regressions pass; Drops polish accepted by user | Other dialogs, screen readers and configurable/OS-global shortcuts |
 | Channel search | Stale-response cancellation and dismissal regressions pass | Broader keyboard/accessibility coverage |
-| Auto-updater | Endpoint reachable, assets present; published Windows installer checked against configured keys | Signing key mismatch blocks release readiness; see verification guide |
+| Auto-updater | Four-platform artifact/signature gate and public-key recovery diagnostic implemented | Real CI signer also differs from configured trust; recovery/migration and installed-upgrade test pending |
+| Dependency security | Five original alerts patched, additional nanoid patch; npm audit clean | Linux GTK/GLib advisory remains blocked by upstream version compatibility |
 
 Validation: 513 frontend tests pass, one skipped; lint passes; latest backend verification:
-56 Rust tests, fmt/Clippy and Windows build pass. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
+56 Rust tests, 8 release/security tests, fmt/Clippy and Windows build pass. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
 Now: Twitch reliability and keyboard. Next: VOD resume/bookmarks and workspace profiles.
 Then: resource saving, selective alerts, replay buffer and a local media library.
