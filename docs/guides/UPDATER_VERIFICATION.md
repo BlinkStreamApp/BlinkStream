@@ -1,7 +1,7 @@
 # Auto-updater verification
 
 Checked: 2026-10-07. Source: 1.4.2. Published: 1.4.1.
-Verdict: **current signer verified; release/legacy-upgrade validation still pending**.
+Verdict: **signed candidate validated on all targets; tag publication pending; legacy trust migration remains limited**.
 
 ## Verified flow
 
@@ -100,16 +100,17 @@ The registry package is now vendored with exactly the two-line upstream fix from
 [gtk-rs-core#1343](https://github.com/gtk-rs/gtk-rs-core/pull/1343), without a fake version change.
 The source-tree integrity gate passes. Linux CI passed both iteration regressions in debug and
 optimized release mode, 57 native unit tests, frontend/lint/build, strict Clippy and 44 Deno tests.
-The actual GTK/Tauri AppImage build remains pending.
+The actual GTK/Tauri AppImage/deb builds also pass.
 See [ADR-014](../decisions/ADR-014-glib-gtk3-security-backport.md).
 Other scanners may still flag the old version label rather than the patched code.
 
-Signing/GLib/installer corrections reached master at `607e375`; the APT correction is `0cae839`.
-The quality job in [CI 37672251656](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37672251656)
-passed, as did Windows (signed installer/reinstall smoke) and both macOS targets.
-Linux bundle setup timed out because the runner also uses `/etc/apt/apt-mirrors.txt`;
-the dependency script now rewrites that mirror-file URI to the direct official HTTPS archive.
-All-platform artifact verification is still pending, so publication remains blocked.
+The signed candidate at `2bd66ec` passed every job in
+[CI 37675590056](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37675590056), including
+Windows install/reinstall/process-restart smoke, both macOS targets, Linux AppImage/deb and the
+four-artifact signature/manifest gate. Downloaded candidate binaries also passed local verification
+against the configured key without executing any installer on the user's PC.
+The runner's `/etc/apt/apt-mirrors.txt` URI now resolves directly to the official HTTPS archive;
+this was the remaining APT timeout cause. Signing secrets exist only in bundle-building steps.
 The public-key diagnostic `37668124715` succeeded using the verified official utility.
 No release/tag or installation on the user's PC was performed.
 
@@ -118,7 +119,9 @@ No release/tag or installation on the user's PC was performed.
 2. Run frontend/lint, Rust fmt/Clippy/tests, release-manifest tests and CI.
 3. Build signed platform artifacts from the intended tag; match manifest URLs and signatures.
 4. Verify artifact and manifest availability before exposing the release as latest.
-5. Test check/download/verification/install/relaunch and settings persistence in a disposable installation.
+5. Installer-mode install/reinstall/restart is verified on a disposable Windows runner.
+   A full GUI historical upgrade, authenticated settings/session persistence and upgrade during an
+   active recording are separate unverified scenarios; do not infer them from this smoke test.
 
 The user explicitly authorized publication of 1.4.2 after validation on all three platforms,
 but not installing anything on their PC. A source push alone is not release validation.

@@ -1,6 +1,6 @@
 # BlinkStream 1.4.2 — Twitch reliability and integrated Drops
 
-Status: release preparation, 2026-10-07. No 1.4.2 installers or update manifest are published.
+Date: 2026-10-07.
 
 ## Drops in one window
 
@@ -28,19 +28,24 @@ Status: release preparation, 2026-10-07. No 1.4.2 installers or update manifest 
   GTK3 uses an exact upstream GLib security backport with a reproducible integrity check;
   Dependabot may still flag the old version label. See ADR-014 for scope and removal criteria.
 
-## Validation and release blockers
+## Validation and known limits
 
 - The Windows user accepted the integrated Drops panel and subsequent polish.
 - 514 frontend tests pass, one skipped; lint and 11 release/security tests pass. Backend: 56 Rust tests,
-  fmt/Clippy and local Windows build pass. Other desktop platforms are not certified by those checks.
+  fmt/Clippy and local Windows build pass. Linux CI: 57 unit tests and two GLib regressions,
+  also executed with release optimizations; 44 Edge Function tests pass.
+- Signed updater artifacts pass cryptographic verification for Windows x64, macOS Intel,
+  macOS Apple Silicon and Linux x64. The Linux AppImage/deb and both macOS bundles build successfully.
+- A disposable Windows runner verified the NSIS signature, installed 1.4.2, reinstalled with
+  Tauri's passive updater flags and confirmed the installed process restarted.
 - An authorized EventSub redemption, separate automatic-click confirmation, and isolated
   native-watch pause/session tests remain outstanding.
-- Auto-updater verification found incompatible signing keys in the configured/public release chain.
-  Public-key recovery confirms the current secret matches configured trust without rotating keys
-  or exporting the private secret; historical artifacts remain incompatible.
-  A source push is not a signed release and does not make 1.4.2 downloadable.
-- Before publication: resolve signing continuity, verify signed artifacts for supported platforms,
-  and test an actual upgrade from an existing installation.
+- The current signing secret matches the unchanged configured public key; all new updater
+  artifacts verify against it. Historical artifacts used another signer. Clients trusting an
+  unavailable older key need a verified manual transition, not disabled signature verification.
+- The installer smoke test is not a historical 1.4.1 migration or complete GUI upgrade test.
+  Authenticated settings/session persistence and upgrades during active recording remain unverified.
+- Updater signatures do not replace Authenticode or macOS notarization; OS trust warnings may appear.
 
 Details: [updater verification](docs/guides/UPDATER_VERIFICATION.md), [roadmap](ROADMAP.md)
 and [Drops watch test](docs/guides/DROPS_NATIVE_WATCH_TEST.md).
