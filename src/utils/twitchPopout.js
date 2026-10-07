@@ -32,4 +32,3 @@ export async function openTwitchDropsWindow(alwaysOnTop = false) {
   }
   window.open('https://www.twitch.tv/drops/inventory', 'twitch_drops_inventory', 'width=520,height=750,menubar=no,toolbar=no,location=no,status=no,noopener,noreferrer') // ALLOWED-REGRESSION: popup window
 }
-

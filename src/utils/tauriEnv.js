@@ -1,11 +1,12 @@
 
 
 export function isTauri() {
-  return typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
+  return Boolean(globalThis.isTauri)
+    || (typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__))
 }
 
 export function isTauriDev() {
-  return isTauri() && window.__TAURI_INTERNALS__?.metadata?.dev === true
+  return isTauri() && import.meta.env.DEV
 }
 
 export function safeOpenUrl(url, focus = true) {

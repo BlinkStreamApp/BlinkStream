@@ -5,8 +5,11 @@ use std::time::Duration;
 use std::time::Instant;
 use tauri::AppHandle;
 use tauri::Manager;
+use tauri::Webview;
 use wait_timeout::ChildExt;
 
+mod drops_watch;
+mod embedded_drops;
 mod recorder;
 pub use recorder::{start_recording, stop_recording};
 pub mod companion;
@@ -1801,7 +1804,7 @@ async fn open_gamer_overlay(app: AppHandle, channel: String) -> Result<(), Strin
     Ok(())
 }
 
-const TWITCH_CLEANUP_SCRIPT: &str = r#"
+const TWITCH_CHAT_BRIDGE_SCRIPT: &str = r#"
 (function() {
     try {
         if (!navigator.plugins) {
@@ -1814,14 +1817,6 @@ const TWITCH_CLEANUP_SCRIPT: &str = r#"
             }
         }, true);
     } catch(e) {}
-    try {
-        var badCookies = ["server_session", "twilight-user", "name", "login"];
-        badCookies.forEach(function(c) {
-            document.cookie = c + "=; domain=.twitch.tv; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-            document.cookie = c + "=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        });
-    } catch(e) {}
-
     var seenEvents = new Set();
     function scanAndBridge() {
         try {
@@ -1876,7 +1871,7 @@ async fn open_twitch_popout_window(
 
     if let Some(existing) = app.get_webview_window(label) {
         let _ = existing.set_focus();
-        let _ = existing.eval(TWITCH_CLEANUP_SCRIPT);
+        let _ = existing.eval(TWITCH_CHAT_BRIDGE_SCRIPT);
         let url_str = format!(
             "https://twitch.tv/popout/{}/chat?popout=",
             urlencoding::encode(&channel)
@@ -1904,7 +1899,7 @@ async fn open_twitch_popout_window(
         .resizable(true)
         .always_on_top(always_on_top.unwrap_or(false))
         .decorations(true)
-        .initialization_script(TWITCH_CLEANUP_SCRIPT)
+        .initialization_script(TWITCH_CHAT_BRIDGE_SCRIPT)
         .build()
         .map_err(|e| format!("Error al abrir ventana de chat popout: {e}"))?;
 
@@ -1947,201 +1942,450 @@ async fn open_twitch_drops_window(
     Ok(())
 }
 
-const TWITCH_DROPS_WATCHER_SCRIPT: &str = r#"
-(function() {
-    try {
-        if (!navigator.plugins) {
-            Object.defineProperty(navigator, 'plugins', { get: function() { return []; }, configurable: true });
+const TWITCH_DROPS_INVENTORY_QUERY: &str = "query DropsInventory { currentUser { id inventory { dropCampaignsInProgress { id name status game { id name boxArtURL } timeBasedDrops { id name requiredMinutesWatched benefitEdges { benefit { id name imageAssetURL } } self { currentMinutesWatched isClaimed dropInstanceID } } } } } }";
+const TWITCH_CHANNEL_DROPS_QUERY: &str = "query ChannelDrops($id: ID!) { channel(id: $id) { viewerDropCampaigns { id name game { name boxArtURL } timeBasedDrops { id name requiredMinutesWatched benefitEdges { benefit { name imageAssetURL } } } } } }";
+
+fn drops_response_array(
+    response: &serde_json::Value,
+    path: &str,
+) -> Result<serde_json::Value, String> {
+    if let Some(error) = response
+        .get("errors")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|errors| errors.first())
+    {
+        return Err(error
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("Twitch rechazó la consulta de Drops")
+            .chars()
+            .take(300)
+            .collect());
+    }
+    response
+        .pointer(path)
+        .filter(|value| value.is_array())
+        .cloned()
+        .ok_or_else(|| "Twitch no devolvió una lista válida de Drops".to_string())
+}
+
+async fn fetch_channel_drops(channel: &str, token: &str) -> Result<serde_json::Value, String> {
+    let user = fetch_twitch_gql(
+        "query DropChannel($login: String!) { user(login: $login) { id } }".to_string(),
+        Some(serde_json::json!({ "login": channel })),
+        None,
+        None,
+    )
+    .await?;
+    let id = user
+        .pointer("/data/user/id")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "No se pudo consultar el canal de Drops".to_string())?;
+    // El inventario personal puede omitir campañas sin progreso o ya completadas.
+    // Consultar self aquí recupera esos estados; si Twitch no crea esa arista,
+    // la consulta pública sigue confirmando disponibilidad, no minutos ganados.
+    let progress_query = TWITCH_CHANNEL_DROPS_QUERY.replace(
+        "requiredMinutesWatched benefitEdges",
+        "requiredMinutesWatched self { currentMinutesWatched isClaimed dropInstanceID } benefitEdges",
+    );
+    if let Ok(response) = fetch_twitch_gql(
+        progress_query,
+        Some(serde_json::json!({ "id": id })),
+        Some(token.to_string()),
+        None,
+    )
+    .await
+    {
+        if let Ok(campaigns) = drops_response_array(&response, "/data/channel/viewerDropCampaigns")
+        {
+            return Ok(campaigns);
         }
-        window.addEventListener('error', function(e) {
-            if (e && e.message && e.message.includes('plugins')) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-            }
-        }, true);
-    } catch(e) {}
-    try {
-        Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; } });
-        Object.defineProperty(document, 'hidden', { get: function() { return false; } });
-        window.addEventListener('visibilitychange', function(e) { e.stopImmediatePropagation(); }, true);
-    } catch(e) {}
-
-    function keepPlaybackActive() {
-        try {
-            var videos = document.querySelectorAll('video');
-            videos.forEach(function(v) {
-                v.muted = true;
-                v.volume = 0;
-                if (v.paused) {
-                    v.play().catch(function() {});
-                }
-            });
-
-            var matureButtons = document.querySelectorAll('[data-a-target="player-overlay-mature-accept"], button[data-a-target="content-classification-gate-overlay-start-watching-button"], [data-a-target="tw-core-button-label-text"]');
-            matureButtons.forEach(function(btn) {
-                try {
-                    var txt = (btn.innerText || btn.textContent || '').toLowerCase();
-                    if (txt.includes('empezar') || txt.includes('start watching') || txt.includes('aceptar') || txt.includes('accept') || txt.includes('entendido')) {
-                        btn.click();
-                    }
-                } catch(e) {}
-            });
-
-            var claimButtons = document.querySelectorAll('button[aria-label*="Claim"], button[aria-label*="Reclamar"], .community-points-summary button');
-            claimButtons.forEach(function(btn) {
-                try { btn.click(); } catch(e) {}
-            });
-        } catch(e) {}
     }
+    let response = fetch_twitch_gql(
+        TWITCH_CHANNEL_DROPS_QUERY.to_string(),
+        Some(serde_json::json!({ "id": id })),
+        None,
+        None,
+    )
+    .await?;
+    drops_response_array(&response, "/data/channel/viewerDropCampaigns")
+}
 
-    async function syncDropsData() {
-        try {
-            var cookieStr = document.cookie || '';
-            var tokenCookie = cookieStr.split('; ').find(function(row) { return row.startsWith('auth-token='); });
-            var authToken = tokenCookie ? tokenCookie.split('=')[1] : null;
-            if (!authToken) {
-                try { authToken = localStorage.getItem('api_token') || localStorage.getItem('token'); } catch(e) {}
-            }
+static DROPS_SYNC_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-            var query = "query DropsInventory { currentUser { id inventory { dropCampaignsInProgress { id name status game { id name boxArtURL } timeBasedDrops { id name requiredMinutesWatched benefitEdges { benefit { id name imageAssetURL } } self { currentMinutesWatched isClaimed dropInstanceID } } } } } }";
+fn drops_now_ms() -> u64 {
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    u64::try_from(millis).unwrap_or(u64::MAX)
+}
 
-            var headers = {
-                'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko', // ALLOWED-REGRESSION: first-party web client for twitch drops gql inside webview
-                'Content-Type': 'application/json'
-            };
-            if (authToken) {
-                headers['Authorization'] = 'OAuth ' + authToken;
-            }
+async fn twitch_webview_auth_token(webview: &Webview) -> Result<Option<String>, String> {
+    let webview = webview.clone();
+    let url: tauri::Url = "https://www.twitch.tv/"
+        .parse()
+        .map_err(|error| format!("URL de cookies Twitch inválida: {error}"))?;
 
-            var res = await fetch('https://gql.twitch.tv/gql', {
-                method: 'POST',
-                headers: headers,
-                credentials: 'include',
-                body: JSON.stringify({ query: query })
-            });
+    let cookie_task = tokio::task::spawn_blocking(move || webview.cookies_for_url(url));
+    let cookies = tokio::time::timeout(Duration::from_secs(5), cookie_task)
+        .await
+        .map_err(|_| "La lectura de la sesión web de Twitch agotó el tiempo de espera".to_string())?
+        .map_err(|error| format!("No se pudo consultar la sesión web de Twitch: {error}"))?
+        .map_err(|error| format!("No se pudieron leer las cookies de Twitch: {error}"))?;
 
-            if (res.ok) {
-                var json = await res.json();
-                var rawCampaigns = json?.data?.currentUser?.inventory?.dropCampaignsInProgress || [];
-                
-                var postPayload = JSON.stringify({ campaigns: rawCampaigns });
-                fetch('http://127.0.0.1:9876/api/drops_update', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: postPayload
-                }).catch(function() {
-                    fetch('http://127.0.0.1:9877/api/drops_update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: postPayload
-                    }).catch(function() {});
-                });
-            }
-        } catch(e) {}
-    }
+    Ok(cookies
+        .into_iter()
+        .find(|cookie| cookie.name() == "auth-token")
+        .map(|cookie| cookie.value().to_string())
+        .filter(|token| !token.is_empty()))
+}
 
-    window.__syncDropsData = syncDropsData;
-
-    window.__claimTwitchDrop = async function(dropInstanceId) {
-        try {
-            var cookieStr = document.cookie || '';
-            var tokenCookie = cookieStr.split('; ').find(function(row) { return row.startsWith('auth-token='); });
-            var authToken = tokenCookie ? tokenCookie.split('=')[1] : null;
-            if (!authToken) {
-                try { authToken = localStorage.getItem('api_token') || localStorage.getItem('token'); } catch(e) {}
-            }
-
-            var mutation = "mutation ClaimDrop($input: ClaimCommunityPointsDropInput!) { claimCommunityPointsDrop(input: $input) { dropInstanceID status } }";
-
-            var headers = {
-                'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko', // ALLOWED-REGRESSION: first-party web client for twitch drops gql inside webview
-                'Content-Type': 'application/json'
-            };
-            if (authToken) {
-                headers['Authorization'] = 'OAuth ' + authToken;
-            }
-
-            var res = await fetch('https://gql.twitch.tv/gql', {
-                method: 'POST',
-                headers: headers,
-                credentials: 'include',
-                body: JSON.stringify({
-                    query: mutation,
-                    variables: { input: { dropInstanceID: dropInstanceId } }
-                })
-            });
-            if (res.ok) {
-                syncDropsData();
-                return true;
-            }
-        } catch(e) {}
-        return false;
+async fn sync_drops_inventory_from_webview(
+    app: AppHandle,
+    webview: Webview,
+    channel: Option<String>,
+) -> Result<(), String> {
+    let generation = DROPS_SYNC_GENERATION.load(std::sync::atomic::Ordering::SeqCst);
+    let Some(token) = twitch_webview_auth_token(&webview).await? else {
+        return companion::publish_drops_inventory(
+            &app,
+            serde_json::json!({
+                "campaigns": [],
+                "authRequired": true,
+                "status": "auth-required",
+                "error": null,
+                "updatedAt": drops_now_ms()
+            }),
+        );
     };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            keepPlaybackActive();
-            setInterval(keepPlaybackActive, 2500);
-            setTimeout(syncDropsData, 3000);
-            setInterval(syncDropsData, 15000);
-        });
+    let inventory_request = fetch_twitch_gql(
+        TWITCH_DROPS_INVENTORY_QUERY.to_string(),
+        None,
+        Some(token.clone()),
+        Some(TWITCH_WEB_CLIENT_ID.to_string()),
+    );
+    let channel_request = async {
+        match channel.as_deref() {
+            Some(channel) => {
+                tokio::time::timeout(Duration::from_secs(8), fetch_channel_drops(channel, &token))
+                    .await
+                    .map_err(|_| {
+                        "La consulta de Drops del canal agotó el tiempo de espera".to_string()
+                    })?
+            }
+            None => Ok(serde_json::json!([])),
+        }
+    };
+    let (response, channel_result) = tokio::join!(inventory_request, channel_request);
+    let response = response?;
+
+    let current_user = response.pointer("/data/currentUser");
+    // Un error GraphQL no equivale a inventario vacío ni a sesión caducada.
+    let auth_required =
+        current_user.is_some_and(serde_json::Value::is_null) && response.get("errors").is_none();
+    let campaigns = if auth_required {
+        serde_json::json!([])
     } else {
-        keepPlaybackActive();
-        setInterval(keepPlaybackActive, 2500);
-        setTimeout(syncDropsData, 3000);
-        setInterval(syncDropsData, 15000);
+        drops_response_array(
+            &response,
+            "/data/currentUser/inventory/dropCampaignsInProgress",
+        )?
+    };
+    let (channel_campaigns, channel_error) = match channel_result {
+        Ok(campaigns) => (campaigns, None),
+        Err(error) => (serde_json::json!([]), Some(error)),
+    };
+    if DROPS_SYNC_GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation {
+        return Ok(());
     }
-})();
-"#;
+    let campaign_count = campaigns.as_array().map_or(0, Vec::len);
+
+    log::info!(
+        "[Drops] Inventario nativo recibido: status={}, campaigns={campaign_count}",
+        if auth_required {
+            "auth-required"
+        } else {
+            "ready"
+        }
+    );
+    companion::publish_drops_inventory(
+        &app,
+        serde_json::json!({
+            "campaigns": campaigns,
+            "channelCampaigns": channel_campaigns,
+            "channel": channel,
+            "authRequired": auth_required,
+            "status": if auth_required { "auth-required" } else if channel_error.is_some() { "partial" } else { "ready" },
+            "error": channel_error,
+            "updatedAt": drops_now_ms()
+        }),
+    )
+}
+
+fn publish_drops_sync_error(app: &AppHandle, error: String) {
+    let safe_error = error.chars().take(300).collect::<String>();
+    log::error!("[Drops] Sincronización nativa falló: {safe_error}");
+    let _ = companion::publish_drops_inventory(
+        app,
+        serde_json::json!({
+            "campaigns": [],
+            "authRequired": false,
+            "status": "error",
+            "error": safe_error,
+            "updatedAt": drops_now_ms()
+        }),
+    );
+}
+
+fn schedule_native_drops_sync(app: AppHandle, webview: Webview, channel: String) {
+    let generation = DROPS_SYNC_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    tauri::async_runtime::spawn(async move {
+        // El panel solicita el primer refresco de forma explícita. Esperar evita
+        // dos lecturas concurrentes del almacén de cookies de WebView2.
+        tokio::time::sleep(Duration::from_secs(15)).await;
+        loop {
+            if DROPS_SYNC_GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation
+                || webview.window().is_visible().is_err()
+            {
+                break;
+            }
+            if let Err(error) = sync_drops_inventory_from_webview(
+                app.clone(),
+                webview.clone(),
+                Some(channel.clone()),
+            )
+            .await
+            {
+                publish_drops_sync_error(&app, error);
+            }
+            tokio::time::sleep(Duration::from_secs(15)).await;
+        }
+    });
+}
+
+#[tauri::command]
+async fn force_refresh_drops_watcher(
+    app: AppHandle,
+    webview: Webview,
+    channel: Option<String>,
+) -> Result<serde_json::Value, String> {
+    embedded_drops::require_ui(&webview)?;
+    if let Some(channel) = channel.as_deref() {
+        validate_channel(channel)?;
+    }
+    if let Err(error) = sync_drops_inventory_from_webview(app.clone(), webview, channel).await {
+        publish_drops_sync_error(&app, error);
+    }
+    companion::get_cached_drops_inventory()
+}
+
+const TWITCH_OFFICIAL_CLAIM_SCRIPT: &str = include_str!("drops_claim.js");
+static OFFICIAL_DROPS_CLAIM_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+fn official_drop_claim_target(
+    inventory: &serde_json::Value,
+    instance: &str,
+) -> Option<serde_json::Value> {
+    for key in ["campaigns", "channelCampaigns"] {
+        for campaign in inventory
+            .get(key)
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            for drop in campaign
+                .get("timeBasedDrops")
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                if drop
+                    .pointer("/self/dropInstanceID")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(instance)
+                {
+                    return Some(serde_json::json!({
+                        "id": instance,
+                        "dropId": drop.get("id")?,
+                        "names": [drop.get("name")?, drop.pointer("/benefitEdges/0/benefit/name").unwrap_or(&serde_json::Value::Null)],
+                        "images": [drop.pointer("/benefitEdges/0/benefit/imageAssetURL").unwrap_or(&serde_json::Value::Null)]
+                    }));
+                }
+            }
+        }
+    }
+    None
+}
+
+fn official_drop_claim_confirmed(
+    response: &serde_json::Value,
+    drop_id: &str,
+) -> Result<bool, String> {
+    let campaigns = drops_response_array(
+        response,
+        "/data/currentUser/inventory/dropCampaignsInProgress",
+    )?;
+    Ok(campaigns.as_array().into_iter().flatten().any(|campaign| {
+        campaign
+            .get("timeBasedDrops")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .any(|drop| {
+                drop.get("id").and_then(serde_json::Value::as_str) == Some(drop_id)
+                    && drop
+                        .pointer("/self/isClaimed")
+                        .and_then(serde_json::Value::as_bool)
+                        == Some(true)
+            })
+    }))
+}
+
+fn official_drop_claim_after_poll(
+    response: &serde_json::Value,
+    drop_id: &str,
+    page_closed: bool,
+) -> Result<bool, String> {
+    if official_drop_claim_confirmed(response, drop_id)? {
+        return Ok(true);
+    }
+    if page_closed {
+        return Err("No se pudo confirmar el reclamo en la página oficial: la ventana se ha cerrado. Actualiza el inventario antes de reintentar.".to_string());
+    }
+    Ok(false)
+}
+
+async fn claim_drop_on_official_page(
+    app: &AppHandle,
+    webview: &Webview,
+    mut target: serde_json::Value,
+    inventory_label: &str,
+) -> Result<bool, String> {
+    let drop_id = target
+        .get("dropId")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("El Drop no tiene identificador verificable")?
+        .to_string();
+    let token = twitch_webview_auth_token(webview)
+        .await?
+        .ok_or("Inicia sesión en la ventana oficial de Twitch")?;
+    let inventory = fetch_twitch_gql(
+        TWITCH_DROPS_INVENTORY_QUERY.to_string(),
+        None,
+        Some(token.clone()),
+        None,
+    )
+    .await?;
+    if official_drop_claim_confirmed(&inventory, &drop_id)? {
+        return Ok(true);
+    }
+    target["deadline"] = serde_json::json!(drops_now_ms() + 30000);
+    let script =
+        format!("window.__blinkstreamDropClaimRequest = {target};\n{TWITCH_OFFICIAL_CLAIM_SCRIPT}");
+    let mut account_checked = false;
+    loop {
+        let official = app.get_webview(inventory_label);
+        let page_closed = official.is_none();
+        let mut page_error = None;
+        if let Some(official) = official {
+            match official.url() {
+                Ok(url) if url.scheme() == "https"
+                    && url.host_str() == Some("www.twitch.tv")
+                    && url.path() == "/drops/inventory" => {
+                    if !account_checked {
+                        let official_token = twitch_webview_auth_token(&official)
+                            .await?
+                            .ok_or("Inicia sesión en la ventana oficial de Twitch")?;
+                        if official_token != token {
+                            return Err("La ventana oficial usa una sesión distinta; actualiza el panel tras iniciar sesión con la misma cuenta".to_string());
+                        }
+                        account_checked = true;
+                    }
+                    if official.eval(&script).is_err() {
+                        page_error = Some("No se pudo confirmar el reclamo en la página oficial: no se pudo ejecutar el control de reclamo.".to_string());
+                    }
+                }
+                Err(_) => page_error = Some("No se pudo confirmar el reclamo en la página oficial: la ventana ya no está disponible.".to_string()),
+                _ => {}
+            }
+        }
+        // Closing the page is not evidence of failure: a manual click may already be accepted.
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        let response = fetch_twitch_gql(
+            TWITCH_DROPS_INVENTORY_QUERY.to_string(),
+            None,
+            Some(token.clone()),
+            None,
+        )
+        .await?;
+        if official_drop_claim_after_poll(&response, &drop_id, page_closed)? {
+            return Ok(true);
+        }
+        if let Some(error) = page_error {
+            return Err(error);
+        }
+    }
+}
+
+#[tauri::command]
+async fn claim_twitch_drop(
+    app: AppHandle,
+    webview: Webview,
+    drop_instance_id: String,
+    inventory_session: String,
+) -> Result<bool, String> {
+    embedded_drops::require_ui(&webview)?;
+    let inventory_label = embedded_drops::host_label(&inventory_session)?;
+    if app.get_webview(&inventory_label).is_none() {
+        return Err("Abre el inventario integrado antes de reclamar".to_string());
+    }
+    if drop_instance_id.is_empty() || drop_instance_id.len() > 256 {
+        return Err("ID de Drop inválido".to_string());
+    }
+    let _claim_guard = OFFICIAL_DROPS_CLAIM_LOCK
+        .try_lock()
+        .map_err(|_| "Ya hay un reclamo en curso en la ventana oficial".to_string())?;
+    let mut target =
+        official_drop_claim_target(&companion::get_cached_drops_inventory()?, &drop_instance_id)
+            .ok_or("El Drop ya no está en el inventario sincronizado; actualiza el panel")?;
+    target["id"] = serde_json::json!(format!("{drop_instance_id}:{}", drops_now_ms()));
+    let result = tokio::time::timeout(Duration::from_secs(35), claim_drop_on_official_page(&app, &webview, target, &inventory_label))
+        .await.map_err(|_| "No se pudo confirmar el reclamo en la página oficial. Revisa esa ventana y actualiza el panel.".to_string())
+        .and_then(|result| result);
+    if let Some(official) = app.get_webview(&inventory_label) {
+        let _ = official.eval("window.__blinkstreamDropClaimJob?.stop();");
+    }
+    result?;
+    let channel = companion::get_cached_drops_inventory()?
+        .get("channel")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string);
+    // Un refresco fallido no convierte un reclamo ya confirmado en otro intento.
+    if let Err(error) = sync_drops_inventory_from_webview(app.clone(), webview, channel).await {
+        publish_drops_sync_error(&app, error);
+    }
+    Ok(true)
+}
 
 #[tauri::command]
 async fn start_drops_watcher(
     app: AppHandle,
+    webview: Webview,
     channel: String,
 ) -> Result<(), String> {
+    embedded_drops::require_ui(&webview)?;
     validate_channel(&channel)?;
-    let label = "twitch_drops_watcher";
-
-    let url_str = format!(
-        "https://www.twitch.tv/{}",
-        urlencoding::encode(&channel)
-    );
-    let parsed_url: tauri::Url = url_str
-        .parse()
-        .map_err(|e| format!("URL inválida para drops watcher: {e}"))?;
-
-    if let Some(existing) = app.get_webview_window(label) {
-        let _ = existing.eval(TWITCH_DROPS_WATCHER_SCRIPT);
-        let _ = existing.navigate(parsed_url);
-        return Ok(());
-    }
-
-    let url = tauri::WebviewUrl::External(parsed_url);
-
-    let _window = tauri::WebviewWindowBuilder::new(&app, label, url)
-        .title("Twitch Drops Watcher")
-        .inner_size(400.0, 300.0)
-        .position(-10000.0, -10000.0)
-        .visible(true)
-        .decorations(false)
-        .initialization_script(TWITCH_DROPS_WATCHER_SCRIPT)
-        .build()
-        .map_err(|e| format!("Error al iniciar drops watcher: {e}"))?;
-
+    companion::reset_twitch_drops_inventory(&app)?;
+    log::info!("[Drops] Iniciando sincronización nativa para el canal {channel}");
+    schedule_native_drops_sync(app.clone(), webview, channel);
     Ok(())
 }
 
 #[tauri::command]
-async fn stop_drops_watcher(
-    app: AppHandle,
-) -> Result<(), String> {
-    let label = "twitch_drops_watcher";
-    if let Some(existing) = app.get_webview_window(label) {
-        if let Ok(blank_url) = "about:blank".parse::<tauri::Url>() {
-            let _ = existing.navigate(blank_url);
-        }
-        let _ = existing.close();
-    }
+async fn stop_drops_watcher(_app: AppHandle) -> Result<(), String> {
+    DROPS_SYNC_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     Ok(())
 }
 
@@ -2171,7 +2415,7 @@ async fn mount_embedded_twitch_chat(
     if let Some(existing_webview) = app.get_webview(label) {
         let _ = existing_webview.set_position(tauri::LogicalPosition::new(x, y));
         let _ = existing_webview.set_size(tauri::LogicalSize::new(width, height));
-        let _ = existing_webview.eval(TWITCH_CLEANUP_SCRIPT);
+        let _ = existing_webview.eval(TWITCH_CHAT_BRIDGE_SCRIPT);
         let _ = existing_webview.navigate(parsed_url);
         let _ = existing_webview.show();
         return Ok(());
@@ -2184,7 +2428,7 @@ async fn mount_embedded_twitch_chat(
     let webview_builder =
         tauri::WebviewBuilder::new(label, tauri::WebviewUrl::External(parsed_url))
             .auto_resize()
-            .initialization_script(TWITCH_CLEANUP_SCRIPT);
+            .initialization_script(TWITCH_CHAT_BRIDGE_SCRIPT);
 
     let _child = main_window
         .add_child(
@@ -2281,9 +2525,14 @@ pub fn run() {
             open_twitch_popout_window,
             open_twitch_drops_window,
             start_drops_watcher,
+            drops_watch::sample_native_drops_watch,
             stop_drops_watcher,
             fetch_twitch_gql,
             mount_embedded_twitch_chat,
+            embedded_drops::mount_embedded_twitch_drops,
+            embedded_drops::update_embedded_twitch_drops_bounds,
+            embedded_drops::unmount_embedded_twitch_drops,
+            embedded_drops::reset_embedded_twitch_drops,
             update_embedded_twitch_chat_bounds,
             set_embedded_twitch_chat_visible,
             unmount_embedded_twitch_chat,
@@ -2299,8 +2548,8 @@ pub fn run() {
             companion::stop_companion_server_cmd,
             companion::update_companion_state,
             companion::get_cached_drops_inventory,
-            companion::claim_twitch_drop,
-            companion::force_refresh_drops_watcher,
+            claim_twitch_drop,
+            force_refresh_drops_watcher,
         ])
         .setup(|app| {
             let mut labels_to_close = Vec::new();
@@ -2463,5 +2712,85 @@ mod tests {
                 "el error debe mencionar la variable faltante, got: {err}"
             );
         }
+    }
+
+    #[test]
+    fn twitch_webviews_preserve_real_sessions_and_keep_drops_tokens_native() {
+        assert!(!TWITCH_CHAT_BRIDGE_SCRIPT.contains("badCookies"));
+        assert!(!TWITCH_CHAT_BRIDGE_SCRIPT.contains("expires=Thu, 01 Jan 1970"));
+        assert!(TWITCH_DROPS_INVENTORY_QUERY.contains("dropCampaignsInProgress"));
+        assert!(TWITCH_DROPS_INVENTORY_QUERY.contains("currentMinutesWatched"));
+    }
+
+    #[test]
+    fn drops_responses_distinguish_empty_inventory_from_graphql_errors() {
+        let path = "/data/currentUser/inventory/dropCampaignsInProgress";
+        let empty = serde_json::json!({"data": {"currentUser": {"inventory": {"dropCampaignsInProgress": []}}}});
+        assert_eq!(
+            drops_response_array(&empty, path).unwrap(),
+            serde_json::json!([])
+        );
+        let rejected = serde_json::json!({"errors": [{"message": "failed integrity check"}], "data": {"currentUser": null}});
+        assert_eq!(
+            drops_response_array(&rejected, path).unwrap_err(),
+            "failed integrity check"
+        );
+        assert!(drops_response_array(&serde_json::json!({}), path).is_err());
+    }
+
+    #[test]
+    fn channel_drops_response_accepts_campaigns_without_personal_progress() {
+        let response = serde_json::json!({"data": {"channel": {"viewerDropCampaigns": [{"id": "aion", "timeBasedDrops": [{"id": "voucher", "requiredMinutesWatched": 30}]}]}}});
+        let campaigns =
+            drops_response_array(&response, "/data/channel/viewerDropCampaigns").unwrap();
+        assert_eq!(campaigns[0]["id"], "aion");
+        assert!(campaigns[0]["timeBasedDrops"][0].get("self").is_none());
+    }
+
+    #[test]
+    fn official_claim_requires_authoritative_inventory_confirmation() {
+        let response = serde_json::json!({"data": {"currentUser": {"inventory": {"dropCampaignsInProgress": [{"timeBasedDrops": [
+            {"id": "pending", "self": {"isClaimed": false}},
+            {"id": "claimed", "self": {"isClaimed": true, "dropInstanceID": null}}
+        ]}]}}}});
+        assert!(official_drop_claim_confirmed(&response, "claimed").unwrap());
+        assert!(!official_drop_claim_confirmed(&response, "pending").unwrap());
+        assert!(!official_drop_claim_confirmed(&response, "absent").unwrap());
+        assert!(official_drop_claim_confirmed(
+            &serde_json::json!({"errors": [{"message": "rejected"}]}),
+            "claimed"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn official_claim_target_comes_only_from_the_cached_instance() {
+        let cache = serde_json::json!({"campaigns": [{"timeBasedDrops": [{"id": "voucher", "name": "Voucher", "self": {"dropInstanceID": "instance"}}]}]});
+        assert_eq!(
+            official_drop_claim_target(&cache, "instance").unwrap()["dropId"],
+            "voucher"
+        );
+        assert!(official_drop_claim_target(&cache, "unknown").is_none());
+        assert!(!TWITCH_OFFICIAL_CLAIM_SCRIPT.contains("document.cookie"));
+        assert!(!TWITCH_OFFICIAL_CLAIM_SCRIPT.contains("fetch("));
+        assert!(!TWITCH_OFFICIAL_CLAIM_SCRIPT.contains("__TAURI"));
+    }
+
+    #[test]
+    fn official_claim_checks_inventory_before_reporting_a_closed_page() {
+        let response = serde_json::json!({"data": {"currentUser": {"inventory": {"dropCampaignsInProgress": [
+            {"timeBasedDrops": [{"id": "voucher", "self": {"isClaimed": true}}]}
+        ]}}}});
+        assert!(official_drop_claim_after_poll(&response, "voucher", true).unwrap());
+        assert!(!official_drop_claim_after_poll(&response, "pending", false).unwrap());
+        assert!(official_drop_claim_after_poll(&response, "pending", true)
+            .unwrap_err()
+            .starts_with("No se pudo confirmar el reclamo en la página oficial"));
+        assert!(official_drop_claim_after_poll(
+            &serde_json::json!({"errors": [{"message": "rejected"}]}),
+            "voucher",
+            true
+        )
+        .is_err());
     }
 }

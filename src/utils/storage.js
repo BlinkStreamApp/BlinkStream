@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
   OVERLAY_OPACITY: 'blinkstream_overlay_opacity',
   FAVORITE_CHANNELS: 'blinkstream_favorites',
   EMOTE_EFFECTS: 'blinkstream_emote_effects',
+  DROPS_NATIVE_WATCH: 'blinkstream_drops_native_watch_experimental',
 }
 
 export function getItem(key, defaultValue = '') {

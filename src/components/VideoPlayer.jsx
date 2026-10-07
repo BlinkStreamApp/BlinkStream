@@ -20,7 +20,8 @@ import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { useAudioCompressor } from '../hooks/useAudioCompressor'
 import { useLiveDVR } from '../hooks/useLiveDVR'
 import DropsModal from './drops/DropsModal'
-import { startDropsWatcher, stopDropsWatcher } from '../utils/dropsWatcher'
+import { startDropsWatcher, stopDropsWatcher, watchNativeDropsPlayback } from '../utils/dropsWatcher'
+import { getPlayerShortcut } from '../utils/keyboard'
 
 function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
@@ -246,6 +247,10 @@ export default function VideoPlayer({
   const [availableQualities, setAvailableQualities] = useState(null)
   const [showClips, setShowClips] = useState(false)
   const [showDrops, setShowDrops] = useState(false)
+  const [nativeDropsEnabled, setNativeDropsEnabled] = useState(
+    () => getItem(STORAGE_KEYS.DROPS_NATIVE_WATCH, 'false') === 'true',
+  )
+  const [nativeDropsStatus, setNativeDropsStatus] = useState(null)
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
   const [isPiP, setIsPiP] = useState(false)
   const [showStats, setShowStats] = useState(false)
@@ -281,30 +286,14 @@ export default function VideoPlayer({
 
   useEffect(() => { volumeRef.current = volume }, [volume])
 
+  useEffect(() => {
+    if (!nativeDropsEnabled || !channel || !streamUrl || audioOnly) return
+    return watchNativeDropsPlayback(videoRef.current, channel, setNativeDropsStatus)
+  }, [nativeDropsEnabled, channel, streamUrl, audioOnly])
+
   const jumpToLive = useCallback(() => {
     dvrSeekToLive()
   }, [dvrSeekToLive])
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      const tag = e.target?.tagName?.toLowerCase()
-      if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return
-
-      if (e.key === 'j' || e.key === 'J') {
-        e.preventDefault()
-        seekRelative(-10)
-      } else if (e.key === 'l' || e.key === 'L') {
-        e.preventDefault()
-        seekRelative(10)
-      } else if (e.key === 'Home' || e.key === '0') {
-        e.preventDefault()
-        dvrSeekToLive()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [seekRelative, dvrSeekToLive])
 
   useEffect(() => {
     if (streamUrl && channel && !recording && localStorage.getItem('blinkstream_rec_autostart') === 'true') {
@@ -316,11 +305,18 @@ export default function VideoPlayer({
   }, [streamUrl, channel, recording, startRecording])
 
   useEffect(() => {
-    if (channel) {
+    let started = false
+    const timer = setTimeout(() => {
+      if (!channel) return
+      started = true
       startDropsWatcher(channel).catch(() => {})
-    }
+    }, 50)
+
     return () => {
-      stopDropsWatcher().catch(() => {})
+      clearTimeout(timer)
+      if (started) {
+        stopDropsWatcher().catch(() => {})
+      }
     }
   }, [channel])
 
@@ -709,7 +705,10 @@ export default function VideoPlayer({
   }
 
   const handleVolume = (e) => { const val = Number(e.target.value); onVolumeChange(val); if (videoRef.current) videoRef.current.volume = val / 100; setMuted(false) }
-  const toggleFullscreen = () => { if (document.fullscreenElement) document.exitFullscreen(); else containerRef.current?.requestFullscreen() }
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) document.exitFullscreen()
+    else containerRef.current?.requestFullscreen()
+  }, [])
   const togglePiP = async () => {
     const v = videoRef.current; if (!v) return
     try {
@@ -824,39 +823,29 @@ export default function VideoPlayer({
   const handleRetry = useCallback(() => { fetchStream(channel) }, [channel, fetchStream])
   useEffect(() => {
     const handleKey = (e) => {
-      const tag = e.target.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return
-
-      switch (e.code) {
-        case 'Space':
-          e.preventDefault(); togglePlay(); break
-        case 'KeyM':
-          toggleMute(); break
-        case 'KeyF':
-          toggleFullscreen(); break
-        case 'KeyT':
-          if (!e.ctrlKey && !e.metaKey) onToggleTheatre(); break
-        case 'KeyC':
-          if (!e.ctrlKey && !e.metaKey) setShowOverlayChat(p => !p); break
-        case 'KeyS':
-          if (((e.ctrlKey || e.metaKey) && e.shiftKey) || (!e.ctrlKey && !e.metaKey && !e.altKey)) {
-            e.preventDefault()
-            captureSnapshot()
-          }
-          break
-        case 'KeyD':
-          if (e.ctrlKey || e.metaKey) { e.preventDefault(); setShowStats(p => !p); } break
-        case 'ArrowUp':
-          e.preventDefault(); onVolumeChange(Math.min(volume + 5, 100)); break
-        case 'ArrowDown':
-          e.preventDefault(); onVolumeChange(Math.max(volume - 5, 0)); break
+      const action = getPlayerShortcut(e)
+      if (!action) return
+      e.preventDefault()
+      switch (action) {
+        case 'play': togglePlay(); break
+        case 'mute': toggleMute(); break
+        case 'fullscreen': toggleFullscreen(); break
+        case 'theatre': onToggleTheatre?.(); break
+        case 'chat': setShowOverlayChat(p => !p); break
+        case 'snapshot': captureSnapshot(); break
+        case 'stats': setShowStats(p => !p); break
+        case 'rewind': seekRelative(-10); break
+        case 'forward': seekRelative(10); break
+        case 'live': dvrSeekToLive(); break
+        case 'volumeUp': onVolumeChange(Math.min(volume + 5, 100)); break
+        case 'volumeDown': onVolumeChange(Math.max(volume - 5, 0)); break
       }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [volume, muted, streamUrl, playing, captureSnapshot])
+  }, [volume, togglePlay, toggleMute, toggleFullscreen, onToggleTheatre, onVolumeChange,
+    captureSnapshot, seekRelative, dvrSeekToLive])
 
   return (
     <div ref={containerRef} className={`relative bg-black overflow-hidden group/player ${theatreMode ? 'w-full h-full' : 'w-full'}`} style={theatreMode ? {} : { aspectRatio: '16/9', maxHeight: '100%' }}
@@ -868,7 +857,7 @@ export default function VideoPlayer({
         </div>
       )}
 
-      <video ref={videoRef} className={`w-full h-full object-contain ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
+      <video ref={videoRef} className={`relative z-10 w-full h-full object-contain bg-black ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
       {audioOnly && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 select-none">
           <div className="w-16 h-16 rounded-2xl bg-twitch/20 flex items-center justify-center mb-3 animate-pulse-glow">
@@ -1034,7 +1023,7 @@ export default function VideoPlayer({
           <div className="flex items-center gap-3">
             <button onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.clips', 'Clips')} aria-label="Abrir clips"><ClipIcon/></button>
             <button onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.vods', 'VODs')} aria-label="Ver VODs"><VodIcon/></button>
-            <button onClick={() => setShowDrops(true)} className="hover:text-purple-400 transition-colors cursor-pointer" title="Twitch Drops & Recompensas" aria-label="Abrir Twitch Drops">
+            <button onClick={() => setShowDrops(true)} className="transition-colors cursor-pointer hover:text-purple-400" title="Twitch Drops & Recompensas" aria-label="Abrir Twitch Drops">
               <PhosphorIcon name="Gift" size={18} weight="duotone" />
             </button>
             <button onClick={async () => {
@@ -1136,6 +1125,15 @@ export default function VideoPlayer({
         <DropsModal
           token={twitchToken}
           channel={channel}
+          nativeWatchEnabled={nativeDropsEnabled}
+          nativeWatchStatus={audioOnly || !streamUrl ? { state: 'paused' } : nativeDropsStatus}
+          onToggleNativeWatch={() => {
+            setNativeDropsEnabled(enabled => {
+              setItem(STORAGE_KEYS.DROPS_NATIVE_WATCH, !enabled)
+              return !enabled
+            })
+            setNativeDropsStatus(null)
+          }}
           onClose={() => setShowDrops(false)}
         />
       )}

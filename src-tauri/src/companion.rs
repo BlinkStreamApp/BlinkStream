@@ -5,7 +5,7 @@ use std::net::{TcpListener, UdpSocket};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompanionStateData {
@@ -47,8 +47,39 @@ static DROPS_CACHE: OnceLock<Arc<Mutex<serde_json::Value>>> = OnceLock::new();
 
 fn get_drops_cache() -> Arc<Mutex<serde_json::Value>> {
     DROPS_CACHE
-        .get_or_init(|| Arc::new(Mutex::new(json!({ "campaigns": [] }))))
+        .get_or_init(|| {
+            Arc::new(Mutex::new(json!({
+                "campaigns": [],
+                "authRequired": false,
+                "status": "starting"
+            })))
+        })
         .clone()
+}
+
+fn validate_drops_inventory(inventory: &serde_json::Value) -> Result<(), String> {
+    let campaigns = inventory
+        .get("campaigns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "El inventario de Drops debe incluir un array campaigns".to_string())?;
+
+    if campaigns.len() > 100 {
+        return Err("El inventario de Drops supera el limite de campanas".to_string());
+    }
+
+    if inventory.to_string().len() > 1_000_000 {
+        return Err("El inventario de Drops supera el limite de tamano".to_string());
+    }
+
+    if inventory
+        .get("error")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|error| error.len() > 300)
+    {
+        return Err("El error de Drops supera el limite de tamano".to_string());
+    }
+
+    Ok(())
 }
 
 fn detect_local_ip() -> String {
@@ -280,27 +311,6 @@ fn handle_client_stream(
         return Ok(());
     }
 
-    if method == "POST" && path == "/api/drops_update" {
-        if let Some(body) = request_body(&req_str) {
-            if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body) {
-                let cache = get_drops_cache();
-                if let Ok(mut guard) = cache.lock() {
-                    *guard = json_val.clone();
-                }
-                let _ = app_handle.emit("twitch_drops_update", &json_val);
-            }
-        }
-        let ok_json = json!({"status": "ok"}).to_string();
-        let resp = format!(
-            "HTTP/1.1 200 OK\r\n{}Access-Control-Allow-Origin: *\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
-            response_headers,
-            ok_json.len(),
-            ok_json
-        );
-        stream.write_all(resp.as_bytes())?;
-        return Ok(());
-    }
-
     if method == "POST" && path == "/api/command" {
         if let Some(body) = request_body(&req_str) {
             if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body) {
@@ -361,31 +371,43 @@ pub fn get_cached_drops_inventory() -> Result<serde_json::Value, String> {
     Ok(guard.clone())
 }
 
-#[tauri::command]
-pub async fn claim_twitch_drop(app: AppHandle, drop_instance_id: String) -> Result<bool, String> {
-    let escaped_id = drop_instance_id.replace('"', "\\\"");
-    let script = format!(
-        "if (typeof window.__claimTwitchDrop === 'function') {{ window.__claimTwitchDrop(\"{escaped_id}\"); }}"
-    );
-    if let Some(watcher) = app.get_webview_window("twitch_drops_watcher") {
-        let _ = watcher.eval(&script);
-    }
-    if let Some(chat) = app.get_webview("embedded_twitch_chat") {
-        let _ = chat.eval(&script);
-    }
-    Ok(true)
+fn store_drops_inventory(app: &AppHandle, inventory: serde_json::Value) -> Result<(), String> {
+    let cache = get_drops_cache();
+    let mut guard = cache.lock().map_err(|e| format!("Lock error: {e}"))?;
+    *guard = inventory.clone();
+    drop(guard);
+
+    app.emit("twitch_drops_update", &inventory)
+        .map_err(|e| format!("No se pudo emitir el inventario de Drops: {e}"))
 }
 
-#[tauri::command]
-pub async fn force_refresh_drops_watcher(app: AppHandle) -> Result<bool, String> {
-    let script = "if (typeof window.__syncDropsData === 'function') { window.__syncDropsData(); }";
-    if let Some(watcher) = app.get_webview_window("twitch_drops_watcher") {
-        let _ = watcher.eval(script);
-    }
-    if let Some(chat) = app.get_webview("embedded_twitch_chat") {
-        let _ = chat.eval(script);
-    }
-    Ok(true)
+pub(crate) fn publish_drops_inventory(
+    app: &AppHandle,
+    inventory: serde_json::Value,
+) -> Result<(), String> {
+    validate_drops_inventory(&inventory)?;
+    store_drops_inventory(app, inventory)
+}
+
+pub fn reset_twitch_drops_inventory(app: &AppHandle) -> Result<(), String> {
+    let started_at = unix_timestamp_millis();
+    store_drops_inventory(
+        app,
+        json!({
+            "campaigns": [],
+            "authRequired": false,
+            "status": "starting",
+            "updatedAt": started_at
+        }),
+    )
+}
+
+fn unix_timestamp_millis() -> u64 {
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    u64::try_from(millis).unwrap_or(u64::MAX)
 }
 
 #[tauri::command]
@@ -665,7 +687,8 @@ fn get_companion_html() -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{query_parameter, request_body, supplied_pin};
+    use super::{query_parameter, request_body, supplied_pin, validate_drops_inventory};
+    use serde_json::json;
 
     #[test]
     fn pin_query_requires_exact_parameter_name() {
@@ -682,5 +705,21 @@ mod tests {
 
         let spoofed = "POST /api/command HTTP/1.1\r\n\r\n{\"notpin\":\"123456\"}";
         assert_eq!(supplied_pin("", spoofed), None);
+    }
+
+    #[test]
+    fn drops_inventory_requires_a_bounded_campaign_array() {
+        assert!(validate_drops_inventory(&json!({
+            "campaigns": [],
+            "authRequired": true,
+            "status": "auth-required"
+        }))
+        .is_ok());
+        assert!(validate_drops_inventory(&json!({ "campaigns": "invalid" })).is_err());
+        assert!(validate_drops_inventory(&json!({
+            "campaigns": [],
+            "error": "x".repeat(301)
+        }))
+        .is_err());
     }
 }
