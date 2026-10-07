@@ -89,6 +89,7 @@ LATER:
 
 ## Known Debt
 
+- README recupera arquitectura/stack/setup/pruebas sin changelog de versiones. No hay `LICENSE` raíz aunque Cargo declara MIT; formalizar texto/copyright con el titular. `.env.example` y guía Twitch contienen opciones legacy; README avisa que no bastan para self-host y no recomienda secretos frontend.
 - Auditoría UI: foco de otros modales, volumen cero/persistencia, índices/responsive multistream y contraste; `docs/reviews/UI_AUDIT_2026-10-02.md`.
 - Tests nativos/auth reales no se sustituyen por mocks, headless CI o compilación.
 - Mantener integridad/licencia/procedencia del vendor GLib; no ignorar avisos globalmente.
