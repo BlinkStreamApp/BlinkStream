@@ -1,6 +1,6 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-10-07. Estado: preparación fuente 1.4.2; release bloqueado por continuidad de firmas.
+Actualizado: 2026-10-07. Estado: fuente 1.4.2; firmante actual verificado, release pendiente de builds/upgrade y revisión GLib/Linux.
 
 ## Objetivo y reglas
 
@@ -37,8 +37,8 @@ No fijar fechas de entrega ni versiones futuras hasta cerrar los criterios de ca
 - Twitch retiró PubSub el 2025-04-14. EventSub no reproduce todas las capacidades privadas del chat web.
 - Canjes personalizados por EventSub requieren autorización del creador y scopes de redemptions; ser moderador no garantiza acceso.
 - No añadir un player/iframe oficial oculto para acreditar tiempo. El reporte nativo experimental es opt-in y su aceptación no garantiza crédito.
-- El updater presenta una incompatibilidad de firmas comprobada; resolverla antes de un release (ver `guides/UPDATER_VERIFICATION.md`).
-- Verificación criptográfica previa a publicación implementada; diagnóstico manual permite recuperar solo la clave pública del secreto existente. No rotar la confianza ni prometer upgrade de clientes antiguos sin validar una migración.
+- El secreto actual/config del updater coinciden y verifican una prueba firmada; los artefactos históricos usan otra clave (ver `guides/UPDATER_VERIFICATION.md`).
+- Verificación criptográfica previa a publicación implementada; diagnóstico recuperó solo la pública del secreto existente. No rotar la confianza ni prometer upgrade de clientes antiguos sin validar una migración.
 - Cinco avisos originales de dependencias corregidos y audit npm limpio; GLib sigue ligado a GTK/Linux y requiere un fix upstream compatible con validación Linux.
 - El DVR actual usa el rango disponible del reproductor; no garantiza un historial completo del directo.
 - Separar "implementado", "probado automáticamente" y "validado en sesión real"; no marcar una función terminada solo porque compila.

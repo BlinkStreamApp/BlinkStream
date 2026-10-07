@@ -1,7 +1,7 @@
 # Auto-updater verification
 
 Checked: 2026-10-07. Source: 1.4.2. Published: 1.4.1.
-Verdict: **not release-ready — signing continuity is unresolved**.
+Verdict: **current signer verified; release/legacy-upgrade validation still pending**.
 
 ## Verified flow
 
@@ -18,7 +18,7 @@ Verdict: **not release-ready — signing continuity is unresolved**.
 - Local 1.4.2 checks: 513 frontend tests pass/1 skipped, 8 release/security tests, 56 Rust tests,
   lint/fmt/Clippy pass. Compilation is checked separately; no real installation was attempted.
 
-## Signing blocker
+## Current signer and historical incompatibility
 
 Minisign key IDs below are public identifiers, in their encoded byte order:
 
@@ -31,13 +31,21 @@ Minisign key IDs below are public identifiers, in their encoded byte order:
   rejects them against the configured key. They were downloaded to a temporary directory,
   never executed or installed. The historical public-key fix did not establish compatibility.
 
-GitHub lists `TAURI_PRIVATE_KEY` as a repository secret. Its value was not accessed;
-presence does not prove it matches installed trust. The optional password secret is not listed,
-which matters only if the signing key requires a password.
+The successful [public-key diagnostic](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37668124715)
+reconstructed the existing public key from `TAURI_PRIVATE_KEY` inside CI. The raw public key
+exactly equals the configured key (`44fc384bdb89207e`), and its signed probe verifies with the
+app's existing configuration. No key/config/secret rotation was needed. The private value was
+never downloaded, displayed or uploaded; only public evidence was retrieved.
 
-Do not fabricate signatures, silently rotate trust or disable verification. Identify/recover the
-production signing key and trusted public key, then establish which installed versions accept it.
-If recovery is impossible, document a verified manual migration instead of promising automatic upgrade.
+This confirms the **current** signer/config pair, not the incompatible historical artifacts.
+The old CI portable executable also contains the current configured key while its NSIS/MSI
+signatures carry a different ID. Do not reuse historical signatures or infer that all binaries
+with the same version have identical trust. Existing installations must be checked individually;
+clients trusting an unavailable older key need a verified manual transition installation.
+
+Do not fabricate signatures, silently rotate trust or disable verification. The new artifact gate
+will verify actual platform binaries once CI builds them. A signed probe alone is not a complete
+check/download/install/relaunch test and does not prove historical upgrade compatibility.
 
 The user no longer has the local signing files. A manual-only workflow,
 `updater-key-check.yml`, can reconstruct **only the existing public key** using official
@@ -45,7 +53,7 @@ The user no longer has the local signing files. A manual-only workflow,
 an explicit three-file allowlist (public key, probe and signature). The private key is decoded
 only into a mode-0600 temporary file on the runner, removed in `finally`, never logged or uploaded.
 No new key is generated and no repository secret is modified. Recovery is not a trust migration:
-the recovered public key still needs comparison with real artifacts and installed-client trust.
+comparison confirmed current configured trust, not acceptance by every historical installed client.
 Run it with `gh workflow run updater-key-check.yml`; it does not publish a release.
 The diagnostic bootstraps pinned Minisign 0.12 from its official archive, verifying its upstream
 signature before extracting/executing it. This avoids an observed APT installation stall.
@@ -80,13 +88,14 @@ Windows target tree. Do not hide the alert or force a second unrelated GLib vers
 Linux release readiness needs a reviewed upstream-compatible backport or dependency migration,
 with Linux build/runtime checks; neither has been validated here.
 
-The hardening push reached master at `02bbadb`. Its
+The hardening push reached master at `02bbadb`; diagnostic bootstrap fix is `4698c0d`. The
 [Release Build CI](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37667316122)
-is running; signed multi-platform success is not confirmed. The separate
-[public-key diagnostic](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37667316323)
-is also running, last observed installing Minisign. No release/tag/installation was performed.
+is running; signed multi-platform success is not confirmed. The original APT diagnostic was
+cancelled and replaced by successful run `37668124715` using the verified official utility.
+No release/tag/installation was performed.
 
-1. Resolve signing continuity; verify a real artifact using the key trusted by installed clients.
+1. Current signer/config pair is verified. Verify newly built real artifacts and inventory installed-client trust;
+   document a manual transition for incompatible clients before promising automatic upgrade.
 2. Run frontend/lint, Rust fmt/Clippy/tests, release-manifest tests and CI.
 3. Build signed platform artifacts from the intended tag; match manifest URLs and signatures.
 4. Verify artifact and manifest availability before exposing the release as latest.

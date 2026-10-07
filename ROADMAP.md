@@ -22,7 +22,7 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Custom reward events | EventSub implemented; automated lifecycle tests pass | Authorized creator session, real redemption and native CSP |
 | Keyboard shortcuts / Drops focus | Interactive-control/modal isolation and focus regressions pass; Drops polish accepted by user | Other dialogs, screen readers and configurable/OS-global shortcuts |
 | Channel search | Stale-response cancellation and dismissal regressions pass | Broader keyboard/accessibility coverage |
-| Auto-updater | Four-platform artifact/signature gate and public-key recovery diagnostic implemented | Real CI signer also differs from configured trust; recovery/migration and installed-upgrade test pending |
+| Auto-updater | Four-platform artifact/signature gate; recovered current signer matches configured trust and validates probe | New signed multi-platform builds and installed-upgrade test pending; historical signatures use another key |
 | Dependency security | Five original alerts patched, additional nanoid patch; npm audit clean | Linux GTK/GLib advisory remains blocked by upstream version compatibility |
 
 Validation: 513 frontend tests pass, one skipped; lint passes; latest backend verification:

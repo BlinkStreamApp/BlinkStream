@@ -37,7 +37,8 @@ A source push does not publish installers or enable an update to 1.4.2.
 - **UI reliability:** stale search responses cannot reopen dismissed results; player shortcuts respect
   interactive controls/modals; Drops restores React focus and highlights the active pane.
 - **Update safeguards:** CI verifies every updater artifact and its trusted comment before publishing
-  a complete release. Signing continuity remains blocked; no key has been silently replaced.
+  a complete release. The current signing key matches configured trust; historical installers still
+  require migration/upgrade validation. No key has been replaced.
 - **Security maintenance:** JavaScript audit is clean and rustls is patched. The Linux GTK/GLib
   advisory still requires an upstream-compatible fix; see the verification guide.
 

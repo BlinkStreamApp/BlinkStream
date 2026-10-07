@@ -35,8 +35,8 @@ Status: release preparation, 2026-10-07. No 1.4.2 installers or update manifest 
 - An authorized EventSub redemption, separate automatic-click confirmation, and isolated
   native-watch pause/session tests remain outstanding.
 - Auto-updater verification found incompatible signing keys in the configured/public release chain.
-  A post-key-change CI artifact still uses the incompatible signer; public-key recovery is prepared
-  without rotating keys or exporting the private secret.
+  Public-key recovery confirms the current secret matches configured trust without rotating keys
+  or exporting the private secret; historical artifacts remain incompatible.
   A source push is not a signed release and does not make 1.4.2 downloadable.
 - Before publication: resolve signing continuity, verify signed artifacts for supported platforms,
   and test an actual upgrade from an existing installation.
