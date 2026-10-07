@@ -47,6 +47,15 @@ If recovery is impossible, document a verified manual migration instead of promi
 
 ## Before a release
 
+Additional check after the source push: GitHub Dependabot lists six open alerts, including one high
+development-tool alert for `source-map-js`; the other five are moderate (`rustls`, `glib`,
+`brace-expansion`, `vitest`, `@vitest/mocker`). Rustls and glib are classified as runtime dependencies.
+They were not changed in this task. Resolve/review them before publication rather than treating
+passing functional tests as a dependency-security audit.
+
+The code push reached master at `7cd688b`. Its [Release Build CI](https://github.com/BlinkStreamApp/BlinkStream/actions/runs/37664890531)
+was running at this check; its success and signed multi-platform builds are not yet confirmed.
+
 1. Resolve signing continuity; verify a real artifact using the key trusted by installed clients.
 2. Run frontend/lint, Rust fmt/Clippy/tests, release-manifest tests and CI.
 3. Build signed platform artifacts from the intended tag; match manifest URLs and signatures.

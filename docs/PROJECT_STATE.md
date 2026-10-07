@@ -65,6 +65,7 @@ instalación interactiva en Windows; el updater consume artefactos firmados gene
 NOW:
 - Preparación 1.4.2 y push autorizados explícitamente el 2026-10-07. README, roadmap y notas distinguen código de release publicado. Updater: endpoint/artefactos accesibles, pero firma Windows 1.4.1 rechazada al verificar con la clave actual y la del tag; ninguna coincide con el ID de las firmas del manifiesto. Bloqueo de publicación documentado en `docs/guides/UPDATER_VERIFICATION.md`. No modificar claves ni manifiesto público, crear tags o instalar actualizaciones sin nueva autorización.
 - Verificación local 1.4.2: 513 frontend/1 omitido, 4 manifiesto y 56 Rust; lint/fmt/Clippy correctos. El contrato UI del updater cubre consentimiento y fallo de firma/instalación sin reinicio. CI remoto y plataformas adicionales no equivalen a estas pruebas Windows.
+- Push de código/docs completado a master el 2026-10-07: EventSub `7bf6005`, Drops `25170a1`, buscador `56f0f9d` y documentación `7cd688b`. CI Release Build iniciado para ese código; resultado pendiente al registrar este estado. Release 1.4.2 no publicado.
 - Inventario oficial integrado y pulido aceptados por el usuario («Funciona perfectamente» / «todo correcto»), 2026-10-07: foco/restauración y Tab en React, Escape consumido, aislamiento de atajos, pestañas y visibilidad nativa. La aceptación general no prueba por separado clic automático/login/vinculación; React no controla el foco de Twitch. Commit/push autorizados; publicación de release no autorizada.
 - Revisión de interfaz: 18 hallazgos documentados; aislamiento de atajos y foco del modal de Drops corregidos localmente. Siguen pendientes foco de otros modales, persistencia de volumen y estado/responsive de multistream. Las acciones autenticadas y accesibilidad con lector de pantalla siguen sin validar.
 - Bloque 1 de `docs/EXECUTION_PLAN.md`: EventSub y aislamiento de teclado implementados; falta validación nativa con un canje real y campaña activa de Drops.
@@ -86,6 +87,8 @@ LATER:
 - Activar la protección de contraseñas filtradas desde la configuración del proyecto Supabase.
 
 ## Known Risks
+
+- Dependabot verificado tras el push: seis alertas abiertas; `source-map-js` alta en desarrollo, cuatro avisos moderados de `rustls`/`brace-expansion`/`vitest`/`@vitest/mocker` y uno moderado de `glib`. Rustls/glib figuran como runtime. No modificados en esta preparación; revisar antes de publicar (detalle en la guía del updater).
 
 - La migración `20260804195525_harden_favorites_identity_permissions.sql` existe localmente pero no está desplegada.
 - Los cambios locales de `twitch-auth` y `blinkstream-data` aún no están desplegados en Supabase.
