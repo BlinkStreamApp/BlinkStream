@@ -89,21 +89,21 @@ export function ModView({
     }
     window.addEventListener('message', handleBridgeMessage)
 
-    const handlePubSubRedemption = (e) => {
-      if (e.detail) {
+    const handleRedemption = (e) => {
+      if (e.detail?.broadcaster_id === String(effectiveBroadcasterId)) {
         setChatMessages(prev => {
           if (prev.some(m => m.id === e.detail.id)) return prev
           return [e.detail, ...prev]
         })
       }
     }
-    window.addEventListener('bs:pubsub-redemption', handlePubSubRedemption)
+    window.addEventListener('bs:reward-redemption', handleRedemption)
 
     return () => {
       window.removeEventListener('message', handleBridgeMessage)
-      window.removeEventListener('bs:pubsub-redemption', handlePubSubRedemption)
+      window.removeEventListener('bs:reward-redemption', handleRedemption)
     }
-  }, [])
+  }, [effectiveBroadcasterId])
 
   // Load layout config from localStorage
   const [config, setConfig] = useState(() => {
@@ -519,6 +519,7 @@ export function ModView({
           />
         ) : (
           <RewardsQueuePanel
+            realtime={rewardsState.realtime}
             pendingRedemptions={rewardsState.pendingRedemptions}
             fulfilledRedemptions={rewardsState.fulfilledRedemptions}
             onFulfillRedemption={rewardsState.fulfillRedemption}

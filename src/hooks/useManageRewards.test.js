@@ -2,9 +2,13 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
+import { startRewardEventSub } from '../utils/twitchEventSub'
+
+vi.mock('../utils/twitchEventSub', () => ({ startRewardEventSub: vi.fn(() => vi.fn()) }))
 
 const cpMocks = {
   getCustomRewards: vi.fn(),
+  getCustomRewardsGQL: vi.fn(),
   createCustomReward: vi.fn(),
   updateCustomReward: vi.fn(),
   deleteCustomReward: vi.fn(),
@@ -13,6 +17,7 @@ const cpMocks = {
 }
 vi.mock('../utils/twitch', () => ({
   getCustomRewards: (...args) => cpMocks.getCustomRewards(...args),
+  getCustomRewardsGQL: (...args) => cpMocks.getCustomRewardsGQL(...args),
   createCustomReward: (...args) => cpMocks.createCustomReward(...args),
   updateCustomReward: (...args) => cpMocks.updateCustomReward(...args),
   deleteCustomReward: (...args) => cpMocks.deleteCustomReward(...args),
@@ -23,9 +28,48 @@ vi.mock('../utils/twitch', () => ({
 const { useManageRewards } = await import('./useManageRewards')
 
 describe('useManageRewards', () => {
+  it('ignores a catalog response from a channel that was already left', async () => {
+    let resolveOld
+    cpMocks.getCustomRewards.mockImplementation(id => id === 'old'
+      ? new Promise(resolve => { resolveOld = resolve })
+      : Promise.resolve({ ok: true, data: [{ id: 'new-reward' }] }))
+    cpMocks.getRedemptions.mockResolvedValue({ ok: true, data: { data: [] } })
+    const { result, rerender } = renderHook(({ id }) => useManageRewards({ broadcasterId: id, pollIntervalMs: 0 }), {
+      initialProps: { id: 'old' },
+    })
+    await waitFor(() => expect(resolveOld).toBeDefined())
+    rerender({ id: 'new' })
+    await waitFor(() => expect(result.current.rewards[0]?.id).toBe('new-reward'))
+    await act(async () => resolveOld({ ok: true, data: [{ id: 'old-reward' }] }))
+    expect(result.current.rewards.map(reward => reward.id)).toEqual(['new-reward'])
+  })
+
+  it('moves an updated live redemption out of pending without duplicating activity', async () => {
+    cpMocks.getCustomRewards.mockResolvedValue({ ok: true, data: [{ id: 'reward-1' }] })
+    cpMocks.getRedemptions.mockResolvedValue({ ok: true, data: { data: [] } })
+    const activity = vi.fn()
+    window.addEventListener('bs:reward-redemption', activity)
+    const { result, unmount } = renderHook(() => useManageRewards({ broadcasterId: '123', pollIntervalMs: 0 }))
+    await waitFor(() => expect(result.current.rewards).toHaveLength(1))
+    const { onRedemption } = startRewardEventSub.mock.calls.at(-1)[0]
+    const rd = { id: 'rd-live', reward_id: 'reward-1', user_name: 'Alice', cost: 100,
+      reward_title: 'Agua', redeemed_at: '2026-09-29T10:00:00Z', status: 'UNFULFILLED' }
+    act(() => onRedemption(rd, true))
+    expect(result.current.pendingRedemptions).toHaveLength(1)
+    act(() => onRedemption({ ...rd, status: 'FULFILLED' }, false))
+    expect(result.current.pendingRedemptions).toHaveLength(0)
+    expect(result.current.fulfilledRedemptions).toHaveLength(1)
+    await act(async () => result.current.refresh())
+    expect(result.current.fulfilledRedemptions).toHaveLength(1)
+    expect(activity).toHaveBeenCalledOnce()
+    window.removeEventListener('bs:reward-redemption', activity)
+    unmount()
+  })
+
   beforeEach(() => {
     localStorage.clear()
     Object.values(cpMocks).forEach(m => m.mockReset())
+    startRewardEventSub.mockClear()
   })
 
   afterEach(() => {

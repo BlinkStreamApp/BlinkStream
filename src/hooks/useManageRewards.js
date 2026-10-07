@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { logError } from '../utils/errors'
 import { logEvent } from '../utils/eventLog'
+import { startRewardEventSub } from '../utils/twitchEventSub'
 import {
   getCustomRewards,
   getCustomRewardsGQL,
@@ -21,22 +22,47 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
   const [fulfilledRedemptions, setFulfilledRedemptions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [realtime, setRealtime] = useState({ state: 'idle', message: '' })
+  const liveRedemptionsRef = useRef(new Map())
   const timerRef = useRef(null)
   const cancelledRef = useRef(false)
+  const generationRef = useRef(0)
 
   const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('blinkstream_twitch_token') : null)
+
+  useEffect(() => {
+    const generation = ++generationRef.current
+    liveRedemptionsRef.current.clear()
+    return () => {
+      generationRef.current = generation + 1
+    }
+  }, [broadcasterId, effectiveToken])
 
   const rewardsRef = useRef([])
   useEffect(() => {
     rewardsRef.current = rewards
   }, [rewards])
 
+  const applyRedemption = useCallback((rd) => {
+    liveRedemptionsRef.current.set(rd.id, rd)
+    if (liveRedemptionsRef.current.size > 500) {
+      liveRedemptionsRef.current.delete(liveRedemptionsRef.current.keys().next().value)
+    }
+    const updateList = (previous, status) => (
+      rd.status === status ? [rd, ...previous.filter(item => item.id !== rd.id)] : previous.filter(item => item.id !== rd.id)
+    ).slice(0, 500)
+    setPendingRedemptions(previous => updateList(previous, PENDING_STATUS))
+    setFulfilledRedemptions(previous => updateList(previous, 'FULFILLED'))
+  }, [])
+
   const fetchRewards = useCallback(async () => {
+    const generation = generationRef.current
     if (!broadcasterId) {
       setRewards([])
       return []
     }
     let res = await getCustomRewards(broadcasterId, ...(effectiveToken ? [effectiveToken] : []))
+    if (cancelledRef.current || generation !== generationRef.current) return []
     if (!res.ok || !res.data || res.data.length === 0) {
       if (channel) {
         const gqlRes = await getCustomRewardsGQL(channel, effectiveToken)
@@ -45,7 +71,7 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
         }
       }
     }
-    if (cancelledRef.current) return []
+    if (cancelledRef.current || generation !== generationRef.current) return []
     if (res.ok) {
       setRewards(res.data || [])
       return res.data || []
@@ -60,6 +86,7 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
   }, [broadcasterId, effectiveToken])
 
   const fetchRedemptions = useCallback(async (rewardsList) => {
+    const generation = generationRef.current
     const list = rewardsList || []
     if (!broadcasterId || list.length === 0 || helixForbiddenRef.current) {
       return
@@ -74,7 +101,7 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
       ),
     ])
 
-    if (cancelledRef.current) return
+    if (cancelledRef.current || generation !== generationRef.current) return
 
     const isForbidden = pendingResults.some(r => r.status === 'fulfilled' && (r.value?.error?.includes?.('403') || r.value?.code === 'FORBIDDEN')) ||
       fulfilledResults.some(r => r.status === 'fulfilled' && (r.value?.error?.includes?.('403') || r.value?.code === 'FORBIDDEN'))
@@ -93,7 +120,11 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
       }
     })
     pendingAll.sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at))
-    setPendingRedemptions(pendingAll)
+    const liveIds = liveRedemptionsRef.current
+    setPendingRedemptions([
+      ...pendingAll.filter(rd => !liveIds.has(rd.id)),
+      ...[...liveIds.values()].filter(rd => rd.status === PENDING_STATUS),
+    ].sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at)).slice(0, 500))
 
     const fulfilledAll = []
     fulfilledResults.forEach((settled, i) => {
@@ -106,18 +137,22 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
       }
     })
     fulfilledAll.sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at))
-    setFulfilledRedemptions(fulfilledAll)
+    setFulfilledRedemptions([
+      ...fulfilledAll.filter(rd => !liveIds.has(rd.id)),
+      ...[...liveIds.values()].filter(rd => rd.status === 'FULFILLED'),
+    ].sort((a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at)).slice(0, 500))
   }, [broadcasterId, effectiveToken])
 
   const refresh = useCallback(async () => {
+    const generation = generationRef.current
     setLoading(true)
     setError(null)
     try {
       const fresh = await fetchRewards()
-      if (cancelledRef.current) return
+      if (cancelledRef.current || generation !== generationRef.current) return
       await fetchRedemptions(fresh)
     } finally {
-      if (!cancelledRef.current) setLoading(false)
+      if (!cancelledRef.current && generation === generationRef.current) setLoading(false)
     }
   }, [fetchRewards, fetchRedemptions])
 
@@ -148,120 +183,30 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
     }
   }, [broadcasterId, refresh])
 
-  // Real-time PubSub listener for community-points-channel-v1.<broadcasterId>
+  // EventSub is available only with the broadcaster's authorization.
   useEffect(() => {
     if (!broadcasterId) return
-
-    let isSubscribed = true
-    let ws = null
-    let pingTimer = null
-    let reconnectTimer = null
-
-    const connectPubSub = () => {
-      if (!isSubscribed) return
-      try {
-        ws = new WebSocket('wss://pubsub-edge.twitch.tv/v1')
-
-        ws.onopen = () => {
-          if (!isSubscribed) {
-            try { ws.close() } catch { /* ignore */ }
-            return
-          }
-          const cleanToken = (effectiveToken || '').replace(/^oauth:/i, '')
-          const listenMsg = {
-            type: 'LISTEN',
-            nonce: 'bs_cp_' + Math.random().toString(36).slice(2, 10),
-            data: {
-              topics: [`community-points-channel-v1.${broadcasterId}`],
-              auth_token: cleanToken || undefined,
+    return startRewardEventSub({
+      broadcasterId,
+      token: effectiveToken,
+      onStatus: setRealtime,
+      onRedemption: (rd, isNew) => {
+        applyRedemption(rd)
+        if (isNew) {
+          window.dispatchEvent(new CustomEvent('bs:reward-redemption', {
+            detail: {
+              id: rd.id, broadcaster_id: String(broadcasterId), eventType: 'reward', isReward: true,
+              user: rd.user_name || rd.user_login, user_id: rd.user_id,
+              reward_title: rd.reward_title, cost: rd.cost,
+              eventHeader: `🎁 ${rd.user_name || rd.user_login} ha canjeado ${rd.reward_title} (${rd.cost} pts)`,
+              message: rd.user_input || '', text: rd.user_input || '',
+              timestamp: new Date(rd.redeemed_at).getTime() || Date.now(),
             },
-          }
-          ws.send(JSON.stringify(listenMsg))
-
-          pingTimer = setInterval(() => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'PING' }))
-            }
-          }, 3.5 * 60 * 1000)
+          }))
         }
-
-        ws.onmessage = (event) => {
-          if (!isSubscribed) return
-          try {
-            const data = JSON.parse(event.data)
-            if (data.type === 'MESSAGE' && data.data?.topic?.startsWith('community-points-channel-v1')) {
-              const msgData = typeof data.data.message === 'string' ? JSON.parse(data.data.message) : data.data.message
-              if (msgData?.type === 'reward-redeemed' && msgData.data?.redemption) {
-                const rd = msgData.data.redemption
-                const formattedRd = {
-                  id: rd.id,
-                  user_name: rd.user?.display_name || rd.user?.login || 'Espectador',
-                  user_login: rd.user?.login || '',
-                  user_id: rd.user?.id || '',
-                  user_input: rd.user_input || '',
-                  reward_title: rd.reward?.title || 'Recompensa',
-                  cost: rd.reward?.cost || 0,
-                  status: rd.status || 'FULFILLED',
-                  redeemed_at: rd.redeemed_at || new Date().toISOString(),
-                  reward: rd.reward,
-                }
-
-                if (formattedRd.status === 'UNFULFILLED') {
-                  setPendingRedemptions(prev => [formattedRd, ...prev.filter(p => p.id !== rd.id)])
-                } else {
-                  setFulfilledRedemptions(prev => [formattedRd, ...prev.filter(p => p.id !== rd.id)])
-                }
-
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('bs:pubsub-redemption', {
-                    detail: {
-                      id: rd.id,
-                      eventType: 'reward',
-                      isReward: true,
-                      user: formattedRd.user_name,
-                      user_id: formattedRd.user_id,
-                      reward_title: formattedRd.reward_title,
-                      cost: formattedRd.cost,
-                      eventHeader: `🎁 ${formattedRd.user_name} ha canjeado ${formattedRd.reward_title} (${formattedRd.cost} pts)`,
-                      message: formattedRd.user_input || '',
-                      text: formattedRd.user_input || '',
-                      timestamp: Date.now(),
-                    },
-                  }))
-                }
-              }
-            }
-          } catch {
-            // ignore malformed pubsub messages
-          }
-        }
-
-        ws.onclose = () => {
-          if (pingTimer) clearInterval(pingTimer)
-          if (isSubscribed) {
-            reconnectTimer = setTimeout(connectPubSub, 4000)
-          }
-        }
-
-        ws.onerror = () => {
-          // let onclose handle reconnect
-        }
-      } catch {
-        // fallback
-      }
-    }
-
-    connectPubSub()
-
-    return () => {
-      isSubscribed = false
-      if (pingTimer) clearInterval(pingTimer)
-      if (reconnectTimer) clearTimeout(reconnectTimer)
-      if (ws) {
-        try { ws.close() } catch { /* ignore */ }
-      }
-    }
-  }, [broadcasterId, effectiveToken])
+      },
+    })
+  }, [broadcasterId, effectiveToken, applyRedemption])
 
   const createReward = useCallback(async (data) => {
     if (!broadcasterId) return { ok: false, error: 'No hay broadcaster activo' }
@@ -306,12 +251,12 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
     if (!broadcasterId || !pending) return { ok: false, error: 'Redencion no encontrada' }
     const res = await updateRedemptionStatus(broadcasterId, pending.reward_id, [id], 'FULFILLED', ...(effectiveToken ? [effectiveToken] : []))
     if (res.ok) {
-      setPendingRedemptions(prev => prev.filter(p => p.id !== id))
+      applyRedemption({ ...pending, status: 'FULFILLED' })
       logEvent('channel_points', 'redemption.fulfilled', { broadcasterId, rewardId: pending.reward_id })
       return { ok: true }
     }
     return { ok: false, error: res.error }
-  }, [broadcasterId, pendingRedemptions, effectiveToken])
+  }, [broadcasterId, pendingRedemptions, effectiveToken, applyRedemption])
 
   const cancelRedemption = useCallback(async (id, _reason) => {
     void _reason
@@ -319,12 +264,12 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
     if (!broadcasterId || !pending) return { ok: false, error: 'Redencion no encontrada' }
     const res = await updateRedemptionStatus(broadcasterId, pending.reward_id, [id], 'CANCELED', ...(effectiveToken ? [effectiveToken] : []))
     if (res.ok) {
-      setPendingRedemptions(prev => prev.filter(p => p.id !== id))
+      applyRedemption({ ...pending, status: 'CANCELED' })
       logEvent('channel_points', 'redemption.canceled', { broadcasterId, rewardId: pending.reward_id })
       return { ok: true }
     }
     return { ok: false, error: res.error }
-  }, [broadcasterId, pendingRedemptions, effectiveToken])
+  }, [broadcasterId, pendingRedemptions, effectiveToken, applyRedemption])
 
   const bulkFulfill = useCallback(async (ids) => {
     if (!broadcasterId || ids.length === 0) return { ok: true }
@@ -342,13 +287,13 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
     )
     const allOk = results.every(r => r.ok)
     if (allOk) {
-      setPendingRedemptions(prev => prev.filter(p => !ids.includes(p.id)))
+      pendingRedemptions.filter(p => ids.includes(p.id)).forEach(p => applyRedemption({ ...p, status: 'FULFILLED' }))
       logEvent('channel_points', 'redemption.bulkFulfilled', { broadcasterId, count: ids.length })
       return { ok: true }
     }
     const firstErr = results.find(r => !r.ok)
     return { ok: false, error: firstErr?.error }
-  }, [broadcasterId, pendingRedemptions, effectiveToken])
+  }, [broadcasterId, pendingRedemptions, effectiveToken, applyRedemption])
 
   const bulkCancel = useCallback(async (ids) => {
     if (!broadcasterId || ids.length === 0) return { ok: true }
@@ -366,18 +311,19 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
     )
     const allOk = results.every(r => r.ok)
     if (allOk) {
-      setPendingRedemptions(prev => prev.filter(p => !ids.includes(p.id)))
+      pendingRedemptions.filter(p => ids.includes(p.id)).forEach(p => applyRedemption({ ...p, status: 'CANCELED' }))
       logEvent('channel_points', 'redemption.bulkCanceled', { broadcasterId, count: ids.length })
       return { ok: true }
     }
     const firstErr = results.find(r => !r.ok)
     return { ok: false, error: firstErr?.error }
-  }, [broadcasterId, pendingRedemptions, effectiveToken])
+  }, [broadcasterId, pendingRedemptions, effectiveToken, applyRedemption])
 
   return {
     rewards,
     pendingRedemptions,
     fulfilledRedemptions,
+    realtime,
     loading,
     error,
     refresh,

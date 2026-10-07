@@ -11,6 +11,7 @@ import ManageRewards from './ManageRewards'
 import RewardForm from './RewardForm'
 import PendingRedemptions from './PendingRedemptions'
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { RedemptionConnectionNotice } from './RedemptionConnectionNotice'
 
 const PANEL_WIDTH = 380
 
@@ -156,6 +157,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
         </div>
 
         {}
+        {isBroadcaster && <RedemptionConnectionNotice connection={manage.realtime} />}
         {!isBroadcaster && (
           <div className="px-4 py-3 bg-gradient-to-r from-twitch/15 via-purple-500/10 to-transparent border-b border-twitch/20">
             <div className="flex items-center justify-between">

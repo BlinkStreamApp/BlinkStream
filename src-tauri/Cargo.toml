@@ -1,6 +1,6 @@
 [package]
 name = "blinkstream"
-version = "1.4.1"
+version = "1.4.2"
 description = "BlinkStream - Cliente ultralight y de nueva generación de Twitch"
 authors = ["BlinkStream Team"]
 license = "MIT"
@@ -18,12 +18,14 @@ tauri-build = { version = "2.6.2", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 log = "0.4"
 # `tokio` se usa para `task::spawn_blocking` dentro de comandos async de Tauri
 # (mover llamadas síncronas largas como `run_streamlink_with_timeout` fuera
 # del event loop). Tauri 2 ya depende transitivamente de tokio, pero
 # necesitamos declararlo para usar `spawn_blocking` desde este crate.
-tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time", "net"] }
 tauri = { version = "2.11.2", features = ["unstable", "macos-private-api"] }
 tauri-plugin-log = "2"
 tauri-plugin-process = "2"

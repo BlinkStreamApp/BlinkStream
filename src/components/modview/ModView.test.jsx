@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { ModQuickActionsBar } from './ModQuickActionsBar'
 import { UserInspectorCard } from './UserInspectorCard'
 import { ModActionFeed } from './ModActionFeed'
@@ -265,6 +265,17 @@ describe('ActivityFeed', () => {
 })
 
 describe('RewardsQueuePanel', () => {
+  it('shows failed updates and enables the action again', async () => {
+    const onFulfill = vi.fn().mockResolvedValue({ ok: false, error: 'Sin permisos para actualizar este canje.' })
+    render(<RewardsQueuePanel pendingRedemptions={[{
+      id: 'rd-failed', reward: { id: 'r-1', title: 'Agua' }, user_name: 'Alice', status: 'UNFULFILLED',
+    }]} onFulfillRedemption={onFulfill} realtime={{ state: 'unavailable', message: 'Se requiere autorización del creador.' }} />)
+    expect(screen.getByRole('status')).toHaveTextContent('Se requiere autorización del creador.')
+    await act(async () => fireEvent.click(screen.getByText('Cumplir')))
+    expect(screen.getByRole('alert')).toHaveTextContent('Sin permisos para actualizar este canje.')
+    expect(screen.getByText('Cumplir').closest('button')).not.toBeDisabled()
+  })
+
   it('renders empty state when no redemptions pending', () => {
     render(<RewardsQueuePanel pendingRedemptions={[]} />)
     expect(screen.getByText('Sin solicitudes pendientes')).toBeInTheDocument()
@@ -294,8 +305,8 @@ describe('RewardsQueuePanel', () => {
     expect(screen.getByText('@music_lover')).toBeInTheDocument()
     expect(screen.getByText('"Canta Bohemian Rhapsody por favor"')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByText('Cumplir'))
-    expect(onFulfill).toHaveBeenCalledWith('rew-1', 'red-1')
+    await act(async () => fireEvent.click(screen.getByText('Cumplir')))
+    expect(onFulfill).toHaveBeenCalledWith('red-1')
   })
 
   it('handles cancel redemption', async () => {
@@ -316,8 +327,8 @@ describe('RewardsQueuePanel', () => {
       />
     )
 
-    fireEvent.click(screen.getByText('Rechazar'))
-    expect(onCancel).toHaveBeenCalledWith('rew-2', 'red-2')
+    await act(async () => fireEvent.click(screen.getByText('Rechazar')))
+    expect(onCancel).toHaveBeenCalledWith('red-2')
   })
 })
 
@@ -352,7 +363,5 @@ describe('ModViewLayoutDrawer', () => {
     expect(onClose).toHaveBeenCalled()
   })
 })
-
-
 
 

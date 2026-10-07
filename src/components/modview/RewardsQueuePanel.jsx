@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { RedemptionConnectionNotice } from '../channelpoints/RedemptionConnectionNotice'
 
 export function RewardsQueuePanel({
   pendingRedemptions = [],
@@ -9,19 +10,26 @@ export function RewardsQueuePanel({
   loading = false,
   onRefresh,
   onInspectUser,
+  realtime,
 }) {
   const [tab, setTab] = useState('all') // 'all' | 'pending' | 'fulfilled'
   const [actionPending, setActionPending] = useState({})
+  const [actionError, setActionError] = useState(null)
 
   const handleAction = async (redemption, action) => {
     if (!redemption?.id) return
     setActionPending(prev => ({ ...prev, [redemption.id]: true }))
-    if (action === 'FULFILLED') {
-      await onFulfillRedemption?.(redemption.reward?.id || redemption.reward_id, redemption.id)
-    } else {
-      await onCancelRedemption?.(redemption.reward?.id || redemption.reward_id, redemption.id)
+    setActionError(null)
+    try {
+      const result = action === 'FULFILLED'
+        ? await onFulfillRedemption?.(redemption.id)
+        : await onCancelRedemption?.(redemption.id)
+      if (result?.ok === false) setActionError(result.error || 'No se pudo actualizar el canje.')
+    } catch {
+      setActionError('No se pudo actualizar el canje. Inténtalo de nuevo.')
+    } finally {
+      setActionPending(prev => ({ ...prev, [redemption.id]: false }))
     }
-    setActionPending(prev => ({ ...prev, [redemption.id]: false }))
   }
 
   const displayedList =
@@ -35,6 +43,8 @@ export function RewardsQueuePanel({
 
   return (
     <div className="h-full flex flex-col font-sans">
+      <RedemptionConnectionNotice connection={realtime} />
+      {actionError && <p role="alert" className="px-3 py-2 text-xs text-red-400">{actionError}</p>}
       {/* Header */}
       <div className="shrink-0 p-2.5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
         <div className="flex items-center gap-1.5">

@@ -8,6 +8,7 @@ import DiskSpaceIndicator from './components/recording/DiskSpaceIndicator'
 import { RecordingProvider } from './components/recording/RecordingContext'
 import { BlinkStreamLogo } from './components/BlinkStreamLogo'
 import { getUserIdByLogin, validateToken, clearStoredToken, getHeaders, getHelixClientId } from './utils/twitch'
+import { isEditingText } from './utils/keyboard'
 import { applyStoredHslTheme, applyStoredCustomFont, applyStoredCustomIconStyle } from './utils/hslTheme'
 
 const VideoPlayer = lazy(() => import('./components/VideoPlayer'))
@@ -191,6 +192,7 @@ function MainApp() {
 
   useEffect(() => {
     const handleKey = (e) => {
+      if (e.defaultPrevented || e.repeat || e.altKey || e.shiftKey) return
       if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyK' || e.code === 'KeyP')) {
         e.preventDefault()
         if (!theatreMode) {
@@ -199,6 +201,7 @@ function MainApp() {
         }
       }
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyM') {
+        if (isEditingText(e.target)) return
         e.preventDefault()
         setViewMode(p => p === 'modview' ? 'normal' : 'modview')
       }
