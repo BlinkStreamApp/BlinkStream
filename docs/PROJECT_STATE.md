@@ -59,11 +59,13 @@ instalación interactiva en Windows; el updater consume artefactos firmados gene
 - DEC-011 rechazada → `docs/decisions/ADR-011-drops-official-playback.md`: el usuario exige reproducción nativa sin acudir al player de Twitch; retirada la alternativa de ventana oficial.
 - DEC-012 → `docs/decisions/ADR-012-experimental-native-drops-watch.md`: reporte experimental de minutos de reproducción medidos en Rust, con opt-in, endpoint acotado, pausa ante rechazos y progreso solo remoto.
 - DEC-013 → `docs/decisions/ADR-013-embedded-drops-inventory.md`: el reclamo oficial se aloja en una Webview hija del modal, sin popout. Comandos de Drops usan la `Webview` principal recibida para seguir operativos al añadir vistas hijas; credenciales y verificación permanecen nativas/oficiales.
+- DEC-014 → `docs/decisions/ADR-014-glib-gtk3-security-backport.md`: mantener GTK3 mediante GLib 0.18.5 vendorizado con el parche upstream exacto, integridad del árbol y regresión optimizada en Linux; no falsear la versión ni ocultar Dependabot.
 
 ## Current Work
 
 NOW:
-- Preparación 1.4.2 y push autorizados explícitamente el 2026-10-07. README, roadmap y notas distinguen código de release publicado. Updater: firmante actual/config verificados; artefactos históricos 1.4.1 incompatibles y upgrade instalado pendiente. Ver `docs/guides/UPDATER_VERIFICATION.md`. Sin rotación de claves; no crear tags/releases ni instalar actualizaciones sin nueva autorización.
+- Publicación del tag/release 1.4.2 autorizada el 2026-10-07 únicamente tras validar el candidato firmado. El usuario exige Windows, macOS y Linux; no excluir Linux para acelerar. No instalar nada en su PC. Updater: firmante actual/config verificados; artefactos históricos 1.4.1 incompatibles y upgrade instalado pendiente. Ver `docs/guides/UPDATER_VERIFICATION.md`.
+- CI anterior falló al decodificar saltos de línea en el Base64 exterior del secreto. El wrapper elimina solo ese whitespace sin alterar clave/contraseña ni registrarlas. Backport GLib preparado y probado en integridad; ejecución Linux optimizada y cuatro bundles firmados pendientes del nuevo CI. Suite release local: 11 tests correctos.
 - Verificación local 1.4.2: 513 frontend/1 omitido, 8 release/seguridad y 56 Rust; lint/fmt/Clippy y build Windows correctos. El contrato UI del updater cubre consentimiento y fallo de firma/instalación sin reinicio. CI remoto y plataformas adicionales no equivalen a estas pruebas Windows.
 - Hardening del updater: firmas/bytes/comentarios de cuatro plataformas obligatorios, tag/config coherentes y publicación central tras verificación. Usuario sin archivos de claves; diagnóstico CI `37668124715` recuperó solo la pública y confirmó firmante/config actuales con prueba criptográfica. Artefactos antiguos de CI `33440160727` siguen firmados con otra clave. Clientes antiguos requieren comprobar confianza/migración antes de prometer auto-upgrade.
 - Hardening enviado en `02bbadb`, bootstrap diagnóstico corregido en `4698c0d`; GitHub cerró cinco avisos originales y mantiene solo GLib. CI release `37667316122` sigue en curso; diagnóstico público completado con éxito. Ningún tag/release/instalación realizado.
@@ -90,7 +92,7 @@ LATER:
 
 ## Known Risks
 
-- Dependencias: cinco avisos originales corregidos (rustls 0.23.45, Vitest/mocker 4.1.11, source-map-js 1.2.2, brace-expansion 5.0.12), además nanoid 3.3.18; audit npm sin vulnerabilidades. GLib 0.18.5 persiste en GTK/Linux y necesita backport/migración compatible; forzar 0.20 no resuelve la cadena existente. Sin validación Linux y sin cerrar/ocultar alertas manualmente.
+- Dependencias: cinco avisos originales corregidos, además nanoid 3.3.18; audit npm sin vulnerabilidades. GLib 0.18.5 de GTK/Linux usa backport local de las dos líneas upstream vulnerables; pendiente regresión optimizada Linux. Dependabot puede seguir señalando la versión antigua: no ocultar la alerta, retirar el vendor cuando exista una actualización compatible (ADR-014).
 
 - La migración `20260804195525_harden_favorites_identity_permissions.sql` existe localmente pero no está desplegada.
 - Los cambios locales de `twitch-auth` y `blinkstream-data` aún no están desplegados en Supabase.
@@ -114,7 +116,7 @@ LATER:
 ## Constraints
 
 - No desplegar migraciones, Edge Functions ni releases sin autorización explícita.
-- Commit y push del código autorizados explícitamente el 2026-10-07 tras validar el panel/pulido. Tags, releases y despliegues externos siguen requiriendo autorización aparte.
+- Commit/push y publicación 1.4.2 autorizados explícitamente el 2026-10-07; publicar solo después de validar el candidato de las tres plataformas. No instalar nada en el PC del usuario. Despliegues Supabase siguen sin autorización.
 - No abrir ventanas aparte para el reclamo de Drops: usar el panel oficial integrado y conservar los requisitos de integridad/vinculación de Twitch.
 - No trasladar la reproducción al player oficial de Twitch ni abrir otro player para Drops; el objetivo es reproducción nativa sin anuncios, con progreso remoto observado hasta 33 minutos y controles de pausa/automatización pendientes.
 - No almacenar secretos Twitch en el frontend ni en el repositorio.

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHash, generateKeyPairSync, sign } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { buildUpdaterManifest, verifyUpdaterArtifact } from './build-updater-manifest.mjs'
 import { PROBE, recoverUpdaterPublicKey } from './recover-updater-public-key.mjs'
+import { buildSignedRelease, normalizeSigningEnvironment } from './build-signed-release.mjs'
+import { verifyGLibBackport } from './verify-glib-backport.mjs'
 
 const testKeys = generateKeyPairSync('ed25519')
 const keyId = Buffer.from('0102030405060708', 'hex')
@@ -34,6 +36,57 @@ const ARTIFACTS = [
   `BlinkStream_${VERSION}_macOS_x64.app.tar.gz`,
   `BlinkStream_${VERSION}_Linux_x86_64.AppImage`,
 ]
+
+test('normaliza LF/CRLF y Base64 envuelto sin cambiar bytes, contraseña ni entorno original', () => {
+  const bytes = Buffer.from('test-only signing material\nsecond line\n')
+  const key = bytes.toString('base64')
+  const environment = { TAURI_SIGNING_PRIVATE_KEY: ` ${key.slice(0, 16)}\r\n${key.slice(16)}\n`,
+    TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ' password with spaces \n', OTHER: 'preserved' }
+  const normalized = normalizeSigningEnvironment(environment)
+  assert.equal(normalized.TAURI_SIGNING_PRIVATE_KEY, key)
+  assert.deepEqual(Buffer.from(normalized.TAURI_SIGNING_PRIVATE_KEY, 'base64'), bytes)
+  assert.equal(normalized.TAURI_SIGNING_PRIVATE_KEY_PASSWORD, environment.TAURI_SIGNING_PRIVATE_KEY_PASSWORD)
+  assert.equal(normalized.OTHER, 'preserved')
+  assert.notEqual(environment.TAURI_SIGNING_PRIVATE_KEY, key)
+  for (const invalid of ['', '====', 'not!base64', 'Zg', 'Zm=9v']) {
+    assert.throws(() => normalizeSigningEnvironment({ TAURI_SIGNING_PRIVATE_KEY: invalid }), /secreto/i)
+  }
+})
+
+test('GLib vendor conserva exactamente el backport revisado y rechaza su reversión', () => {
+  assert.doesNotThrow(() => verifyGLibBackport())
+  const root = mkdtempSync(join(tmpdir(), 'blinkstream-glib-backport-'))
+  const copy = join(root, 'glib')
+  try {
+    cpSync(new URL('../src-tauri/vendor/glib/', import.meta.url), copy, { recursive: true })
+    const path = join(copy, 'src/variant_iter.rs')
+    const code = readFileSync(path, 'utf8')
+    writeFileSync(path, code.replace('let mut p: *mut libc::c_char', 'let p: *mut libc::c_char')
+      .replace('&mut p,', '&p,'))
+    assert.throws(() => verifyGLibBackport(copy), /backport/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('build firmado entrega la clave solo por entorno y propaga un fallo del CLI', () => {
+  const encoded = Buffer.from('test-only key').toString('base64')
+  let called = false
+  const status = buildSignedRelease(['--bundles', 'nsis'], {
+    environment: { TAURI_SIGNING_PRIVATE_KEY: `${encoded}\n` },
+    run: (_executable, args, options) => {
+      called = true
+      assert.ok(args.includes('src-tauri/tauri.release.conf.json'))
+      assert.ok(args.includes('nsis'))
+      assert.equal(args.includes(encoded), false)
+      assert.equal(options.env.TAURI_SIGNING_PRIVATE_KEY, encoded)
+      assert.equal(options.stdio, 'inherit')
+      return { status: 17 }
+    },
+  })
+  assert.equal(called, true)
+  assert.equal(status, 17)
+})
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'blinkstream-updater-'))

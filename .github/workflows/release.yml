@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   quality:
@@ -62,6 +62,9 @@ jobs:
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: GLib security regression with release optimizations
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --test glib_variant_regression --release
 
       - name: OAuth security tests
         run: node supabase/functions/twitch-auth/_security-test.mjs
@@ -118,7 +121,7 @@ jobs:
 
       - name: Build Linux bundles
         if: runner.os == 'Linux'
-        run: pnpm tauri build --config src-tauri/tauri.release.conf.json --target ${{ matrix.target }} --bundles deb,appimage
+        run: node scripts/build-signed-release.mjs --target ${{ matrix.target }} --bundles deb,appimage
 
       - name: Rename Linux bundles
         if: runner.os == 'Linux'
@@ -143,7 +146,7 @@ jobs:
 
       - name: Build macOS bundles
         if: runner.os == 'macOS'
-        run: pnpm tauri build --config src-tauri/tauri.release.conf.json --target ${{ matrix.target }} --bundles app,dmg
+        run: node scripts/build-signed-release.mjs --target ${{ matrix.target }} --bundles app,dmg
 
       - name: Rename macOS bundles
         if: runner.os == 'macOS'
@@ -169,7 +172,7 @@ jobs:
 
       - name: Build Windows bundles
         if: runner.os == 'Windows'
-        run: pnpm tauri build --config src-tauri/tauri.release.conf.json --target ${{ matrix.target }} --bundles msi,nsis
+        run: node scripts/build-signed-release.mjs --target ${{ matrix.target }} --bundles msi,nsis
 
       - name: Rename Windows bundles
         if: runner.os == 'Windows'
@@ -190,6 +193,16 @@ jobs:
           if (Test-Path "$($nsis[0].FullName).sig") {
             Rename-Item -LiteralPath "$($nsis[0].FullName).sig" -NewName "BlinkStream_${version}_Win_x64.exe.sig"
           }
+
+      - name: Smoke test signed Windows installer and updater mode
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          ./scripts/test-windows-installer.ps1 -Installer "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/BlinkStream_${version}_Win_x64.exe"
 
       - name: Upload Linux artifacts
         if: runner.os == 'Linux'

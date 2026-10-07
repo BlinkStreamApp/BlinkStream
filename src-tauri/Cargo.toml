@@ -62,3 +62,10 @@ libc = "0.2"
 # basico; `macros` provee el macro `#[tokio::test]`.)
 [dev-dependencies]
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+glib = "0.18.5"
+
+# ADR-014: GTK3 requires 0.18; exact upstream security backport, no API/version spoofing.
+[patch.crates-io]
+glib = { path = "vendor/glib" }
