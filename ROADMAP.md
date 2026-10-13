@@ -7,13 +7,13 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-13 / v1.4.4 release candidate
+## Execution status — 2026-10-13 / v1.4.4 published
 
 The historical phases below describe product direction, not proof of a published release.
-Source version is 1.4.4; latest published release remains [1.4.3](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.3)
-until the new signed release passes all gates. The user accepted the incremental UI/grid delivery and authorized publication after validation.
+Source and latest published release are [1.4.4](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.4).
+Candidate CI `38449215321` and tag CI `38451126905` passed all gates; downloaded public updater artifacts independently pass signature and SHA-256 verification.
 Signed builds are available for Windows x64, macOS Intel/Apple Silicon and Linux x64.
-The hotfix includes account-scoped favorites/follows, logout cleanup and approved branding.
+The update adds category discovery, UI polish and unified grid chat, retaining account-scoped favorites/follows, logout cleanup and approved branding.
 Windows logout/welcome and real Twitch follow/unfollow refresh were accepted by the user.
 Small corrections use patch releases; see [hotfix policy](docs/guides/HOTFIX_RELEASES.md).
 Implementation, real-session validation and publication are separate gates.
@@ -22,7 +22,7 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Capability | Local status | Remaining validation |
 | --- | --- | --- |
 | Session cleanup / follows / branding | Released in 1.4.3; Windows logout, welcome and live follow/unfollow refresh accepted by the user | Broader cross-platform desktop session checks |
-| Categories / UI / unified grid chat | Included in 1.4.4 candidate; category/grid polish accepted, 623 frontend tests pass and Windows builds locally | Signed multiplatform CI; live chat sending and independent native/audio acceptance remain separate checks |
+| Categories / UI / unified grid chat | Published in 1.4.4; category/grid polish accepted, 623 frontend tests pass and signed multiplatform CI passes | Live chat sending and independent native/audio acceptance remain separate checks |
 | Gamer HUD, night audio compressor, predictions/polls, media trimming | Implementation exists | Permissions, real desktop behavior and integration regression checks |
 | Live DVR | Seeks within the available player range | Buffer bounds, discontinuities and return to live; no full-stream rewind guarantee |
 | Drops inventory | Native sync and embedded official inventory; panel/polish accepted by Windows user on 2026-10-07 | Other platforms and separate login/linking scenarios |
@@ -30,13 +30,12 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Custom reward events | EventSub implemented; automated lifecycle tests pass | Authorized creator session, real redemption and native CSP |
 | Keyboard shortcuts / Drops focus | Interactive-control/modal isolation and focus regressions pass; Drops polish accepted by user | Other dialogs, screen readers and configurable/OS-global shortcuts |
 | Channel search | Stale-response cancellation and dismissal regressions pass | Broader keyboard/accessibility coverage |
-| Auto-updater | 1.4.3 published/latest; four signed platform builds and manifest pass release CI; Windows install/reinstall/restart smoke passes | Historical trust migration and authenticated settings persistence remain limited; Linux integrated updates require AppImage |
+| Auto-updater | 1.4.4 published/latest; four public updater artifacts independently verified; manifest matches master after Git line-ending normalization; Windows install/reinstall/restart smoke passes | Historical trust migration and authenticated settings persistence remain limited; Linux integrated updates require AppImage |
 | Dependency security | Six original alerts closed by GitHub; npm audit clean; GLib backport passes optimized regressions and Linux bundles | Retire vendor when upstream compatibility permits (ADR-014) |
 
-Validation: 623 frontend tests pass, one skipped; lint/legacy and Windows build pass locally. Historical backend verification:
-56 Rust tests, 11 release/security tests, fmt/Clippy and Windows build pass. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
+Validation: 623 frontend tests pass, one skipped; 56 Rust Windows tests and 19 release/signature/documentation tests pass locally. Lint/legacy/fmt/Clippy, optimized GLib tests, signed four-target builds and NSIS smoke pass CI. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
-Now: validate and publish incremental 1.4.4 with documentation/site kept in sync.
+Now: 1.4.4 published; maintain documentation/site coherence and record outstanding live integration checks.
 Next: VOD resume/bookmarks and workspace profiles, alongside outstanding Twitch reliability checks.
 Then: resource saving, selective alerts, replay buffer and a local media library.
 AI, additional platforms and hardware integrations remain later work.
@@ -53,7 +52,7 @@ AI, additional platforms and hardware integrations remain later work.
 - **Acceptance:** rapid category/language changes never mix streams; pagination deduplicates live results; HTTP/auth/timeout errors remain distinct from empty results; keyboard controls and logout work; real Twitch desktop test by the user.
 - **Scope limits:** no invented global totals, reliable Drops filter claims, or alternate global sorting unsupported by Twitch.
 - **Tradeoff:** VOD resume and workspace profiles move behind this user-requested block; other pending validations remain open.
-- **Delivery:** the user authorized commit/push and publication after pertinent validation on 2026-10-13. Version 1.4.4 is the current candidate; no tag/release until cross-platform CI passes. PC installation and Supabase deployment remain outside that authority.
+- **Delivery:** 1.4.4 published on 2026-10-13 after user approval, local checks and signed cross-platform CI. Public updater signatures verified independently. PC installation and Supabase deployment remain outside that authority.
 
 ### Included UI polish
 
@@ -65,7 +64,7 @@ AI, additional platforms and hardware integrations remain later work.
 
 ### Included grid chat extension — Unified chat
 
-- **Status:** included in the user-approved 1.4.4 candidate. Independent live Twitch sending remains to be recorded; no blanket live validation is inferred from mock tests.
+- **Status:** published in the user-approved 1.4.4 update. Independent live Twitch sending remains to be recorded; no blanket live validation is inferred from mock tests.
 - **Scope:** optional Individual/Unified switch; merge the unique visible channels in 2/3/4-cell grids into an arrival-ordered native feed, with distinct source labels and explicit send destination.
 - **Safety:** require the destination room to acknowledge joining; never broadcast to all channels or transfer a draft to a different destination. Hidden/removed channels cannot receive sends. Per-channel emotes, badges, duplicate suppression and IRC message/user deletions remain isolated.
 - **Boundaries:** official embedded chat stays individual. Moderation commands/context menus and Companion sends stay in Individual; `/me` is available for one selected recipient. Retain bounded history (500 messages) and dedupe (1,000 IDs), batching and socket/request cleanup.

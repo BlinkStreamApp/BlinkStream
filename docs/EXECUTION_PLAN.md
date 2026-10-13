@@ -1,6 +1,6 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-10-13. Fuente candidata 1.4.4; última publicada 1.4.3. Categorías/UI/grid aceptados por el usuario; commit/push y publicación autorizados tras pruebas y CI multiplataforma.
+Actualizado: 2026-10-13. Fuente y última publicada 1.4.4. Categorías/UI/grid aceptados por el usuario; CI candidata `38449215321` y tag `38451126905` correctos. Cuatro artefactos públicos del updater verificados independientemente; sin instalar en el PC del usuario.
 
 ## Objetivo y reglas
 
@@ -14,7 +14,7 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 
 | Bloque | Entrega | Dependencias | Criterio de cierre | Estado |
 | --- | --- | --- | --- | --- |
-| 0. Categorías y UI/grid | Categorías, idioma/paginación, pulido de Ajustes y grid, chat unificado con destino seguro | Sesión Twitch, Helix/IRC y componentes existentes | Regresiones, aceptación del usuario y CI firmado de cuatro targets; documentar límites de pruebas reales | Candidata 1.4.4 |
+| 0. Categorías y UI/grid | Categorías, idioma/paginación, pulido de Ajustes y grid, chat unificado con destino seguro | Sesión Twitch, Helix/IRC y componentes existentes | Regresiones, aceptación del usuario y CI firmado de cuatro targets; documentar límites de pruebas reales | Publicada 1.4.4; envío Twitch real y audio nativo independientes pendientes |
 | 1. Fiabilidad Twitch y teclado | Sustituir PubSub por EventSub para canjes personalizados, informar de permisos/conexión, separar atajos y validar Drops | Cuenta autorizada, campaña elegible y sesión real | Sin conexiones PubSub; reconexión/cleanup probados; atajos sin dobles acciones; aumento real de minutos y reclamo comprobados | En curso |
 | 2. Continuar viendo | Posición de VOD, lista para más tarde y marcadores con notas | Identidad estable de VOD/canal y almacenamiento existente | Recuperar posición tras reiniciar; gestionar marcadores; enlaces ausentes tratados | Pendiente |
 | 3. Espacios de trabajo | Perfiles de canales, distribución, volumen y calidad; audio principal en multistream | Bloque 1 y layouts existentes | Restaurar un perfil sin procesos huérfanos ni sonido inesperado | Pendiente |
@@ -40,7 +40,7 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 - No añadir un player/iframe oficial oculto para acreditar tiempo. El reporte nativo experimental es opt-in y su aceptación no garantiza crédito.
 - El secreto actual/config del updater coinciden y verifican una prueba firmada; los artefactos históricos usan otra clave (ver `guides/UPDATER_VERIFICATION.md`).
 - Verificación criptográfica previa a publicación implementada; diagnóstico recuperó solo la pública del secreto existente. No rotar la confianza ni prometer upgrade de clientes antiguos sin validar una migración.
-- Cinco avisos originales de dependencias corregidos y audit npm limpio; GLib sigue ligado a GTK/Linux y requiere un fix upstream compatible con validación Linux.
+- Seis avisos originales cerrados y audit npm limpio; GLib ligado a GTK/Linux tiene un backport vendorizado validado con tests optimizados y builds Linux (ADR-014). Retirarlo cuando exista una dependencia upstream compatible corregida.
 - El DVR actual usa el rango disponible del reproductor; no garantiza un historial completo del directo.
 - Separar "implementado", "probado automáticamente" y "validado en sesión real"; no marcar una función terminada solo porque compila.
 

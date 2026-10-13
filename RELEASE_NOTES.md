@@ -1,6 +1,6 @@
 # BlinkStream 1.4.4 — Interface, discovery and multistream update
 
-Date: 2026-10-13. Incremental compatible update; publication is gated by signed cross-platform CI.
+Date: 2026-10-13. Published incremental compatible update; signed cross-platform CI passed.
 
 ## Category discovery and visual polish
 
@@ -33,7 +33,8 @@ Date: 2026-10-13. Incremental compatible update; publication is gated by signed 
 - 56 Rust Windows tests, format checks and 19 release/signature/documentation tests pass locally.
 - Socket-simulated tests cover chat routing, destination changes, assets and deletions; responsive checks cover narrow grids.
 - Live Twitch authentication/sending, independent audio/keyboard acceptance and other desktop platforms are not certified by mocks.
-- Signed builds for Windows, both macOS architectures and Linux, installer smoke and updater verification must pass CI before publication.
+- Candidate CI `38449215321` and tag CI `38451126905` passed quality, signed builds for Windows/both macOS architectures/Linux, NSIS smoke and manifest verification.
+- All four downloaded public updater artifacts independently pass signature, trusted-comment and SHA-256 verification; the public manifest matches master after Git line-ending normalization.
 - Signing trust, cloud schema and shared Twitch cookies are unchanged; no Supabase deployment or automatic PC installation.
 - Historical updater-key migration, authenticated upgrades and independent Drops auto-claim retain their previous limits.
 - Every hotfix/update keeps README, release notes, repository roadmap and website current; release tests enforce version markers.

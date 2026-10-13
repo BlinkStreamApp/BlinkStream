@@ -6,7 +6,7 @@ Status: active
 ## Objective
 
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
-Publicar la actualización incremental 1.4.4 de categorías, UI y multistream tras validar CI.
+Mantener la 1.4.4 publicada y avanzar en fiabilidad Twitch, VOD y workspaces.
 
 ## Stack
 
@@ -40,7 +40,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Decisions
 
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
-- DEC-002 — Fuente candidata 1.4.4; latest publicado 1.4.3 hasta completar CI/release firmados.
+- DEC-002 — Fuente y latest publicados 1.4.4; CI firmado y cuatro artefactos públicos del updater verificados.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
 - DEC-005 — Favoritos autorizados mediante identidad auth confiable, no metadata editable.
@@ -57,18 +57,12 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
-- 1.4.4: usuario acepta el bloque UI/grid y autoriza commit/push/publicación tras pruebas. Candidato preparado: 623 frontend pasan/1 omitido, 56 Rust Windows y 19 release/firma/documentación; lint/fmt/legacy y build Windows correctos. Versiones package/Cargo/Tauri alineadas; README/notas/roadmap/web actualizados, descargas todavía 1.4.3. CI de cuatro targets y tag pendientes; prueba de release exige marcadores de versión coherentes en las cuatro superficies documentales.
-- Chat unificado del grid implementado localmente: selector Individual/Unificado, fuentes visibles únicas (2/3/4), etiquetas diferenciadas, una conexión IRC y destino explícito sin reconectar al cambiarlo. Emotes/insignias, anti-spam/dedupe y borrados aislados por canal; drafts nunca saltan a otro destino y enviar requiere JOIN confirmado. Moderación/Companion y chat oficial permanecen en Individual; `/me` solo para un destino. 623 tests pasan/1 omitido; lint/legacy/build Windows correctos y web simulada a 1280×720 y 800×480. Exe `src-tauri/target/release/blinkstream-unified-chat-test.exe`; pendiente Twitch real, sin instalar/ejecutar/publicar. Nuevas claves UI ES/EN; otros idiomas usan el fallback existente.
-- Multistream corregido localmente: carga/errores centrados en el área de vídeo, cabecera adaptable por ancho de celda, mensajes largos con scroll, descarte de respuestas obsoletas y cleanup HLS. Audio/chat solo de celdas visibles (las ocultas se conservan), mute binaural/0% coherente y chat izquierdo en orden DOM. 13 regresiones nuevas; 606 tests pasan/1 omitido y lint/legacy/build Windows correctos. Revisión web simulada a 800×480, 1280×720 y 400×720; reproducción/audio nativos pendientes de aceptación. Exe `src-tauri/target/release/blinkstream-multistream-fix-test.exe`, sin instalar/ejecutar ni Git remoto.
-- Categorías/grid aceptados por el usuario. Nuevo bloque UI local: Ajustes/ConfirmDialog comparten foco inicial/Tab/restauración y Escape seguro; tabs accesibles por flechas, labels/switches/cierre más claros, logo botón Inicio y lector de volumen compartido que preserva 0% (fallback grid 40). Subtítulo y botones de categorías pulidos con iconos, tipografía legible, targets 44px y carga anunciada sin solicitudes duplicadas. 591 tests pasan/1 omitido; lint/legacy/build Windows correctos. Exe `src-tauri/target/release/blinkstream-category-controls-test.exe`, no instalado/ejecutado; aceptación nativa pendiente. No se cambian Drops ni About en esta iteración.
-- Categorías/grid: búsqueda Helix, idioma, paginación/dedupe y cancelación; tarjetas, tipografía, miniaturas 640×360 y badges completos aceptados. Validación previa local de 569 tests/1 omitido y build Windows; incluidos ahora en la candidata 1.4.4.
-- Hotfix 1.4.3 publicado/latest: tag sobre `758c464`; candidato CI `37694946505` y tag CI `37696597017` correctos. Release pública con 15 assets y updater de master en 1.4.3. Roadmap/web actualizados a la entrega; guía reutilizable: `docs/guides/HOTFIX_RELEASES.md`.
-- Logout/recientes y bienvenida clásica/logo aceptados por el usuario en Windows. Blink blanco y Stream violeta→fucsia igual que cabecera; sin nuevos CTAs. Iconos desktop, favicon, web y README usan el logo elegido.
-- Follows separados de pins por cuenta; refresh visible cada 60 s y al volver/online, abort/timeout y descarte de respuestas obsoletas. Logout limpia recientes/caché de portada, cierra stream y no permite restauraciones auth tardías. El usuario confirma que follow/unfollow real funciona; regresiones automatizadas cubren el flujo.
-- Validación local: 542 frontend pasan/1 omitido, 11 release/firma y 56 Rust Windows; lint/fmt/Clippy y build Windows correctos. CI firmado multiplataforma y smoke NSIS correctos; verificación independiente de bytes públicos del hotfix no repetida. Nada instalado ni desplegado en Supabase.
-- Limpieza aislada publicada en `master` (`13d2685`): hero/Vite/sprite social sin consumidores. Favicon SVG antiguo retirado ahora que el hotfix referencia PNG.
-- Base publicada 1.4.2: tag `c53c209`, CI `37678585652` completo; cuatro artefactos updater y firmas públicas verificados. Windows smoke NSIS install/reinstall/restart correcto. Evidencias históricas: `docs/guides/UPDATER_VERIFICATION.md`.
-- Drops: progreso remoto y reclamo manual observados; no equivalen a validación independiente de Auto-Claim, sesiones/vinculación ni desktop de otras plataformas.
+- 1.4.4 publicada/latest: tag `3ac7b7a`; candidata CI `38449215321` y tag CI `38451126905` correctos. Cuatro targets firmados, smoke NSIS y verificación independiente de firmas/hashes de los cuatro artefactos públicos. Updater público/master coherentes tras normalizar CRLF; clave sin cambios. README/roadmaps/web sincronizados.
+- Categorías, filtro de idioma/paginación y pulido UI/grid aceptados por el usuario. Chat unificado opcional para canales visibles, destino explícito con JOIN confirmado, recursos/dedupe/borrados aislados y drafts seguros; chat oficial, moderación y Companion permanecen Individual.
+- Validación: 623 frontend pasan/1 omitido, 56 Rust Windows, 19 release/firma/documentación; lint/legacy/fmt/Clippy, GLib optimizado, builds firmados y smoke correctos. Responsive/chat verificados con sockets simulados; envío Twitch real, audio/teclado nativos independientes y desktop de otras plataformas no certificados por mocks.
+- Logout/recientes, bienvenida/logo y refresh follow/unfollow reales aceptados en Windows (1.4.3). Datos/cache por cuenta, auth tardía invalidada, 0% de volumen preservado y foco accesible en Ajustes/confirmaciones.
+- Drops: progreso remoto y reclamo manual observados; no equivalen a Auto-Claim independiente ni validación universal de sesiones/vinculación.
+- Nada instalado en el PC del usuario ni desplegado en Supabase; evidencias históricas en la guía del updater.
 
 NEXT:
 - Prueba GUI voluntaria desde 1.4.1 y de conservación de settings/sesión, sin instalar automáticamente en el PC del usuario. Linux updater integrado requiere AppImage; `.deb` se actualiza manualmente/mediante paquetes.

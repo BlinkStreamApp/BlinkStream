@@ -1,8 +1,18 @@
 # Auto-updater verification
 
-Hotfix 1.4.3 published/latest (2026-10-08): candidate CI `37694946505` and tag CI
+## Current release: 1.4.4 (2026-10-13)
+
+- Source tag `v1.4.4` resolves to `3ac7b7a54e78693f5a919f6f8a79b6e0524bd5de`.
+- Candidate CI `38449215321` and tag CI `38451126905` pass quality, four signed builds, Windows NSIS install/reinstall/restart smoke and cryptographic manifest verification.
+- Latest public release contains 15 assets. Independently downloaded Windows NSIS, macOS ARM/Intel updater archives and Linux AppImage pass configured-key artifact/trusted-comment signature checks, detached signature/manifest equality, asset-size and GitHub SHA-256 digest checks.
+- Public updater and master updater both contain version 1.4.4 and exactly four targets; contents match after normalizing Git CRLF line endings. Manifest download SHA-256: `937c44f09036169ecc9f7e8e18e7679bf91e7157d9cefc283c51dfb0dac17291`.
+- Signing trust and endpoint are unchanged. Nothing was installed/executed on the user's PC. Historical key migration, authenticated GUI upgrades and settings persistence are not certified by this verification; Linux integrated updates require AppImage.
+
+## Historical hotfix: 1.4.3
+
+Hotfix 1.4.3 published on 2026-10-08: candidate CI `37694946505` and tag CI
 `37696597017` pass quality, four signed builds, NSIS smoke and manifest verification.
-Public release contains 15 assets; master updater is 1.4.3. Trust/endpoint are unchanged.
+At that check, the public release contained 15 assets and master updater was 1.4.3. Trust/endpoint were unchanged.
 Independent local verification of the hotfix's downloaded public bytes has not been repeated.
 The detailed historical evidence below is for 1.4.2, not a new authenticated GUI upgrade test.
 

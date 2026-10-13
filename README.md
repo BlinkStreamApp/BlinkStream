@@ -52,20 +52,20 @@ See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 
 ### Windows
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-Source version 1.4.4 is a release candidate; the latest published download remains 1.4.3
-until cross-platform CI and publication finish. Updates require a compatible signing key and your confirmation.
+Version 1.4.4 is published with verified signed builds for all four targets.
+Updates require a compatible signing key and your confirmation.
 
-- ⭐ **`BlinkStream_1.4.3_Win_x64.exe`** *(Recommended NSIS installer, used by the updater)*
-- `BlinkStream_1.4.3_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream_1.4.4_Win_x64.exe`** *(Recommended NSIS installer, used by the updater)*
+- `BlinkStream_1.4.4_Win_x64.msi` *(Enterprise MSI installer)*
 
 Install streaming dependencies and download the official installer from PowerShell:
 
 ```powershell
 winget install --id Streamlink.Streamlink --exact
 winget install --id Gyan.FFmpeg --exact
-Invoke-WebRequest -Uri "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.3/BlinkStream_1.4.3_Win_x64.exe" -OutFile "BlinkStream_1.4.3_Win_x64.exe"
+Invoke-WebRequest -Uri "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.4/BlinkStream_1.4.4_Win_x64.exe" -OutFile "BlinkStream_1.4.4_Win_x64.exe"
 # Review the download and the warning below before running:
-.\BlinkStream_1.4.3_Win_x64.exe
+.\BlinkStream_1.4.4_Win_x64.exe
 ```
 
 Restart your terminal/application after installing dependencies so PATH changes are visible.
@@ -90,8 +90,8 @@ See [Microsoft's SmartScreen overview](https://learn.microsoft.com/en-us/windows
 ```bash
 brew install streamlink ffmpeg
 # Apple Silicon; for Intel replace arm64 with x64 in the filename and URL.
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.3/BlinkStream_1.4.3_macOS_arm64.dmg"
-open BlinkStream_1.4.3_macOS_arm64.dmg
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.4/BlinkStream_1.4.4_macOS_arm64.dmg"
+open BlinkStream_1.4.4_macOS_arm64.dmg
 ```
 
 Drag BlinkStream into Applications. macOS 11+ is configured as the minimum; choose the
@@ -102,16 +102,16 @@ installer matching your CPU. Updater signatures do not imply Apple notarization.
 ```bash
 sudo apt update
 sudo apt install streamlink ffmpeg
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.3/BlinkStream_1.4.3_Linux_x86_64.deb"
-sudo apt install ./BlinkStream_1.4.3_Linux_x86_64.deb
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.4/BlinkStream_1.4.4_Linux_x86_64.deb"
+sudo apt install ./BlinkStream_1.4.4_Linux_x86_64.deb
 ```
 
 Alternatively, use the x86_64 AppImage:
 
 ```bash
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.3/BlinkStream_1.4.3_Linux_x86_64.AppImage"
-chmod +x BlinkStream_1.4.3_Linux_x86_64.AppImage
-./BlinkStream_1.4.3_Linux_x86_64.AppImage
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.4/BlinkStream_1.4.4_Linux_x86_64.AppImage"
+chmod +x BlinkStream_1.4.4_Linux_x86_64.AppImage
+./BlinkStream_1.4.4_Linux_x86_64.AppImage
 ```
 
 AppImage may require FUSE support depending on the distribution.
@@ -143,7 +143,7 @@ pnpm install --frozen-lockfile
 ```
 
 Run subsequent commands from the repository root. To reproduce the published source,
-check out tag `v1.4.3` before installing dependencies; `master` includes later documentation/changes.
+check out tag `v1.4.4` before installing dependencies; `master` includes later documentation/changes.
 
 ### Configuration
 
