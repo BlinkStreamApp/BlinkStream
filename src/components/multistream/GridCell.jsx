@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
 import { measureInvoke } from '../../utils/perf'
 import { TauriPlaylistLoader } from '../../utils/tauriHls'
-import { useT } from '../../utils/i18n'
+import { useT, t as translate } from '../../utils/i18n'
 import { useStereoPanner } from '../../hooks/useStereoPanner'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import LiveBadge from '../LiveBadge'
+import { readVolume } from '../../utils/storage'
 
 export default function GridCell({
   index,
@@ -24,19 +25,19 @@ export default function GridCell({
 }) {
   const t = useT()
   const [inputVal, setInputVal] = useState('')
-  const [streamUrl, setStreamUrl] = useState('')
+  const [streamSource, setStreamSource] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const [isPlaying, setIsPlaying] = useState(true)
   const [quality, setQuality] = useState(gridCount >= 3 ? '720p60' : '1080p60')
-  const [volume, setVolume] = useState(() => {
-    const v = Number(localStorage.getItem('blinkstream_volume'))
-    return !isNaN(v) && v > 0 ? v : 40 
-  })
+  const [volume, setVolume] = useState(() => readVolume(40))
+  const streamUrl = streamSource?.channel === channel && streamSource?.quality === quality ? streamSource.url : ''
+  const isOffline = /no playable streams found|offline|no streams found/i.test(String(error))
 
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
+  const requestIdRef = useRef(0)
   const { pan, setPan, isSupported: isPanSupported } = useStereoPanner(videoRef, externalPan ?? 0)
 
   useEffect(() => {
@@ -47,23 +48,26 @@ export default function GridCell({
 
   const fetchStream = useCallback(async (ch, targetQ) => {
     if (!ch) return
+    const requestId = ++requestIdRef.current
+    const isCurrent = () => requestIdRef.current === requestId
     setLoading(true)
     setError('')
-    setStreamUrl('')
+    setStreamSource(null)
     const q = targetQ || quality
     try {
       let url = ''
       try {
         url = await measureInvoke('get_stream_url', { channel: ch, quality: q })
       } catch {
+        if (!isCurrent()) return
         url = await measureInvoke('get_stream_url', { channel: ch, quality: 'best' })
       }
-      setStreamUrl(url)
+      if (isCurrent()) setStreamSource({ url, channel: ch, quality: q })
     } catch (e) {
       const msg = typeof e === 'string' ? e : e?.message || 'Error de conexión al stream'
-      setError(msg)
+      if (isCurrent()) setError(msg)
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }, [quality])
 
@@ -73,23 +77,17 @@ export default function GridCell({
       : null
     return () => {
       if (loadTimer !== null) window.clearTimeout(loadTimer)
-      if (hlsRef.current) {
-        hlsRef.current.destroy()
-        hlsRef.current = null
-      }
+      requestIdRef.current += 1
     }
   }, [channel, quality, fetchStream])
 
   useEffect(() => {
     const video = videoRef.current
     if (!video || !streamUrl) return
-    if (hlsRef.current) {
-      hlsRef.current.destroy()
-      hlsRef.current = null
-    }
-
+    let hls = null
+    let disposed = false
     if (Hls.isSupported()) {
-      const hls = new Hls({
+      hls = new Hls({
         loader: TauriPlaylistLoader,
         lowLatencyMode: true,
         backBufferLength: 15,
@@ -101,25 +99,37 @@ export default function GridCell({
         capLevelToPlayerSize: true,
         enableWorker: true,
       })
-      hls.loadSource(streamUrl)
-      hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().then(() => setIsPlaying(true)).catch(() => {})
+        if (!disposed) video.play().catch(() => {})
+      })
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!disposed && data.fatal) {
+          setError(translate('player.error', 'Error al cargar el stream'))
+          hls.stopLoad()
+        }
       })
       hlsRef.current = hls
+      hls.loadSource(streamUrl)
+      hls.attachMedia(video)
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = streamUrl
+    }
+    return () => {
+      disposed = true
+      hls?.destroy()
+      if (hlsRef.current === hls) hlsRef.current = null
+      video.pause()
+      video.removeAttribute('src')
+      video.load()
     }
   }, [streamUrl])
 
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.muted = !isAudioFocused || volume === 0
-      if (isAudioFocused) {
-        videoRef.current.volume = Math.min(1.0, Math.max(0, volume / 100))
-      }
+      videoRef.current.muted = (!isAudioFocused && !isBinaural) || volume === 0
+      videoRef.current.volume = Math.min(1.0, Math.max(0, volume / 100))
     }
-  }, [isAudioFocused, volume])
+  }, [isAudioFocused, isBinaural, volume, channel, streamUrl])
 
   const handleVolumeChange = (val) => {
     const v = Number(val)
@@ -142,8 +152,7 @@ export default function GridCell({
       if (hlsRef.current) {
         try { hlsRef.current.startLoad() } catch {  }
       }
-      video.play().then(() => setIsPlaying(true)).catch(() => {})
-      setIsPlaying(true)
+      video.play().catch(() => {})
     }
   }
 
@@ -164,13 +173,14 @@ export default function GridCell({
         <h4 className="text-[14px] font-bold text-text-primary mb-1">{t('grid.emptyCell', 'Celda de directo vacía')}</h4>
         <p className="text-[12px] text-text-muted mb-4">{t('grid.addChannel', 'Añadir canal en vivo...')}</p>
 
-        <form onSubmit={handleFormSubmit} className="flex gap-2 w-full max-w-[240px]">
+        <form onSubmit={handleFormSubmit} className="flex flex-wrap justify-center gap-2 w-full max-w-[280px]">
           <input
             type="text"
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
             placeholder={t('nav.searchPlaceholder', 'Buscar canal…')}
-            className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-bg-tertiary border border-white/10 text-[12px] text-text-primary placeholder-text-muted/60 focus:outline-none focus:border-twitch"
+            aria-label={`${t('nav.searchPlaceholder', 'Buscar canal…')} ${index + 1}`}
+            className="flex-1 min-w-[120px] px-3 py-1.5 rounded-xl bg-bg-tertiary border border-white/10 text-[12px] text-text-primary placeholder-text-muted/60 focus:outline-none focus:border-twitch"
           />
           <button
             type="submit"
@@ -184,48 +194,47 @@ export default function GridCell({
   }
 
   return (
-    <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl group flex flex-col justify-between">
+    <div className="@container relative w-full h-full bg-black rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl group flex flex-col justify-between">
       {}
-      <div className="absolute inset-0 z-0 flex items-center justify-center bg-bg-primary">
+      <div className="relative flex-1 min-h-0 z-0 bg-bg-primary overflow-hidden">
         {loading && (
-          <div className="flex flex-col items-center gap-2 z-10">
-            <span className="w-8 h-8 border-3 border-twitch border-t-transparent rounded-full animate-spin" />
+          <div role="status" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 p-4 text-center bg-bg-primary/80 pointer-events-none">
+            <span aria-hidden="true" className="w-8 h-8 shrink-0 border-3 border-twitch border-t-transparent rounded-full motion-safe:animate-spin" />
             <span className="text-[12px] font-medium text-text-secondary">{t('player.connecting', 'Conectando…')}</span>
           </div>
         )}
-        {error && !loading && (() => {
-          const lower = String(error).toLowerCase()
-          const isOffline = lower.includes('no playable streams found') || lower.includes('offline') || lower.includes('no streams found')
-          return (
-            <div className="flex flex-col items-center gap-1.5 p-4 text-center z-10 max-w-[85%] select-none animate-fade-in">
-              <div className="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-text-muted mb-0.5 shadow-lg">
+        {error && !loading && (
+          <div role="alert" className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center bg-bg-primary/95 select-none animate-fade-in">
+            <div className="flex max-h-full w-full flex-col items-center gap-1.5 overflow-y-auto">
+              <div className="w-10 h-10 shrink-0 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-text-muted mb-0.5 shadow-lg">
                 <PhosphorIcon name="Television" size={22} className="text-white/40" weight="duotone" />
               </div>
-              <p className="text-xs font-bold text-white">
+              <p className="shrink-0 max-w-full break-words text-xs font-bold text-white">
                 {isOffline ? `${channel} está Offline` : 'Error al cargar'}
               </p>
-              <p className="text-[11px] text-text-muted max-w-[200px] leading-tight">
+              <p className="shrink-0 text-[12px] text-text-secondary max-w-[280px] w-full break-words [overflow-wrap:anywhere] leading-relaxed">
                 {isOffline ? 'El canal no está transmitiendo en directo.' : error}
               </p>
               <button
                 onClick={() => fetchStream(channel, quality)}
-                className="px-3 py-1 mt-1 rounded-lg bg-twitch hover:bg-twitch-dark text-[11px] text-white font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-md"
+                className="shrink-0 px-3 py-1 mt-1 rounded-lg bg-twitch hover:bg-twitch-dark text-[11px] text-white font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-md"
               >
                 <PhosphorIcon name="ArrowsClockwise" size={12} weight="bold" />
                 <span>{t('player.retry', 'Reintentar')}</span>
               </button>
             </div>
-          )
-        })()}
+          </div>
+        )}
         <video
           ref={videoRef}
-          className="w-full h-full object-contain cursor-pointer"
+          className="absolute inset-0 w-full h-full object-contain cursor-pointer"
           onClick={togglePlayPause}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           autoPlay
           playsInline
-          muted={!isAudioFocused && !isBinaural}
+          muted={(!isAudioFocused && !isBinaural) || volume === 0}
+          onError={() => { if (streamUrl) setError(t('player.error', 'Error al cargar el stream')) }}
         />
         {!isPlaying && !loading && !error && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 pointer-events-none">
@@ -237,8 +246,8 @@ export default function GridCell({
       </div>
 
       {}
-      <div className="relative z-20 flex items-center justify-between p-2.5 bg-gradient-to-b from-black/90 via-black/50 to-transparent opacity-95 group-hover:opacity-100 transition-opacity gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="relative order-first shrink-0 z-20 flex flex-wrap items-center justify-between p-2.5 bg-gradient-to-b from-black/90 via-black/50 to-transparent opacity-95 group-hover:opacity-100 transition-opacity gap-2">
+        <div className="flex flex-1 basis-full @[560px]:basis-auto items-center gap-2 min-w-[120px]">
           <button
             onClick={togglePlayPause}
             title={isPlaying ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}
@@ -246,14 +255,14 @@ export default function GridCell({
           >
             <PhosphorIcon name={isPlaying ? "Pause" : "Play"} size={14} weight="fill" />
           </button>
-          <LiveBadge />
-          <span className="font-extrabold text-[13px] text-white tracking-tight truncate shadow-sm">{channel}</span>
+          {!error && <LiveBadge />}
+          <span title={channel} className="min-w-0 font-extrabold text-[13px] text-white tracking-tight truncate shadow-sm">{channel}</span>
 
           {}
           <select
             value={quality}
             onChange={(e) => setQuality(e.target.value)}
-            className="bg-black/60 border border-white/20 rounded-lg px-1.5 py-0.5 text-[10px] font-mono text-twitch-light focus:outline-none focus:border-twitch cursor-pointer hover:bg-black/80 transition-colors hidden sm:inline"
+            className="shrink-0 bg-black/60 border border-white/20 rounded-lg px-1.5 py-0.5 text-[10px] font-mono text-twitch-light focus:outline-none focus:border-twitch cursor-pointer hover:bg-black/80 transition-colors hidden @[300px]:inline"
             title={t('set.streamQuality', 'Calidad de stream')}
           >
             {['best', '1440p60', '1080p60', '963p60', '936p60', '720p60', '480p30', '360p30', 'audio_only'].map(q => (
@@ -262,7 +271,7 @@ export default function GridCell({
           </select>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           {}
           <div className={`flex items-center gap-1.5 px-1.5 py-1 rounded-lg border transition-all ${
             isAudioFocused || isBinaural
@@ -286,8 +295,9 @@ export default function GridCell({
                 max="100"
                 value={volume}
                 onChange={(e) => handleVolumeChange(e.target.value)}
-                className="w-14 sm:w-16 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer accent-twitch transition-all"
+                className="w-12 @[420px]:w-16 h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer accent-twitch transition-all"
                 title={`${t('set.defaultVolume', 'Volumen')}: ${volume}%`}
+                aria-label={`${t('set.defaultVolume', 'Volumen')}: ${channel}`}
               />
             )}
 
@@ -339,7 +349,7 @@ export default function GridCell({
             <button
               onClick={() => onSelectSingleChannel(channel)}
               title={t('grid.jumpSingle', 'Ver en reproductor principal individual (pantalla completa / teatro)')}
-              className="p-1.5 rounded-lg border border-white/10 bg-black/60 text-text-muted hover:text-twitch-light hover:border-twitch/40 transition-all cursor-pointer hidden md:inline-flex"
+              className="p-1.5 rounded-lg border border-white/10 bg-black/60 text-text-muted hover:text-twitch-light hover:border-twitch/40 transition-all cursor-pointer hidden @[420px]:inline-flex"
             >
               <PhosphorIcon name="CornersOut" size={17} weight="regular" />
             </button>

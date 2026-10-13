@@ -23,6 +23,7 @@ describe('HomeScreen después de cerrar sesión', () => {
     expect(screen.queryByText('old_recent')).not.toBeInTheDocument()
     expect(screen.queryByText('Vistos Recientemente')).not.toBeInTheDocument()
     expect(screen.queryByText('Juegos populares')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Explorar categorías' })).not.toBeInTheDocument()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 

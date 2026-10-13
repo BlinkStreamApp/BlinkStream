@@ -164,7 +164,7 @@ export function SettingsRecordingTab() {
               Si está activado, al abrir un stream en directo se iniciará la grabación en segundo plano de forma automática.
             </span>
           </div>
-          <ToggleSwitch active={recAutoStart} onClick={() => setRecAutoStart(p => !p)} />
+          <ToggleSwitch label="Grabación automática en vivo" active={recAutoStart} onClick={() => setRecAutoStart(p => !p)} />
         </div>
       </div>
 

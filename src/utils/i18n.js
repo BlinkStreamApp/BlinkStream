@@ -2416,6 +2416,25 @@ Object.keys(extendedKeys).forEach((lang) => {
   }
 })
 
+Object.assign(translations.es, {
+  'grid.chatsTitle': 'Chats del grid', 'grid.chatMode': 'Modo de chat',
+  'grid.unified': 'Unificado', 'grid.individual': 'Individual', 'grid.unifiedChat': 'Chat unificado',
+  'grid.unifiedHint': 'Mensajes de los canales visibles, juntos y etiquetados por origen.',
+  'grid.includedChannels': 'Canales incluidos', 'grid.channels': 'canales',
+  'grid.sendTo': 'Enviar a:', 'grid.destination': 'Canal de destino', 'grid.chooseDestination': 'Elige un canal',
+  'grid.destinationHint': 'Solo se enviará al canal elegido. Moderación y mando Wi-Fi disponibles en Individual.',
+  'grid.waitForDestination': 'Esperando conexión con el canal de destino…', 'grid.messageFor': 'Mensaje para',
+})
+Object.assign(translations.en, {
+  'grid.chatsTitle': 'Grid chats', 'grid.chatMode': 'Chat mode',
+  'grid.unified': 'Unified', 'grid.individual': 'Individual', 'grid.unifiedChat': 'Unified chat',
+  'grid.unifiedHint': 'Messages from visible channels, together and labeled by source.',
+  'grid.includedChannels': 'Included channels', 'grid.channels': 'channels',
+  'grid.sendTo': 'Send to:', 'grid.destination': 'Destination channel', 'grid.chooseDestination': 'Choose a channel',
+  'grid.destinationHint': 'Sent only to the selected channel. Moderation and Wi-Fi remote available in Individual.',
+  'grid.waitForDestination': 'Waiting for the destination channel to connect…', 'grid.messageFor': 'Message for',
+})
+
 let currentLang = (() => {
   try { return localStorage.getItem('blinkstream_lang') || 'es' }
   catch { return 'es' }

@@ -4,12 +4,14 @@
 
 Welcome to the official **BlinkStream Roadmap**. Built upon high-performance desktop native frameworks (Tauri v2 in Rust, React 19, Tailwind CSS and Supabase), our mission is to deliver the cleanest, fastest, and most privacy-focused Twitch desktop client ever conceived.
 
-We strictly follow sequential Semantic Versioning (SemVer).
+We use ordered version numbers: consecutive PATCH releases for tested compatible
+fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-08 / v1.4.3 hotfix released
+## Execution status — 2026-10-13 / v1.4.4 release candidate
 
 The historical phases below describe product direction, not proof of a published release.
-Source and latest published release are [1.4.3](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.3).
+Source version is 1.4.4; latest published release remains [1.4.3](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.3)
+until the new signed release passes all gates. The user accepted the incremental UI/grid delivery and authorized publication after validation.
 Signed builds are available for Windows x64, macOS Intel/Apple Silicon and Linux x64.
 The hotfix includes account-scoped favorites/follows, logout cleanup and approved branding.
 Windows logout/welcome and real Twitch follow/unfollow refresh were accepted by the user.
@@ -20,6 +22,7 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Capability | Local status | Remaining validation |
 | --- | --- | --- |
 | Session cleanup / follows / branding | Released in 1.4.3; Windows logout, welcome and live follow/unfollow refresh accepted by the user | Broader cross-platform desktop session checks |
+| Categories / UI / unified grid chat | Included in 1.4.4 candidate; category/grid polish accepted, 623 frontend tests pass and Windows builds locally | Signed multiplatform CI; live chat sending and independent native/audio acceptance remain separate checks |
 | Gamer HUD, night audio compressor, predictions/polls, media trimming | Implementation exists | Permissions, real desktop behavior and integration regression checks |
 | Live DVR | Seeks within the available player range | Buffer bounds, discontinuities and return to live; no full-stream rewind guarantee |
 | Drops inventory | Native sync and embedded official inventory; panel/polish accepted by Windows user on 2026-10-07 | Other platforms and separate login/linking scenarios |
@@ -30,12 +33,44 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Auto-updater | 1.4.3 published/latest; four signed platform builds and manifest pass release CI; Windows install/reinstall/restart smoke passes | Historical trust migration and authenticated settings persistence remain limited; Linux integrated updates require AppImage |
 | Dependency security | Six original alerts closed by GitHub; npm audit clean; GLib backport passes optimized regressions and Linux bundles | Retire vendor when upstream compatibility permits (ADR-014) |
 
-Validation: 542 frontend tests pass, one skipped; lint passes; latest backend verification:
+Validation: 623 frontend tests pass, one skipped; lint/legacy and Windows build pass locally. Historical backend verification:
 56 Rust tests, 11 release/security tests, fmt/Clippy and Windows build pass. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
-Now: Twitch reliability and keyboard. Next: VOD resume/bookmarks and workspace profiles.
+Now: validate and publish incremental 1.4.4 with documentation/site kept in sync.
+Next: VOD resume/bookmarks and workspace profiles, alongside outstanding Twitch reliability checks.
 Then: resource saving, selective alerts, replay buffer and a local media library.
 AI, additional platforms and hardware integrations remain later work.
+
+---
+
+## 1.4.4 delivery — Category discovery and UI (2026-10-13)
+
+- **Goal:** find the right Twitch category/direct stream without confusing stale results or failed requests with an empty list.
+- **First delivery (accepted by the user):** category search, paginated popular/search results, language-filtered live streams, clear selection/context, loading/error/empty states and cancellation on query/filter/session changes. Automated regressions complement user acceptance; they do not certify all desktop platforms.
+- **Visual direction:** retain current palette/cards and compact home row; expand to a category grid on demand. Broader navigation/return-position polish follows acceptance of the first delivery.
+- **2026-10-13 user validation:** category discovery and the polished grid both accepted in the real desktop session. Clearer typography/hierarchy, modern cards, sharper thumbnails and full-name language badges (no country flags) stay as the approved direction.
+- **Dependencies:** authenticated Helix reads (`games/top`, `search/categories`, `streams`); no new cloud service or dependency.
+- **Acceptance:** rapid category/language changes never mix streams; pagination deduplicates live results; HTTP/auth/timeout errors remain distinct from empty results; keyboard controls and logout work; real Twitch desktop test by the user.
+- **Scope limits:** no invented global totals, reliable Drops filter claims, or alternate global sorting unsupported by Twitch.
+- **Tradeoff:** VOD resume and workspace profiles move behind this user-requested block; other pending validations remain open.
+- **Delivery:** the user authorized commit/push and publication after pertinent validation on 2026-10-13. Version 1.4.4 is the current candidate; no tag/release until cross-platform CI passes. PC installation and Supabase deployment remain outside that authority.
+
+### Included UI polish
+
+- Settings: named dialog, contained/restored focus, arrow-key tabs, clearer header/control labels and larger switch/close hit targets.
+- Confirmations: safe initial focus on Cancel, Tab containment and Escape only closing the upper registered dialog; preserve native overlay markers.
+- Header: semantic Home button usable by keyboard, retaining the approved logo/colors.
+- Volume: shared validated storage reader preserves 0%, clamps invalid ranges and retains the grid's separate fallback when no preference exists.
+- Automated regressions and local build required; native keyboard/audio acceptance remains separate. Other audit items stay pending; no claim of full WCAG certification.
+
+### Included grid chat extension — Unified chat
+
+- **Status:** included in the user-approved 1.4.4 candidate. Independent live Twitch sending remains to be recorded; no blanket live validation is inferred from mock tests.
+- **Scope:** optional Individual/Unified switch; merge the unique visible channels in 2/3/4-cell grids into an arrival-ordered native feed, with distinct source labels and explicit send destination.
+- **Safety:** require the destination room to acknowledge joining; never broadcast to all channels or transfer a draft to a different destination. Hidden/removed channels cannot receive sends. Per-channel emotes, badges, duplicate suppression and IRC message/user deletions remain isolated.
+- **Boundaries:** official embedded chat stays individual. Moderation commands/context menus and Companion sends stay in Individual; `/me` is available for one selected recipient. Retain bounded history (500 messages) and dedupe (1,000 IDs), batching and socket/request cleanup.
+- **Validation:** socket-simulated integration tests and responsive web checks cover two/four rooms, safe destination changes, source assets and removals; 623 frontend tests pass/one skipped. Live authentication, Twitch sending and other desktop platforms remain separate acceptance checks.
+- **Delivery:** consecutive compatible PATCH update after local checks and signed cross-platform CI; README, this roadmap and the website roadmap must be updated together. Existing VOD/workspace plans remain Next.
 
 ---
 

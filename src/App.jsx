@@ -9,6 +9,7 @@ import { RecordingProvider } from './components/recording/RecordingContext'
 import { BlinkStreamLogo } from './components/BlinkStreamLogo'
 import { getUserIdByLogin, validateToken, clearStoredToken, getHeaders, getHelixClientId } from './utils/twitch'
 import { isEditingText } from './utils/keyboard'
+import { readVolume } from './utils/storage'
 import { applyStoredHslTheme, applyStoredCustomFont, applyStoredCustomIconStyle } from './utils/hslTheme'
 
 const VideoPlayer = lazy(() => import('./components/VideoPlayer'))
@@ -107,7 +108,7 @@ function saveTo(key, value) {
 }
 
 function loadRecent() { return loadFrom('blinkstream_recent', []).filter(f => typeof f === 'string') }
-function loadVolume() { const v = Number(localStorage.getItem('blinkstream_volume')); return isNaN(v) ? 100 : v }
+function loadVolume() { return readVolume() }
 function loadTheatre() { return localStorage.getItem('blinkstream_theatre') === 'true' }
 
 function MainApp() {
@@ -447,13 +448,13 @@ function MainApp() {
       <TitleBar />
 
         <header className={`flex items-center gap-3 px-4 py-2 bg-bg-secondary/50 backdrop-blur-xl border-b border-white/[0.04] shrink-0 select-none relative z-[1000] ${showOnboarding ? 'hidden pointer-events-none' : ''} ${theatreMode ? 'opacity-0 max-h-0 overflow-hidden pointer-events-none' : ''} transition-all duration-300`}>
-          <div className="flex items-center gap-3 mr-1.5 cursor-pointer" onClick={() => { setViewMode('normal'); if (channel) setChannel('') }} title={channel || viewMode === 'multistream' ? t('nav.home', 'Volver al inicio') : 'BlinkStream'}>
+          <button type="button" aria-label={t('nav.home', 'Volver al inicio')} className="flex items-center gap-3 mr-1.5 rounded-xl p-1 text-left cursor-pointer hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-twitch" onClick={() => { setViewMode('normal'); if (channel) setChannel('') }} title={t('nav.home', 'Volver al inicio')}>
             <BlinkStreamLogo size={30} />
             <span className="text-base font-extrabold tracking-tight hidden sm:inline">
               <span className="text-text-primary">Blink</span>
               <span className="bg-gradient-to-r from-twitch to-fuchsia-400 bg-clip-text text-transparent font-bold">Stream</span>
             </span>
-          </div>
+          </button>
           <div className="w-px h-6 bg-bg-tertiary mx-1.5" />
           <ChannelSearch onSelect={selectChannel} currentChannel={channel} />
 
@@ -636,6 +637,7 @@ function MainApp() {
             ) : (
               <Suspense fallback={<PlayerFallback />}>
                 <HomeScreen
+                  categorySessionKey={username}
                   isLoggedIn={isLoggedIn}
                   onSelect={selectChannel}
                   onToggleFavorite={toggleFavorite}

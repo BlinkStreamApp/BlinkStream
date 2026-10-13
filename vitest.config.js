@@ -40,6 +40,7 @@ export default defineConfig({
       '**/.{idea,git,cache,output,temp}/**',
       'supabase/**', // tests Deno, no vitest
       'scripts/build-updater-manifest.test.mjs', // suite del runner nativo de Node
+      'scripts/check-release-docs.test.mjs', // coherencia documental: runner nativo de Node
     ],
   },
 })

@@ -1,12 +1,12 @@
 # PROJECT_STATE
 
-Updated: 2026-10-08
+Updated: 2026-10-13
 Status: active
 
 ## Objective
 
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
-Consolidar la fiabilidad Twitch tras publicar el hotfix 1.4.3 de sesión y marca.
+Publicar la actualización incremental 1.4.4 de categorías, UI y multistream tras validar CI.
 
 ## Stack
 
@@ -40,7 +40,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Decisions
 
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
-- DEC-002 — Fuente/publicada/latest 1.4.3; cuatro builds firmados y manifiesto validados por CI.
+- DEC-002 — Fuente candidata 1.4.4; latest publicado 1.4.3 hasta completar CI/release firmados.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
 - DEC-005 — Favoritos autorizados mediante identidad auth confiable, no metadata editable.
@@ -57,6 +57,11 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- 1.4.4: usuario acepta el bloque UI/grid y autoriza commit/push/publicación tras pruebas. Candidato preparado: 623 frontend pasan/1 omitido, 56 Rust Windows y 19 release/firma/documentación; lint/fmt/legacy y build Windows correctos. Versiones package/Cargo/Tauri alineadas; README/notas/roadmap/web actualizados, descargas todavía 1.4.3. CI de cuatro targets y tag pendientes; prueba de release exige marcadores de versión coherentes en las cuatro superficies documentales.
+- Chat unificado del grid implementado localmente: selector Individual/Unificado, fuentes visibles únicas (2/3/4), etiquetas diferenciadas, una conexión IRC y destino explícito sin reconectar al cambiarlo. Emotes/insignias, anti-spam/dedupe y borrados aislados por canal; drafts nunca saltan a otro destino y enviar requiere JOIN confirmado. Moderación/Companion y chat oficial permanecen en Individual; `/me` solo para un destino. 623 tests pasan/1 omitido; lint/legacy/build Windows correctos y web simulada a 1280×720 y 800×480. Exe `src-tauri/target/release/blinkstream-unified-chat-test.exe`; pendiente Twitch real, sin instalar/ejecutar/publicar. Nuevas claves UI ES/EN; otros idiomas usan el fallback existente.
+- Multistream corregido localmente: carga/errores centrados en el área de vídeo, cabecera adaptable por ancho de celda, mensajes largos con scroll, descarte de respuestas obsoletas y cleanup HLS. Audio/chat solo de celdas visibles (las ocultas se conservan), mute binaural/0% coherente y chat izquierdo en orden DOM. 13 regresiones nuevas; 606 tests pasan/1 omitido y lint/legacy/build Windows correctos. Revisión web simulada a 800×480, 1280×720 y 400×720; reproducción/audio nativos pendientes de aceptación. Exe `src-tauri/target/release/blinkstream-multistream-fix-test.exe`, sin instalar/ejecutar ni Git remoto.
+- Categorías/grid aceptados por el usuario. Nuevo bloque UI local: Ajustes/ConfirmDialog comparten foco inicial/Tab/restauración y Escape seguro; tabs accesibles por flechas, labels/switches/cierre más claros, logo botón Inicio y lector de volumen compartido que preserva 0% (fallback grid 40). Subtítulo y botones de categorías pulidos con iconos, tipografía legible, targets 44px y carga anunciada sin solicitudes duplicadas. 591 tests pasan/1 omitido; lint/legacy/build Windows correctos. Exe `src-tauri/target/release/blinkstream-category-controls-test.exe`, no instalado/ejecutado; aceptación nativa pendiente. No se cambian Drops ni About en esta iteración.
+- Categorías/grid: búsqueda Helix, idioma, paginación/dedupe y cancelación; tarjetas, tipografía, miniaturas 640×360 y badges completos aceptados. Validación previa local de 569 tests/1 omitido y build Windows; incluidos ahora en la candidata 1.4.4.
 - Hotfix 1.4.3 publicado/latest: tag sobre `758c464`; candidato CI `37694946505` y tag CI `37696597017` correctos. Release pública con 15 assets y updater de master en 1.4.3. Roadmap/web actualizados a la entrega; guía reutilizable: `docs/guides/HOTFIX_RELEASES.md`.
 - Logout/recientes y bienvenida clásica/logo aceptados por el usuario en Windows. Blink blanco y Stream violeta→fucsia igual que cabecera; sin nuevos CTAs. Iconos desktop, favicon, web y README usan el logo elegido.
 - Follows separados de pins por cuenta; refresh visible cada 60 s y al volver/online, abort/timeout y descarte de respuestas obsoletas. Logout limpia recientes/caché de portada, cierra stream y no permite restauraciones auth tardías. El usuario confirma que follow/unfollow real funciona; regresiones automatizadas cubren el flujo.
@@ -96,6 +101,7 @@ LATER:
 
 ## Constraints
 
+- 2026-10-13: el usuario levanta el modo solo local para publicar 1.4.4 tras pruebas. Regla permanente: fixes/mejoras compatibles se suben como PATCH consecutivos tras validar; MINOR para entregas mayores acordadas. Actualizar siempre README, notas, roadmap del repo y web, junto a versiones nativas. Una instrucción posterior de pausa/solo local prevalece.
 - Hotfix 1.4.3 autorizado el 2026-10-08; PATCH estable en lugar de 1.4.2-a (prerelease anterior). Guía: `docs/guides/HOTFIX_RELEASES.md`.
 - Publicación 1.4.2 autorizada el 2026-10-07 tras validar las tres plataformas; no excluir Linux.
 - No instalar nada en el PC del usuario ni desplegar Supabase sin autorización.
@@ -106,6 +112,7 @@ LATER:
 ## Invariants
 
 - Follows de Twitch no se suben como favoritos automáticamente; pins/cache de cuenta no se muestran al invitado ni a otra cuenta. Logout invalida auth pendiente y serializa borrado tras escrituras de token en curso.
+- Chat unificado: origen y destino son independientes; solo canales visibles únicos, envío a un único destino confirmado, nunca trasladar borradores ni permisos/recursos de otro canal. Moderación y Companion permanecen en Individual.
 - Todo proceso Streamlink/FFmpeg debe disponer de cleanup; cambiar/cerrar stream no debe dejar huérfanos.
 - UI no contiene privilegios nativos específicos del OS; código compartido mantiene tres plataformas.
 - Credenciales/cookies Twitch no se entregan a React, no se registran ni se borran al montar chat.

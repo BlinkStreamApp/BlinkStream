@@ -8,6 +8,7 @@ import PhosphorIcon from './icons/PhosphorIcon'
 import StreamPreview from './StreamPreview'
 import { useT } from '../utils/i18n'
 import WelcomeScreen from './WelcomeScreen'
+import CategoryExplorer from './CategoryExplorer'
 
 function exactViewers(n) {
   if (n == null) return null
@@ -384,7 +385,7 @@ const HeroCarousel = memo(function HeroCarousel({ streams, onSelect, logos, curr
   )
 })
 
-export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onShowAbout, authing, favorites, pinnedFavorites = favorites, followsError, recentChannels = [], onRemoveRecent }) {
+export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onShowAbout, authing, favorites, pinnedFavorites = favorites, followsError, recentChannels = [], onRemoveRecent, categorySessionKey = 'current' }) {
   const t = useT()
 
   const isFunc = { name: 'function', check: (v) => typeof v === 'function' }
@@ -414,10 +415,6 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
   })
   const cachedStatusRef = useRef({})
   const cachedLogosRef = useRef({})
-  const [topGames, setTopGames] = useState([])
-  const [activeGameId, setActiveGameId] = useState(null)
-  const [gameStreams, setGameStreams] = useState([])
-  const [gameLoading, setGameLoading] = useState(false)
 
   const fetchLiveStatus = useCallback(async (canApply = () => true) => {
     if (!isLoggedIn) return
@@ -559,26 +556,6 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
     }
   }, [fetchLiveStatus])
 
-  useEffect(() => {
-    if (!isLoggedIn) return
-    let c = false
-    const fetchTopGames = async () => {
-      const headers = await getHeaders()
-      try {
-        const r = await fetch(`https://api.twitch.tv/helix/games/top?first=12`, { headers, signal: AbortSignal.timeout(8000) })
-        if (!c && r.ok) {
-          const d = await r.json()
-          if (c) return
-          if (d?.data) setTopGames(d.data.map(g => ({
-            id: g.id, name: g.name, boxArt: g.box_art_url?.replace('{width}','285').replace('{height}','380') || '',
-          })))
-        }
-      } catch {  }
-    }
-    fetchTopGames()
-    window.addEventListener('blinkstream_auth_updated', fetchTopGames)
-    return () => { c = true; window.removeEventListener('blinkstream_auth_updated', fetchTopGames) }
-  }, [isLoggedIn])
 
   const sortedFavorites = useMemo(() => {
     return [...favorites].sort((a, b) => {
@@ -766,62 +743,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
               )}
               <HeroCarousel streams={heroStreams} onSelect={onSelect} logos={channelLogos} currentIndex={heroIndex} onIndexChange={setHeroIndex} previewEnabled={true} />
 
-          {topGames.length > 0 && (
-            <section className="mb-6 animate-fade-in">
-              <SectionHeader title={t('topGames', 'Juegos populares')} />
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-                {topGames.map(game => (
-                  <button key={game.id} onClick={async () => {
-                    if (activeGameId === game.id) { setActiveGameId(null); setGameStreams([]); return }
-                    setActiveGameId(game.id); setGameLoading(true)
-                    try {
-                      const h = await getHeaders()
-                      const res = await fetch(`https://api.twitch.tv/helix/streams?game_id=${game.id}&first=8`, { headers: h, signal: AbortSignal.timeout(8000) })
-                      if (res.ok) { const d = await res.json(); setGameStreams(d.data || []) }
-                    } catch {  }
-                    setGameLoading(false)
-                  }} className="flex flex-col items-center gap-1.5 shrink-0 w-[110px] group cursor-pointer card-hover rounded-lg p-2 hover:bg-hover transition-colors">
-                    {game.boxArt ? (
-                      <img src={game.boxArt} alt="" className="w-full aspect-[3/4] object-cover rounded-md transition-transform group-hover:scale-105" loading="lazy" />
-                    ) : (
-                      <div className="w-full aspect-[3/4] bg-bg-tertiary rounded-md flex items-center justify-center text-text-muted/30">
-                        <PhosphorIcon name="GameController" size={24} weight="regular" />
-                      </div>
-                    )}
-                    <span className="text-[12px] font-medium text-text-primary truncate w-full text-center">{game.name}</span>
-                  </button>
-                ))}
-              </div>
-              {activeGameId && (
-                <div className="mt-4 p-3 rounded-xl bg-bg-secondary/50 border border-bg-tertiary/40">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-[13px] font-bold text-text-primary">{t('liveNow', 'En vivo ahora')}</h3>
-                    <button onClick={() => { setActiveGameId(null); setGameStreams([]) }} className="text-[11px] text-text-muted hover:text-text-primary cursor-pointer">Cerrar </button>
-                  </div>
-                  {gameLoading ? <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin" /></div>
-                  : gameStreams.length === 0 ? <p className="text-[12px] text-text-muted text-center py-2">{t('noLiveStreams', 'No hay streams en vivo')}</p>
-                  : (
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {gameStreams.map(s => (
-                        <button key={s.id} onClick={() => onSelect(s.user_login)} className="shrink-0 w-[160px] sm:w-[180px] lg:w-[200px] text-left group cursor-pointer card-hover rounded-lg overflow-hidden bg-bg-tertiary">
-                          <div className="relative aspect-video overflow-hidden">
-                            {s.thumbnail_url ? (
-                              <img src={s.thumbnail_url.replace('{width}','320').replace('{height}','180')} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
-                            ) : <div className="w-full h-full bg-bg-tertiary" />}
-                            <span className="absolute bottom-1 left-1 bg-black/80 px-1.5 py-0.5 rounded text-[12px] text-white/90">{s.viewer_count >= 1000 ? `${(s.viewer_count/1000).toFixed(1)}k` : s.viewer_count} viewers</span>
-                          </div>
-                          <div className="p-2">
-                            <p className="text-[13px] font-semibold text-text-primary truncate">{s.user_name}</p>
-                            <p className="text-[12px] text-text-muted truncate">{s.title}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
+          <CategoryExplorer key={categorySessionKey} onSelect={onSelect} />
 
           {(() => {
             const liveChannels = favorites

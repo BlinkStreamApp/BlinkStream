@@ -38,6 +38,13 @@ export function setItem(key, value) {
   }
 }
 
+export function readVolume(fallback = 100) {
+  const stored = getItem(STORAGE_KEYS.VOLUME, null)
+  if (stored === null || stored.trim() === '') return fallback
+  const value = Number(stored)
+  return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : fallback
+}
+
 export function removeItem(key) {
   try {
     localStorage.removeItem(key)

@@ -1,19 +1,20 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-10-08. Estado: 1.4.2 publicada; hotfix 1.4.3 autorizado, candidato pendiente de CI firmado multiplataforma. Incluye sesión/follows y marca, sin ampliar el roadmap funcional.
+Actualizado: 2026-10-13. Fuente candidata 1.4.4; última publicada 1.4.3. Categorías/UI/grid aceptados por el usuario; commit/push y publicación autorizados tras pruebas y CI multiplataforma.
 
 ## Objetivo y reglas
 
 Consolidar reproducción, chat y eventos de Twitch antes de ampliar la experiencia de escritorio.
 Responsables: Codex implementa y verifica; el usuario valida el comportamiento en su sesión real.
-El usuario autoriza commit/push del código tras aceptar el panel de Drops y su pulido.
-No crear tags/releases ni desplegar servicios externos sin nueva autorización.
-No fijar fechas de entrega ni versiones futuras hasta cerrar los criterios de cada bloque.
+El usuario autoriza entregar fixes y mejoras incrementales como PATCH consecutivos después de las pruebas pertinentes; reservar MINOR para hitos mayores acordados.
+Antes de publicar, alinear README, notas, roadmap del repo y de la web, y versiones package/Tauri/Cargo. No crear tags hasta CI firmado correcto; no anunciar descargas inexistentes.
+La autorización no incluye instalación en su PC, cambios de permisos/secretos ni despliegues Supabase. Una pausa o modo solo local posterior prevalece.
 
 ## Orden de ejecución
 
 | Bloque | Entrega | Dependencias | Criterio de cierre | Estado |
 | --- | --- | --- | --- | --- |
+| 0. Categorías y UI/grid | Categorías, idioma/paginación, pulido de Ajustes y grid, chat unificado con destino seguro | Sesión Twitch, Helix/IRC y componentes existentes | Regresiones, aceptación del usuario y CI firmado de cuatro targets; documentar límites de pruebas reales | Candidata 1.4.4 |
 | 1. Fiabilidad Twitch y teclado | Sustituir PubSub por EventSub para canjes personalizados, informar de permisos/conexión, separar atajos y validar Drops | Cuenta autorizada, campaña elegible y sesión real | Sin conexiones PubSub; reconexión/cleanup probados; atajos sin dobles acciones; aumento real de minutos y reclamo comprobados | En curso |
 | 2. Continuar viendo | Posición de VOD, lista para más tarde y marcadores con notas | Identidad estable de VOD/canal y almacenamiento existente | Recuperar posición tras reiniciar; gestionar marcadores; enlaces ausentes tratados | Pendiente |
 | 3. Espacios de trabajo | Perfiles de canales, distribución, volumen y calidad; audio principal en multistream | Bloque 1 y layouts existentes | Restaurar un perfil sin procesos huérfanos ni sonido inesperado | Pendiente |

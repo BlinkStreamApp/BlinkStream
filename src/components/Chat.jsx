@@ -11,6 +11,8 @@ import { safeOpenUrl, isTauri } from '../utils/tauriEnv'
 import { invoke } from '@tauri-apps/api/core'
 import { TwitchChatPopout } from './chat/TwitchChatPopout'
 import { openTwitchChatPopoutWindow } from '../utils/twitchPopout'
+import { normalizeChatChannels, parseIrcEnvelope } from '../utils/chatChannels'
+import ChannelLabel from './chat/ChannelLabel'
 
 async function gqlGetUserIdByLogin(channel) {
   const login = sanitizeChannelForGraphQL(channel)
@@ -346,7 +348,7 @@ function UserCardPopup({ username, position, onClose }) {
 
 let msgIdCounter = 0
 
-const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage, onContextMenu, isGridMode, onSelectUserForInspection, _isModerator }) => {
+const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage, onContextMenu, isGridMode, chatChannels, onSelectUserForInspection, _isModerator }) => {
   const isSpecial = Boolean(msg.eventType || msg.isNotice || msg.isReward)
 
   if (isSpecial) {
@@ -357,17 +359,12 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
         onContextMenu={onContextMenu ? (e) => onContextMenu(e, msg) : undefined}
       >
         <div className="flex items-center gap-1.5 font-extrabold text-xs tracking-wide">
+          {isGridMode && msg.channel && <ChannelLabel channel={msg.channel} channels={chatChannels} />}
           <span>{msg.eventHeader || (msg.message && !msg.user ? msg.message : 'Notificación del canal')}</span>
         </div>
 
         {(msg.message || !msg.isNotice || msg.eventType === 'reward' || msg.eventType === 'bits') && msg.user && msg.user !== 'unknown' && (
           <div className="relative text-sm mt-1 leading-relaxed break-words text-white/95" style={{ fontSize: `${chatFontSize}px` }}>
-            {isGridMode && msg.channel && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded mr-1.5 bg-gradient-to-r from-twitch/40 to-fuchsia-600/40 border border-twitch/60 text-fuchsia-200 font-extrabold text-[10px] tracking-tight shadow-sm select-none align-middle uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse" />
-                {msg.channel}
-              </span>
-            )}
             {msg.badges?.length > 0 && (
               <span className="inline-flex items-center gap-0.5 mr-1 align-middle select-none">
                 {msg.badges.map((b, i) => {
@@ -400,7 +397,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
             {msg.message && <span className="text-text-muted/50 font-bold ml-0.5 mr-1.5 inline select-none">:</span>}
             {msg.message && (
               <span className="inline font-normal tracking-wide">
-                {renderMessage(msg.message, msg.emotes)}
+                {renderMessage(msg.message, msg.emotes, msg.channel)}
               </span>
             )}
             {msg.timestamp && (
@@ -424,13 +421,8 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
       onContextMenu={onContextMenu ? (e) => onContextMenu(e, msg) : undefined}
       style={{ fontSize: `${chatFontSize}px` }}
     >
-      {isGridMode && msg.channel && (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded mr-1.5 bg-gradient-to-r from-twitch/40 to-fuchsia-600/40 border border-twitch/60 text-fuchsia-200 font-extrabold text-[10px] tracking-tight shadow-sm select-none align-middle uppercase">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse" />
-          {msg.channel}
-        </span>
-      )}
-      {msg.badges.length > 0 && (
+      {isGridMode && msg.channel && <ChannelLabel channel={msg.channel} channels={chatChannels} />}
+      {msg.badges?.length > 0 && (
         <span className="inline-flex items-center gap-0.5 mr-1 align-middle select-none">
           {msg.badges.map((b, i) => {
             const url = findBadgeUrl(badgeUrls, b.set, b.version)
@@ -450,7 +442,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
       </span>
       <span className="text-text-muted/50 font-bold ml-0.5 mr-1.5 inline select-none">:</span>
       <span className="inline font-normal tracking-wide">
-        {renderMessage(msg.message, msg.emotes)}
+        {renderMessage(msg.message, msg.emotes, msg.channel)}
         {msg.spamCount > 1 && (
           <span className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-twitch/20 border border-twitch/60 text-fuchsia-300 shadow-sm shadow-twitch/30 tabular-nums animate-pulse align-middle">
             x{msg.spamCount}
@@ -467,7 +459,9 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
 })
 
 export default function Chat({
-  channel,
+  channel: channelName,
+  channels: chatChannels,
+  onSelectDestination,
   _isLoggedIn,
   twitchToken,
   twitchUsername,
@@ -486,6 +480,11 @@ export default function Chat({
   onMessagesUpdate,
 }) {
   const t = useT()
+  const channel = normalizeChatChannels([channelName])[0] || ''
+  const isUnified = Array.isArray(chatChannels)
+  const channelsKey = normalizeChatChannels(isUnified ? chatChannels : [channel]).sort().join(',')
+  const subscribedChannels = useMemo(() => channelsKey ? channelsKey.split(',') : [], [channelsKey])
+  const [joinedChannels, setJoinedChannels] = useState([])
   const [messages, setMessages] = useState([])
 
   useEffect(() => {
@@ -504,11 +503,15 @@ export default function Chat({
     return getItem(STORAGE_KEYS.ANTISPAM, 'false') === 'true'
   })
   const antiSpamRef = useRef(getItem(STORAGE_KEYS.ANTISPAM, 'false') === 'true')
-  const [emotes, setEmotes] = useState({})
-  const [badgeUrls, setBadgeUrls] = useState({})
+  const [channelAssets, setChannelAssets] = useState({})
+  const emotes = useMemo(() => channelAssets[channel]?.emotes || {}, [channelAssets, channel])
+  const emoteList = channelAssets[channel]?.list || []
   const [connected, setConnected] = useState(false)
+  const canSend = connected && subscribedChannels.includes(channel) && (!isUnified || joinedChannels.includes(channel))
   const [connError, setConnError] = useState('')
   const [inputText, setInputText] = useState('')
+  const [draftChannel, setDraftChannel] = useState(channel)
+  const draftMatchesDestination = !isUnified || draftChannel === channel
   const [newMsgCount, setNewMsgCount] = useState(0)
   const [activeTab, setActiveTab] = useState('all') // 'all' | 'mentions' | 'featured'
   const [unreadMentions, setUnreadMentions] = useState(0)
@@ -662,41 +665,43 @@ export default function Chat({
   const trieRef = useRef({})
   const mountedRef = useRef(true)
   const userBadgesRef = useRef([])
+  const userBadgesByChannelRef = useRef({})
   const userColorRef = useRef(null)
   const userDisplayNameRef = useRef('')
 
   useEffect(() => {
     userBadgesRef.current = []
+    userBadgesByChannelRef.current = {}
     userColorRef.current = null
     userDisplayNameRef.current = auth.username || ''
-  }, [auth.username, channel])
+  }, [auth.username])
 
   const getUserBadgesForSend = useCallback(() => {
-    const list = [...(userBadgesRef.current || [])]
+    const list = [...(userBadgesByChannelRef.current[channel] || userBadgesRef.current || [])]
     const chLower = (channel || '').toLowerCase()
     const userLower = (auth?.username || '').toLowerCase()
 
-    if (isBroadcaster || (userLower && chLower === userLower)) {
+    if ((!isUnified && isBroadcaster) || (userLower && chLower === userLower)) {
       if (!list.some(b => b.set === 'broadcaster')) {
         list.unshift({ set: 'broadcaster', version: '1' })
       }
-    } else if (isModerator || isMod) {
+    } else if (!isUnified && (isModerator || isMod)) {
       if (!list.some(b => b.set === 'moderator')) {
         list.unshift({ set: 'moderator', version: '1' })
       }
-    } else if (isVip) {
+    } else if (!isUnified && isVip) {
       if (!list.some(b => b.set === 'vip')) {
         list.unshift({ set: 'vip', version: '1' })
       }
     }
     return list
-  }, [channel, auth.username, isBroadcaster, isModerator, isMod, isVip])
+  }, [channel, auth.username, isBroadcaster, isModerator, isMod, isVip, isUnified])
 
   useEffect(() => {
     trieRef.current = buildEmoteTrie(emotes)
   }, [emotes])
 
-  useEffect(() => { return () => { mountedRef.current = false } }, [])
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current
@@ -711,9 +716,10 @@ export default function Chat({
     setNewMsgCount(0)
   }, [])
 
-  const renderMessage = useCallback((text, twitchEmotes) => {
+  const channelTries = useMemo(() => Object.fromEntries(Object.entries(channelAssets).map(([name, assets]) => [name, buildEmoteTrie(assets.emotes || {})])), [channelAssets])
+  const renderMessage = useCallback((text, twitchEmotes, sourceChannel) => {
     if (!text) return text
-    const parts = matchEmotesInText(text, twitchEmotes, trieRef.current)
+    const parts = matchEmotesInText(text, twitchEmotes, channelTries[sourceChannel] || {})
     const isOnlyEmotes = parts.every(p => p.type !== 'text' || p.text.trim() === '') && parts.filter(p => p.type !== 'text').length >= 1 && parts.filter(p => p.type !== 'text').length <= 5
     return parts.map((part, idx) => {
       if (part.type === 'text') return renderTextWithLinks(part.text, idx)
@@ -730,15 +736,21 @@ export default function Chat({
         <img key={idx} src={part.urls?.[2] || part.urls?.[1] || part.urls?.[0]} alt={part.name} title={part.name} className={emoteClass} loading="lazy" onError={hideOnError} />
       )
     })
-  }, [])
+  }, [channelTries])
 
-  const emoteControllersRef = useRef([])
-  const [emoteList, setEmoteList] = useState([])
+  const emoteControllersRef = useRef({})
 
-  const loadEmotes = useCallback(async (channelName) => {
-    emoteControllersRef.current.forEach(ac => ac.abort())
+  const loadEmotes = useCallback(async (channelName, activeChannels) => {
+    const previous = emoteControllersRef.current[channelName]
+    if (previous) { previous.cancelled = true; previous.controllers.forEach(ac => ac.abort()) }
     const controllers = []
-    emoteControllersRef.current = controllers
+    const batch = { controllers, cancelled: false }
+    emoteControllersRef.current[channelName] = batch
+    const isCurrent = () => mountedRef.current && !batch.cancelled
+    const publish = (dict, items) => {
+      if (!isCurrent()) return
+      setChannelAssets(prev => ({ ...Object.fromEntries(Object.entries(prev).filter(([name]) => activeChannels.includes(name))), [channelName]: { ...prev[channelName], emotes: { ...dict }, list: [...items] } }))
+    }
 
     const dict = {}
     const emoteItems = []
@@ -880,43 +892,31 @@ export default function Chat({
 
     tasks.forEach(task => {
       task.then(() => {
-        if (mountedRef.current) {
-          setEmotes(prev => ({ ...prev, ...dict }))
-          setEmoteList(prev => {
-            const existing = new Set(prev.map(e => e.provider + '-' + e.id))
-            const news = emoteItems.filter(e => !existing.has(e.provider + '-' + e.id))
-            return [...prev, ...news]
-          })
-        }
+        publish(dict, emoteItems)
       }).catch(() => {})
     })
     Promise.all(tasks).then(() => {
-      if (mountedRef.current) {
-        setEmotes(dict)
-        setEmoteList(emoteItems)
-      }
+      publish(dict, emoteItems)
     }).catch(() => {})
   }, [])
 
   useEffect(() => {
-    if (!channel) return
-    loadEmotes(channel)
+    for (const name of subscribedChannels) loadEmotes(name, subscribedChannels)
     return () => {
-      emoteControllersRef.current.forEach(ac => ac.abort())
-      emoteControllersRef.current = []
+      for (const batch of Object.values(emoteControllersRef.current)) { batch.cancelled = true; batch.controllers.forEach(ac => ac.abort()) }
+      emoteControllersRef.current = {}
     }
-  }, [channel, loadEmotes])
+  }, [subscribedChannels, loadEmotes])
 
   useEffect(() => {
-    if (!channel) return
     let cancelled = false
-    fetchBadgesForChannel(channel).then(dict => {
+    for (const name of subscribedChannels) fetchBadgesForChannel(name).then(dict => {
       if (!cancelled && dict && Object.keys(dict).length > 0) {
-        setBadgeUrls(prev => ({ ...prev, ...dict }))
+        setChannelAssets(prev => ({ ...Object.fromEntries(Object.entries(prev).filter(([name]) => subscribedChannels.includes(name))), [name]: { ...prev[name], badges: dict } }))
       }
     })
     return () => { cancelled = true }
-  }, [channel])
+  }, [subscribedChannels])
 
   const getClientId = useCallback(() => customClientId || DEFAULT_CLIENT_ID, [customClientId])
 
@@ -1053,21 +1053,26 @@ export default function Chat({
   }, [getClientId, onLoginWithToken])
 
   useEffect(() => {
-    if (!channel) return
+    if (!channelsKey) return
     let cancelled = false
     let retryDelay = 1000
     const MAX_RETRY = 30000
     let reconnectTimer = null
+    const rooms = new Set(channelsKey.split(','))
     // Reset legítimo de error al (re)conectar a un canal: NO es cascading
     // render en la práctica (se ejecuta una vez por cambio de canal) y el
     // efecto siguiente ya depende de `channel`/`connError` vía el closure.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setConnError('')
+    setConnected(false)
+    setJoinedChannels([])
     setMessages([])
+    userBadgesByChannelRef.current = {}
     lineBufferRef.current = ''
 
     // Búfer por lotes (Batching Buffer) para evitar tormentas de re-renders
     const msgBatch = []
+    const seenIds = new Set()
     const batchInterval = setInterval(() => {
       if (msgBatch.length > 0) {
         const toFlush = msgBatch.slice()
@@ -1115,6 +1120,7 @@ export default function Chat({
                 last &&
                 last.message &&
                 msg.message &&
+                last.channel === msg.channel &&
                 last.message.trim().toLowerCase() === msg.message.trim().toLowerCase() &&
                 !last.isNotice && !last.eventType && !last.isReward &&
                 !msg.isNotice && !msg.eventType && !msg.isReward
@@ -1141,6 +1147,7 @@ export default function Chat({
 
     const connect = () => {
       if (cancelled) return
+      lineBufferRef.current = ''
       const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443')
       wsRef.current = ws
 
@@ -1158,14 +1165,13 @@ export default function Chat({
           ws.send('NICK justinfan12345')
         }
 
-        const ircChannel = (channel || '').toLowerCase().replace(/^#/, '')
-        ws.send(`JOIN #${ircChannel}`)
+        ws.send(`JOIN ${channelsKey.split(',').map(name => `#${name}`).join(',')}`)
         setConnected(true)
         setConnError('')
       }
 
       ws.onmessage = (event) => {
-        if (cancelled) return
+        if (cancelled || wsRef.current !== ws) return
         lineBufferRef.current += event.data
         const lines = lineBufferRef.current.split('\r\n')
         lineBufferRef.current = lines.pop() || ''
@@ -1177,11 +1183,38 @@ export default function Chat({
             continue
           }
 
-          const tagEnd = line.indexOf(' ')
-          if (tagEnd === -1) continue
-          const tags = line.slice(0, tagEnd)
-          const rest = line.slice(tagEnd + 1).trimStart()
-          const parts = rest.split(' ')
+          const envelope = parseIrcEnvelope(line)
+          if (!envelope) continue
+          const { tags, parts, command, channel, prefix } = envelope
+          if (channel && !rooms.has(channel)) continue
+          const parsedTags = parseMessageTags(tags)
+          if (channel && (command === 'ROOMSTATE' || command === 'USERSTATE' || (command === 'JOIN' && prefix.split('!')[0].toLowerCase() === (auth.username?.toLowerCase() || 'justinfan12345')))) {
+            setJoinedChannels(prev => prev.includes(channel) ? prev : [...prev, channel])
+          }
+          if (command === 'CLEARMSG' || command === 'CLEARCHAT') {
+            const messageId = parsedTags['target-msg-id']
+            const targetUser = parsedTags['target-user-id']
+            const keep = msg => msg.channel !== channel || (command === 'CLEARMSG' ? msg.message_id !== messageId : targetUser ? msg.user_id !== targetUser : false)
+            if (command === 'CLEARCHAT' || messageId) {
+              for (let index = msgBatch.length - 1; index >= 0; index--) if (!keep(msgBatch[index])) msgBatch.splice(index, 1)
+              setMessages(prev => prev.filter(keep))
+            }
+            continue
+          }
+          if (command === 'NOTICE') {
+            const detail = parts.slice(parts.indexOf('NOTICE') + 2).join(' ').replace(/^:/, '')
+            if (parsedTags['msg-id'] === 'msg_channel_suspended' || parsedTags['msg-id'] === 'msg_banned') {
+              setJoinedChannels(prev => prev.filter(name => name !== channel))
+            }
+            if (detail) setConnError(`${channel ? `${channel}: ` : ''}${detail}`)
+            continue
+          }
+          if (channel && parsedTags.id) {
+            const identity = `${channel}:${parsedTags.id}`
+            if (seenIds.has(identity)) continue
+            seenIds.add(identity)
+            if (seenIds.size > 1000) seenIds.delete(seenIds.values().next().value)
+          }
           const usernoticeIdx = parts.indexOf('USERNOTICE')
           const privmsgIdx = parts.indexOf('PRIVMSG')
           const userstateIdx = parts.indexOf('USERSTATE')
@@ -1194,9 +1227,11 @@ export default function Chat({
                 const [set, version] = b.split('/')
                 return { set, version }
               })
-              userBadgesRef.current = badgeList
+              if (channel) userBadgesByChannelRef.current[channel] = badgeList
+              else userBadgesRef.current = badgeList
             } else if (parsed.badges === '') {
-              userBadgesRef.current = []
+              if (channel) userBadgesByChannelRef.current[channel] = []
+              else userBadgesRef.current = []
             }
             if (parsed.color) {
               userColorRef.current = parsed.color
@@ -1206,7 +1241,7 @@ export default function Chat({
             }
 
             // Real-time role detection from IRC USERSTATE
-            const badges = userBadgesRef.current || []
+            const badges = userBadgesByChannelRef.current[channel] || []
             const isIrcBroadcaster = badges.some(b => b.set === 'broadcaster') || (auth.username && channel && auth.username.toLowerCase() === channel.toLowerCase())
             const isIrcMod = parsed.mod === '1' || parsed['user-type'] === 'mod' || badges.some(b => b.set === 'moderator')
             const isIrcVip = badges.some(b => b.set === 'vip')
@@ -1327,6 +1362,7 @@ export default function Chat({
           }
 
           if (privmsgIdx === -1) continue
+          if (!channel) continue
 
           const userRaw = parts[0]?.split('!')[0]?.replace(':', '') || 'unknown'
           const messageParts = parts.slice(privmsgIdx + 2)
@@ -1389,8 +1425,9 @@ export default function Chat({
       }
 
       ws.onclose = () => {
-        if (cancelled) return
+        if (cancelled || wsRef.current !== ws) return
         setConnected(false)
+        setJoinedChannels([])
         setConnError(`Reconectando en ${retryDelay/1000}s...`)
         reconnectTimer = setTimeout(() => {
           retryDelay = Math.min(retryDelay * 2, MAX_RETRY)
@@ -1399,7 +1436,7 @@ export default function Chat({
       }
 
       ws.onerror = () => {
-        if (cancelled) return
+        if (cancelled || wsRef.current !== ws) return
         setConnError('Error de conexión al chat')
       }
     }
@@ -1415,7 +1452,7 @@ export default function Chat({
         wsRef.current = null
       }
     }
-  }, [channel, auth, isGridMode, isOverlay, viewerLogin])
+  }, [channelsKey, auth, isGridMode, isOverlay, viewerLogin])
 
   useEffect(() => {
     if (isAtBottomRef.current) {
@@ -1424,6 +1461,10 @@ export default function Chat({
   }, [messages])
 
   const handleSlashCommand = useCallback(async (text) => {
+    if (isUnified && (!canSend || !/^\/me\s+/i.test(text))) {
+      setConnError('Usa el chat individual para comandos de moderación. En unificado puedes usar /me.')
+      return
+    }
     const meMatch = text.match(/^\/me\s+(.+)/i)
     if (meMatch) {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -1606,12 +1647,13 @@ export default function Chat({
 
     setConnError(`Comando /${cmd} no soportado o requiere permisos especiales.`)
     setInputText('')
-  }, [channel, auth, broadcasterId, userId, isModerator, isBroadcaster, getUserBadgesForSend])
+  }, [channel, auth, broadcasterId, userId, isModerator, isBroadcaster, getUserBadgesForSend, isUnified, canSend])
 
   const sendMessage = async (e) => {
     e.preventDefault()
     const text = inputText.trim()
     if (!text) return
+    if (!canSend || !draftMatchesDestination || /[\r\n]/.test(text)) return
     if (!auth.token || !auth.username) {
       setConnError('Debes iniciar sesión para enviar mensajes')
       return
@@ -1651,7 +1693,7 @@ export default function Chat({
 
   useEffect(() => {
     // Si isOverlay está activo junto al chat normal, solo permitimos al chat principal procesar el mensaje del móvil
-    if (!isTauri() || isOverlay) return;
+    if (!isTauri() || isOverlay || isUnified) return;
     let unlistenFn = null;
     let isCancelled = false;
     import('@tauri-apps/api/event').then(({ listen }) => {
@@ -1694,11 +1736,11 @@ export default function Chat({
       isCancelled = true;
       if (unlistenFn) unlistenFn();
     };
-  }, [isOverlay, handleSlashCommand, getUserBadgesForSend]);
+  }, [isOverlay, isUnified, handleSlashCommand, getUserBadgesForSend]);
 
   return (
-    <div className={`h-full flex flex-col relative transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
-      {!isMod && useTwitchPopout && (
+    <div className={`h-full min-h-0 flex flex-col relative transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
+      {!isMod && !isUnified && useTwitchPopout && (
         <TwitchChatPopout
           channelName={channel}
           twitchToken={auth.token}
@@ -1709,19 +1751,19 @@ export default function Chat({
           }}
         />
       )}
-      <div className={`h-full flex flex-col ${!isMod && useTwitchPopout ? 'invisible pointer-events-none absolute inset-0' : ''}`}>
+      <div className={`h-full min-h-0 flex flex-col ${!isMod && !isUnified && useTwitchPopout ? 'invisible pointer-events-none absolute inset-0' : ''}`}>
         <div className="shrink-0 px-2.5 py-1.5 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center justify-between gap-1.5 select-none">
           {/* Left: Channel indicator */}
           <div className="flex items-center gap-1.5 min-w-0">
             <span className={`w-2 h-2 rounded-full shrink-0 ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
             <span className="text-xs text-text-primary font-bold truncate max-w-[100px] sm:max-w-[130px]">
-              {isOverlay ? 'Chat' : channel}
+              {isUnified ? t('grid.unifiedChat', 'Chat unificado') : isOverlay ? 'Chat' : channel}
             </span>
           </div>
 
         {/* Right: Action Buttons toolbar */}
         <div className="flex items-center gap-1 shrink-0">
-          {!isOverlay && (
+          {!isOverlay && !isUnified && (
             <>
               {/* Twitch Popout Button (Toggles Embedded Native Child Webview) */}
               <button
@@ -1833,7 +1875,7 @@ export default function Chat({
           </div>
         )}
 
-        <span className="text-[11px] text-text-muted/40 ml-1">{messages.length}</span>
+        <span className={`ml-1 text-[11px] tabular-nums ${isUnified ? 'text-text-secondary' : 'text-text-muted/40'}`} aria-live={isUnified ? 'polite' : undefined}>{isUnified ? `${joinedChannels.filter(name => subscribedChannels.includes(name)).length}/${subscribedChannels.length} ${t('grid.channels', 'canales')}` : messages.length}</span>
 
         {isOverlay && onCloseOverlay && (
           <button
@@ -1921,8 +1963,8 @@ export default function Chat({
       )}
 
       <div ref={containerRef} className="flex-1 overflow-y-auto px-1 py-0.5" onScroll={handleScroll} role="log" aria-live="polite" aria-label="Mensajes del chat">
-        {connError && !connected && (
-          <p className="text-orange-400/80 text-xs text-center mt-4">{connError}</p>
+        {connError && (!connected || isUnified) && (
+          <p role="status" className="text-orange-300 text-xs text-center my-3 px-2 break-words">{connError}</p>
         )}
         {messages.length === 0 && !connError && !authing && !chatHidden && (
           <p className="text-text-muted/50 text-xs text-center mt-6">
@@ -1939,6 +1981,7 @@ export default function Chat({
           <div className="space-y-0.5">
             {(() => {
               const filtered = messages
+                .filter(msg => subscribedChannels.includes(msg.channel))
                 .filter(msg => !hideBots || !msg.user.toLowerCase().includes('bot'))
                 .filter(msg => {
                   if (activeTab === 'mentions') return Boolean(msg.isMention)
@@ -1971,14 +2014,15 @@ export default function Chat({
                 <ChatMessage
                   key={msg.id}
                   msg={msg}
-                  badgeUrls={badgeUrls}
+                  badgeUrls={channelAssets[msg.channel]?.badges || {}}
                   chatFontSize={chatFontSize}
                   setUserCard={setUserCard}
                   renderMessage={renderMessage}
-                  onContextMenu={isModerator ? handleContextMenu : undefined}
+                  onContextMenu={!isUnified && isModerator ? handleContextMenu : undefined}
                   isGridMode={isGridMode}
+                  chatChannels={subscribedChannels}
                   onSelectUserForInspection={onSelectUserForInspection}
-                  isModerator={isModerator}
+                  isModerator={!isUnified && isModerator}
                 />
               ))
             })()}
@@ -1989,7 +2033,7 @@ export default function Chat({
             renderiza si hay un target y el viewer es mod/broadcaster
             (en cuyo caso tiene sentido). El componente ya cierra
             solo con click fuera / Escape. */}
-        {contextMenu && isModerator && (
+        {contextMenu && isModerator && !isUnified && (
           <MessageContextMenu
             position={{ x: contextMenu.x, y: contextMenu.y }}
             target={contextMenu.target}
@@ -2014,6 +2058,18 @@ export default function Chat({
       )}
 
       <div className="shrink-0">
+        {isUnified && <div className="border-t border-twitch/20 bg-twitch/5 px-3 py-3">
+          <label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-text-secondary">
+            <PhosphorIcon name="ChatCircleDots" size={16} className="text-twitch-light" />
+            {t('grid.sendTo', 'Enviar a:')}
+            <select aria-label={t('grid.destination', 'Canal de destino')} value={subscribedChannels.includes(channel) ? channel : ''} onChange={event => { setInputText(''); setDraftChannel(event.target.value); setConnError(''); setShowEmoteMenu(false); onSelectDestination?.(event.target.value) }} className="min-h-9 min-w-0 flex-1 rounded-xl border border-twitch/30 bg-bg-tertiary px-3 py-1.5 text-[13px] font-semibold text-text-primary focus-visible:outline-2 focus-visible:outline-twitch">
+              <option value="">{t('grid.chooseDestination', 'Elige un canal')}</option>
+              {subscribedChannels.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </label>
+          <p className="mt-2 text-[11px] leading-relaxed text-text-secondary [@media(max-height:600px)]:hidden">{t('grid.destinationHint', 'Solo se enviará al canal elegido. Los comandos de moderación y el mando Wi-Fi siguen en el chat individual.')}</p>
+          {channel && !canSend && <p role="status" className="mt-1 text-[11px] text-twitch-light">{t('grid.waitForDestination', 'Esperando conexión con el canal de destino…')}</p>}
+        </div>}
         {inputText.startsWith('/') && auth.token && (
           <div className="px-2 py-1 bg-bg-tertiary/40 border-t border-bg-tertiary/30 text-[9px] text-text-muted/60 flex flex-wrap gap-x-2 gap-y-0.5 animate-fade-in">
             <span><strong className="text-text-secondary">/me</strong> texto</span>
@@ -2201,14 +2257,15 @@ export default function Chat({
             <input
               ref={inputRef}
               type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              value={draftMatchesDestination ? inputText : ''}
+              onChange={(e) => { setInputText(e.target.value); setDraftChannel(channel) }}
               placeholder={
                 !connected ? t('chat.placeholder.connecting', 'Conectando al chat...') :
                 !auth.token ? t('chat.placeholder.login', 'Inicia sesión para participar') :
                 t('chat.placeholder.send', 'Enviar un mensaje al chat...')
               }
-              disabled={!connected || !auth.token}
+              aria-label={isUnified ? `${t('grid.messageFor', 'Mensaje para')} ${channel || t('grid.chooseDestination', 'Elige un canal')}` : t('chat.placeholder.send', 'Enviar un mensaje al chat...')}
+              disabled={!canSend || !auth.token}
               maxLength={500}
               className="w-full pl-4 pr-12 py-2 rounded-xl bg-[#202024]/80 hover:bg-[#202024] text-white placeholder-text-muted/50 text-[13px] border border-white/[0.08] focus:border-twitch focus:bg-[#25252b] focus:ring-2 focus:ring-twitch/30 focus:outline-none transition-all disabled:opacity-40"
             />
@@ -2221,7 +2278,7 @@ export default function Chat({
 
           <button
             type="submit"
-            disabled={!connected || !inputText.trim() || !auth.token}
+            disabled={!canSend || !draftMatchesDestination || !inputText.trim() || !auth.token}
             className="shrink-0 px-4 py-2 rounded-xl bg-gradient-to-r from-twitch via-purple-600 to-indigo-600 hover:from-twitch-dark hover:via-purple-700 hover:to-indigo-700 text-white text-[13px] font-bold cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed transition-all shadow-lg shadow-twitch/25 hover:shadow-twitch/40 hover:scale-[1.02] active:scale-95"
           >
             {t('chat.sendBtn', 'Enviar')}

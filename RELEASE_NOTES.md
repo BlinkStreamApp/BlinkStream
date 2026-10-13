@@ -1,37 +1,42 @@
-# BlinkStream 1.4.3 — Session and branding hotfix
+# BlinkStream 1.4.4 — Interface, discovery and multistream update
 
-Date: 2026-10-08.
+Date: 2026-10-13. Incremental compatible update; publication is gated by signed cross-platform CI.
 
-## Session cleanup and follows
+## Category discovery and visual polish
 
-- Logout immediately hides account data, clears recent history/session caches, closes
-  playback and returns to the guest welcome without deleting preferences or shared Twitch cookies.
-- Manual pinned favorites are isolated by account; Twitch follows are refreshed separately
-  every 60 seconds while visible and on focus, reconnection or return to the app.
-- Unfollows replace the old snapshot; failed requests preserve the last valid list and report errors.
-- Pagination supports more than 500 follows; cancellation and timeouts reject partial/stale results.
-- Pending authentication and native token writes cannot restore an account after logout.
-- The legacy mixed list is backed up; unowned data is not assigned to another account.
-  A legacy follow removed before migration cannot always be distinguished from a manual pin.
+- Search games/categories beyond the popular list, load more results and filter live streams by language.
+- Cancel obsolete requests on query, category, language or account changes; deduplicate paginated results.
+- Keep HTTP/auth/rate-limit/timeout errors distinct from an empty list and offer explicit retry.
+- Modernized cards, sharper stream thumbnails, readable full-name language badges and clearer controls.
 
-## Approved branding and small polish
+## Multistream and unified chat
 
-- New user-approved B/lightning logo across the interface, desktop icons, favicon and website.
-- Classic centered guest welcome retained, without extra panels or login buttons.
-- Name colors match the header: white Blink and violet-to-fuchsia Stream.
-- Removed unused hero image, Vite asset and social sprite.
-- Documented a reusable stable PATCH hotfix process: 1.4.2 → 1.4.3, not a prerelease suffix.
+- Center loading/error messages in the video area; wrap long errors and adapt controls to each cell's width.
+- Ignore late channel/quality responses and release HLS resources on replacement/unmount.
+- Restrict audio/chat selection to visible cells; preserve zero volume and coherent binaural mute behavior.
+- Apply left/right chat placement in matching DOM order; allow re-opening hidden chat from a cell.
+- Optional Individual/Unified native chat mode for 2/3/4-cell grids; one subscription per unique visible channel.
+- Source-colored labels, arrival-ordered messages and channel-scoped emotes, badges, anti-spam, dedupe and deletions.
+- Explicit single-recipient sending requires a joined destination; drafts never transfer to another channel.
+- Official embedded chat, moderation and Companion chat sends remain in Individual; `/me` targets one selected room.
 
-## Validation and limits
+## Settings and keyboard polish
 
-- Windows logout, the classic welcome/logo and live Twitch follow/unfollow refresh were accepted by the user.
-- 542 frontend tests pass, one skipped; lint and frontend build pass locally.
-- 11 release/signature tests and 56 Rust Windows tests pass; fmt and Clippy pass.
-- Automated regressions also cover follow/unfollow refresh, account changes and stale responses.
-- Cross-platform signed builds, installer smoke and updater signatures are publication gates in CI.
-- Signing trust remains unchanged. This hotfix does not deploy Supabase or change database schemas.
-- Historical trust migration, authenticated GUI upgrades and automatic Drops claim validation
-  retain the limits documented for 1.4.2. Nothing is installed automatically on the user's PC.
+- Safe initial focus, Tab containment and focus restoration in Settings and confirmation dialogs.
+- Arrow-key navigation between Settings tabs, named switches/controls and a keyboard-operable Home logo.
+- Shared validated volume reader preserves 0%, clamps invalid ranges and retains grid's separate default.
+
+## Validation and delivery limits
+
+- The user accepted category/grid/UI changes and authorized the incremental 1.4.4 publication workflow.
+- 623 frontend tests pass, one skipped; lint, legacy checks and Windows local build pass.
+- 56 Rust Windows tests, format checks and 19 release/signature/documentation tests pass locally.
+- Socket-simulated tests cover chat routing, destination changes, assets and deletions; responsive checks cover narrow grids.
+- Live Twitch authentication/sending, independent audio/keyboard acceptance and other desktop platforms are not certified by mocks.
+- Signed builds for Windows, both macOS architectures and Linux, installer smoke and updater verification must pass CI before publication.
+- Signing trust, cloud schema and shared Twitch cookies are unchanged; no Supabase deployment or automatic PC installation.
+- Historical updater-key migration, authenticated upgrades and independent Drops auto-claim retain their previous limits.
+- Every hotfix/update keeps README, release notes, repository roadmap and website current; release tests enforce version markers.
 
 See [hotfix policy](docs/guides/HOTFIX_RELEASES.md),
 [updater verification](docs/guides/UPDATER_VERIFICATION.md) and [roadmap](ROADMAP.md).

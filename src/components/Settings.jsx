@@ -1,6 +1,6 @@
 
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useId } from 'react'
 import { BlinkStreamLogo } from './BlinkStreamLogo'
 import { getLanguage, setLanguage, useT } from '../utils/i18n'
 import { validateProps } from '../utils/validateProps'
@@ -11,6 +11,8 @@ import { SettingsRecordingTab } from './settings/SettingsRecordingTab'
 import { SettingsAdvancedTab } from './settings/SettingsAdvancedTab'
 import HslThemeStudio from './settings/HslThemeStudio'
 import PhosphorIcon from './icons/PhosphorIcon'
+import { useDialogFocus } from '../hooks/useDialogFocus'
+import { readVolume, setItem } from '../utils/storage'
 
 function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> }
 
@@ -24,19 +26,32 @@ const TABS = [
 ]
 const LS_TAB_KEY = 'bs.settingsTab'
 
-function Tabs({ tabs, active, onChange }) {
+function Tabs({ tabs, active, onChange, prefix, label }) {
   return (
-    <div className="flex border-b border-white/[0.08] bg-[#14141d]/70 backdrop-blur-md px-6 shrink-0 overflow-x-auto no-scrollbar gap-2">
+    <div role="tablist" aria-label={label} className="flex border-b border-white/[0.08] bg-bg-secondary/70 px-4 sm:px-6 shrink-0 overflow-x-auto scrollbar-thin gap-1.5">
       {tabs.map(tab => {
         const isActive = active === tab.id
         return (
           <button
             key={tab.id}
+            id={`${prefix}-tab-${tab.id}`}
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={isActive ? `${prefix}-panel` : undefined}
+            tabIndex={isActive ? 0 : -1}
+            onKeyDown={event => {
+              const index = tabs.findIndex(item => item.id === tab.id)
+              const next = { ArrowRight: (index + 1) % tabs.length, ArrowLeft: (index - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key]
+              if (next === undefined) return
+              event.preventDefault()
+              onChange(tabs[next].id)
+              event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next]?.focus()
+            }}
             onClick={() => onChange(tab.id)}
             className={`relative px-4 py-3 text-[13px] font-semibold cursor-pointer transition-all duration-200 flex items-center gap-2 whitespace-nowrap rounded-t-xl ${
               isActive
                 ? 'text-white font-extrabold bg-white/[0.04]'
-                : 'text-text-muted hover:text-white/80 hover:bg-white/[0.02]'
+                : 'text-text-secondary hover:text-text-primary hover:bg-white/[0.02]'
             }`}
           >
             {tab.icon && (
@@ -66,10 +81,14 @@ export default function Settings({ onClose }) {
   )
 
   const t = useT()
+  const prefix = useId()
+  const dialogRef = useRef(null)
+  const closeButtonRef = useRef(null)
+  useDialogFocus(dialogRef, closeButtonRef, onClose)
   const currentTabs = [
     { id: 'general', label: t('tab.general', 'General'), icon: 'Gear' },
     { id: 'hsl', label: t('hsl.tab', 'Personalización & Temas'), icon: 'Palette' },
-    { id: 'account', label: t('tab.account', 'Cuenta'), icon: 'UserCircle' },
+    { id: 'account', label: t('tab.account', 'Cuenta'), icon: 'User' },
     { id: 'moderation', label: t('tab.moderation', 'Moderación'), icon: 'ShieldCheck' },
     { id: 'recording', label: t('tab.recording', 'Grabación'), icon: 'VideoCamera' },
     { id: 'advanced', label: t('tab.advanced', 'Avanzado'), icon: 'Sliders' },
@@ -83,7 +102,7 @@ export default function Settings({ onClose }) {
   })
 
   const [prefQuality, setPrefQuality] = useState(() => localStorage.getItem('blinkstream_quality') || '1080p60')
-  const [defaultVol, setDefaultVol] = useState(() => Number(localStorage.getItem('blinkstream_volume')) || 100)
+  const [defaultVol, setDefaultVol] = useState(() => readVolume())
   const [autoTheatre, setAutoTheatre] = useState(() => localStorage.getItem('blinkstream_auto_theatre') === 'true')
   const [chatOnRight, setChatOnRight] = useState(() => localStorage.getItem('blinkstream_chat_side') !== 'left')
   const [compactMode, setCompactMode] = useState(() => localStorage.getItem('blinkstream_compact') === 'true')
@@ -94,48 +113,43 @@ export default function Settings({ onClose }) {
   }, [activeTab])
 
   useEffect(() => { localStorage.setItem('blinkstream_quality', prefQuality) }, [prefQuality])
-  useEffect(() => { localStorage.setItem('blinkstream_volume', String(defaultVol)) }, [defaultVol])
+  useEffect(() => { setItem('blinkstream_volume', defaultVol) }, [defaultVol])
   useEffect(() => { localStorage.setItem('blinkstream_auto_theatre', String(autoTheatre)) }, [autoTheatre])
   useEffect(() => { localStorage.setItem('blinkstream_chat_side', chatOnRight ? 'right' : 'left') }, [chatOnRight])
   useEffect(() => { localStorage.setItem('blinkstream_compact', String(compactMode)) }, [compactMode])
 
   useEffect(() => {
-    const handleKey = (e) => { if (e.code === 'Escape') onClose() }
-    window.addEventListener('keydown', handleKey)
     window.dispatchEvent(new CustomEvent('bs:modal-state-change', { detail: { isModalOpen: true } }))
     return () => {
-      window.removeEventListener('keydown', handleKey)
       window.dispatchEvent(new CustomEvent('bs:modal-state-change', { detail: { isModalOpen: false } }))
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
       data-modal="true"
       className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/65 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
-      <div className="bg-[#12121a]/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.85)] w-full max-w-[880px] max-h-[88vh] flex flex-col overflow-hidden shrink-0" onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${prefix}-title`} tabIndex={-1} className="bg-bg-secondary/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.85)] w-full max-w-[880px] max-h-[88vh] flex flex-col overflow-hidden shrink-0" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] shrink-0">
           <div className="flex items-center gap-2">
-            <BlinkStreamLogo size={20} />
-            <h2 className="text-sm font-bold text-text-primary">{t('settings')}</h2>
+            <BlinkStreamLogo size={28} />
+            <h2 id={`${prefix}-title`} className="text-lg font-bold tracking-tight text-text-primary">{t('settings')}</h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors">
+          <button ref={closeButtonRef} aria-label={t('close', 'Cerrar')} onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 text-text-secondary hover:text-text-primary hover:bg-hover cursor-pointer transition-colors">
             <CloseIcon />
           </button>
         </div>
 
-        <Tabs tabs={currentTabs} active={activeTab} onChange={setActiveTab} />
+        <Tabs tabs={currentTabs} active={activeTab} onChange={setActiveTab} prefix={prefix} label={t('settings')} />
 
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div role="tabpanel" id={`${prefix}-panel`} aria-labelledby={`${prefix}-tab-${activeTab}`} tabIndex={0} className="flex-1 overflow-y-auto px-5 py-4">
           {activeTab === 'general' && (
             <div className="space-y-5">
               <div>
-                <label className="text-xs font-medium text-text-secondary mb-1.5 block">{t('set.streamQuality', 'Calidad de stream')}</label>
-                <select value={prefQuality} onChange={e => setPrefQuality(e.target.value)}
+                <label htmlFor={`${prefix}-quality`} className="text-xs font-medium text-text-secondary mb-1.5 block">{t('set.streamQuality', 'Calidad de stream')}</label>
+                <select id={`${prefix}-quality`} value={prefQuality} onChange={e => setPrefQuality(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl bg-[#13151c] text-white font-mono text-xs border border-white/10 focus:border-twitch focus:outline-none transition-all shadow-inner cursor-pointer">
                   <option value="1440p60">1440p60 (2K 💎)</option>
                   <option value="1080p60">1080p60 (Full HD ⚡)</option>
@@ -153,22 +167,22 @@ export default function Settings({ onClose }) {
                 <span className="text-sm text-text-primary">{t('set.defaultVolume', 'Volumen por defecto')}</span>
                 <span className="text-xs text-text-secondary font-mono">{defaultVol}%</span>
               </div>
-              <input type="range" min="0" max="100" value={defaultVol} onChange={e => setDefaultVol(Number(e.target.value))}
+              <input aria-label={t('set.defaultVolume', 'Volumen por defecto')} aria-valuetext={`${defaultVol}%`} type="range" min="0" max="100" value={defaultVol} onChange={e => setDefaultVol(Number(e.target.value))}
                 className="w-full h-1.5 rounded-lg appearance-none bg-bg-tertiary cursor-pointer accent-twitch" />
 
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-text-primary">{t('set.autoTheatre', 'Modo teatro automático')}</span>
-                <ToggleSwitch active={autoTheatre} onClick={() => setAutoTheatre(p => !p)} />
+                <ToggleSwitch label={t('set.autoTheatre', 'Modo teatro automático')} active={autoTheatre} onClick={() => setAutoTheatre(p => !p)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-text-primary">{t('set.chatRight', 'Chat a la derecha')}</span>
-                <ToggleSwitch active={chatOnRight} onClick={() => setChatOnRight(p => !p)} />
+                <ToggleSwitch label={t('set.chatRight', 'Chat a la derecha')} active={chatOnRight} onClick={() => setChatOnRight(p => !p)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-text-primary">{t('set.compactMode', 'Modo compacto')}</span>
-                <ToggleSwitch active={compactMode} onClick={() => setCompactMode(p => !p)} />
+                <ToggleSwitch label={t('set.compactMode', 'Modo compacto')} active={compactMode} onClick={() => setCompactMode(p => !p)} />
               </div>
 
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#181824] via-[#101018] to-[#161622] border border-white/[0.08] shadow-lg relative overflow-hidden">

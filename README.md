@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/source_version-1.4.3-e94560" alt="Source version 1.4.3">
+  <img src="https://img.shields.io/badge/source_version-1.4.4-e94560" alt="Source version 1.4.4">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
   <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
@@ -33,6 +33,9 @@ See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 | 🌧️ **Emote Rain & Combos** | Floating real-time emote particle overlays and dynamic neon Combo meter (HYPERS, SUPER, GODLIKE) |
 | 🔔 **Smart Chat Tabs** | Quick navigation bar filtering between All messages, @Mentions with live counter, and ⭐ Featured events |
 | 📺 **Live Streams** | Smooth Twitch stream playback using integrated Streamlink + FFmpeg engine |
+| 🧭 **Category Discovery** | Search games/categories, browse paginated results and filter live streams by language; clear loading/error states and readable language badges |
+| 🖥️ **Multi-Stream Grid** | Watch 2, 3 or 4 channels with cell-aware controls, centered loading/error states and visible-channel audio/chat selection |
+| 💬 **Unified Grid Chat** | Optional native merged feed with source labels, channel-specific emotes/badges and explicit single-recipient sending; moderation and Wi-Fi chat remain in Individual mode |
 | 🎬 **Clips & VODs** | Dedicated video-on-demand and clip player with selectable multi-quality tiers |
 | 📼 **Local Recording** | Built-in live recording system with automatic disk space monitoring and background encoding |
 | 🔐 **OAuth Authentication** | Secure Twitch login powered by Supabase Edge Functions with state-of-the-art token security |
@@ -49,7 +52,8 @@ See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 
 ### Windows
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-Version 1.4.3 is available. Updates require a compatible signing key and your confirmation.
+Source version 1.4.4 is a release candidate; the latest published download remains 1.4.3
+until cross-platform CI and publication finish. Updates require a compatible signing key and your confirmation.
 
 - ⭐ **`BlinkStream_1.4.3_Win_x64.exe`** *(Recommended NSIS installer, used by the updater)*
 - `BlinkStream_1.4.3_Win_x64.msi` *(Enterprise MSI installer)*
@@ -269,6 +273,9 @@ Publication is triggered by a version tag only after quality, bundles, Windows i
 and signature verification pass. CI publishes the complete release and updates `updater.json`.
 The app checks for updates automatically or manually; installation requires user confirmation.
 Small compatible fixes use stable PATCH releases, not suffixes on an already published version.
+Before every update/hotfix, keep source versions, release notes, this README, the repository
+roadmap and website roadmap aligned. `pnpm test:release` checks the documentation version markers.
+Only switch download links to the new version after the complete signed release is verified.
 See [hotfix procedure](docs/guides/HOTFIX_RELEASES.md) and [roadmap](ROADMAP.md).
 
 ---
