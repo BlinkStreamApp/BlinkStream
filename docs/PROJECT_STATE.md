@@ -41,6 +41,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
 - DEC-002 — Fuente y latest publicados 1.4.4; CI firmado y cuatro artefactos públicos del updater verificados.
+- Plan 2026-10-13 — Hitos consecutivos: 1.5 organización/chat, 1.6 continuidad/medios, 1.7 moderación, 1.8 integraciones, 1.9 consolidación, 2.0 rediseño completo. Entregas mínimas y ampliaciones PATCH; IA/plugins/Kick/YouTube condicionados y no bloqueantes de 2.0. Detalle en ROADMAP, sin nuevas fechas ni cambio de versión publicada.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
 - DEC-005 — Favoritos autorizados mediante identidad auth confiable, no metadata editable.
@@ -57,6 +58,8 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- Web: fix aislado `57ccd8d` subido y Pages desplegado/verificado, sin release/bump de app. Roadmap mantiene título/descripción/em/code inline; cabecera, tarjetas, mockup, footer y anclas adaptados a móvil. Revisión navegador de 320/390/768/1024/1440 px sin desbordamientos en bloques comprobados, imágenes/anclas locales correctas y sin errores de consola. Tres regresiones nuevas (22 tests release/documentación pasan); evidencia pública móvil en `scratch/website-roadmap-mobile-fixed.png`. No se incluyen los cambios locales de latencia en ese commit.
+- Fix en cola para 1.4.5: latencia HLS compartida objetivo 2 s, recuperación limitada a 1.1× y sin controlador manual competidor; pausa/DVR manual desactivan catch-up y buffer precargado intacto. Usuario acepta 2.5 s de latencia/2.3 s de buffer en el principal (captura Twitch, 2026-10-13), no garantía universal. 632 frontend pasan/1 omitido, 19 release/documentación y lint/legacy/build Windows correctos. Ejecutable de prueba `src-tauri/target/release/blinkstream-latency-test-20261013.exe`; no instalado por el agente. Pendientes grid real, pausa/DVR y estabilidad sostenida, más CI firmado antes de publicar. Versión publicada/fuente sigue 1.4.4; petición actual solo añade el fix a la próxima entrega.
 - 1.4.4 publicada/latest: tag `3ac7b7a`; candidata CI `38449215321` y tag CI `38451126905` correctos. Cuatro targets firmados, smoke NSIS y verificación independiente de firmas/hashes de los cuatro artefactos públicos. Updater público/master coherentes tras normalizar CRLF; clave sin cambios. README/roadmaps/web sincronizados.
 - Categorías, filtro de idioma/paginación y pulido UI/grid aceptados por el usuario. Chat unificado opcional para canales visibles, destino explícito con JOIN confirmado, recursos/dedupe/borrados aislados y drafts seguros; chat oficial, moderación y Companion permanecen Individual.
 - Validación: 623 frontend pasan/1 omitido, 56 Rust Windows, 19 release/firma/documentación; lint/legacy/fmt/Clippy, GLib optimizado, builds firmados y smoke correctos. Responsive/chat verificados con sockets simulados; envío Twitch real, audio/teclado nativos independientes y desktop de otras plataformas no certificados por mocks.
@@ -67,10 +70,11 @@ NOW:
 NEXT:
 - Prueba GUI voluntaria desde 1.4.1 y de conservación de settings/sesión, sin instalar automáticamente en el PC del usuario. Linux updater integrado requiere AppImage; `.deb` se actualiza manualmente/mediante paquetes.
 - Validar canje EventSub real, Auto-Claim independiente y pausa/aislamiento del reporte nativo.
-- VOD resume/bookmarks, perfiles de workspace y audio principal multistream.
+- 1.5: colecciones, categorías favoritas/ocultas y búsqueda del chat de sesión; después 1.6 VOD/bookmarks, workspaces y audio principal antes de ahorro/replay/biblioteca.
 - Supabase: desplegar funciones/migración solo con autorización aparte.
 
 LATER:
+- 1.7–1.9: consolidación de moderación, agenda/enlaces/privacidad e integraciones opcionales; baseline, migraciones y prototipos antes de rediseñar todas las pantallas en 2.0, conservando marca/paridad funcional. Ver ROADMAP.
 - Retirar vendor GLib cuando GTK/Tauri tengan una dependencia oficial corregida compatible.
 - Activar protección de contraseñas filtradas en Supabase tras autorización.
 

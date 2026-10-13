@@ -12,15 +12,17 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 
 ## Orden de ejecución
 
-| Bloque | Entrega | Dependencias | Criterio de cierre | Estado |
+| Orden | Hito / bloque | Dependencias | Criterio de cierre | Estado |
 | --- | --- | --- | --- | --- |
-| 0. Categorías y UI/grid | Categorías, idioma/paginación, pulido de Ajustes y grid, chat unificado con destino seguro | Sesión Twitch, Helix/IRC y componentes existentes | Regresiones, aceptación del usuario y CI firmado de cuatro targets; documentar límites de pruebas reales | Publicada 1.4.4; envío Twitch real y audio nativo independientes pendientes |
-| 1. Fiabilidad Twitch y teclado | Sustituir PubSub por EventSub para canjes personalizados, informar de permisos/conexión, separar atajos y validar Drops | Cuenta autorizada, campaña elegible y sesión real | Sin conexiones PubSub; reconexión/cleanup probados; atajos sin dobles acciones; aumento real de minutos y reclamo comprobados | En curso |
-| 2. Continuar viendo | Posición de VOD, lista para más tarde y marcadores con notas | Identidad estable de VOD/canal y almacenamiento existente | Recuperar posición tras reiniciar; gestionar marcadores; enlaces ausentes tratados | Pendiente |
-| 3. Espacios de trabajo | Perfiles de canales, distribución, volumen y calidad; audio principal en multistream | Bloque 1 y layouts existentes | Restaurar un perfil sin procesos huérfanos ni sonido inesperado | Pendiente |
-| 4. Consumo y avisos | Ahorro al minimizar/streams secundarios, horarios silenciosos y filtros de alertas | Bloques 1 y 3 | Comparar recursos antes/después; respetar grabación y Drops; evitar avisos repetidos | Pendiente |
-| 5. Recuperar momentos | Prototipo de buffer circular en disco y guardar últimos 30–120 s | Reproducción/grabación estable y FFmpeg disponible | Límite de disco, limpieza, continuidad del fragmento y consumo medidos en un stream antes de ampliar | Pendiente |
-| 6. Biblioteca y comodidad | Biblioteca de capturas/grabaciones/fragmentos, diagnóstico accesible y modo de interfaz sencilla | Bloques 2, 3 y 5 | Buscar/abrir archivos; tratar archivos movidos; informe sin secretos; herramientas avanzadas opcionales | Pendiente |
+| 0 | 1.4.4 categorías/UI/chat unificado | Componentes existentes, Helix/IRC | Publicación y CI firmados; aceptación específica registrada | Publicada; checks independientes de envío/audio pendientes |
+| 1 | 1.4.5 fiabilidad/latencia y validaciones Twitch | HLS, campañas/cuentas autorizadas | Grid, pausa/DVR, estabilidad y CI; separar crédito/reclamo/inventario | Principal: 2.5 s aceptados; resto pendiente |
+| 2 | 1.5 organización y chat | Cache por cuenta, favoritos y feed acotado | Colecciones, categorías favoritas/ocultas y búsqueda de sesión sin fuga al salir ni recursos cruzados | Planificada |
+| 3 | 1.6.0 continuidad/workspaces | Identidad VOD y persistencia existentes | Reinicio/restauración, medios ausentes, cleanup y audio principal correctos | Planificada |
+| 4 | 1.6.x consumo/medios | Bloque 3, FFmpeg y disco acotado | DVR/audio existentes validados → ahorro/avisos → recorte/replay → biblioteca → temporizador; respetar grabación | Planificada |
+| 5 | 1.7 moderación/eventos/control | Cuenta creadora autorizada, Helix/EventSub | Feed y predicciones/encuestas con permisos/confirmaciones, atajos sin conflictos, HUD y Drops probados por separado | Código parcial existente; consolidación pendiente |
+| 6 | 1.8 integraciones/comodidad | Endpoints permitidos y contratos por OS | Agenda/DST, enlaces seguros y privacidad; RPC/Stream Deck opcionales e importación sin secretos | Planificada; traducción/VOD chat condicionados |
+| 7 | 1.9 consolidación/prototipos | Bloques anteriores y hardware de referencia | Migraciones/recuperación, regresiones y accesibilidad; prototipos aceptados y baseline de rendimiento | Planificada |
+| 8 | 2.0 rediseño integral | Mapa de navegación, tokens, componentes y migraciones 1.9 | Paridad funcional y migración por pantallas, beta, pruebas nativas de tres plataformas, CI/updater firmados | Hito mayor aprobado para planificación |
 
 ## Primer bloque: tareas y evidencia
 
@@ -44,10 +46,18 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 - El DVR actual usa el rango disponible del reproductor; no garantiza un historial completo del directo.
 - Separar "implementado", "probado automáticamente" y "validado en sesión real"; no marcar una función terminada solo porque compila.
 
-## Después
+## Alcance y siguiente ejecución
 
-Chat sincronizado en VODs, Discord RPC y Stream Deck quedan después del núcleo anterior.
-IA local y soporte de otras plataformas permanecen como investigación, sin compromiso de versión.
+El detalle funcional y las reasignaciones de la antigua 1.5/1.6 están en [ROADMAP.md](../ROADMAP.md); no mantener listas paralelas divergentes.
+
+1. Cerrar las pruebas pendientes de 1.4.5, sin publicar solo por el resultado de 2.5 s del principal.
+2. Inspeccionar favoritos/cache/chat y prototipar el bloque mínimo 1.5 (20 canales y dos fuentes de chat); reutilizar almacenamiento y mantener aislamiento por cuenta.
+3. Implementar y validar colecciones, preferencias de categorías y búsqueda en incrementos separados.
+4. Dimensionar VOD/workspaces antes de abrir el bloque de medios; no activar todo 1.6 simultáneamente.
+
+Cada hito distingue entrega mínima de ampliaciones posteriores. IA/plugins/nuevas plataformas se investigan aparte y no bloquean el rediseño 2.0. Agenda depende de horarios publicados; VOD chat requiere una fuente permitida verificada. No hay fechas cerradas ni garantía universal de latencia.
+
+Planificación no cambia la versión fuente/latest (1.4.4), no despliega cloud y no autoriza instalaciones. Al publicar: README/roadmaps/web/notas y metadata coherentes; evitar que un cambio documental arrastre los fixes locales sin validar.
 
 Fuentes de integración: [EventSub WebSocket](https://dev.twitch.tv/docs/eventsub/handling-websocket-events/),
 [tipos de suscripción](https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/) y

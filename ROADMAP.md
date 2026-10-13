@@ -36,11 +36,18 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 Validation: 623 frontend tests pass, one skipped; 56 Rust Windows tests and 19 release/signature/documentation tests pass locally. Lint/legacy/fmt/Clippy, optimized GLib tests, signed four-target builds and NSIS smoke pass CI. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
 Now: 1.4.4 published; maintain documentation/site coherence and record outstanding live integration checks.
-Next: VOD resume/bookmarks and workspace profiles, alongside outstanding Twitch reliability checks.
-Then: resource saving, selective alerts, replay buffer and a local media library.
-AI, additional platforms and hardware integrations remain later work.
+Next: close 1.4.5 validation, then 1.5 organization/chat improvements and 1.6 VOD/workspaces/media.
+Then: 1.7 moderation, 1.8 integrations and 1.9 consolidation.
+2.0 centers on a complete interface redesign; AI, additional platforms and plugins remain conditional.
 
 ---
+
+## Next release fix list — 1.4.5 (not published)
+
+- **Lower live video latency:** implemented locally in the main player and multistream grid. Shared HLS target of 2 seconds, bounded catch-up at 1.1× and removal of the competing manual live controller; preload buffers remain unchanged and manual DVR/pause disable catch-up.
+- **User evidence (2026-10-13):** main-player screenshot shows 2.5 seconds latency and 2.3 seconds buffer; the user accepts this result. This is one observed Twitch session, not a guaranteed latency across channels/networks.
+- **Validation:** 632 frontend tests pass/one skipped, 19 release/documentation tests, lint/legacy and local Windows build pass. Live grid, pause/DVR and sustained stability checks remain pending, alongside signed cross-platform release CI.
+- **Delivery:** queued for the next PATCH update; source/downloads/updater remain 1.4.4 until the release workflow is completed. Existing VOD/workspace priorities are unchanged.
 
 ## 1.4.4 delivery — Category discovery and UI (2026-10-13)
 
@@ -144,79 +151,127 @@ AI, additional platforms and hardware integrations remain later work.
 
 ---
 
-## 🎯 Phase 5: v1.5.0 — Moderation Suite, Predictions, Live DVR & Media Tools [NEXT IMMEDIATE MILESTONE]
-*Focus: Advanced mod feed filtering, interactive prediction widgets, hotkeys, live DVR timeline, and acoustic comfort compression.*
+## Plan secuencial: 1.5 → 2.0 (2026-10-13)
 
-### 🎨 UI & UX Improvements
-- **🌟 Feed de Actividad Avanzado**:
-  - Píldoras de filtro en vivo: `[ Todos ]` `[ 💎 Canjes ]` `[ ⭐ Subs & Raids ]` `[ 🛡️ Moderación ]`.
-  - Contador de sesión: Indicador visual en tiempo real de puntos acumulados / canjeados (ej. `💎 13,450 pts hoy`).
-  - Búsqueda instantánea de usuarios o recompensas en el historial.
-- **🎲 Widget de Predicciones y Encuestas en Vivo (Predictions & Polls)**:
-  - Creación y gestión en 1 clic de apuestas/votaciones desde Mod View sin abrir la web de Twitch.
-  - Barras dinámicas de porcentajes y puntos apostados en tiempo real.
-  - Declaración de opción ganadora o cancelación con devolución de puntos.
-- **⌨️ Hotkeys & Shortcuts Configurables**:
-  - Captura: `Ctrl/Cmd + Shift + S`; no reutilizar este atajo para moderación.
-  - `Ctrl + Shift + G`: propuesta para Modo Escudo, pendiente de implementar.
-  - `Ctrl + Shift + C`: Vaciar chat del canal.
-  - `Espacio` / `K`: Pausar / Reanudar reproducción; la pausa de scroll tendrá un atajo propio.
-  - `M`: Silenciar / Activar sonido instantáneo.
-  - Separar atajos de aplicación de los atajos globales del sistema operativo; estos últimos quedan pendientes.
-- **Overlay Gamer Transparente (Click-Through Chat HUD)**: Mini-ventana translúcida para jugar en pantalla completa sin interrumpir clics.
-- **Live Stream Rewind & DVR Timeline**: Rebobinado instantáneo en buffer RAM (`J`/`K`/`L`) y rebobinado completo con botón `[🔴 EN VIVO]`.
+Los números siguientes son hitos de producto, no fechas ni versiones publicadas.
+Cada hito comienza con una entrega mínima; ampliaciones compatibles salen como PATCH
+consecutivos cuando están probadas. No saltar de versión para cada idea ni esperar
+a terminar todo un hito para entregar una corrección validada.
 
-### ⚙️ Core Functionality
-- **🔊 Alertas Visuales y Sonoras de Moderación**: Notificaciones acústicas sutiles configurables ante canjes prioritarios o picos inusuales de actividad.
-- **Modo Nocturno / Compresor de Audio (Loudness Equalizer)**: Compresión de rango dinámico por software (Web Audio API) para amortiguar gritos y explosiones y amplificar diálogos suaves.
-- **Audio Estéreo Separado en Multi-Stream**: Enrutado binaural (Canal 1 a oído izquierdo, Canal 2 a oído derecho).
-- **Automated Twitch Drops Tracker & Auto-Claimer**: Validar por separado inventario, acreditación real de minutos y reclamo antes de marcarlo completado.
-- **Descargador de VODs y Clips con Recorte Temporal**: Descarga en MP4 seleccionando marcas de inicio y fin (*ej. min 12:30 al 18:45*).
+**Estado:** 1.4.4 publicada; 1.4.5 en cola. Todas las iniciativas nuevas son planificación.
+Codex se encarga de implementación/regresiones; el usuario acepta los flujos reales.
+Antes de cada hito: revisar el código existente, reutilizarlo y verificar permisos,
+consumo, migraciones y límites del proveedor. Ninguna prueba simulada certifica Twitch real.
 
----
+| Orden | Hito | Entrega mínima / prioridad | Dependencia y cierre |
+| --- | --- | --- | --- |
+| 0 | 1.4.5 — Fiabilidad | Latencia y regresiones de pausa/DVR/grid; continuar validación Twitch | Prueba real, CI firmado y updater; 2.5 s observados no son garantía universal |
+| 1 | 1.5 — Organización y uso diario | Colecciones, categorías favoritas/ocultas y búsqueda del chat de sesión | Aislamiento por cuenta y búsquedas acotadas; no fuga de datos al salir |
+| 2 | 1.6 — Reproducción y medios | Continuar VOD, workspaces y herramientas de medios fiables | Identidad VOD, cleanup y almacenamiento limitado; medir CPU/RAM/disco |
+| 3 | 1.7 — Control y moderación | Consolidar feed, predicciones/encuestas y atajos | Cuenta autorizada y permisos reales; acciones confirmadas por servidor |
+| 4 | 1.8 — Integraciones y comodidad | Agenda, enlaces de app, privacidad y ecosistema | APIs oficiales y contratos por OS; no ejecutar acciones desde enlaces |
+| 5 | 1.9 — Consolidación para 2.0 | Migraciones/backup seguro, accesibilidad y prototipos opt-in | Ensayo de actualización/recuperación y presupuesto de rendimiento |
+| 6 | 2.0 — Rediseño integral | Nueva navegación, sistema visual y todas las pantallas coherentes | Prototipos aceptados, migración incremental y paridad funcional |
 
-## 📋 Phase 6: v1.6.0 — Chat Translator, Discord RPC & Ecosystem [PLANNED]
-*Focus: Real-time translation, peripheral integration, and automated community engagement.*
+### 1.5.x — Organización, descubrimiento y chat [NEXT / PLANNED]
 
-### 🎨 UI & UX Improvements
-- **Traductor en Vivo de Chat Multilingüe**: Traducción en tiempo real de mensajes a tu idioma nativo con un solo clic.
-- **Tipografías y Badges Personalizables**: Integración de fuentes Google Fonts, interlineado y reemplazo de iconos estándar.
-- **Bandwidth Saver Mode**: Reducción automática a 160p o solo audio al minimizar a la bandeja del sistema.
+**Objetivo:** encontrar lo que quieres ver y navegar por el chat con menos esfuerzo, sin rediseñar aún toda la app.
 
-### ⚙️ Core Functionality
-- **🎮 Discord Rich Presence (RPC)**:
-  - Estado detallado en Discord con canal, categoría/juego, carátula y botón interactivo *"Ver en BlinkStream"*.
-- **🎛️ Plugin Oficial para Elgato Stream Deck**:
-  - Acciones físicas en hardware: cambio de canal, silenciar, activar PiP, lanzar canjes de puntos y activar Modo Escudo.
-- **Asistente Automatizado de Puntos de Canal**: Reglas de apuesta inteligentes para pronósticos.
-- **Historial de Chat Sincronizado en VODs (Time-Synced Replay)**: Reproducción del chat original alineado al segundo exacto.
+**Entrega mínima (1.5.0):**
+- **Colecciones de canales — nuevo:** listas propias (Gaming, Esports, Para escuchar), orden manual y acceso rápido. No confundir con workspaces: no guardan layout ni lanzan varios streams automáticamente.
+- **Categorías favoritas y contenido oculto — nuevo:** fijar juegos y ocultar canales/categorías en Explorar; posibilidad de deshacer y gestionar exclusiones. Sin recomendaciones opacas ni filtros de Drops no verificables.
+- **Búsqueda del chat de sesión — nuevo:** texto, usuario, enlaces y canal de origen en el chat unificado. Solo mensajes realmente recibidos y conservados; mantener los borrados de moderación y el límite de historial.
 
-### Prioritized desktop experience improvements
+**Ampliaciones posteriores del hito:** orden/filtros de colecciones y navegación con teclado, reutilizando la infraestructura existente. Sin persistir conversaciones por defecto.
 
-- **Continue Watching & Bookmarks**: Posición de VOD, lista para más tarde y momentos guardados con notas.
-- **Workspace Profiles**: Restaurar canales, distribución, calidad y volumen; seleccionar el audio principal del multistream.
-- **Selective Alerts**: Ampliar alertas existentes con horarios silenciosos y filtros por categoría/cambio de juego.
-- **Replay Buffer**: Guardar los últimos 30–120 segundos mediante un buffer circular en disco con límites y cleanup.
-- **Local Media Library**: Capturas, grabaciones y fragmentos con miniaturas, búsqueda y etiquetas.
-- **Simple Interface & Playback Diagnostics**: Herramientas avanzadas opcionales y recuperación guiada de fallos sin exponer secretos.
+**Cierre:** crear/editar/borrar y restaurar listas; búsqueda sin bloquear reproducción; cambio de cuenta/logout sin datos ajenos. Validar primero un prototipo con 20 canales y chat de dos fuentes, antes de ampliar.
 
-Their delivery order is defined by the execution plan, without assigning unvalidated features to a release date.
+### 1.6.x — Reproducción, continuidad y biblioteca [PLANNED]
 
----
+**Entrega mínima:** continuar VOD con posición, lista para más tarde y bookmarks con notas; workspaces de canales/layout/calidad/volumen y audio principal. Canales/VOD retirados deben tener estado explícito, no restauración infinita.
 
-## 🌌 Phase 7: v2.0.0 — On-Device AI Intelligence & Global Overlays [HORIZON]
-*Focus: Lightweight on-device intelligence, OBS integration, and multi-platform broadcasting.*
+**Entregas posteriores, en este orden:**
+1. Consolidar DVR y vuelta al directo, compresor nocturno y audio binaural ya existentes; no prometer rebobinado completo ni salida a dispositivos distintos sin implementación/prueba específica.
+2. Ahorro de recursos al minimizar o en streams secundarios, horarios silenciosos y avisos por categoría/cambio de juego; respetar grabación y mostrar el efecto sobre Drops.
+3. Recorte temporal de VOD/clips y replay buffer circular de 30–120 s, comenzando con un solo stream; cancelación, disco lleno y cleanup obligatorios.
+4. Biblioteca local de capturas/grabaciones/fragmentos: miniaturas, etiquetas, búsqueda y tratamiento de archivos movidos.
+5. **Temporizador de reproducción — nuevo:** detener vídeo/audio por duración/hora, aviso cancelable y protección explícita de grabaciones activas.
 
-### 🧠 On-Device AI & Analytics
-- **Resumen Inteligente "Me lo perdí" (AFK Catch-Up)**: Resumen en 3 viñetas de lo ocurrido en el directo durante una pausa mediante modelos locales (Ollama / LLM local).
-- **Detector de Momentos Épicos (Climax Heatmap)**: Gráfica de calor sobre la barra temporal detectando picos de emotes (`POGGERS`, `KEKW`, `LUL`).
-- **Subtítulos y Traducción de Voz en Directo con IA**: Transcripción a ultra-baja latencia con Whisper/Silero VAD.
+**Cierre:** restaurar VOD/workspace tras reiniciar sin procesos huérfanos; cero volumen conservado; medir consumo y límites de disco con FFmpeg real. Buffer y biblioteca no deben retrasar el directo.
 
-### 🔌 Extensibility & Overlays
-- **🎨 Plugins y Overlays para OBS**:
-  - Exportación de fuentes de navegador (Browser Sources) generadas por BlinkStream para streamers (alertas de canjes, chat overlay limpio).
-- **🌐 Compatibilidad Multi-Plataforma**:
-  - Soporte integrado para Kick y YouTube Live dentro del mismo panel Multi-Stream y Chat unificado.
-- **📊 Panel de Estadísticas en Vivo**:
-  - Gráficas de espectadores, velocidad de chat y canjes más populares de la sesión.
-- **Distribución Universal**: Paquetes oficiales para Flatpak y Homebrew.
+### 1.7.x — Moderación, eventos y control [PLANNED / EXISTING CODE TO VALIDATE]
+
+**Entrega mínima:** consolidar Mod View y feed de actividad existentes con filtros Todos/Canjes/Subs-Raids/Moderación, búsqueda y deduplicación. Contadores de sesión solo de eventos observados; no inventar el saldo privado de puntos de un espectador.
+
+**Entregas posteriores:**
+- Predicciones/encuestas: permisos explícitos, creación/resolución/cancelación según Helix, progreso y confirmaciones para operaciones irreversibles; no presentar al moderador como creador autorizado.
+- Atajos configurables con conflictos detectados, edición/restauración y aislamiento de inputs/modales. Conservar captura Ctrl/Cmd+Shift+S; acciones destructivas no se disparan por accidente. Atajos globales del OS son un bloque separado.
+- HUD/overlay gamer, acciones rápidas, AutoMod y alertas visuales/sonoras: comprobar transparencia, click-through, foco y lifecycle nativos.
+- Drops: continuar verificación independiente de inventario, crédito real y Auto-Claim; pausa persistida ante incertidumbre y controles oficiales dentro de la app. Validación transversal, no requisito para que el resto de 1.7 pueda salir.
+
+**Cierre:** sesión autorizada real, ausencia de duplicados/reconexiones huérfanas y rechazo seguro al perder permisos. Moderación/Companion siguen individuales hasta que exista un contrato seguro de destino.
+
+### 1.8.x — Agenda, privacidad e integraciones [PLANNED]
+
+**Entrega mínima:**
+- **Agenda — nuevo:** horarios publicados por streamers favoritos en zona local; vacaciones/cancelaciones y canales sin agenda diferenciados. Programado no significa realmente en directo.
+- **Enlaces de BlinkStream — nuevo:** pegar enlaces Twitch y abrir enlaces de app en la instancia existente. Lista permitida de destinos; nunca aceptar comandos, rutas de disco o acciones de moderación desde una URL.
+- **Modo presentación/privacidad — nuevo:** ocultación temporal de identidad, listas y previsualizaciones al compartir pantalla. No equivale a anonimato ni garantiza ocultar contenido a todas las herramientas de captura.
+
+**Ampliaciones:** Discord RPC opt-in; Stream Deck sobre acciones existentes; exportación/importación de preferencias y colecciones sin tokens/cookies ni conversaciones. Firma/esquema/tamaño de importación validados y vista previa antes de sobrescribir.
+
+**Condicionado:** traducción de chat bajo demanda, con proveedor/coste/privacidad claros, original visible y caché acotada. Nada se envía a terceros sin consentimiento. Repetición de chat VOD solo si se verifica una fuente permitida de datos; ausencia de API/datos significa aplazar, no simular historial.
+El asistente de puntos conserva su lugar como investigación: no automatizar apuestas sin API autorizada y confirmación específica.
+
+**Cierre:** zona horaria/DST correctos; enlaces maliciosos rechazados; RPC apagado no filtra actividad; integraciones opcionales sin afectar arranque.
+
+### 1.9.x — Consolidación y preparación del rediseño [PLANNED]
+
+**Entrega mínima:** cerrar regresiones, validar actualización/conservación de preferencias y rollback; diagnósticos sin secretos; auditar teclado, foco, contraste, lector de pantalla y traducciones (incluidos fallbacks actuales, no afirmar cobertura completa).
+
+**Preparación 2.0:** inventario de pantallas/componentes, mapa de navegación, tokens visuales, presupuestos de CPU/RAM/latencia y prototipos del inicio, reproductor, chat y grid. Recoger aceptación antes de trasladar todas las pantallas.
+
+**Prototipos aislados / opcionales:**
+- Estadísticas locales de sesión (espectadores, velocidad de chat, eventos recibidos) y heatmap de actividad, sin analítica remota oculta.
+- AFK Catch-Up basado en chat observado; no confundir resumen del chat con comprensión de todo el vídeo.
+- Subtítulos/transcripción local: comparar exactitud, idiomas, carga y retardo en hardware de referencia antes de integrar.
+- Evaluar distribución Flatpak/Homebrew y contratos de OBS/plugins/otras plataformas, sin cambiar permisos o pipeline hasta un diseño revisado.
+
+**Cierre:** recorridos críticos estables en Windows/macOS/Linux, migraciones reversibles y prototipos aceptados; IA desactivada no carga modelos ni consume recursos extra.
+
+### 2.0 — Rediseño completo de interfaz y experiencia [PLANNED MAJOR MILESTONE]
+
+**Compromiso principal:** rediseñar la app completa, no cambiar solo la paleta ni rehacer el backend.
+
+1. **Arquitectura de navegación:** Inicio, Explorar, Colecciones, Continuar viendo, Biblioteca, Multistream y herramientas de creador con rutas claras y retorno al contexto anterior.
+2. **Sistema visual unificado:** tipografía, jerarquía, espaciado, iconos, botones, tarjetas, formularios, estados y motion; temas y densidad sobre tokens comunes. Preservar el logo aprobado y Blink blanco + Stream violeta→fucsia salvo nueva decisión del usuario.
+3. **Reproductor y chat:** controles consistentes, paneles redimensionables, destinos/fuentes inequívocos, modo individual/unificado y foco/lectura accesibles; overlays discretos sin penalizar reproducción.
+4. **Rediseño de todas las superficies:** bienvenida/sesión, cabecera/sidebar, categorías, canal, VOD, grid, chat, Drops, Ajustes, About/updater, Mod View, grabación/biblioteca y Companion.
+5. **Adaptabilidad y accesibilidad:** ventanas pequeñas, ultrawide y escalado 100/125/150/200%; teclado/lector de pantalla, contraste y movimiento reducido. Sin aumentar ventanas independientes por defecto.
+6. **Migración y paridad:** preservar preferencias, colecciones, identidad/sesión y workspaces; introducir por pantallas/beta, no una reescritura ciega. Ensayar backup/recuperación y upgrades antes de retirar el diseño anterior.
+7. **Web/documentación:** actualizar landing, capturas y guías con la identidad 2.0, sin anunciar funciones no entregadas.
+
+**Aceptación:** prototipos aprobados → sistema de componentes → migración por pantallas → beta → pruebas reales por plataforma → release firmada. Sin regresiones en playback/chat/Drops/cleanup; comparar rendimiento con 1.9 en el mismo hardware, canales y calidad. La cifra objetivo se fija con esa línea base, no con promesas de marketing.
+
+**Extensiones condicionadas para 2.0.x, no bloqueantes del rediseño:**
+- IA local, resumen AFK, heatmap y subtítulos, solo si pasan pruebas de calidad/consumo y quedan opt-in.
+- Fuentes OBS y SDK de plugins/widgets con API aislada, revisión de permisos, procedencia y sin acceso Tauri arbitrario.
+- Adaptadores Kick/YouTube Live, únicamente tras comprobar reproducción/chat/auth permitidos y límites de cada proveedor; no prometer chat unificado universal.
+- Distribución Flatpak/Homebrew tras validar firma, actualización y mantenimiento de paquetes.
+
+### Qué cambia respecto al roadmap anterior
+
+- Se mantienen las fases históricas 1.1–1.4 y su evidencia; no se vuelven a vender funciones existentes como nuevas.
+- La antigua 1.5 concentraba moderación, DVR, audio y medios: ahora organización es 1.5, reproducción/medios 1.6 y consolidación de moderación 1.7.
+- VOD/workspaces siguen antes de ahorro/replay/biblioteca, respetando el orden de dependencias del plan de ejecución.
+- La antigua 1.6 distribuye ahorro a 1.6, Discord/Stream Deck/traducción/VOD chat a 1.8 y tipografía/accesibilidad al diseño 1.9–2.0.
+- El horizonte 2.0 deja de depender de entregar simultáneamente IA, todas las plataformas y plugins. Su requisito central es el rediseño completo; el resto mantiene una vía condicionada sin fecha impuesta.
+- Las siete propuestas nuevas quedan asignadas: colecciones/búsqueda/categorías a 1.5, temporizador a 1.6, agenda/enlaces/privacidad a 1.8. No se elimina ninguna línea histórica; se corrigen garantías no demostradas.
+
+### Dependencias y política de alcance
+
+Revisar alcance antes de cada versión inicial: Must = entrega mínima/cierre; Should = siguientes incrementos; Could = extensiones condicionadas.
+Si una API, permiso, hardware o migración bloquea una ampliación, aplazar ese elemento explícitamente en lugar de ampliar permisos o detener todas las entregas.
+No hay calendario cerrado hasta dimensionar y validar cada bloque. No desplegar Supabase ni instalar en el PC del usuario por aprobar este plan.
+
+Referencias de viabilidad: [Agenda Twitch](https://dev.twitch.tv/docs/api/schedule/), [Helix predicciones/encuestas](https://dev.twitch.tv/docs/api/reference/), [Enlaces Tauri](https://tauri.app/plugin/deep-linking/).

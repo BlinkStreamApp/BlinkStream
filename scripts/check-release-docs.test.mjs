@@ -46,3 +46,13 @@ test('website cards and navigation handle narrow screens without fixed minimum w
 test('website text has no replacement characters or common broken UTF-8 sequences', () => {
   assert.doesNotMatch(readReleaseDocs().website, /\uFFFD|Ã[\u0080-\u00BF]|â€/)
 })
+
+test('planned milestones through 2.0 appear in both repository and website roadmaps', () => {
+  const { roadmap, website } = readReleaseDocs()
+  for (const version of ['1.5.x', '1.6.x', '1.7.x', '1.8.x', '1.9.x', '2.0']) {
+    assert.ok(roadmap.includes(`### ${version} —`), `Missing repository milestone ${version}`)
+    assert.ok(website.includes(`v${version} —`), `Missing website milestone ${version}`)
+  }
+  assert.match(roadmap, /### 2\.0 — Rediseño completo/)
+  assert.match(website, /v2\.0 — Rediseño completo/)
+})

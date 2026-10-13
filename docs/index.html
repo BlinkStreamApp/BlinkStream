@@ -863,7 +863,7 @@
     <p class="section-desc">
       Una visión transparente de nuestra evolución arquitectónica y visual. Nuestro objetivo es liderar el estándar mundial en clientes de streaming nativo de escritorio.
     </p>
-    <p class="section-desc">1.4.4 publicada: categorías más intuitivas, UI pulida y chat unificado del grid. Builds firmados y updater verificados para Windows, macOS Intel/Apple Silicon y Linux.</p>
+    <p class="section-desc">1.4.4 publicada y 1.4.5 en cola. Los hitos 1.5–2.0 siguientes son planificación, no funciones entregadas ni fechas cerradas. La 2.0 incluye un rediseño completo de la app.</p>
 
     <div class="roadmap-container">
       <div class="timeline">
@@ -955,77 +955,151 @@
           </div>
         </div>
 
-        <!-- Phase 5 -->
+        <!-- Planned milestone 1.5.x -->
         <div class="timeline-item">
           <div class="timeline-dot dot-future"></div>
           <div class="timeline-header">
-            <div class="timeline-title">Fase 5: v1.5.x — Live DVR, Media Archive & Loudness Equalizer</div>
-            <span class="timeline-tag tag-plan">Siguiente Hito 🎯</span>
+            <div class="timeline-title">Fase 5: v1.5.x — Organización, descubrimiento y chat</div>
+            <span class="timeline-tag tag-plan">Siguiente hito</span>
           </div>
           <div class="roadmap-cols">
             <div class="roadmap-col">
-              <h4>🎨 Mejoras UI / UX & Control</h4>
+              <h4>Colecciones y categorías</h4>
               <ul class="roadmap-list">
-                <li><strong>Live Stream Rewind & DVR:</strong> Barra de tiempo para rebobinar el directo al instante (30s-2m) y acceso a repetición completa con botón <code>[🔴 EN VIVO]</code>.</li>
-                <li><strong>Audio Estéreo Separado en Multi-Stream:</strong> Asignación binaural (canal 1 al oído izquierdo, canal 2 al derecho o a dispositivos distintos).</li>
+                <li><strong>Colecciones de canales:</strong> Listas propias y orden manual, separadas de los perfiles de workspace.</li>
+                <li><strong>Categorías favoritas y ocultas:</strong> Fijar juegos, excluir contenido y deshacer preferencias por cuenta.</li>
               </ul>
             </div>
             <div class="roadmap-col">
-              <h4>⚙️ Funcionalidades Core</h4>
+              <h4>Chat y aceptación</h4>
               <ul class="roadmap-list">
-                <li><strong>Compresor de Audio / Modo Nocturno:</strong> Nivelación dinámica de picos y realce de voces (Web Audio API) para ver directos de noche sin sobresaltos.</li>
-                <li><strong>Descargas con Recorte de Tiempo:</strong> Descarga directa en MP4 de fragmentos específicos de VODs y clips sin bajar archivos de 8 horas.</li>
-                <li><strong>Auto-Claimer de Twitch Drops:</strong> Recolección automática de recompensas de videojuegos en segundo plano con seguimiento de %.</li>
+                <li><strong>Búsqueda de sesión:</strong> Texto, usuario, enlaces y origen entre mensajes realmente recibidos; respetar borrados.</li>
+                <li><strong>Entrega mínima:</strong> Validar aislamiento por cuenta y rendimiento antes de ampliar; sin nueva fecha de release.</li>
               </ul>
             </div>
           </div>
         </div>
 
-        <!-- Phase 6 -->
+        <!-- Planned milestone 1.6.x -->
         <div class="timeline-item">
           <div class="timeline-dot dot-future"></div>
           <div class="timeline-header">
-            <div class="timeline-title">Fase 6: v1.6.x — Traductor de Chat, Discord & Periféricos</div>
-            <span class="timeline-tag tag-plan">Planificada 🔮</span>
+            <div class="timeline-title">Fase 6: v1.6.x — Reproducción, continuidad y medios</div>
+            <span class="timeline-tag tag-plan">Planificada</span>
           </div>
           <div class="roadmap-cols">
             <div class="roadmap-col">
-              <h4>🎨 Mejoras UI / UX & Social</h4>
+              <h4>Continuar y restaurar</h4>
               <ul class="roadmap-list">
-                <li><strong>Traducción Automática en Tiempo Real:</strong> Traducción instantánea de mensajes de chat en idiomas extranjeros (inglés, japonés, coreano ➔ español).</li>
-                <li><strong>Discord Rich Presence & Stream Deck:</strong> Estado interactivo en Discord con botón "Ver juntos" y plugin físico para Stream Deck.</li>
+                <li><strong>VOD y workspaces:</strong> Posición, lista para más tarde, bookmarks y perfiles de canales/layout/calidad/volumen.</li>
+                <li><strong>DVR y audio:</strong> Consolidar rango disponible, compresor nocturno y binaural existentes; no prometer rebobinado completo.</li>
               </ul>
             </div>
             <div class="roadmap-col">
-              <h4>⚙️ Funcionalidades Core</h4>
+              <h4>Entregas posteriores</h4>
               <ul class="roadmap-list">
-                <li><strong>Asistente Automatizado de Predicciones:</strong> Reglas automáticas para apostar puntos de canal en pronósticos y encuestas.</li>
-                <li><strong>Repetición de Chat Sincronizada en VODs:</strong> Chat original sincronizado al milisegundo al reproducir directos pasados.</li>
+                <li><strong>Medios y consumo:</strong> Ahorro/avisos → recorte y replay limitado → biblioteca local, con cleanup y medición de recursos.</li>
+                <li><strong>Temporizador:</strong> Parada programada de vídeo/audio con aviso cancelable y protección de grabaciones.</li>
               </ul>
             </div>
           </div>
         </div>
 
-        <!-- Phase 7 -->
+        <!-- Planned milestone 1.7.x -->
+        <div class="timeline-item">
+          <div class="timeline-dot dot-future"></div>
+          <div class="timeline-header">
+            <div class="timeline-title">Fase 7: v1.7.x — Moderación, eventos y control</div>
+            <span class="timeline-tag tag-plan">Planificada</span>
+          </div>
+          <div class="roadmap-cols">
+            <div class="roadmap-col">
+              <h4>Consolidar lo existente</h4>
+              <ul class="roadmap-list">
+                <li><strong>Feed y predicciones:</strong> Filtros, búsqueda, dedupe y encuestas/predicciones con autorización real y confirmaciones.</li>
+                <li><strong>Atajos y HUD:</strong> Conflictos detectados, inputs/modales protegidos, overlay gamer y alertas nativas validadas.</li>
+              </ul>
+            </div>
+            <div class="roadmap-col">
+              <h4>Límites y seguridad</h4>
+              <ul class="roadmap-list">
+                <li><strong>Drops:</strong> Inventario, crédito y Auto-Claim probados por separado; pausa persistida ante incertidumbre.</li>
+                <li><strong>Permisos:</strong> No inventar saldos privados ni equiparar moderador con creador autorizado; destino inequívoco.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Planned milestone 1.8.x -->
+        <div class="timeline-item">
+          <div class="timeline-dot dot-future"></div>
+          <div class="timeline-header">
+            <div class="timeline-title">Fase 8: v1.8.x — Agenda, privacidad e integraciones</div>
+            <span class="timeline-tag tag-plan">Planificada</span>
+          </div>
+          <div class="roadmap-cols">
+            <div class="roadmap-col">
+              <h4>Comodidad diaria</h4>
+              <ul class="roadmap-list">
+                <li><strong>Agenda y enlaces:</strong> Horarios publicados en zona local y enlaces seguros de app, sin comandos ni acciones privilegiadas.</li>
+                <li><strong>Modo presentación:</strong> Ocultar temporalmente identidad, listas y previsualizaciones; no equivale a anonimato.</li>
+              </ul>
+            </div>
+            <div class="roadmap-col">
+              <h4>Ecosistema opcional</h4>
+              <ul class="roadmap-list">
+                <li><strong>Discord y Stream Deck:</strong> Integraciones opt-in y exportación/importación de preferencias sin secretos.</li>
+                <li><strong>Traducción y VOD chat:</strong> Proveedor/consentimiento explícitos; replay solo con una fuente permitida verificada. Asistente de puntos sigue en investigación.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Planned milestone 1.9.x -->
+        <div class="timeline-item">
+          <div class="timeline-dot dot-future"></div>
+          <div class="timeline-header">
+            <div class="timeline-title">Fase 9: v1.9.x — Consolidación y preparación de 2.0</div>
+            <span class="timeline-tag tag-plan">Planificada</span>
+          </div>
+          <div class="roadmap-cols">
+            <div class="roadmap-col">
+              <h4>Preparar la migración</h4>
+              <ul class="roadmap-list">
+                <li><strong>Fiabilidad y accesibilidad:</strong> Regresiones, upgrades/recuperación, teclado, foco, contraste y traducciones.</li>
+                <li><strong>Prototipos y baseline:</strong> Mapa de pantallas, tokens y pruebas de rendimiento antes de cambiar toda la interfaz.</li>
+              </ul>
+            </div>
+            <div class="roadmap-col">
+              <h4>Investigación aislada</h4>
+              <ul class="roadmap-list">
+                <li><strong>IA y estadísticas:</strong> AFK basado en chat observado, heatmap y subtítulos locales: opt-in y sujetos a calidad/consumo.</li>
+                <li><strong>Distribución y extensibilidad:</strong> Evaluar Flatpak/Homebrew, OBS, plugins y contratos de otros proveedores; sin promesas de soporte universal.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Planned milestone 2.0 -->
         <div class="timeline-item">
           <div class="timeline-dot dot-horizon"></div>
           <div class="timeline-header">
-            <div class="timeline-title">Fase 7: v2.0.0 — IA On-Device, Heatmap de Clímax & Ecosistema (2027)</div>
-            <span class="timeline-tag tag-horizon">Visión Larga 🌌</span>
+            <div class="timeline-title">Fase 10: v2.0 — Rediseño completo de BlinkStream</div>
+            <span class="timeline-tag tag-horizon">Hito mayor planificado</span>
           </div>
           <div class="roadmap-cols">
             <div class="roadmap-col">
-              <h4>🧠 Inteligencia Artificial & Analytics</h4>
+              <h4>Nueva experiencia integral</h4>
               <ul class="roadmap-list">
-                <li><strong>Resumen Inteligente "Me lo perdí" (AFK Catch-Up):</strong> IA local ligera que genera un resumen en 3 viñetas de lo ocurrido mientras no estabas.</li>
-                <li><strong>Detector de Momentos Épicos (Climax Heatmap):</strong> Análisis de picos de emoción en chat marcados en la barra de tiempo.</li>
+                <li><strong>Navegación y sistema visual:</strong> Inicio, Explorar, Colecciones, Continuar, Biblioteca y Multistream; tipografía, iconos, controles, temas y densidad coherentes.</li>
+                <li><strong>Todas las pantallas:</strong> Reproductor, chat, grid, Drops, Ajustes, Mod View, medios, Companion y web. Conservar logo y patrón Blink blanco / Stream violeta→fucsia.</li>
               </ul>
             </div>
             <div class="roadmap-col">
-              <h4>🔌 Extensibilidad & Ecosistema</h4>
+              <h4>Migración y aceptación</h4>
               <ul class="roadmap-list">
-                <li><strong>Subtítulos de Voz con IA en Directo:</strong> Transcripción y traducción de voz a texto a baja latencia sobre el vídeo.</li>
-                <li><strong>BlinkStream Plugin & Widget SDK:</strong> API aislada y segura para que la comunidad desarrolle extensiones y overlays personalizados.</li>
+                <li><strong>Paridad y beta:</strong> Prototipos aprobados, migración por pantallas y conservación de preferencias/sesión; escalado y accesibilidad en tres plataformas.</li>
+                <li><strong>Extensiones 2.0.x condicionadas:</strong> IA, OBS/plugins, Kick/YouTube y nuevos paquetes solo tras verificar viabilidad, permisos y rendimiento; no bloquean el rediseño.</li>
               </ul>
             </div>
           </div>
