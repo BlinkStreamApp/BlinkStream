@@ -26,3 +26,23 @@ test('does not mistake history mentions for current documentation', () => {
 test('version dots are literals rather than wildcard matches', () => {
   assert.throws(() => validateReleaseDocs({ ...docs, readme: 'source_version-1x4x4-purple' }), /README/)
 })
+
+test('roadmap prose remains inline instead of becoming separate flex/grid items', () => {
+  const website = readReleaseDocs().website
+  const rule = website.match(/\.roadmap-list li\s*\{([^}]+)\}/)?.[1]
+  assert.ok(rule, 'Missing roadmap item styles')
+  assert.doesNotMatch(rule, /display\s*:\s*(?:inline-)?(?:flex|grid)\b/)
+  assert.match(rule, /padding-left\s*:/)
+  assert.match(website, /\.roadmap-list li::before\s*\{[^}]*position:\s*absolute/)
+})
+
+test('website cards and navigation handle narrow screens without fixed minimum widths', () => {
+  const website = readReleaseDocs().website
+  assert.match(website, /minmax\(min\(100%,\s*340px\),\s*1fr\)/)
+  assert.match(website, /\.nav-links\s*\{[^}]*order:\s*3;[^}]*flex-wrap:\s*wrap/)
+  assert.match(website, /section\[id\]\s*\{\s*scroll-margin-top:/)
+})
+
+test('website text has no replacement characters or common broken UTF-8 sequences', () => {
+  assert.doesNotMatch(readReleaseDocs().website, /\uFFFD|Ã[\u0080-\u00BF]|â€/)
+})

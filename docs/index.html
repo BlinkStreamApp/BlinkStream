@@ -36,9 +36,11 @@
       color: var(--text-main);
       overflow-x: hidden;
       line-height: 1.5;
-      selection-background-color: var(--twitch-purple);
-      selection-color: white;
     }
+
+    ::selection { background: var(--twitch-purple); color: white; }
+    section[id] { scroll-margin-top: 9rem; }
+    a:focus-visible { outline: 2px solid var(--cyan-glow); outline-offset: 4px; }
 
     /* Ambient animated neon backgrounds */
     .ambient-light {
@@ -98,6 +100,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 1rem;
     }
 
     .logo {
@@ -109,6 +112,7 @@
       display: flex;
       align-items: center;
       gap: 0.65rem;
+      flex-shrink: 0;
     }
 
     .logo-icon {
@@ -298,12 +302,15 @@
       font-size: 0.85rem;
       font-weight: 500;
       color: #7b7b99;
+      min-width: 0;
+      text-align: center;
+      overflow-wrap: anywhere;
     }
 
     .mockup-content {
       padding: 2rem;
       display: grid;
-      grid-template-columns: 2fr 1fr;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
       gap: 1.5rem;
       min-height: 420px;
     }
@@ -322,6 +329,8 @@
       align-items: center;
       position: relative;
       overflow: hidden;
+      min-height: 240px;
+      padding: 3.5rem 1rem 1.5rem;
     }
 
     .stream-player::before {
@@ -397,6 +406,7 @@
 
     .chat-line {
       line-height: 1.4;
+      overflow-wrap: anywhere;
       animation: fadeIn 0.4s ease forwards;
     }
 
@@ -431,7 +441,7 @@
 
     .features-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
       gap: 1.75rem;
       margin-bottom: 8rem;
     }
@@ -511,6 +521,7 @@
 
     .footer-links {
       display: flex;
+      flex-wrap: wrap;
       gap: 2rem;
       list-style: none;
     }
@@ -607,7 +618,7 @@
 
     .roadmap-cols {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 2rem;
     }
 
@@ -636,14 +647,17 @@
     .roadmap-list li {
       font-size: 0.92rem;
       color: var(--text-muted);
-      display: flex;
-      align-items: baseline;
-      gap: 0.5rem;
+      position: relative;
+      padding-left: 1rem;
+      overflow-wrap: anywhere;
       line-height: 1.5;
     }
 
     .roadmap-list li::before {
       content: '▸';
+      position: absolute;
+      left: 0;
+      top: 0;
       color: var(--twitch-glow);
       font-weight: 700;
     }
@@ -655,6 +669,44 @@
       background: rgba(255,255,255,0.03);
       border: 1px dashed rgba(255,255,255,0.15);
       border-radius: 16px;
+    }
+
+    @media (max-width: 1000px) {
+      header { padding: 1rem 0; }
+      .nav-container { flex-wrap: wrap; }
+      .nav-links { order: 3; width: 100%; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem; }
+    }
+
+    @media (max-width: 600px) {
+      section[id] { scroll-margin-top: 14rem; }
+      .container { padding: 0 1rem; }
+      .logo { font-size: 1.2rem; gap: 0.4rem; }
+      header .cta-button { font-size: 0.8rem; padding: 0.6rem 0.85rem; }
+      .nav-links a { font-size: 0.85rem; }
+      .hero { padding: 3rem 1rem; }
+      h1.hero-title { font-size: clamp(2rem, 9vw, 2.8rem); }
+      .release-pill { padding: 0.4rem 0.75rem; }
+      .hero-actions { gap: 0.75rem; }
+      .hero-actions a { justify-content: center; width: 100%; }
+      .window-topbar { gap: 0.75rem; padding: 0.75rem; }
+      .window-topbar > div:last-child { display: none; }
+      .window-controls { flex-shrink: 0; }
+      .mockup-content { padding: 1rem; }
+      .section-title { font-size: 1.9rem; }
+      .feature-card { padding: 1.5rem; }
+      .timeline { padding-left: 1rem; }
+      .timeline-dot { left: -1rem; top: 1.5rem; }
+      .timeline-item { padding: 1.5rem 1.25rem; }
+      .timeline-title { font-size: 1.2rem; overflow-wrap: anywhere; }
+      .timeline-item:hover { transform: none; }
+      .roadmap-col h4 { font-size: 0.85rem; }
+      .roadmap-cta-block { padding: 1.25rem; }
+      .roadmap-cta-block a { max-width: 100%; justify-content: center; text-align: center; }
+      .footer-links { gap: 0.75rem 1.25rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
     }
   </style>
 </head>
@@ -880,6 +932,7 @@
             <div class="roadmap-col">
               <h4>🎨 Mejoras UI / UX & Control</h4>
               <ul class="roadmap-list">
+                <li><strong>Próximo fix v1.4.5 (no publicado):</strong> Reducción de latencia del vídeo con objetivo HLS de 2 s. Usuario acepta 2,5 s observados en el reproductor principal; validación real del grid y CI firmado pendientes. No es una latencia garantizada para todos los canales.</li>
                 <li><strong>Actualización v1.4.4 (publicada):</strong> Búsqueda y paginación de categorías, directos filtrados por idioma, miniaturas y tipografía más claras.</li>
                 <li><strong>Chat unificado del grid:</strong> Mensajes de 2–4 canales visibles con etiquetas por origen y selector de un único destino. Emotes, insignias y borrados separados por canal; moderación y mando Wi-Fi en Individual.</li>
                 <li><strong>Pulido de interfaz:</strong> Carga/errores centrados, controles adaptables, foco seguro en Ajustes/confirmaciones y volumen 0% conservado. Aceptación del usuario, 623 tests frontend y CI firmado multiplataforma correctos. Envío Twitch real y audio nativo mantienen sus verificaciones independientes.</li>
