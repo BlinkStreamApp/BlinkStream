@@ -280,6 +280,11 @@ See [hotfix procedure](docs/guides/HOTFIX_RELEASES.md) and [roadmap](ROADMAP.md)
 
 ---
 
+## Privacy
+
+Read the [privacy policy](https://blinkstreamapp.github.io/BlinkStream/privacy.html)
+or its [repository source](PRIVACY.md). Privacy requests: contacto.apxstudio@gmail.com.
+
 ## 📄 License
 
 The project declares **MIT** in [its native package manifest](src-tauri/Cargo.toml).
