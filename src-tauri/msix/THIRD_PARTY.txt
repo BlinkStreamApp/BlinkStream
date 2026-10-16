@@ -27,8 +27,12 @@ separately from the MSIX. It contains pinned FFmpeg, Python and Streamlink sourc
 archives, upstream build scripts/patches, the upstream FFmpeg dependency source
 cache and a SHA256 inventory. See BUILDING_RUNTIME.md in that companion.
 
+Source download (same runtime in BlinkStream 1.5.0, 1.5.1 and 1.5.2):
+https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.0/BlinkStream-1.5.0-runtime-sources.zip
+SHA256: f3bd70b2068668b6cfaa035ad405e1fb4d9b78a3327e90b586884d141befe0db
+Size: 2,116,378,839 bytes. This separate download is not required to run the app.
+Build instructions and the complete observed FFmpeg configure line are included.
+
 Distributor: APX Studio, contacto.apxstudio@gmail.com.
-Before distributing this app publicly, the distributor must make the reviewed
-source companion available to recipients with clear download instructions.
-The upstream project links above are provenance links, not a replacement for
-that source distribution. This notice is not a claim of Store certification.
+Original copyright/license notices are preserved. No bit-for-bit rebuild,
+patent clearance, legal certification or Microsoft Store certification is claimed.

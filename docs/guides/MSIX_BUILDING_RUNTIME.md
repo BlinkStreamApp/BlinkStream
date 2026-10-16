@@ -1,6 +1,6 @@
 # Bundled runtime: source and build map
 
-Applies to BlinkStream 1.5.0 MSIX, portable runtime 8.6.2-1. The tools are unmodified
+Applies to BlinkStream 1.5.0/1.5.1/1.5.2 MSIX, portable runtime 8.6.2-1. The tools are unmodified
 upstream executables launched as separate processes. Source archives are shipped
 in the separate `BlinkStream-1.5.0-runtime-sources.zip`; SHA256 values and upstream
 locations are in `source-inventory.json`. This is not a claim of bit-for-bit
@@ -61,3 +61,8 @@ the companion persistently downloadable by recipients; provide its actual URL in
 the app/download listing. Do not invent a published URL or a written source offer.
 Packaging checks and archive integrity do not certify legal compliance or Store
 acceptance. Source publication remains separate from generating the MSIX.
+
+The 2026-10-17 technical correspondence review is recorded in
+[MSIX_SOURCE_CORRESPONDENCE.md](../reviews/MSIX_SOURCE_CORRESPONDENCE.md).
+The app's runtime notices identify the persistent v1.5.0 source asset for all
+three app versions; verify that public asset before completing distribution.

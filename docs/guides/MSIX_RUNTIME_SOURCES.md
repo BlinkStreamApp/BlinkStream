@@ -49,6 +49,13 @@ trial binaries during later artifact cleanup.
 
 ## Required before public distribution
 
+Technical source correspondence reviewed on 2026-10-17:
+[72 enabled options, original build scripts/cache and inventory checks](../reviews/MSIX_SOURCE_CORRESPONDENCE.md).
+The single runtime source companion is retained for 1.5.0/1.5.1/1.5.2; app/runtime
+notices now identify its exact v1.5.0 download URL and SHA256. Public availability
+must be verified before closing publication. No exact offline rebuild or legal
+certification is claimed. The remaining requirements below remain distributor duties.
+
 - Review the actual FFmpeg configure line against every enabled library, its exact
   source snapshot, patches and build instructions in the upstream scripts/cache.
 - Preserve all copyright and license notices, including Python wheels/native modules.

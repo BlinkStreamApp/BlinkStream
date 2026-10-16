@@ -7,7 +7,7 @@ import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { validateProps } from '../utils/validateProps'
 import { logError } from '../utils/errors'
-import { isTauri } from '../utils/tauriEnv'
+import { isTauri, safeOpenUrl } from '../utils/tauriEnv'
 import PhosphorIcon from './icons/PhosphorIcon'
 import { useT } from '../utils/i18n'
 import { APP_VERSION } from '../utils/appVersion'
@@ -203,6 +203,7 @@ export default function AboutDialog({ onClose }) {
             <details className="mt-4 w-full rounded-xl border border-white/10 p-3 text-left text-xs text-text-secondary">
               <summary className="cursor-pointer font-semibold focus-visible:outline-2 focus-visible:outline-twitch">Streamlink · Python · FFmpeg</summary>
               <pre className="mt-3 max-h-52 overflow-y-auto whitespace-pre-wrap break-words font-sans text-[11px] leading-relaxed">{storeRuntimeNotices}</pre>
+              <a href="https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.0/BlinkStream-1.5.0-runtime-sources.zip" onClick={event => { event.preventDefault(); safeOpenUrl(event.currentTarget.href) }} className="mt-3 inline-block rounded text-twitch-light underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-twitch">{t('about.runtimeSources', 'Código fuente del runtime (2,12 GB)')}</a>
             </details>
           )}
           <p className="text-text-muted/60 text-[10px] mt-4">

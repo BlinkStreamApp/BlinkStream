@@ -10,6 +10,7 @@ Status: local candidate, not published. Stable GitHub and Microsoft Store versio
 - Panel adaptable con traducciones en los ocho idiomas, foco automático y cierre con Escape.
 - Completadas las traducciones de pestañas, ayudas, estados vacíos, etiquetas accesibles y errores locales que rodean al buscador; cambiar de idioma conserva filtros, borrador y conexión.
 - Documentación y roadmap actualizados para reflejar la 1.5.1 publicada en GitHub y Microsoft Store, y las ampliaciones pendientes.
+- Avisos Store con acceso traducido al paquete de fuentes del runtime Streamlink/Python/FFmpeg; conserva una sola copia para el runtime compartido.
 
 ## EN
 
@@ -19,6 +20,7 @@ Status: local candidate, not published. Stable GitHub and Microsoft Store versio
 - Responsive panel with all eight interface languages, automatic focus and Escape to close.
 - Completed surrounding chat tabs, hints, empty states, accessible labels and local error translations; language changes preserve filters, drafts and the connection.
 - Updated documentation and roadmap to reflect 1.5.1 published on GitHub and Microsoft Store and the remaining improvements.
+- Store notices provide localized access to the Streamlink/Python/FFmpeg runtime source companion, retaining a single copy for the shared runtime.
 
 Validation and Windows test-build details are tracked in `docs/PROJECT_STATE.md`.
 The maintainer accepted the translated candidate. Signed cross-platform release checks
