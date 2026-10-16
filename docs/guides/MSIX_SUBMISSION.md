@@ -1,10 +1,10 @@
-# Microsoft Store submission — Blink Stream 1.5.1
+# Microsoft Store submission — Blink Stream 1.5.2
 
-Updated: 2026-10-16
+Updated: 2026-10-17
 Status: local package rebuilt and checked; user handles Partner Center; not uploaded or submitted
 
-The maintainer confirms that 1.5.0 is already published in Store. This document now
-binds the 1.5.1 icon hotfix, not the previously accepted package. The agent does not
+The maintainer confirms that 1.5.1 is already published in Store. This document now
+binds the 1.5.2 chat-search update, not the previously accepted package. The agent does not
 access Partner Center or submit this update. Package identity is unchanged.
 
 ## Authorized route
@@ -28,13 +28,13 @@ technical compliance tests. Our local WACK run produced no report and is not a p
 
 ## Candidate binding
 
-- File: `src-tauri/target/msix/BlinkStream_1.5.1.0_x64.msix`
-- Size: 94,712,117 bytes
-- SHA256: `5FEF473218DDA1408FC15D0DD2F4CBBF2326CE8627337A8FEB07C9B2CFE5535C`
+- File: `src-tauri/target/msix/BlinkStream_1.5.2.0_x64.msix`
+- Size: 94,721,474 bytes
+- SHA256: `4AA3F112961F2C013488304B70C7FDC2F0252FA9610FC3A48289E2DFFD3AD46E`
 - Identity Name: `APXStudio.7806DADA0693`
 - Publisher: `CN=3B464BD9-E8B7-489D-8127-EA042A644ED5`
 - Publisher display name: `APX Studio`
-- Architecture/version: x64 / `1.5.1.0`
+- Architecture/version: x64 / `1.5.2.0`
 
 Recheck `candidate.json` and the actual file before upload. If package contents or
 notices change, rebuild, record the new hash here and validate that candidate.
@@ -53,7 +53,7 @@ while assembling it. Sources have not been publicly hosted and an exact rebuild
 has not been performed; do not claim complete license review or reproducibility.
 
 The rebuilt MSIX passed MakeAppx pack/unpack, executable/manifest/runtime hash
-verification, 29 release tests, 702 frontend tests (one skipped), and full frontend
+verification, 31 release tests, 730 frontend tests (one skipped), and full frontend
 lint. All 63 generated PNG variants and resources.pri matched after unpacking;
 MakePRI dump confirmed target sizes and UNPLATED/LIGHTUNPLATED candidates. Third-party notices are available in About and in the package root. This
 new hash was not installed in Sandbox; earlier smoke results apply to the previous
@@ -61,9 +61,10 @@ candidate/runtime, not a new end-to-end acceptance. No host installation or remo
 publication was performed. WACK and Store certification remain uncompleted.
 
 Runtime executables are unchanged from 1.5.0; the same source companion above is
-retained rather than generating another duplicate 2 GB archive for an icon fix.
-Certifier update note: version 1.5.1 adds transparent icon variants for taskbar/Start
-light/dark themes and display scales, plus the compiled Windows resource index.
+retained rather than generating another duplicate 2 GB archive for a frontend update.
+Certifier update note: version 1.5.2 adds in-memory native session chat search by text,
+sender, links and source channel, with eight-language labels and preserved moderation
+deletions. The existing transparent taskbar/Start icon variants and resource index remain.
 No application capability or package identity is added or changed.
 
 ## Distributor checklist

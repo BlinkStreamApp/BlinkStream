@@ -24,9 +24,9 @@ describe('recent feature translations', () => {
   })
 
   it('covers keys used by new components and collection validation errors', () => {
-    for (const path of ['../components/ChannelCollections.jsx', '../components/CategoryExplorer.jsx', '../components/CompanionModal.jsx', '../components/QRCodeSvg.jsx']) {
+    for (const path of ['../components/ChannelCollections.jsx', '../components/CategoryExplorer.jsx', '../components/CompanionModal.jsx', '../components/QRCodeSvg.jsx', '../components/chat/ChatSearchPanel.jsx', '../components/chat/ChannelLabel.jsx', '../components/Chat.jsx']) {
       const source = readFileSync(new URL(path, import.meta.url), 'utf8')
-      for (const [, key] of source.matchAll(/t\('(collections\.[^']+|browse\.[^']+|companion\.[^']+|qr\.[^']+)'/g)) {
+      for (const [, key] of source.matchAll(/t\('(collections\.[^']+|browse\.[^']+|companion\.[^']+|qr\.[^']+|chat\.(?:search|ui)\.[^']+)'/g)) {
         expect(recentTranslations.es[key], key).toBeTruthy()
       }
     }

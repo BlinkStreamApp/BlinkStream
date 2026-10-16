@@ -13,6 +13,8 @@ import { TwitchChatPopout } from './chat/TwitchChatPopout'
 import { openTwitchChatPopoutWindow } from '../utils/twitchPopout'
 import { normalizeChatChannels, parseIrcEnvelope } from '../utils/chatChannels'
 import ChannelLabel from './chat/ChannelLabel'
+import ChatSearchPanel from './chat/ChatSearchPanel'
+import { CHAT_URL_REGEX as URL_REGEX, EMPTY_CHAT_SEARCH, createChatSearchMatcher } from '../utils/chatSearch'
 
 async function gqlGetUserIdByLogin(channel) {
   const login = sanitizeChannelForGraphQL(channel)
@@ -66,8 +68,7 @@ function parseMessageTags(tags) {
   return obj
 }
 
-const URL_REGEX = /((?:https?:\/\/[^\s]+|www\.[^\s]+|\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:tv|com|gg|co|io|net|org|es|me|app|dev|ai|live|pro|fm|store|shop|tech|space|site|online|ws|gs|xyz|club|info|biz|lat|uk|de|fr|br|nl|eu|ca|au|in|pl|tr|sr|st|su|se|no|fi|ch|at|gr|pt|dk|cz|hu|ro|sk|si|hr|bg|lt|lv|ee|ie|is|lu|mt|mc|by|kr|tw|hk|sg|ph|my|id|th|vn|ae|il|za|pr|ec|pe|uy|pa|do|ve|cr|gt|bo|ni|hn|py|sv|bz)(?:\/[^\s]*)?))/gi
-function renderTextWithLinks(text, partIdx) {
+function renderTextWithLinks(text, partIdx, t) {
   if (!text || !text.match(URL_REGEX)) return text
   const parts = []
   let lastIdx = 0
@@ -93,7 +94,7 @@ function renderTextWithLinks(text, partIdx) {
           try { safeOpenUrl(href, true) } catch { /* ignore */ }
         }}
         className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 decoration-cyan-500/60 hover:decoration-cyan-300 font-medium cursor-pointer transition-colors break-all inline-flex items-center gap-0.5"
-        title={`Abrir enlace en navegador: ${href}`}
+        title={`${t('chat.ui.openLink', 'Abrir enlace en navegador')}: ${href}`}
       >
         {url}
       </span>
@@ -349,6 +350,7 @@ function UserCardPopup({ username, position, onClose }) {
 let msgIdCounter = 0
 
 const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMessage, onContextMenu, isGridMode, chatChannels, onSelectUserForInspection, _isModerator }) => {
+  const t = useT()
   const isSpecial = Boolean(msg.eventType || msg.isNotice || msg.isReward)
 
   if (isSpecial) {
@@ -360,7 +362,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
       >
         <div className="flex items-center gap-1.5 font-extrabold text-xs tracking-wide">
           {isGridMode && msg.channel && <ChannelLabel channel={msg.channel} channels={chatChannels} />}
-          <span>{msg.eventHeader || (msg.message && !msg.user ? msg.message : 'Notificación del canal')}</span>
+          <span>{msg.eventHeader || (msg.message && !msg.user ? msg.message : t('chat.ui.channelNotice', 'Notificación del canal'))}</span>
         </div>
 
         {(msg.message || !msg.isNotice || msg.eventType === 'reward' || msg.eventType === 'bits') && msg.user && msg.user !== 'unknown' && (
@@ -540,6 +542,16 @@ export default function Chat({
     return { token: null, username: null }
   }, [twitchToken, twitchUsername])
 
+  const [searchState, setSearchState] = useState(() => ({ ...EMPTY_CHAT_SEARCH, auth, channelsKey }))
+  // Hide filters synchronously while the connection effect resets a changed session.
+  const search = searchState.auth === auth && searchState.channelsKey === channelsKey ? searchState : EMPTY_CHAT_SEARCH
+  const searchButtonRef = useRef(null)
+  const updateSearch = patch => setSearchState({ ...search, ...patch, auth, channelsKey })
+  const closeSearch = () => {
+    setSearchState({ ...EMPTY_CHAT_SEARCH, auth, channelsKey })
+    searchButtonRef.current?.focus()
+  }
+
   // WT-20260628-56: handler de click derecho sobre un mensaje.
   // Mapea el msg del state al `target` que espera MessageContextMenu
   // y guarda las coordenadas del cursor para posicionar el menu.
@@ -630,6 +642,17 @@ export default function Chat({
   // archivo (ver `_setChatFontSize` arriba) — actualmente no hay UI que
   // lo invoque, pero lo mantenemos para restauracion futura.
   const [chatHidden, _setChatHidden] = useState(() => localStorage.getItem('blinkstream_chat_hidden') === 'true')
+
+  const visibleMessages = useMemo(() => {
+    const matchesSearch = createChatSearchMatcher(search.open ? search : undefined)
+    return messages.filter(msg => {
+      if (!subscribedChannels.includes(msg.channel)) return false
+      if (hideBots && String(msg.user || '').toLowerCase().includes('bot')) return false
+      if (activeTab === 'mentions' && !msg.isMention) return false
+      if (activeTab === 'featured' && !msg.eventType && !msg.isReward && !msg.badges?.some(b => ['moderator', 'vip', 'broadcaster', 'staff', 'admin'].includes(b.set))) return false
+      return matchesSearch(msg)
+    })
+  }, [messages, subscribedChannels, hideBots, activeTab, search])
 
   const [recentEmotes, setRecentEmotes] = useState(() => {
     try {
@@ -722,7 +745,7 @@ export default function Chat({
     const parts = matchEmotesInText(text, twitchEmotes, channelTries[sourceChannel] || {})
     const isOnlyEmotes = parts.every(p => p.type !== 'text' || p.text.trim() === '') && parts.filter(p => p.type !== 'text').length >= 1 && parts.filter(p => p.type !== 'text').length <= 5
     return parts.map((part, idx) => {
-      if (part.type === 'text') return renderTextWithLinks(part.text, idx)
+      if (part.type === 'text') return renderTextWithLinks(part.text, idx, t)
       const hideOnError = (e) => { e.target.style.display = 'none' }
       const emoteClass = isOnlyEmotes
         ? "inline-block w-9 h-9 sm:w-10 sm:h-10 align-middle mx-1 my-0.5 hover:scale-125 transition-transform duration-150 drop-shadow-md cursor-pointer select-none"
@@ -736,7 +759,7 @@ export default function Chat({
         <img key={idx} src={part.urls?.[2] || part.urls?.[1] || part.urls?.[0]} alt={part.name} title={part.name} className={emoteClass} loading="lazy" onError={hideOnError} />
       )
     })
-  }, [channelTries])
+  }, [channelTries, t])
 
   const emoteControllersRef = useRef({})
 
@@ -1067,6 +1090,7 @@ export default function Chat({
     setConnected(false)
     setJoinedChannels([])
     setMessages([])
+    setSearchState({ ...EMPTY_CHAT_SEARCH, auth, channelsKey })
     userBadgesByChannelRef.current = {}
     lineBufferRef.current = ''
 
@@ -1455,10 +1479,10 @@ export default function Chat({
   }, [channelsKey, auth, isGridMode, isOverlay, viewerLogin])
 
   useEffect(() => {
-    if (isAtBottomRef.current) {
+    if (isAtBottomRef.current && !search.open) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages])
+  }, [messages, search.open])
 
   const handleSlashCommand = useCallback(async (text) => {
     if (isUnified && (!canSend || !/^\/me\s+/i.test(text))) {
@@ -1757,12 +1781,15 @@ export default function Chat({
           <div className="flex items-center gap-1.5 min-w-0">
             <span className={`w-2 h-2 rounded-full shrink-0 ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
             <span className="text-xs text-text-primary font-bold truncate max-w-[100px] sm:max-w-[130px]">
-              {isUnified ? t('grid.unifiedChat', 'Chat unificado') : isOverlay ? 'Chat' : channel}
+              {isUnified ? t('grid.unifiedChat', 'Chat unificado') : isOverlay ? t('chat', 'Chat') : channel}
             </span>
           </div>
 
         {/* Right: Action Buttons toolbar */}
         <div className="flex items-center gap-1 shrink-0">
+          <button ref={searchButtonRef} type="button" aria-label={t('chat.search.title', 'Buscar en el chat')} title={t('chat.search.title', 'Buscar en el chat')} aria-expanded={search.open} onClick={() => search.open ? closeSearch() : updateSearch({ open: true })} className={`rounded-lg p-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-twitch ${search.open ? 'bg-twitch/20 text-twitch-light' : 'text-text-muted hover:bg-white/10 hover:text-text-primary'}`}>
+            <PhosphorIcon name="MagnifyingGlass" size={15} weight="bold" />
+          </button>
           {!isOverlay && !isUnified && (
             <>
               {/* Twitch Popout Button (Toggles Embedded Native Child Webview) */}
@@ -1773,8 +1800,8 @@ export default function Chat({
                   try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
                 }}
                 className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg border border-twitch/40 bg-twitch/15 hover:bg-twitch/30 text-white transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95"
-                title="Incrustar Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)"
-                aria-label="Incrustar Popout Oficial de Twitch"
+                title={t('chat.ui.officialHint', 'Incrustar Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)')}
+                aria-label={t('chat.ui.official', 'Incrustar Popout Oficial de Twitch')}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-twitch shrink-0">
                   <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z" />
@@ -1787,8 +1814,8 @@ export default function Chat({
                 type="button"
                 onClick={() => openTwitchChatPopoutWindow(channel, false, auth.token, auth.username)}
                 className="p-1.5 rounded-lg text-text-muted hover:text-cyan-300 hover:bg-white/10 transition-colors cursor-pointer"
-                title="Abrir Chat de Twitch en Ventana Flotante (Popout)"
-                aria-label="Abrir Popout Flotante"
+                title={t('chat.ui.floatingHint', 'Abrir Chat de Twitch en Ventana Flotante (Popout)')}
+                aria-label={t('chat.ui.floating', 'Abrir Popout Flotante')}
               >
                 <PhosphorIcon name="ArrowSquareOut" size={15} weight="bold" />
               </button>
@@ -1805,8 +1832,8 @@ export default function Chat({
                     }
                   }}
                   className="p-1.5 rounded-lg text-text-muted hover:text-cyan-400 hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Abrir Overlay Gamer Transparente (HUD sobre videojuegos)"
-                  aria-label="Abrir Overlay Gamer Transparente"
+                  title={t('chat.ui.overlay', 'Abrir Overlay Gamer Transparente')}
+                  aria-label={t('chat.ui.overlay', 'Abrir Overlay Gamer Transparente')}
                 >
                   <PhosphorIcon name="PictureInPicture" size={15} weight="duotone" />
                 </button>
@@ -1847,13 +1874,13 @@ export default function Chat({
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
                     </div>
                   <div>
-                    <p className="text-xs font-bold text-text-primary">Iniciar sesión</p>
-                    <p className="text-[10px] text-text-muted">Conecta tu cuenta de Twitch</p>
+                    <p className="text-xs font-bold text-text-primary">{t('chat.login', 'Iniciar sesión')}</p>
+                    <p className="text-[10px] text-text-muted">{t('chat.ui.connectAccount', 'Conecta tu cuenta de Twitch')}</p>
                   </div>
                 </div>
 
                 <p className="text-[11px] text-text-muted/80 mb-3 leading-relaxed">
-                  Inicia sesión de forma segura para enviar mensajes, usar emotes de canal y acceder a controles de moderación.
+                  {t('chat.ui.loginHint', 'Inicia sesión de forma segura para enviar mensajes, usar emotes de canal y acceder a controles de moderación.')}
                 </p>
 
                 <button
@@ -1868,7 +1895,7 @@ export default function Chat({
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-twitch hover:bg-twitch-dark text-white text-xs font-bold shadow-lg shadow-twitch/25 transition-all cursor-pointer"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z"/></svg>
-                  <span>Iniciar sesión con Twitch</span>
+                  <span>{t('chat.ui.loginTwitch', 'Iniciar sesión con Twitch')}</span>
                 </button>
               </div>
             )}
@@ -1882,7 +1909,7 @@ export default function Chat({
             onClick={onCloseOverlay}
             className="text-white/60 hover:text-white hover:bg-white/10 rounded-lg p-1 ml-1.5 cursor-pointer transition-colors"
             title={t('player.closeOverlay', 'Cerrar chat superpuesto')}
-            aria-label="Cerrar chat superpuesto"
+            aria-label={t('player.closeOverlay', 'Cerrar chat superpuesto')}
           >
             <PhosphorIcon name="X" size={16} weight="bold" />
           </button>
@@ -1914,10 +1941,10 @@ export default function Chat({
               ? 'bg-twitch/30 text-white shadow-[0_2px_10px_rgba(145,70,255,0.35)] border-twitch/60 font-bold'
               : 'text-text-muted hover:text-white hover:bg-white/[0.04] border-transparent font-bold'
           }`}
-          title="Mensajes donde te mencionan (@TuUsuario)"
+          title={t('chat.ui.mentionsHint', 'Mensajes donde te mencionan (@TuUsuario)')}
         >
           <span className="shrink-0">🔔</span>
-          <span className="truncate">Menciones</span>
+          <span className="truncate">{t('chat.ui.mentions', 'Menciones')}</span>
           {unreadMentions > 0 && (
             <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-black animate-bounce shadow-sm leading-none shrink-0">
               {unreadMentions}
@@ -1932,41 +1959,43 @@ export default function Chat({
               ? 'bg-twitch/30 text-white shadow-[0_2px_10px_rgba(145,70,255,0.35)] border-twitch/60 font-bold'
               : 'text-text-muted hover:text-white hover:bg-white/[0.04] border-transparent font-bold'
           }`}
-          title="Eventos del canal, Mods, VIPs y Recompensas"
+          title={t('chat.ui.featuredHint', 'Eventos del canal, Mods, VIPs y Recompensas')}
         >
           <span className="shrink-0">⭐</span>
-          <span className="truncate">Destacados</span>
+          <span className="truncate">{t('chat.ui.featured', 'Destacados')}</span>
         </button>
       </div>
 
+      {search.open && <ChatSearchPanel search={search} channels={subscribedChannels} count={chatHidden ? 0 : visibleMessages.length} onChange={updateSearch} onClose={closeSearch} />}
+
       {authing && authCode && (
         <div className="shrink-0 px-3 py-4 bg-bg-secondary/80 border-b border-twitch/20 text-center animate-fade-in">
-          <p className="text-xs font-semibold text-twitch mb-2">Autorizar BlinkStream</p>
+          <p className="text-xs font-semibold text-twitch mb-2">{t('chat.ui.authorize', 'Autorizar BlinkStream')}</p>
           <p className="text-[11px] text-text-muted mb-1">
-            1. Abre <strong className="text-text-secondary">twitch.tv/activate</strong> en tu navegador
+            {t('chat.ui.openActivate', '1. En tu navegador, abre:')} <strong className="text-text-secondary">twitch.tv/activate</strong>
           </p>
-          <p className="text-[11px] text-text-muted/60 mb-2">o abre: <code className="text-[9px] bg-bg-tertiary px-1 rounded select-all">https://www.twitch.tv/activate</code></p>
+          <p className="text-[11px] text-text-muted/60 mb-2"><code className="text-[9px] bg-bg-tertiary px-1 rounded select-all">https://www.twitch.tv/activate</code></p>
           <p className="text-[11px] text-text-muted mb-2">
-            2. Ingresa este código:
+            {t('chat.ui.enterCode', '2. Ingresa este código:')}
           </p>
           <div className="inline-block px-4 py-2 rounded-lg bg-bg-tertiary border border-twitch/40">
             <span className="text-lg font-bold tracking-[0.25em] text-twitch select-all">{authCode}</span>
           </div>
-          <p className="text-[11px] text-text-muted/60 mt-3">3. Autoriza y espera aquí...</p>
+          <p className="text-[11px] text-text-muted/60 mt-3">{t('chat.ui.waitAuthorize', '3. Autoriza y espera aquí…')}</p>
         </div>
       )}
 
       {authError && (
         <div className="shrink-0 px-3 py-2 bg-red-900/20 border-b border-red-500/20 text-center">
-          <p className="text-[11px] text-red-400">{authError}</p>
+          <p className="text-[11px] text-red-400">{t(authError, authError)}</p>
         </div>
       )}
 
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-1 py-0.5" onScroll={handleScroll} role="log" aria-live="polite" aria-label="Mensajes del chat">
+      <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto px-1 py-0.5" onScroll={handleScroll} role="log" aria-live={search.open ? 'off' : 'polite'} aria-label={t('chat.ui.messages', 'Mensajes del chat')}>
         {connError && (!connected || isUnified) && (
-          <p role="status" className="text-orange-300 text-xs text-center my-3 px-2 break-words">{connError}</p>
+          <p role="status" className="text-orange-300 text-xs text-center my-3 px-2 break-words">{t(connError, connError)}</p>
         )}
-        {messages.length === 0 && !connError && !authing && !chatHidden && (
+        {messages.length === 0 && !search.open && !connError && !authing && !chatHidden && (
           <p className="text-text-muted/50 text-xs text-center mt-6">
             {connected ? t('chat.waiting', 'Esperando mensajes...') : t('chat.placeholder.connecting', 'Conectando al chat...')}
           </p>
@@ -1980,17 +2009,12 @@ export default function Chat({
         ) : (
           <div className="space-y-0.5">
             {(() => {
-              const filtered = messages
-                .filter(msg => subscribedChannels.includes(msg.channel))
-                .filter(msg => !hideBots || !msg.user.toLowerCase().includes('bot'))
-                .filter(msg => {
-                  if (activeTab === 'mentions') return Boolean(msg.isMention)
-                  if (activeTab === 'featured') {
-                    const isModVip = msg.badges?.some(b => ['moderator', 'vip', 'broadcaster', 'staff', 'admin'].includes(b.set))
-                    return Boolean(msg.eventType || msg.isReward || isModVip)
-                  }
-                  return true
-                })
+              const filtered = visibleMessages
+
+              if (search.open && filtered.length === 0) return <div className="px-4 py-8 text-center text-xs text-text-secondary">
+                <p className="font-semibold text-text-primary">{t('chat.search.empty', 'No hay mensajes que coincidan')}</p>
+                <p className="mt-1 leading-relaxed">{t('chat.search.emptyHint', 'Prueba otros filtros o espera nuevos mensajes.')}</p>
+              </div>
 
               if (filtered.length === 0 && messages.length > 0) {
                 return (
@@ -1998,13 +2022,13 @@ export default function Chat({
                     <span className="text-2xl mb-2">{activeTab === 'mentions' ? '🔔' : '⭐'}</span>
                     <p className="text-xs font-bold text-white/80 mb-1">
                       {activeTab === 'mentions'
-                        ? 'Sin menciones por ahora'
-                        : 'Sin mensajes destacados en vivo'}
+                        ? t('chat.ui.noMentions', 'Sin menciones por ahora')
+                        : t('chat.ui.noFeatured', 'Sin mensajes destacados en vivo')}
                     </p>
                     <p className="text-[11px] text-text-muted/70">
                       {activeTab === 'mentions'
-                        ? 'Aquí aparecerán los mensajes que nombren tu @usuario.'
-                        : 'Aquí aparecerán canjes de puntos, bits y mensajes de Mods o VIPs.'}
+                        ? t('chat.ui.noMentionsHint', 'Aquí aparecerán los mensajes que nombren tu @usuario.')
+                        : t('chat.ui.noFeaturedHint', 'Aquí aparecerán canjes de puntos, bits y mensajes de Mods o VIPs.')}
                     </p>
                   </div>
                 )
@@ -2053,7 +2077,7 @@ export default function Chat({
           onClick={scrollToBottom}
           className="shrink-0 w-full bg-twitch/90 hover:bg-twitch text-white text-[12px] font-semibold py-1.5 cursor-pointer transition-all animate-slide-up shadow-lg shadow-twitch/20"
         >
-          ↓ {newMsgCount} nuevo{newMsgCount !== 1 ? 's' : ''}
+          ↓ {t('chat.ui.newMessages', 'Mensajes nuevos')}: {newMsgCount}
         </button>
       )}
 
@@ -2088,8 +2112,8 @@ export default function Chat({
               type="button"
               onClick={() => { setShowEmoteMenu(p => !p); setEmoteSearch(''); if (!showEmoteMenu) setEmoteTab('all') }}
               className={`p-2 rounded-xl cursor-pointer transition-all ${showEmoteMenu ? 'bg-twitch text-white shadow-lg shadow-twitch/40 scale-105' : 'text-text-muted hover:text-white hover:bg-white/10'}`}
-              title="Emotes"
-              aria-label="Selector de Emotes"
+              title={t('chat.ui.emotes', 'Selector de Emotes')}
+              aria-label={t('chat.ui.emotes', 'Selector de Emotes')}
             >
               <PhosphorIcon name="Smiley" size={20} weight="duotone" />
             </button>
@@ -2111,7 +2135,7 @@ export default function Chat({
                   : 'text-text-muted hover:text-white hover:bg-white/10 border-transparent'
               }`}
               title={antiSpam ? t('chat.antispam.on', 'Anti-Spam Torneo activado') : t('chat.antispam.off', 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos)')}
-              aria-label="Toggle Anti-Spam"
+              aria-label={t('chat.ui.toggleAntispam', 'Alternar antispam')}
             >
               <PhosphorIcon name="ShieldCheck" size={20} weight={antiSpam ? 'fill' : 'duotone'} />
             </button>

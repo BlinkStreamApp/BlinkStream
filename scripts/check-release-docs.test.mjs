@@ -19,7 +19,7 @@ test('current source documentation has matching version markers', () => {
   validateReleaseDocs(readReleaseDocs())
 })
 
-test('README and website expose official Store web and Windows deep links', () => {
+test('README and archived website retain official Store web and Windows deep links', () => {
   const { readme, website } = readReleaseDocs()
   for (const content of [readme, website]) {
     assert.ok(content.includes('https://apps.microsoft.com/detail/9NQZ79VL630L'))
@@ -29,11 +29,22 @@ test('README and website expose official Store web and Windows deep links', () =
 test('candidate may honestly retain previous published download links', () => {
   assert.doesNotThrow(() => validateReleaseDocs(docs))
 })
-for (const [key, path] of [['readme', 'README.md'], ['notes', 'RELEASE_NOTES.md'], ['roadmap', 'ROADMAP.md'], ['website', 'docs/index.html']]) {
+for (const [key, path] of [['readme', 'README.md'], ['notes', 'RELEASE_NOTES.md'], ['roadmap', 'ROADMAP.md']]) {
   test(`rejects forgotten update in ${path}`, () => {
     assert.throws(() => validateReleaseDocs({ ...docs, [key]: docs[key].replaceAll('1.4.4', '1.4.3') }), error => error.message.includes(path))
   })
 }
+
+test('retired Pages archive does not gate new release versions', () => {
+  assert.doesNotThrow(() => validateReleaseDocs({ ...docs, website: 'Archived website' }))
+})
+
+test('README points to the only official website and privacy policy', () => {
+  const { readme } = readReleaseDocs()
+  assert.ok(readme.includes('https://apxstudio.es/'))
+  assert.ok(readme.includes('https://apxstudio.es/privacy.html'))
+  assert.ok(!readme.includes('https://blinkstreamapp.github.io/BlinkStream/'))
+})
 test('does not mistake history mentions for current documentation', () => {
   assert.throws(() => validateReleaseDocs({ ...docs, notes: '# BlinkStream 1.4.3\nOld version. Next release: 1.4.4' }), /RELEASE_NOTES/)
 })
@@ -61,12 +72,10 @@ test('website text has no replacement characters or common broken UTF-8 sequence
   assert.doesNotMatch(readReleaseDocs().website, /\uFFFD|Ã[\u0080-\u00BF]|â€/)
 })
 
-test('planned milestones through 2.0 appear in both repository and website roadmaps', () => {
-  const { roadmap, website } = readReleaseDocs()
+test('repository roadmap includes planned milestones through 2.0', () => {
+  const { roadmap } = readReleaseDocs()
   for (const version of ['1.5.x', '1.6.x', '1.7.x', '1.8.x', '1.9.x', '2.0']) {
     assert.ok(roadmap.includes(`### ${version} —`), `Missing repository milestone ${version}`)
-    assert.ok(website.includes(`v${version} —`), `Missing website milestone ${version}`)
   }
   assert.match(roadmap, /### 2\.0 — Rediseño completo/)
-  assert.match(website, /v2\.0 — Rediseño completo/)
 })

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/source_version-1.5.1-e94560" alt="Source version 1.5.1 hotfix">
+  <img src="https://img.shields.io/badge/source_version-1.5.2-e94560" alt="Source version 1.5.2 candidate">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
   <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
@@ -21,6 +21,12 @@
 
 See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 [updater verification](docs/guides/UPDATER_VERIFICATION.md) for evidence and validation limits.
+
+Source candidate **1.5.2** adds native session chat search by text, sender, links and
+source channel. It searches retained messages in memory, respects moderation
+deletions and existing chat filters, and resets on account/source changes. Official
+embedded Twitch chat keeps its own interface. Published downloads remain **1.5.1**
+until the next release is validated.
 
 | Feature | Description |
 |---------|-------------|
@@ -57,11 +63,11 @@ Store installations receive updates through Microsoft Store; GitHub installation
 use the separate signed updater below.
 
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-Microsoft Store 1.5.0 is published (confirmed by the maintainer). GitHub stable is **1.5.1**, with verified updater-signed builds for Windows, macOS Intel/Apple Silicon and Linux. The source also includes the Store icon hotfix with transparent light/dark assets and DPI-aware resource indexing; the maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
+**1.5.1 is published on Microsoft Store and GitHub** (Store confirmed by the maintainer). GitHub builds have verified updater signatures for Windows, macOS Intel/Apple Silicon and Linux. The Store icon hotfix includes transparent light/dark assets and DPI-aware resource indexing; the maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
 
 The Store edition includes Streamlink/Python/FFmpeg with their original notices;
-WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.0
-is published in Store; the 1.5.1 icon update is prepared separately. Corresponding
+WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.1
+is published in Store, including the Windows icon update. Corresponding
 runtime sources and license-distribution details are documented in [the source guide](docs/guides/MSIX_RUNTIME_SOURCES.md).
 Updates require a compatible signing key and your confirmation.
 
@@ -229,7 +235,7 @@ blinkstream/
 │   └── tauri*.conf.json     # App, CSP, bundles and updater configuration
 ├── supabase/                # OAuth/data Edge Functions and database migrations
 ├── public/                  # Static frontend assets
-├── docs/                    # GitHub Pages, architecture decisions and operating guides
+├── docs/                    # Architecture, operating guides and archived website sources
 ├── scripts/                 # Build, backup, release verification and installer checks
 └── .github/workflows/       # Quality gates and multi-platform release builds
 ```
@@ -284,19 +290,23 @@ and signature verification pass. CI publishes the complete release and updates `
 The app checks for updates automatically or manually; installation requires user confirmation.
 Small compatible fixes use stable PATCH releases, not suffixes on an already published version.
 Before every update/hotfix, keep source versions, release notes, this README, the repository
-roadmap and website roadmap aligned. `pnpm test:release` checks the documentation version markers.
+roadmap and the official [APX Studio website](https://apxstudio.es/blinkstream.html) aligned.
+`pnpm test:release` checks the repository documentation version markers; the official website
+is maintained separately in `BlinkStreamWeb` and must be verified before closing each release.
 Only switch download links to the new version after the complete signed release is verified.
 See [hotfix procedure](docs/guides/HOTFIX_RELEASES.md) and [roadmap](ROADMAP.md).
 
-Optional Raspberry Pi website deployment: [setup guide](docs/guides/PI_WEB_DEPLOY.md).
-Actions can update an existing Nginx-mounted clone through a signed Cloudflare Tunnel endpoint;
-this requires configuring the receiver and repository secrets first, and does not deploy the desktop app.
+The only official website is [apxstudio.es](https://apxstudio.es/).
+Its deployment is managed separately over SSH; GitHub Pages is retired.
+The old website sources in `docs/` are retained as an archive, not a second deployment target.
+The separate login confirmation page at `blinkstreamapp.github.io/auth/` remains active;
+it is not part of the retired marketing website.
 
 ---
 
 ## Privacy
 
-Read the [privacy policy](https://blinkstreamapp.github.io/BlinkStream/privacy.html)
+Read the [privacy policy](https://apxstudio.es/privacy.html)
 or its [repository source](PRIVACY.md). Privacy requests: contacto.apxstudio@gmail.com.
 
 ## 📄 License

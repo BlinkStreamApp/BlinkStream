@@ -26,9 +26,15 @@ publicar con checks fallidos. Una petición posterior de «solo local» suspende
 3. Alinear `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` (paquete
    `blinkstream`) y `src-tauri/tauri.conf.json`. No fabricar firmas ni editar
    `updater.json`: CI lo genera a partir de los artefactos firmados.
-4. Actualizar `RELEASE_NOTES.md`, README, `ROADMAP.md`, roadmap/web `docs/index.html`
+4. Actualizar `RELEASE_NOTES.md`, README, `ROADMAP.md` y la web oficial `https://apxstudio.es/`
    y `PROJECT_STATE` con estado
    de candidato. Distinguir tests de aceptación real; no anunciar descarga inexistente.
+   Toda función, cambio o corrección con texto visible debe incluir traducciones
+   en los ocho idiomas (ES/EN/FR/DE/PT/JA/KO/RU), incluidas ayudas, etiquetas
+   accesibles, errores y estados vacíos. Comprobar también el cambio de idioma
+   en vivo, sin traducir contenido del usuario ni perder el estado de la función.
+   Las traducciones forman parte del cierre del cambio, antes de declararlo
+   terminado o preparar su publicación.
 5. Ejecutar frontend tests/lint/build, tests de release y checks nativos pertinentes.
 6. Subir el candidato a `master`; esperar calidad, cuatro builds (Windows x64,
    macOS Intel/Apple Silicon y Linux x64), smoke NSIS y manifiesto firmado.
@@ -39,8 +45,13 @@ publicar con checks fallidos. Una petición posterior de «solo local» suspende
 8. Verificar release público completo, cuatro entradas de updater, versión,
    URLs y firmas contra la clave configurada. Actualizar enlaces de descarga
    y documentación a «publicada» en un commit posterior `[skip ci]`.
-   Confirmar el despliegue de Pages. `pnpm test:release` debe pasar también en ese commit:
-   verifica que README, notas, roadmap y marcador de versión de la web no quedaron antiguos.
+   Confirmar la actualización pública de APX Studio, mantenida por separado en
+   `../BlinkStreamWeb`; el usuario gestiona su despliegue SSH y no se modifica `deploy.ps1`.
+   GitHub Pages está retirado; `docs/index.html` es un archivo histórico, no un objetivo de despliegue.
+   Esta retirada solo afecta a la web comercial de `BlinkStream`: mantener intacto Pages
+   del repositorio `auth` (`https://blinkstreamapp.github.io/auth/`), usado por la confirmación de login.
+   `pnpm test:release` debe pasar también en ese commit: verifica README, notas y roadmap
+   del repositorio. No certifica el despliegue de la web externa, que se comprueba aparte.
 
 ## Ejemplo: 1.4.3
 

@@ -1,13 +1,14 @@
 # PROJECT_STATE
 
-Updated: 2026-10-16
+Updated: 2026-10-17
 Status: active
 
 ## Objective
 
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
-Store 1.5.0 publicada según confirma el usuario; MSIX 1.5.1 entregado para subida manual.
+Store 1.5.1 publicada según confirma el usuario el 2026-10-16.
 GitHub 1.5.0 y 1.5.1 publicadas y verificadas; 1.5.1 es latest/descargas/updater.
+Candidata local 1.5.2: búsqueda del chat nativo y traducciones aceptadas por el usuario; pendiente de publicación.
 
 ## Stack
 
@@ -15,7 +16,7 @@ GitHub 1.5.0 y 1.5.1 publicadas y verificadas; 1.5.1 es latest/descargas/updater
 - Native: Tauri 2, Rust 1.88.0 fijado; Streamlink/FFmpeg externos en GitHub, runtime portable incluido en MSIX
 - Cloud: Supabase/Postgres, OAuth y Edge Functions Deno
 - Packaging: NSIS/MSI, DMG/app archive, AppImage/deb
-- Microsoft Store: 1.5.0 publicada (confirmación usuario); MSIX x64 1.5.1.0 hotfix local; ADR-015
+- Microsoft Store: 1.5.1 publicada (confirmación usuario); MSIX x64 1.5.1.0; ADR-015
 - Testing: Vitest, Node, Cargo y Deno; package manager: pnpm 10
 
 ## Architecture
@@ -41,9 +42,10 @@ de updater con la clave configurada y solo publica desde un tag validado.
 
 ## Current Decisions
 
+- Web oficial única — `https://apxstudio.es/`, dominio confirmado el 2026-10-17; privacidad en `/privacy.html`. Pages del repositorio BlinkStream desactivado (API 404), sin eliminar fuentes históricas ni tocar Releases/updater. EXCEPCIÓN: conservar Pages del repositorio `auth`, confirmación OAuth en `https://blinkstreamapp.github.io/auth/` (HTTP 200, Pages built). No cambiar redirects ni desplegar OAuth. Mantener solo `../BlinkStreamWeb` como web comercial activa, con despliegue SSH a cargo del usuario y `deploy.ps1` intacto.
 - DEC-015 — Microsoft Store MSIX separado de NSIS/updater GitHub; updater nativo/IPC/UI desactivado y sin winget automático. Identidad oficial en `src-tauri/msix/identity.json`; ver ADR-015.
 
-- Web Pi5 — Actions notifica un receptor Docker por Cloudflare Tunnel con HMAC; solo fetch/fast-forward del clon servido por Nginx, sin SSH, reset ni socket Docker. Master real y main compatibles; secrets/configuración de la Pi pendientes, implementación local sin push.
+- Web Pi5 — El usuario gestiona el despliegue SSH desde `../BlinkStreamWeb/deploy.ps1`, conservado sin cambios. Automatización Actions/webhook descartada y borradores eliminados por autorización; no retomarla ni acceder a la Pi durante la revisión local.
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
 - DEC-002 — GitHub latest/fuente 1.5.1; CI firmado y cuatro artefactos públicos del updater verificados. Históricas 1.5.0/1.4.4 conservadas; Store se actualiza por su propio canal.
 - Plan 2026-10-13 — Hitos consecutivos: 1.5 organización/chat, 1.6 continuidad/medios, 1.7 moderación, 1.8 integraciones, 1.9 consolidación, 2.0 rediseño completo. Entregas mínimas y ampliaciones PATCH; IA/plugins/Kick/YouTube condicionados y no bloqueantes de 2.0. Detalle en ROADMAP, sin nuevas fechas ni cambio de versión publicada.
@@ -63,6 +65,11 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- 2026-10-17: el usuario autoriza retomar el cierre/publicación de 1.5.2 tras revisión local. Preparar CI firmado en candidato aislado antes de promover master/tag. No acceder a Partner Center, desplegar Supabase ni tocar Pages/auth; fuentes/licencias runtime y despliegue web se verifican por separado.
+- Revisión 1.5.2 del 2026-10-17: sin regresiones bloqueantes detectadas en el diff. 730 frontend/1 omitido, 31 release, Rust GitHub 60/Store 61, Clippy/fmt/lint, seguridad Companion/refresh/OAuth (20), 66 comprobaciones navegador y build Tauri/MSIX correctos. pnpm/OSV sin vulnerabilidades conocidas consultadas (565 paquetes Rust; seis avisos informativos sin mantenimiento). MSIX `BlinkStream_1.5.2.0_x64.msix`: 94.721.474 bytes, SHA256 `4aa3f112961f2c013488304b70c7fdc2f0252fa9610fc3a48289e2dffd3ad46e`; sin instalar/subir. Falta CI firmado multiplataforma/publicación y cierre documental de fuentes/licencias GPL para distribuir Store; sin WACK/aceptación instalada propios del nuevo paquete. Detalles y límites en `reviews/RELEASE_READINESS_1.5.2.md`. No commit/push/tag/release; estado de aceptación actual sustituye las entradas históricas pendientes de revisión.
+- 2026-10-17: usuario valida la candidata traducida 1.5.2. Web comercial de Pages retirada; confirmación de login independiente conservada y comprobada HTTP 200. README/privacidad/procedimiento apuntan a APX Studio; archivo histórico web deja de exigir bump de versión para cada release. 31 tests release pasan. Cambios locales sin commit/push/tag/release; publicación de app aún no retomada.
+- Candidata 1.5.2: búsqueda nativa individual/unificada, lógica aceptada por el usuario; publicación pausada para cerrar traducciones. Completados buscador, pestañas/estados vacíos/ayudas/etiquetas accesibles, contador neutro y errores locales relacionados en ocho idiomas. El cambio de idioma conserva filtros, borrador, destino, nombres/contenido y socket; regresiones con i18n real. 730 frontend pasan/1 omitido, 30 release, lint y build Tauri Windows correctos; 66 comprobaciones navegador sin incidencias (dos modos, ocho idiomas, 280/320/390/700 px y dos ventanas de 400 px de alto, datos simulados). Actualizado el mismo `src-tauri/target/release/blinkstream-1.5-test.exe`: 20.495.360 bytes, SHA256 `2892c946dd5bb18fb193bc6d911db38b33353b2f97d28c7a6c5206aba38adc31`. Sin instalar/ejecutar ni commit/push/tag/release. Latest/updater/Store siguen en 1.5.1; el binario traducido espera revisión del usuario antes de retomar publicación y CI firmado.
+- Web corporativa `../BlinkStreamWeb`: contenido ES/EN, privacidad alineada con PRIVACY.md, roadmap completo hasta 2.0 y único diccionario apx-i18n con cargador legacy. Correcciones móviles de cabecera/márgenes/pie; 56 combinaciones página/idioma/anchura comprobadas. El usuario confirma resuelto el arranque del script (PowerShell 7 interpreta UTF-8 sin BOM; 5.1 requiere BOM). Script intacto; despliegue a su cargo. Copias originales de revisión conservadas en `C:/Users/alber/AppData/Local/Temp/BlinkStream-web-review-20261016`, fuera del lint de la app.
 - GitHub 1.5.0/1.5.1 publicadas por autorización: base reconstruida sin icon fix `0fd0a5fef0a8cf0ab4152ea3f2ab3e612b37589b`, hotfix `f1a25f1fcadcbc8404ee3255f54617370a960550`. CI 38924898662/38925125890 correctos: calidad, cuatro builds firmados, NSIS smoke y verificación del manifiesto. Cada release tiene 15 assets/notas ES/EN; todos los bytes públicos coinciden por SHA256 con CI y las cuatro firmas públicas verifican. 1.5.0 histórica; 1.5.1 latest y manifiesto nuevo. README/roadmaps/web/descargas sincronizados. El intento de avanzar master antes de CI fue retenido por seguridad; no se saltó el control y se esperó a CI completo. Pi fuera del commit, ningún Actions eliminado.
 - Enlaces Store HTTPS y ms-windows-store añadidos al README/web; Pages 38924897652 correcto y web pública HTTP 200 con ambos enlaces verificada. 704 frontend/1 omitido, 30 release y lint completo correctos. Una copia temporal del índice para comprobar 1.5.0 se apartó a Temp para no duplicar pruebas; las suites reales pasan.
 - Hotfix 1.5.1 generado y validado: `target/msix/BlinkStream_1.5.1.0_x64.msix`, 94.712.117 bytes, SHA256 `5FEF473218DDA1408FC15D0DD2F4CBBF2326CE8627337A8FEB07C9B2CFE5535C`. Build Store, MakeAppx pack/unpack, hashes de 63 PNG/PRI/runtime y dump de qualifiers/ruta Files/Assets correcto; 702 frontend/1 omitido, 29 release, lint completo pasan. Vista previa transparente revisada; apariencia instalada pendiente del usuario. No instalación, push, envío ni publicación por el agente; runtime/fuentes 1.5.0 idénticos, sin duplicar ZIP de 2 GB.
@@ -92,7 +99,7 @@ NOW:
 NEXT:
 - Prueba GUI voluntaria desde 1.4.1 y de conservación de settings/sesión, sin instalar automáticamente en el PC del usuario. Linux updater integrado requiere AppImage; `.deb` se actualiza manualmente/mediante paquetes.
 - Validar canje EventSub real, Auto-Claim independiente y pausa/aislamiento del reporte nativo.
-- 1.5: colecciones, categorías favoritas/ocultas y búsqueda del chat de sesión; después 1.6 VOD/bookmarks, workspaces y audio principal antes de ahorro/replay/biblioteca.
+- 1.5.2: aceptar búsqueda en sesión real y cerrar CI de publicación. Después 1.5.x: ocultación de canales y refinamientos de colecciones; colecciones personalizables y preferencias de categorías ya publicadas. Luego 1.6 VOD/bookmarks, workspaces y audio principal antes de ahorro/replay/biblioteca.
 - Supabase: desplegar funciones/migración solo con autorización aparte.
 
 LATER:
@@ -122,6 +129,8 @@ LATER:
 
 ## Constraints
 
+- 2026-10-16: toda incorporación/corrección debe salir traducida a los ocho idiomas, incluyendo botones, ayudas, etiquetas accesibles, errores y estados vacíos. Verificar cambio de idioma sin perder estado y conservar contenido del usuario. La publicación de 1.5.2 está pausada explícitamente por el usuario hasta cerrar las traducciones; no hacer commit/push/tag/release en este bloque.
+
 - 2026-10-13: el usuario levanta el modo solo local para publicar 1.4.4 tras pruebas. Regla permanente: fixes/mejoras compatibles se suben como PATCH consecutivos tras validar; MINOR para entregas mayores acordadas. Actualizar siempre README, notas, roadmap del repo y web, junto a versiones nativas. Una instrucción posterior de pausa/solo local prevalece.
 - Hotfix 1.4.3 autorizado el 2026-10-08; PATCH estable en lugar de 1.4.2-a (prerelease anterior). Guía: `docs/guides/HOTFIX_RELEASES.md`.
 - Publicación 1.4.2 autorizada el 2026-10-07 tras validar las tres plataformas; no excluir Linux.
@@ -145,7 +154,7 @@ LATER:
 
 - Corregida compilación de prueba que abría localhost: Cargo release directo omitía `tauri/custom-protocol`. Usar `pnpm build:desktop` (Tauri CLI, sin bundle) para incrustar dist. Regresión de script y advertencia de build para release en modo dev; sustituir el mismo ejecutable de prueba tras recompilar. No confundir compilación con aceptación visual nativa.
 
-- Automatización web Pi5 preparada: `.github/workflows/deploy-pi-web.yml`, `deploy/pi-web/` y guía `docs/guides/PI_WEB_DEPLOY.md`. 11 pruebas Python correctas (HMAC/HTTP/cliente y Git real); Docker ausente localmente, validación Compose en workflow pendiente. No se ha accedido a la Pi ni configurado Tunnel/Secrets/desplegado estos archivos.
+- Automatización web Pi5 descartada y nueve borradores locales eliminados por petición del usuario; despliegue SSH separado a su cargo desde `../BlinkStreamWeb`. Revisión local de la web autorizada; no ejecutar despliegue ni modificar `deploy.ps1`.
 - Política `PRIVACY.md` y web `docs/privacy.html` publicadas por autorización del usuario: commit documental aislado `0565faa`, generador desde Markdown y enlaces web/README; app 1.5/latencia permanecen locales. Pages `38590735220` correcto; `https://blinkstreamapp.github.io/BlinkStream/privacy.html` verificada sin autenticar (HTTP 200, diez secciones/contacto) y enlazada en web pública. Identidad legal, retención/infraestructura y revisión legal siguen en checklist; sin implementar enlace dentro de la app.
 - Categorías: modo Gestionar categorías cerrado por defecto, acciones de fijar/ocultar y restauración visibles solo durante edición; conserva preferencias al cerrar y reinicia edición entre cuentas. 667 frontend pasan/1 omitido y lint correcto. Ejecutable estable `src-tauri/target/release/blinkstream-1.5-test.exe`, sin instalación/ejecución por el agente.
 - Firma corregida sin rotación de claves; cuatro firmas verificadas criptográficamente en CI y local.

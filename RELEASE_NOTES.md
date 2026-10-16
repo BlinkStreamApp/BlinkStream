@@ -1,4 +1,30 @@
-# BlinkStream 1.5.1 — Store taskbar icon hotfix
+# BlinkStream 1.5.2 — Session chat search (candidate)
+
+Status: local candidate, not published. Stable GitHub and Microsoft Store version: 1.5.1.
+
+## ES
+
+- Añadida búsqueda en el chat nativo individual y unificado por texto, usuario, enlaces y canal de origen.
+- Los filtros se combinan con las pestañas del chat, respetan los borrados de moderación y no cambian el destino de los mensajes.
+- La búsqueda utiliza solo mensajes conservados en memoria; se limpia al cambiar de cuenta, cerrar sesión o cambiar los canales visibles.
+- Panel adaptable con traducciones en los ocho idiomas, foco automático y cierre con Escape.
+- Completadas las traducciones de pestañas, ayudas, estados vacíos, etiquetas accesibles y errores locales que rodean al buscador; cambiar de idioma conserva filtros, borrador y conexión.
+- Documentación y roadmap actualizados para reflejar la 1.5.1 publicada en GitHub y Microsoft Store, y las ampliaciones pendientes.
+
+## EN
+
+- Added native individual and unified chat search by text, sender, links and source channel.
+- Filters work with chat tabs, respect moderation deletions and do not change the send destination.
+- Search only uses messages retained in memory and resets on account changes, sign-out or changes to visible source channels.
+- Responsive panel with all eight interface languages, automatic focus and Escape to close.
+- Completed surrounding chat tabs, hints, empty states, accessible labels and local error translations; language changes preserve filters, drafts and the connection.
+- Updated documentation and roadmap to reflect 1.5.1 published on GitHub and Microsoft Store and the remaining improvements.
+
+Validation and Windows test-build details are tracked in `docs/PROJECT_STATE.md`.
+The maintainer accepted the translated candidate. Signed cross-platform release checks
+remain required before publication; local tests do not certify every live-service/platform flow.
+
+## BlinkStream 1.5.1 — Store taskbar icon hotfix
 
 Date: 2026-10-16. Published GitHub hotfix over 1.5.0; Store MSIX update handed to the maintainer.
 

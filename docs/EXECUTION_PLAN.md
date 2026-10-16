@@ -1,6 +1,8 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-10-16. Microsoft Store 1.5.0 publicada según confirma el usuario. GitHub 1.5.0 y 1.5.1 publicadas tras CI firmado multiplataforma, NSIS smoke y verificación independiente de artefactos públicos; 1.5.1 latest/updater. Fuente 1.5.1 incluye el hotfix de iconos MSIX, variantes claro/oscuro/DPI y PRI verificado. El usuario gestiona la subida Store; no instalar en host ni enviar a Partner Center. Ver `guides/MSIX_STORE.md` y `guides/UPDATER_VERIFICATION.md`.
+Actualizado: 2026-10-16. Microsoft Store 1.5.1 publicada según confirma el usuario. GitHub 1.5.0 y 1.5.1 publicadas tras CI firmado multiplataforma, NSIS smoke y verificación independiente de artefactos públicos; 1.5.1 latest/updater. Fuente 1.5.1 incluye el hotfix de iconos MSIX, variantes claro/oscuro/DPI y PRI verificado. El usuario gestiona Partner Center. Ver `guides/MSIX_STORE.md` y `guides/UPDATER_VERIFICATION.md`.
+
+Candidata local 1.5.2: búsqueda del chat nativo individual/unificado y traducciones aceptadas por el usuario. Pendientes CI firmado y publicación; latest/Store permanecen en 1.5.1. Única web comercial: https://apxstudio.es/; conservar la confirmación de login independiente en Pages del repositorio auth.
 
 ## Objetivo y reglas
 
@@ -15,8 +17,8 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 | Orden | Hito / bloque | Dependencias | Criterio de cierre | Estado |
 | --- | --- | --- | --- | --- |
 | 0 | 1.4.4 categorías/UI/chat unificado | Componentes existentes, Helix/IRC | Publicación y CI firmados; aceptación específica registrada | Publicada; checks independientes de envío/audio pendientes |
-| 1 | 1.4.5 fiabilidad/latencia y validaciones Twitch | HLS, campañas/cuentas autorizadas | Grid, pausa/DVR, estabilidad y CI; separar crédito/reclamo/inventario | Principal: 2.5 s aceptados; resto pendiente |
-| 2 | 1.5 organización y chat | Cache por cuenta, favoritos y feed acotado | Colecciones, categorías favoritas/ocultas y búsqueda de sesión sin fuga al salir ni recursos cruzados | Desarrollo local: colecciones aceptadas; categorías en prueba; búsqueda del chat pendiente |
+| 1 | Fiabilidad/latencia y validaciones Twitch, incluidas desde 1.5.0 | HLS, campañas/cuentas autorizadas | Grid, pausa/DVR y estabilidad; separar crédito/reclamo/inventario | Publicada; principal: 2.5 s aceptados; pruebas reales ampliadas pendientes; etiqueta 1.4.5 sustituida |
+| 2 | 1.5.x organización y chat | Cache por cuenta, favoritos y feed acotado | Búsqueda de sesión, ocultación de canales y refinamientos de colecciones sin fuga al salir ni recursos cruzados | Colecciones/categorías publicadas; búsqueda aceptada en candidata 1.5.2, pendiente de CI firmado/publicación |
 | 3 | 1.6.0 continuidad/workspaces | Identidad VOD y persistencia existentes | Reinicio/restauración, medios ausentes, cleanup y audio principal correctos | Planificada |
 | 4 | 1.6.x consumo/medios | Bloque 3, FFmpeg y disco acotado | DVR/audio existentes validados → ahorro/avisos → recorte/replay → biblioteca → temporizador; respetar grabación | Planificada |
 | 5 | 1.7 moderación/eventos/control | Cuenta creadora autorizada, Helix/EventSub | Feed y predicciones/encuestas con permisos/confirmaciones, atajos sin conflictos, HUD y Drops probados por separado | Código parcial existente; consolidación pendiente |
@@ -50,14 +52,14 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 
 El detalle funcional y las reasignaciones de la antigua 1.5/1.6 están en [ROADMAP.md](../ROADMAP.md); no mantener listas paralelas divergentes.
 
-1. Cerrar las pruebas pendientes de 1.4.5, sin publicar solo por el resultado de 2.5 s del principal.
-2. Colecciones: implementación local en Inicio con CRUD/orden/deshacer, portadas y apertura de canales; editor y errores traducidos a los ocho idiomas (2026-10-14). Suite frontend 694 pasa/1 omitido y once regresiones de traducción; probar textos largos en ventanas estrechas y aceptación visual multidioma nativa. No toca follows ni cloud.
-3. Implementar y validar colecciones, preferencias de categorías y búsqueda en incrementos separados.
+1. Cerrar la revisión de la candidata 1.5.2, ya aceptada por el usuario, y completar CI firmado antes de publicar. Conservar las regresiones de texto/usuario/enlaces/origen, borrados de moderación, cambio de cuenta y ventanas estrechas.
+2. Colecciones y categorías: base publicada; mejorar orden/filtros/teclado e incorporar ocultación de canales mediante incrementos PATCH separados.
+3. Mantener pruebas reales de grid, pausa/DVR, estabilidad y Twitch como validación transversal. La mejora de latencia ya se distribuye desde 1.5.0; no crear una entrega 1.4.5 posterior.
 4. Dimensionar VOD/workspaces antes de abrir el bloque de medios; no activar todo 1.6 simultáneamente.
 
 Cada hito distingue entrega mínima de ampliaciones posteriores. IA/plugins/nuevas plataformas se investigan aparte y no bloquean el rediseño 2.0. Agenda depende de horarios publicados; VOD chat requiere una fuente permitida verificada. No hay fechas cerradas ni garantía universal de latencia.
 
-Planificación no cambia la versión fuente/latest (1.4.4), no despliega cloud y no autoriza instalaciones. Al publicar: README/roadmaps/web/notas y metadata coherentes; evitar que un cambio documental arrastre los fixes locales sin validar.
+Fuente candidata 1.5.2; latest/Store 1.5.1. La planificación no despliega cloud ni autoriza instalaciones. Al publicar: README/roadmaps/web/notas y metadata coherentes; evitar que un cambio documental arrastre los fixes locales sin validar.
 
 Fuentes de integración: [EventSub WebSocket](https://dev.twitch.tv/docs/eventsub/handling-websocket-events/),
 [tipos de suscripción](https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/) y

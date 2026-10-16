@@ -7,11 +7,14 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-16 / v1.5.1 published
+## Execution status — 2026-10-16 / v1.5.2 local candidate
+
+Source candidate 1.5.2 adds native session chat search. It is not published; stable
+GitHub downloads/updater and Microsoft Store remain at 1.5.1.
 
 The historical phases below describe product direction, not proof of a published release.
-Microsoft Store 1.5.0 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations and security hardening. GitHub [1.5.0](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.0) and [1.5.1](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.1) are published with separate ES/EN notes, signed four-target builds and independently verified public artifacts. Latest GitHub/downloads/updater: 1.5.1. The Store taskbar fix includes transparent light/dark target-size variants, DPI assets and a compiled resource index. The user handles Partner Center; no Store update was submitted by the agent.
-Candidate CI `38449215321` and tag CI `38451126905` passed all gates; downloaded public updater artifacts independently pass signature and SHA-256 verification.
+Microsoft Store 1.5.1 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations, security hardening and the Windows icon fix. GitHub [1.5.0](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.0) and [1.5.1](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.1) are published with separate ES/EN notes, signed four-target builds and independently verified public artifacts. Latest GitHub/downloads/updater: 1.5.1. The Store taskbar fix includes transparent light/dark target-size variants, DPI assets and a compiled resource index. The maintainer handles Partner Center.
+Release CI `38924898662` (1.5.0) and `38925125890` (1.5.1) passed all gates; downloaded public updater artifacts independently pass signature and SHA-256 verification.
 Signed builds are available for Windows x64, macOS Intel/Apple Silicon and Linux x64.
 The update adds category discovery, UI polish and unified grid chat, retaining account-scoped favorites/follows, logout cleanup and approved branding.
 Windows logout/welcome and real Twitch follow/unfollow refresh were accepted by the user.
@@ -30,13 +33,13 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 | Custom reward events | EventSub implemented; automated lifecycle tests pass | Authorized creator session, real redemption and native CSP |
 | Keyboard shortcuts / Drops focus | Interactive-control/modal isolation and focus regressions pass; Drops polish accepted by user | Other dialogs, screen readers and configurable/OS-global shortcuts |
 | Channel search | Stale-response cancellation and dismissal regressions pass | Broader keyboard/accessibility coverage |
-| Auto-updater | 1.4.4 published/latest; four public updater artifacts independently verified; manifest matches master after Git line-ending normalization; Windows install/reinstall/restart smoke passes | Historical trust migration and authenticated settings persistence remain limited; Linux integrated updates require AppImage |
+| Auto-updater | 1.5.1 published/latest; four public updater artifacts independently verified; manifest matches the release; Windows install/reinstall/restart smoke passes | Historical trust migration and authenticated settings persistence remain limited; Linux integrated updates require AppImage |
 | Dependency security | Six original alerts closed by GitHub; npm audit clean; GLib backport passes optimized regressions and Linux bundles | Retire vendor when upstream compatibility permits (ADR-014) |
 
 Validation: 623 frontend tests pass, one skipped; 56 Rust Windows tests and 19 release/signature/documentation tests pass locally. Lint/legacy/fmt/Clippy, optimized GLib tests, signed four-target builds and NSIS smoke pass CI. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
-Now: Store 1.5.0 published; GitHub 1.5.1 latest with verified download/update artifacts. Store 1.5.1 submission and installed icon acceptance remain with the maintainer.
-Next: close 1.4.5 validation, then 1.5 organization/chat improvements and 1.6 VOD/workspaces/media.
+Now: 1.5.1 published on Store and GitHub; GitHub download/update artifacts verified.
+Next: 1.5.x session chat search, hidden channels and collection refinements, then 1.6 VOD/workspaces/media. Outstanding real-session latency and Twitch checks remain tracked separately.
 Then: 1.7 moderation, 1.8 integrations and 1.9 consolidation.
 2.0 centers on a complete interface redesign; AI, additional platforms and plugins remain conditional.
 
@@ -47,7 +50,7 @@ Then: 1.7 moderation, 1.8 integrations and 1.9 consolidation.
 - **Lower live video latency:** implemented locally in the main player and multistream grid. Shared HLS target of 2 seconds, bounded catch-up at 1.1× and removal of the competing manual live controller; preload buffers remain unchanged and manual DVR/pause disable catch-up.
 - **User evidence (2026-10-13):** main-player screenshot shows 2.5 seconds latency and 2.3 seconds buffer; the user accepts this result. This is one observed Twitch session, not a guaranteed latency across channels/networks.
 - **Validation:** 632 frontend tests pass/one skipped, 19 release/documentation tests, lint/legacy and local Windows build pass. Live grid, pause/DVR and sustained stability checks remain pending, alongside signed cross-platform release CI.
-- **Delivery:** included in the Store 1.5.0 baseline; the formerly planned 1.4.5 label is superseded, not a separate published release. GitHub downloads/updater remain 1.4.4 until new signed builds are published. Existing VOD/workspace priorities are unchanged.
+- **Delivery:** included in the 1.5.0 baseline and current 1.5.1 distributions on Store and GitHub. The formerly planned 1.4.5 label is superseded, not a separate published release. Existing VOD/workspace priorities are unchanged.
 
 ## 1.4.4 delivery — Category discovery and UI (2026-10-13)
 
@@ -158,7 +161,7 @@ Cada hito comienza con una entrega mínima; ampliaciones compatibles salen como 
 consecutivos cuando están probadas. No saltar de versión para cada idea ni esperar
 a terminar todo un hito para entregar una corrección validada.
 
-**Estado:** Store 1.5.0 publicada; GitHub 1.5.0 y 1.5.1 publicadas, con 1.5.1 como latest. MSIX 1.5.1 entregado para subida manual. El resto de hitos continúa como planificación, sin dar por entregadas todas las ampliaciones de 1.5.x.
+**Estado:** 1.5.1 publicada en Microsoft Store y GitHub, confirmada por el mantenedor. El resto de hitos continúa como planificación, sin dar por entregadas todas las ampliaciones de 1.5.x.
 Codex se encarga de implementación/regresiones; el usuario acepta los flujos reales.
 Antes de cada hito: revisar el código existente, reutilizarlo y verificar permisos,
 consumo, migraciones y límites del proveedor. Ninguna prueba simulada certifica Twitch real.
@@ -173,16 +176,19 @@ consumo, migraciones y límites del proveedor. Ninguna prueba simulada certifica
 | 5 | 1.9 — Consolidación para 2.0 | Migraciones/backup seguro, accesibilidad y prototipos opt-in | Ensayo de actualización/recuperación y presupuesto de rendimiento |
 | 6 | 2.0 — Rediseño integral | Nueva navegación, sistema visual y todas las pantallas coherentes | Prototipos aceptados, migración incremental y paridad funcional |
 
-### 1.5.x — Organización, descubrimiento y chat [NEXT / PLANNED]
+### 1.5.x — Organización, descubrimiento y chat [BASE RELEASED / IMPROVEMENTS NEXT]
 
 **Objetivo:** encontrar lo que quieres ver y navegar por el chat con menos esfuerzo, sin rediseñar aún toda la app.
 
-**Entrega mínima (1.5.0):**
+**Disponible desde 1.5.0, conservado en 1.5.1:**
 - **Colecciones de canales — nuevo:** listas propias (Gaming, Esports, Para escuchar), orden manual y acceso rápido. No confundir con workspaces: no guardan layout ni lanzan varios streams automáticamente.
-- **Personalización de colecciones (ampliación solicitada):** tarjetas verticales 3:4 como categorías, color y portada local PNG/JPG/WebP reducida; al seleccionarlas aparecen canales con avatar y estado En vivo/Offline/Sin confirmar. Incluir canales no seguidos en la consulta existente; fallos/timeouts no equivalen a offline. Implementación local en prueba, todavía no publicada.
-- **Categorías favoritas y contenido oculto — nuevo:** fijar juegos y ocultar canales/categorías en Explorar; posibilidad de deshacer y gestionar exclusiones. Sin recomendaciones opacas ni filtros de Drops no verificables.
-  - Categorías implementadas localmente: fijar primero, filtro Solo favoritas, ocultar con deshacer y panel para restaurar; preferencias acotadas por cuenta y sin escrituras en Twitch. Pruebas automáticas correctas; aceptación nativa pendiente. Ocultar canales todavía no implementado.
-- **Búsqueda del chat de sesión — nuevo:** texto, usuario, enlaces y canal de origen en el chat unificado. Solo mensajes realmente recibidos y conservados; mantener los borrados de moderación y el límite de historial.
+- **Personalización de colecciones:** tarjetas verticales 3:4 como categorías, color y portada local PNG/JPG/WebP reducida; al seleccionarlas aparecen canales con avatar y estado En vivo/Offline/Sin confirmar. Incluye canales no seguidos; fallos/timeouts no equivalen a offline. Publicada.
+- **Categorías favoritas y ocultas:** fijar juegos y ocultar categorías en Explorar; posibilidad de deshacer y gestionar exclusiones. Sin recomendaciones opacas ni filtros de Drops no verificables.
+  - Categorías publicadas: fijar primero, filtro Solo favoritas, ocultar con deshacer y panel para restaurar; preferencias acotadas por cuenta y sin escrituras en Twitch. Ocultar canales todavía no implementado.
+
+**Pendiente en las siguientes entregas PATCH de 1.5.x:**
+- **Ocultación de canales:** ampliar las exclusiones sin modificar los follows de Twitch y con opción de restaurar.
+- **Búsqueda del chat de sesión — candidata 1.5.2:** implementada en chat nativo individual/unificado por texto, usuario, enlaces y canal de origen. Solo mensajes realmente recibidos y conservados; mantiene borrados de moderación, filtros existentes y límite de historial. Traducciones en ocho idiomas, Escape y aislamiento de sesión. Aceptada por el usuario; pendientes CI firmado y publicación. Web oficial única: APX Studio; Pages comercial retirado, confirmación de login independiente conservada.
 
 **Ampliaciones posteriores del hito:** orden/filtros de colecciones y navegación con teclado, reutilizando la infraestructura existente. Sin persistir conversaciones por defecto.
 

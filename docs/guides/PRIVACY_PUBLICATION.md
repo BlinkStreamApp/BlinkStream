@@ -19,8 +19,12 @@ La sección 10.5.1 de las [políticas de Microsoft Store](https://learn.microsof
 
 ## Mantenimiento
 
-Página pública prevista: `https://blinkstreamapp.github.io/BlinkStream/privacy.html`.
-Generar la página desde la fuente con `node scripts/build-privacy-page.mjs` y comprobar
-su sincronización con `node scripts/build-privacy-page.mjs --check`. No editar el HTML generado.
+Página pública oficial: [apxstudio.es/privacy.html](https://apxstudio.es/privacy.html).
+GitHub Pages está retirado. Si Partner Center u otra ficha aún usa la URL antigua,
+el responsable del envío debe sustituirla por esta URL oficial.
+La web se mantiene en `../BlinkStreamWeb` y el usuario gestiona su despliegue SSH.
+Revisar que su política ES/EN coincide con los datos y servicios descritos en PRIVACY.md.
+El generador `scripts/build-privacy-page.mjs` y su comprobación `--check` conservan
+la copia histórica del repositorio; no publican ni verifican la web oficial.
 
 Actualizar la fecha y revisar PRIVACY.md cuando cambien los datos enviados, las funciones, la retención o los proveedores; no basta con cambiar la versión de la aplicación. No declarar que los tokens solo existen localmente: el backend OAuth interviene en el intercambio de autenticación.
