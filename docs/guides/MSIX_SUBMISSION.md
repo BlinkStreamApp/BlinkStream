@@ -29,8 +29,8 @@ technical compliance tests. Our local WACK run produced no report and is not a p
 ## Candidate binding
 
 - File: `src-tauri/target/msix/BlinkStream_1.5.2.0_x64.msix`
-- Size: 94,721,474 bytes
-- SHA256: `4AA3F112961F2C013488304B70C7FDC2F0252FA9610FC3A48289E2DFFD3AD46E`
+- Size: 94,721,834 bytes
+- SHA256: `205777AC0351EC0CA00CCB521BCB92569DEA13368000539F6F9535DECB33068C`
 - Identity Name: `APXStudio.7806DADA0693`
 - Publisher: `CN=3B464BD9-E8B7-489D-8127-EA042A644ED5`
 - Publisher display name: `APX Studio`
@@ -48,32 +48,39 @@ version for different content; never silently substitute bytes in an existing su
 2,116,378,839 bytes; SHA256
 `f3bd70b2068668b6cfaa035ad405e1fb4d9b78a3327e90b586884d141befe0db`.
 Contains the pinned source inventory, upstream scripts/patches/cache, a build map
-and the observed complete FFmpeg configuration. All inventory inputs were checked
-while assembling it. Sources have not been publicly hosted and an exact rebuild
-has not been performed; do not claim complete license review or reproducibility.
+and the observed complete FFmpeg configuration. All six source inputs were rechecked
+inside the companion against the pinned inventory. The companion is now public at
+[the persistent 1.5.0 source asset](https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.0/BlinkStream-1.5.0-runtime-sources.zip);
+a full public download streamed to SHA256 matches the local file (no duplicate saved).
+The technical correspondence review maps all 72 enabled FFmpeg options to supplied
+scripts/snapshots or intrinsic/OS settings; no source-download script lacks its keyed
+cache archive. See [review](../reviews/MSIX_SOURCE_CORRESPONDENCE.md). No exact rebuild,
+patent clearance or legal certification is claimed.
 
 The rebuilt MSIX passed MakeAppx pack/unpack, executable/manifest/runtime hash
-verification, 31 release tests, 730 frontend tests (one skipped), and full frontend
+verification, 31 release tests, 740 frontend tests (one skipped), and full frontend
 lint. All 63 generated PNG variants and resources.pri matched after unpacking;
 MakePRI dump confirmed target sizes and UNPLATED/LIGHTUNPLATED candidates. Third-party notices are available in About and in the package root. This
 new hash was not installed in Sandbox; earlier smoke results apply to the previous
-candidate/runtime, not a new end-to-end acceptance. No host installation or remote
-publication was performed. WACK and Store certification remain uncompleted.
+candidate/runtime, not a new end-to-end acceptance. No host installation or app
+publication was performed during the local package check; source publication is
+recorded above. WACK and certification of this new MSIX remain uncompleted.
 
 Runtime executables are unchanged from 1.5.0; the same source companion above is
 retained rather than generating another duplicate 2 GB archive for a frontend update.
 Certifier update note: version 1.5.2 adds in-memory native session chat search by text,
 sender, links and source channel, with eight-language labels and preserved moderation
-deletions. The existing transparent taskbar/Start icon variants and resource index remain.
+deletions. Store runtime notices include the actual source URL/hash and a translated
+download link, visually checked in eight languages at 320/700 px. The existing
+transparent taskbar/Start icon variants and resource index remain.
 No application capability or package identity is added or changed.
 
 ## Distributor checklist
 
-- [ ] Complete the corresponding-source and license review in
-  [MSIX_RUNTIME_SOURCES.md](MSIX_RUNTIME_SOURCES.md), including build instructions.
-- [ ] Make reviewed corresponding sources persistently accessible to recipients
-  before public distribution, with real download instructions. The notices now
-  identify the supplied local source companion; they do not invent a hosted URL.
+- [x] Technical source inventory/configuration/script/cache correspondence reviewed;
+  build map and original licenses preserved. This is not a legal opinion or exact rebuild.
+- [x] Source companion publicly accessible to recipients with verified bytes and
+  actual download instructions in the package/About notices. Preserve this source asset.
 - [ ] Arrange a dedicated Twitch tester account through Partner Center's private
   certification notes, if needed by Microsoft. Never commit credentials, personal
   sessions, OAuth tokens or recovery codes. Do not use the owner's personal account.

@@ -92,5 +92,6 @@ This closes the local technical inventory/mapping check, not a legal opinion or 
 
 Use one source companion for every app release that bundles this exact runtime; do not duplicate it in each hotfix. Preserve it during artifact cleanup. The app's own source, MIT declaration and the GPLv3-or-later FFmpeg executable are distinct; no exception to third-party terms is asserted here.
 
-Reference guidance: [FFmpeg legal information](https://ffmpeg.org/legal.html), the GPL text supplied with the runtime, and [build map](../guides/MSIX_BUILDING_RUNTIME.md). The complete observed configure line is in `src-tauri/msix/FFMPEG_CONFIGURATION.txt`.
+The companion is public at [this permanent source asset](https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.0/BlinkStream-1.5.0-runtime-sources.zip). HTTP 200, size 2,116,378,839 bytes, GitHub asset digest and a full streaming public download all match SHA256 `f3bd70b2068668b6cfaa035ad405e1fb4d9b78a3327e90b586884d141befe0db`. GitHub asset ID: `648778257`. The x264 and x265 cached Git HEADs were additionally read without extracting/executing code and match the pinned script revisions. Store notices include the real URL/hash plus an eight-language source link.
 
+Reference guidance: [FFmpeg legal information](https://ffmpeg.org/legal.html), the GPL text supplied with the runtime, and [build map](../guides/MSIX_BUILDING_RUNTIME.md). The complete observed configure line is in `src-tauri/msix/FFMPEG_CONFIGURATION.txt`.

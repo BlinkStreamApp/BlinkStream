@@ -35,6 +35,9 @@ publicar con checks fallidos. Una petición posterior de «solo local» suspende
    en vivo, sin traducir contenido del usuario ni perder el estado de la función.
    Las traducciones forman parte del cierre del cambio, antes de declararlo
    terminado o preparar su publicación.
+   Crear `docs/releases/X.Y.Z.md` con las notas finales ES/EN de esa versión, sin
+   etiquetas de candidata ni historial ajeno. CI usa ese archivo tanto para el cuerpo
+   de la release como para las notas del updater y falla si falta.
 5. Ejecutar frontend tests/lint/build, tests de release y checks nativos pertinentes.
 6. Subir el candidato a `master`; esperar calidad, cuatro builds (Windows x64,
    macOS Intel/Apple Silicon y Linux x64), smoke NSIS y manifiesto firmado.

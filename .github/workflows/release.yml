@@ -271,11 +271,15 @@ jobs:
           path: release-artifacts
 
       - name: Verify every artifact and build updater manifest
+        id: release_metadata
         shell: bash
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
           TAG="v$VERSION"
+          NOTES="docs/releases/${VERSION}.md"
+          test -f "$NOTES"
+          printf 'notes=%s\n' "$NOTES" >> "$GITHUB_OUTPUT"
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then TAG="$GITHUB_REF_NAME"; fi
           node scripts/build-updater-manifest.mjs \
             --version "$VERSION" \
@@ -283,7 +287,7 @@ jobs:
             --tag "$TAG" \
             --artifacts release-artifacts \
             --config src-tauri/tauri.conf.json \
-            --notes RELEASE_NOTES.md \
+            --notes "$NOTES" \
             --output updater.json
 
       - name: Upload verified manifest
@@ -320,7 +324,7 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           draft: true
-          body_path: RELEASE_NOTES.md
+          body_path: ${{ steps.release_metadata.outputs.notes }}
           fail_on_unmatched_files: true
           files: |
             updater.json

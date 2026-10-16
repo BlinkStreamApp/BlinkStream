@@ -18,8 +18,8 @@ No production auth, IPC, CSP, updater key, dependencies or native code changed.
 
 ## Checks performed
 
-- Frontend: 59 files, 730 tests passed, one existing skipped test; full ESLint passed.
-- Release/metadata/MSIX/manifest documentation: 31 tests passed; diff whitespace check passed.
+- Frontend after the source-notice follow-up: 59 files, 740 tests passed, one existing skipped test; full ESLint passed.
+- Release/metadata/MSIX/manifest documentation: 32 tests passed; diff whitespace check passed.
 - Rust: format and Clippy all-targets/all-features with warnings denied passed.
   Default GitHub profile: 60 tests passed. Store profile: 61 tests passed.
   Linux-only optimized GLib test does not execute on Windows; CI remains required.
@@ -33,6 +33,9 @@ No production auth, IPC, CSP, updater key, dependencies or native code changed.
   widths 280/320/390/700 and compact 320×400. Isolated Chrome, simulated messages
   and sockets, external requests blocked; not a live Twitch/WebView2 playback test.
   Russian screenshot visually inspected. Report: ignored `scratch/chat-search-browser-report.json`.
+- Store source-notice link: 16 additional browser checks, eight languages at 320/700 px;
+  Russian narrow screenshot inspected. Browser preview lacks native IPC, so its existing
+  getVersion fallback logs are not evidence of a desktop IPC failure or a native launch test.
 - Windows standalone Tauri production build passed (not launched or installed).
 - MSIX production Store build, MakePRI indexing/dump, MakeAppx pack/unpack and
   executable/manifest/63 icon/PRI/runtime hash verification passed.
@@ -47,8 +50,8 @@ These failures were not suppressed or counted as passing evidence.
 ## Exact Store candidate
 
 - File: `src-tauri/target/msix/BlinkStream_1.5.2.0_x64.msix`
-- Bytes: 94,721,474
-- SHA256: `4AA3F112961F2C013488304B70C7FDC2F0252FA9610FC3A48289E2DFFD3AD46E`
+- Bytes: 94,721,834
+- SHA256: `205777AC0351EC0CA00CCB521BCB92569DEA13368000539F6F9535DECB33068C`
 - Official package identity/PFN unchanged; no extra capabilities.
 - Unsigned local candidate. Not installed, uploaded, certified or published.
 - Runtime unchanged; retain the existing 1.5.0 source companion, do not duplicate it.
@@ -59,6 +62,8 @@ These failures were not suppressed or counted as passing evidence.
 - Removed the retired marketing website's milestone parity requirement from
   release tests; new release versions no longer require an archived site update.
   APX Studio is the only commercial website. Login confirmation is an explicit exception.
+- Publication and updater now require `docs/releases/X.Y.Z.md`, with a regression
+  test preventing candidate/history notes from being used as the release body.
 
 ## Remaining gates
 
@@ -67,13 +72,17 @@ These failures were not suppressed or counted as passing evidence.
    verify public signatures/hashes before changing stable download links.
 2. Update and verify only the APX Studio website for publication; SSH deployment
    remains with the maintainer. No website deployment was performed here.
-3. For Store distribution, close the documented corresponding-source/license
-   review and persistent recipient access for bundled GPL runtime sources
-   (`MSIX_RUNTIME_SOURCES.md`). Local source preparation does not prove public access;
-   the current GitHub 1.5.1 release has no runtime-source companion asset.
+3. The source-distribution follow-up is technically complete: all six inventory inputs
+   and 72 enabled-option mappings checked, one companion attached to v1.5.0, complete
+   public bytes streamed and SHA256-verified, actual source URL/hash and translated
+   access included in Store notices. Preserve that asset. This is not a legal opinion,
+   patent clearance or bit-for-bit offline rebuild; see `MSIX_SOURCE_CORRESPONDENCE.md`.
 4. New MSIX has no fresh installed end-to-end acceptance or WACK report. Previous
    user acceptance/Store certification is not certification of this new package.
    Partner Center and publication remain the maintainer's responsibility.
 
-No commit, push, tag, release, remote cleanup, host installation or cloud deployment
-was performed during this review. Stable GitHub/Store version remains 1.5.1.
+No app publication, remote cleanup, host installation or cloud deployment was performed
+during the initial review. Subsequent authorized release preparation committed and pushed
+the candidate to `codex/release-1.5.2`; CI run `38974680981` validates exact SHA
+`b1758d1d639f78b2ebabb4b7a00e48d3ad082ea7`. The source companion was published as a new
+v1.5.0 asset without replacing any existing installer. App publication remains gated on CI.

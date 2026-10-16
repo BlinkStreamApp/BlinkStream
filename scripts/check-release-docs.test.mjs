@@ -19,6 +19,21 @@ test('current source documentation has matching version markers', () => {
   validateReleaseDocs(readReleaseDocs())
 })
 
+test('publication and updater use version-specific ES/EN notes, not candidate history', () => {
+  const version = readReleaseDocs().version
+  const notes = readFileSync(new URL(`../docs/releases/${version}.md`, import.meta.url), 'utf8')
+  assert.ok(notes.startsWith(`# BlinkStream ${version} —`))
+  assert.match(notes, /^## ES$/m)
+  assert.match(notes, /^## EN$/m)
+  assert.doesNotMatch(notes, /local candidate|not published|\(candidate\)/i)
+  const workflow = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8')
+  assert.ok(workflow.includes('NOTES="docs/releases/${VERSION}.md"'))
+  assert.ok(workflow.includes('test -f "$NOTES"'))
+  assert.ok(workflow.includes('--notes "$NOTES"'))
+  assert.ok(workflow.includes('body_path: ${{ steps.release_metadata.outputs.notes }}'))
+  assert.ok(!workflow.includes('--notes RELEASE_NOTES.md'))
+})
+
 test('README and archived website retain official Store web and Windows deep links', () => {
   const { readme, website } = readReleaseDocs()
   for (const content of [readme, website]) {
