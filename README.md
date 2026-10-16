@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/source_version-1.4.4-e94560" alt="Source version 1.4.4">
+  <img src="https://img.shields.io/badge/source_version-1.5.0-e94560" alt="Source version 1.5.0">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
   <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
@@ -51,8 +51,18 @@ See [release notes](RELEASE_NOTES.md), [roadmap](ROADMAP.md) and
 ## 📦 Installation
 
 ### Windows
+Available on the **[Microsoft Store](https://apps.microsoft.com/detail/9NQZ79VL630L)**.
+You can also [open the listing in the Microsoft Store app](ms-windows-store://pdp/?productid=9NQZ79VL630L).
+Store installations receive updates through Microsoft Store; GitHub installations
+use the separate signed updater below.
+
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-Version 1.4.4 is published with verified signed builds for all four targets.
+Microsoft Store 1.5.0 is published (confirmed by the maintainer). Source 1.5.1 prepares a Store icon hotfix with transparent taskbar assets for light/dark themes and DPI-aware resource indexing; see [MSIX packaging](docs/guides/MSIX_STORE.md). GitHub downloads/updater remain on 1.4.4 until new signed cross-platform builds are published. Do not confuse updater signatures with Windows Authenticode.
+
+The Store edition includes Streamlink/Python/FFmpeg with their original notices;
+WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.0
+is published in Store; the 1.5.1 icon update is prepared separately. Corresponding
+runtime sources and license-distribution details are documented in [the source guide](docs/guides/MSIX_RUNTIME_SOURCES.md).
 Updates require a compatible signing key and your confirmation.
 
 - ⭐ **`BlinkStream_1.4.4_Win_x64.exe`** *(Recommended NSIS installer, used by the updater)*
@@ -277,6 +287,10 @@ Before every update/hotfix, keep source versions, release notes, this README, th
 roadmap and website roadmap aligned. `pnpm test:release` checks the documentation version markers.
 Only switch download links to the new version after the complete signed release is verified.
 See [hotfix procedure](docs/guides/HOTFIX_RELEASES.md) and [roadmap](ROADMAP.md).
+
+Optional Raspberry Pi website deployment: [setup guide](docs/guides/PI_WEB_DEPLOY.md).
+Actions can update an existing Nginx-mounted clone through a signed Cloudflare Tunnel endpoint;
+this requires configuring the receiver and repository secrets first, and does not deploy the desktop app.
 
 ---
 

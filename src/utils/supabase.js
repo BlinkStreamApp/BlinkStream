@@ -24,8 +24,22 @@ export const LS_BLINKSTREAM_EXPIRES = 'blinkstream_supabase_expires'
 export const LS_BLINKSTREAM_USER_ID = 'blinkstream_supabase_user_id'
 
 const KEYCHAIN_REFRESH_KEY = 'blinkstream_refresh_token'
+let memorySession = null
+let memoryRefresh = null
+let authEpoch = 0
+let secretQueue = Promise.resolve()
+function secretOperation(command, args, epoch) {
+  const next = secretQueue.catch(() => {}).then(async () => {
+    if (epoch !== undefined && epoch !== authEpoch) return
+    const { invoke } = await import('@tauri-apps/api/core')
+    return invoke(command, args)
+  })
+  secretQueue = next
+  return next
+}
 
 export async function pollAuthToken(requestId, { signal, interval = 1500 } = {}) {
+  const epoch = authEpoch
   const pollUrl = `${EDGE_FN}?fetch=${encodeURIComponent(requestId)}`
 
   migrateLegacyRefreshToken().catch(() => {  })
@@ -39,10 +53,11 @@ export async function pollAuthToken(requestId, { signal, interval = 1500 } = {})
       }
 
       const data = await res.json()
+      if (signal?.aborted || epoch !== authEpoch) return null
       if (data?.found && data?.access_token) {
 
         if (data.supabase_jwt) {
-          saveBlinkstreamToken({
+          await saveBlinkstreamToken({
             jwt: data.supabase_jwt,
             refreshToken: data.supabase_refresh_token,
             expiresIn: data.supabase_expires_in,
@@ -72,8 +87,12 @@ function sleep(ms, signal) {
 
 export function getBlinkstreamToken() {
   try {
-    const jwt = localStorage.getItem(LS_BLINKSTREAM_JWT)
-    const expiresAt = Number(localStorage.getItem(LS_BLINKSTREAM_EXPIRES) || 0)
+    const legacyJwt = localStorage.getItem(LS_BLINKSTREAM_JWT)
+    if (legacyJwt) {
+      memorySession = { jwt: legacyJwt, expiresAt: Number(localStorage.getItem(LS_BLINKSTREAM_EXPIRES) || 0) }
+      localStorage.removeItem(LS_BLINKSTREAM_JWT)
+    }
+    const { jwt, expiresAt } = memorySession || {}
     if (!jwt) return null
 
     if (Date.now() >= expiresAt - 60_000) return null
@@ -86,9 +105,12 @@ export function getBlinkstreamToken() {
 export function getBlinkstreamRefreshTokenSync() {
   try {
     const ls = localStorage.getItem(LS_BLINKSTREAM_REFRESH)
-    if (ls) return ls
+    if (ls) {
+      memoryRefresh = ls
+      localStorage.removeItem(LS_BLINKSTREAM_REFRESH)
+    }
   } catch {  }
-  return null
+  return memoryRefresh
 }
 
 export async function getBlinkstreamRefreshTokenAsync() {
@@ -104,12 +126,14 @@ export async function getBlinkstreamRefreshTokenAsync() {
   return getBlinkstreamRefreshTokenSync()
 }
 
-export async function storeBlinkstreamRefreshToken(token) {
+export async function storeBlinkstreamRefreshToken(token, epoch = authEpoch) {
+  if (epoch !== authEpoch) return false
   if (!token) return false
+  memoryRefresh = token
+  try { localStorage.removeItem(LS_BLINKSTREAM_REFRESH) } catch { /* Memory-only fallback. */ }
   if (isTauri()) {
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('store_secret', { key: KEYCHAIN_REFRESH_KEY, value: token })
+      await secretOperation('store_secret', { key: KEYCHAIN_REFRESH_KEY, value: token }, epoch)
 
       try { localStorage.removeItem(LS_BLINKSTREAM_REFRESH) } catch {  }
       return true
@@ -118,7 +142,6 @@ export async function storeBlinkstreamRefreshToken(token) {
     }
   }
 
-  try { localStorage.setItem(LS_BLINKSTREAM_REFRESH, token) } catch {  }
   return false
 }
 
@@ -130,58 +153,61 @@ export async function readBlinkstreamRefreshToken() {
       if (fromKeychain) return fromKeychain
     } catch {  }
   }
-  try { return localStorage.getItem(LS_BLINKSTREAM_REFRESH) || null } catch { return null }
+  return getBlinkstreamRefreshTokenSync()
 }
 
 export async function clearBlinkstreamRefreshToken() {
+  memoryRefresh = null
   if (isTauri()) {
     try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      await invoke('delete_secret', { key: KEYCHAIN_REFRESH_KEY })
+      await secretOperation('delete_secret', { key: KEYCHAIN_REFRESH_KEY })
     } catch {  }
   }
   try { localStorage.removeItem(LS_BLINKSTREAM_REFRESH) } catch {  }
 }
 
 async function migrateLegacyRefreshToken() {
+  const epoch = authEpoch
   if (!isTauri()) return
   try {
     const lsToken = localStorage.getItem(LS_BLINKSTREAM_REFRESH)
     if (!lsToken) return
     const { invoke } = await import('@tauri-apps/api/core')
     const existing = await invoke('get_secret', { key: KEYCHAIN_REFRESH_KEY })
+    if (epoch !== authEpoch) return
     if (existing) {
 
       localStorage.removeItem(LS_BLINKSTREAM_REFRESH)
       return
     }
-    await invoke('store_secret', { key: KEYCHAIN_REFRESH_KEY, value: lsToken })
+    await storeBlinkstreamRefreshToken(lsToken, epoch)
     localStorage.removeItem(LS_BLINKSTREAM_REFRESH)
   } catch {  }
 }
 
 async function saveBlinkstreamToken({ jwt, refreshToken, expiresIn, userId }) {
+  const epoch = authEpoch
   try {
-    if (jwt) {
-      localStorage.setItem(LS_BLINKSTREAM_JWT, jwt)
-    } else {
-      localStorage.removeItem(LS_BLINKSTREAM_JWT)
-    }
-
     const expiresAtMs = Date.now() + (Number(expiresIn) || 3600) * 1000
+    memorySession = jwt ? { jwt, expiresAt: expiresAtMs } : null
+    localStorage.removeItem(LS_BLINKSTREAM_JWT)
     localStorage.setItem(LS_BLINKSTREAM_EXPIRES, String(expiresAtMs))
     if (userId) localStorage.setItem(LS_BLINKSTREAM_USER_ID, userId)
 
     const clearFlag = await getClearAuthBrokenFlag()
+    if (epoch !== authEpoch) return
     if (clearFlag) clearFlag()
 
     if (refreshToken) {
-      await storeBlinkstreamRefreshToken(refreshToken)
+      await storeBlinkstreamRefreshToken(refreshToken, epoch)
     }
   } catch {  }
 }
 
 export function clearBlinkstreamToken() {
+  authEpoch++
+  memorySession = null
+  memoryRefresh = null
   try {
     localStorage.removeItem(LS_BLINKSTREAM_JWT)
     localStorage.removeItem(LS_BLINKSTREAM_REFRESH)
@@ -195,15 +221,16 @@ export function clearBlinkstreamToken() {
 }
 
 export async function refreshBlinkstreamToken() {
-
+  const epoch = authEpoch
   const refresh = await getBlinkstreamRefreshTokenAsync()
   if (!refresh) return null
   try {
-    const res = await fetch(`${EDGE_FN}?refresh=${encodeURIComponent(refresh)}`)
+    const res = await fetch(EDGE_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: refresh }) })
     if (!res.ok) return null
     const data = await res.json()
+    if (epoch !== authEpoch) return null
     if (data?.ok && data?.supabase_jwt) {
-      saveBlinkstreamToken({
+      await saveBlinkstreamToken({
         jwt: data.supabase_jwt,
         refreshToken: data.supabase_refresh_token,
         expiresIn: data.supabase_expires_in,

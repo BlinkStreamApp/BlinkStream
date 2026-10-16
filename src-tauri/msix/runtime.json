@@ -1,0 +1,8 @@
+{
+  "tag": "8.6.2-1",
+  "url": "https://github.com/streamlink/windows-builds/releases/download/8.6.2-1/streamlink-8.6.2-1-py314-x86_64.zip",
+  "sha256": "329eb05252a3dbc8d8c5b8b6857b41acf61df4fd818545a8ee322f3740b6caa1",
+  "prefix": "streamlink-8.6.2-1-py314-x86_64/",
+  "ffmpegBuildCommit": "7def83d2a56f837b9dbb4b46e0d8b4617fa44cca",
+  "ffmpegBuild": "ffmpeg-n9.0.1-6-g9d4ca21220-win64-gpl-9.0"
+}

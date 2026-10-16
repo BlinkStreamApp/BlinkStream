@@ -1,5 +1,7 @@
 
 
+import { redactDiagnostics, redactText } from './redactDiagnostics'
+
 const BUFFER_SIZE = 500
 const LS_KEY = 'blinkstream_eventlog'
 const LS_PERSIST_FLAG = 'blinkstream_eventlog_persist'
@@ -17,7 +19,8 @@ function _loadFromStorage() {
         const parsed = JSON.parse(raw)
         if (Array.isArray(parsed)) {
 
-          _buffer.push(...parsed.slice(-BUFFER_SIZE))
+          _buffer.push(...parsed.slice(-BUFFER_SIZE).map(redactDiagnostics))
+          localStorage.setItem(LS_KEY, JSON.stringify(_buffer))
         }
       }
     }
@@ -42,8 +45,8 @@ export function logEvent(category, message, data) {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     ts: Date.now(),
     category,
-    message,
-    data: data || null,
+    message: redactText(message),
+    data: data ? redactDiagnostics(data) : null,
   }
   _buffer.push(evt)
   if (_buffer.length > BUFFER_SIZE) _buffer.shift()
@@ -58,7 +61,7 @@ export function logEvent(category, message, data) {
   const _logCategory = (category === 'error' || _isDev)
   if (_logCategory) {
     const _style = _isDev ? 'color:#38bdf8;font-weight:bold' : 'color:#ef4444;font-weight:bold'
-    console.log('%c[event:' + category + ']', _style, message, data || '')
+    console.log('%c[event:' + category + ']', _style, evt.message, evt.data || '')
   }
   return evt
 }

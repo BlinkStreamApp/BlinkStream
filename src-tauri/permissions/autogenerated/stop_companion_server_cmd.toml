@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-stop-companion-server-cmd"
+description = "Enables the stop_companion_server_cmd command without any pre-configured scope."
+commands.allow = ["stop_companion_server_cmd"]
+
+[[permission]]
+identifier = "deny-stop-companion-server-cmd"
+description = "Denies the stop_companion_server_cmd command without any pre-configured scope."
+commands.deny = ["stop_companion_server_cmd"]

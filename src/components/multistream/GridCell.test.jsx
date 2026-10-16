@@ -23,7 +23,7 @@ vi.mock('hls.js', () => {
     stopLoad = vi.fn()
     startLoad = vi.fn()
     on = (event, handler) => { this.handlers[event] = handler }
-    constructor() { MockHls.instances.push(this) }
+    constructor(config) { this.config = config; MockHls.instances.push(this) }
   }
   return { default: MockHls }
 })
@@ -42,6 +42,17 @@ describe('GridCell', () => {
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+  })
+
+  it('uses the shared two-second live latency target', async () => {
+    render(<GridCell {...props} />)
+    await waitFor(() => expect(Hls.instances).toHaveLength(1))
+    expect(Hls.instances[0].config).toMatchObject({
+      liveSyncDuration: 2,
+      liveMaxLatencyDuration: 6,
+      maxLiveSyncPlaybackRate: 1.1,
+    })
+    expect(Hls.instances[0].config).not.toHaveProperty('liveSyncDurationCount')
   })
 
   it('positions loading over the video instead of beside it', async () => {

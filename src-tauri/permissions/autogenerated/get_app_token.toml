@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-app-token"
+description = "Enables the get_app_token command without any pre-configured scope."
+commands.allow = ["get_app_token"]
+
+[[permission]]
+identifier = "deny-get-app-token"
+description = "Denies the get_app_token command without any pre-configured scope."
+commands.deny = ["get_app_token"]

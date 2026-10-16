@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-cached-drops-inventory"
+description = "Enables the get_cached_drops_inventory command without any pre-configured scope."
+commands.allow = ["get_cached_drops_inventory"]
+
+[[permission]]
+identifier = "deny-get-cached-drops-inventory"
+description = "Denies the get_cached_drops_inventory command without any pre-configured scope."
+commands.deny = ["get_cached_drops_inventory"]

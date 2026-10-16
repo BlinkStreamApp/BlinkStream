@@ -41,6 +41,37 @@ describe('useLiveDVR', () => {
     expect(result.current.delayFromLive).toBe(0)
   })
 
+  it('disables catch-up during DVR and restores it on return to live', () => {
+    mockHls.config = {}
+    mockVideo.currentTime = 100
+    mockVideo.playbackRate = 1.1
+    const { result } = renderHook(() => useLiveDVR({ current: mockVideo }, { current: mockHls }))
+    act(() => result.current.seekRelative(-40))
+    expect(mockHls.config.liveMaxLatencyDuration).toBe(Infinity)
+    expect(mockHls.config.maxLiveSyncPlaybackRate).toBe(1)
+    expect(mockVideo.playbackRate).toBe(1)
+    act(() => result.current.seekToLive())
+    expect(mockHls.config.liveMaxLatencyDuration).toBe(6)
+    expect(mockHls.config.maxLiveSyncPlaybackRate).toBe(1.1)
+  })
+
+  it('does not auto-seek a paused live player', () => {
+    mockHls.config = {}
+    mockVideo.paused = true
+    renderHook(() => useLiveDVR({ current: mockVideo }, { current: mockHls }))
+    expect(mockHls.config.liveMaxLatencyDuration).toBe(Infinity)
+    expect(mockHls.config.maxLiveSyncPlaybackRate).toBe(1)
+    expect(mockVideo.currentTime).toBe(100)
+  })
+
+  it('keeps recovery enabled for unwanted lag without a user rewind', () => {
+    mockHls.config = {}
+    mockVideo.currentTime = 60
+    renderHook(() => useLiveDVR({ current: mockVideo }, { current: mockHls }))
+    expect(mockHls.config.liveMaxLatencyDuration).toBe(6)
+    expect(mockHls.config.maxLiveSyncPlaybackRate).toBe(1.1)
+  })
+
   it('detects delay when rewound back in time', () => {
     mockVideo.currentTime = 60 // 40 seconds behind
     const videoRef = { current: mockVideo }

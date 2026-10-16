@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-close-gamer-overlay"
+description = "Enables the close_gamer_overlay command without any pre-configured scope."
+commands.allow = ["close_gamer_overlay"]
+
+[[permission]]
+identifier = "deny-close-gamer-overlay"
+description = "Denies the close_gamer_overlay command without any pre-configured scope."
+commands.deny = ["close_gamer_overlay"]

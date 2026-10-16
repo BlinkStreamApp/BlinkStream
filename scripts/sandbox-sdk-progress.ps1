@@ -1,0 +1,5 @@
+$ErrorActionPreference = 'Stop'
+if ($env:USERNAME -ne 'WDAGUtilityAccount' -or -not (Test-Path 'C:\BlinkStreamInput\sandbox-only.marker')) { throw 'Guest only' }
+$logs = @(Get-ChildItem $env:TEMP, 'C:\Windows\Temp' -Depth 2 -File -Filter '*.log' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'sdk|setup|burn' } | Sort-Object LastWriteTime -Descending | Select-Object -First 3)
+$events = @(Get-WinEvent -FilterHashtable @{LogName='Application';ProviderName='MsiInstaller';StartTime=(Get-Date).AddMinutes(-15)} -MaxEvents 5 -ErrorAction SilentlyContinue | Select-Object Id,Message)
+@{events=$events; processes=@(Get-Process winsdksetup,msiexec -ErrorAction SilentlyContinue | Select-Object Name,Id,CPU); logs=@($logs | ForEach-Object { @{name=$_.Name; tail=@(Get-Content $_.FullName -Tail 8 | ForEach-Object { $_.ToString() })} }); appcert=(Test-Path 'C:\Program Files (x86)\Windows Kits\10\App Certification Kit\appcert.exe')} | ConvertTo-Json -Depth 6 | Set-Content C:\BlinkStreamReport\sdk-progress.json -Encoding UTF8

@@ -1,6 +1,6 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-10-13. Fuente y última publicada 1.4.4. Categorías/UI/grid aceptados por el usuario; CI candidata `38449215321` y tag `38451126905` correctos. Cuatro artefactos públicos del updater verificados independientemente; sin instalar en el PC del usuario.
+Actualizado: 2026-10-16. Microsoft Store 1.5.0 publicada según confirma el usuario. Fuente 1.5.1: hotfix de iconos de barra de tareas/Inicio, variantes transparentes claro/oscuro, escalas DPI e índice PRI verificado. El usuario gestiona la subida Store; no instalar ni publicar automáticamente. Ver `guides/MSIX_STORE.md`. GitHub estable/updater siguen en 1.4.4 hasta nuevos builds firmados multiplataforma.
 
 ## Objetivo y reglas
 
@@ -16,7 +16,7 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 | --- | --- | --- | --- | --- |
 | 0 | 1.4.4 categorías/UI/chat unificado | Componentes existentes, Helix/IRC | Publicación y CI firmados; aceptación específica registrada | Publicada; checks independientes de envío/audio pendientes |
 | 1 | 1.4.5 fiabilidad/latencia y validaciones Twitch | HLS, campañas/cuentas autorizadas | Grid, pausa/DVR, estabilidad y CI; separar crédito/reclamo/inventario | Principal: 2.5 s aceptados; resto pendiente |
-| 2 | 1.5 organización y chat | Cache por cuenta, favoritos y feed acotado | Colecciones, categorías favoritas/ocultas y búsqueda de sesión sin fuga al salir ni recursos cruzados | Planificada |
+| 2 | 1.5 organización y chat | Cache por cuenta, favoritos y feed acotado | Colecciones, categorías favoritas/ocultas y búsqueda de sesión sin fuga al salir ni recursos cruzados | Desarrollo local: colecciones aceptadas; categorías en prueba; búsqueda del chat pendiente |
 | 3 | 1.6.0 continuidad/workspaces | Identidad VOD y persistencia existentes | Reinicio/restauración, medios ausentes, cleanup y audio principal correctos | Planificada |
 | 4 | 1.6.x consumo/medios | Bloque 3, FFmpeg y disco acotado | DVR/audio existentes validados → ahorro/avisos → recorte/replay → biblioteca → temporizador; respetar grabación | Planificada |
 | 5 | 1.7 moderación/eventos/control | Cuenta creadora autorizada, Helix/EventSub | Feed y predicciones/encuestas con permisos/confirmaciones, atajos sin conflictos, HUD y Drops probados por separado | Código parcial existente; consolidación pendiente |
@@ -51,7 +51,7 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 El detalle funcional y las reasignaciones de la antigua 1.5/1.6 están en [ROADMAP.md](../ROADMAP.md); no mantener listas paralelas divergentes.
 
 1. Cerrar las pruebas pendientes de 1.4.5, sin publicar solo por el resultado de 2.5 s del principal.
-2. Inspeccionar favoritos/cache/chat y prototipar el bloque mínimo 1.5 (20 canales y dos fuentes de chat); reutilizar almacenamiento y mantener aislamiento por cuenta.
+2. Colecciones: implementación local en Inicio con CRUD/orden/deshacer, portadas y apertura de canales; editor y errores traducidos a los ocho idiomas (2026-10-14). Suite frontend 694 pasa/1 omitido y once regresiones de traducción; probar textos largos en ventanas estrechas y aceptación visual multidioma nativa. No toca follows ni cloud.
 3. Implementar y validar colecciones, preferencias de categorías y búsqueda en incrementos separados.
 4. Dimensionar VOD/workspaces antes de abrir el bloque de medios; no activar todo 1.6 simultáneamente.
 

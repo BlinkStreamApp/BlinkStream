@@ -11,6 +11,8 @@ import { isTauri } from '../utils/tauriEnv'
 import PhosphorIcon from './icons/PhosphorIcon'
 import { useT } from '../utils/i18n'
 import { APP_VERSION } from '../utils/appVersion'
+import { IS_STORE_BUILD } from '../utils/distribution'
+import storeRuntimeNotices from '../../src-tauri/msix/THIRD_PARTY.txt?raw'
 
 function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> }
 
@@ -51,7 +53,7 @@ export default function AboutDialog({ onClose }) {
   }, [])
 
   const handleCheckUpdate = async () => {
-    if (!isTauri()) return
+    if (!isTauri() || IS_STORE_BUILD) return
     setUpdateStatus({ checking: true, installing: false, msg: '', isNew: false, error: false, updateObj: null })
     try {
       const update = await check()
@@ -88,7 +90,7 @@ export default function AboutDialog({ onClose }) {
   }
 
   const handleInstallUpdate = async () => {
-    if (!updateStatus.updateObj) return
+    if (IS_STORE_BUILD || !updateStatus.updateObj) return
     setUpdateStatus(prev => ({ ...prev, installing: true, msg: 'Descargando e instalando...' }))
     try {
       await updateStatus.updateObj.downloadAndInstall()
@@ -136,7 +138,7 @@ export default function AboutDialog({ onClose }) {
               v{appVersion}
             </span>
 
-            {isTauri() && (
+            {isTauri() && !IS_STORE_BUILD && (
               <div className="flex flex-col items-center gap-1.5 mt-1">
                 <button
                   onClick={handleCheckUpdate}
@@ -197,7 +199,12 @@ export default function AboutDialog({ onClose }) {
             <span className="text-twitch/70">{t('aboutMadeWith', 'Hecho con ♥ para la comunidad')}</span>
           </div>
 
-          {}
+          {IS_STORE_BUILD && (
+            <details className="mt-4 w-full rounded-xl border border-white/10 p-3 text-left text-xs text-text-secondary">
+              <summary className="cursor-pointer font-semibold focus-visible:outline-2 focus-visible:outline-twitch">Streamlink · Python · FFmpeg</summary>
+              <pre className="mt-3 max-h-52 overflow-y-auto whitespace-pre-wrap break-words font-sans text-[11px] leading-relaxed">{storeRuntimeNotices}</pre>
+            </details>
+          )}
           <p className="text-text-muted/60 text-[10px] mt-4">
             Animated icons by{' '}
             <a

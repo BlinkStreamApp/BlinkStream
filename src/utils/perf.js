@@ -1,6 +1,7 @@
 
 
 import { logEvent } from './eventLog'
+import { redactText } from './redactDiagnostics'
 
 export function markStart(name) {
   if (typeof performance === 'undefined' || !performance.mark) return
@@ -207,7 +208,7 @@ export async function measureFetch(url, options = {}) {
     const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now()
     const duration = t1 - t0
     const entry = {
-      url: typeof url === 'string' ? url : String(url),
+      url: redactText(typeof url === 'string' ? url : String(url)),
       duration_ms: Math.round(duration * 100) / 100,
       status,
       rate_limit_remaining: rateLimitRemaining,

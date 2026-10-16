@@ -129,6 +129,7 @@ const ALLOWED_ORIGINS = new Set<string>([
   // Tauri desktop
   "tauri://localhost",
   "https://tauri.localhost",
+  "http://tauri.localhost",
 ]);
 
 export function isAllowedOrigin(origin: string | null | undefined): boolean {

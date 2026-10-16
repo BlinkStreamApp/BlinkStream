@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-claim-twitch-drop"
+description = "Enables the claim_twitch_drop command without any pre-configured scope."
+commands.allow = ["claim_twitch_drop"]
+
+[[permission]]
+identifier = "deny-claim-twitch-drop"
+description = "Denies the claim_twitch_drop command without any pre-configured scope."
+commands.deny = ["claim_twitch_drop"]

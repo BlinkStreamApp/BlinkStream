@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-update-embedded-twitch-chat-bounds"
+description = "Enables the update_embedded_twitch_chat_bounds command without any pre-configured scope."
+commands.allow = ["update_embedded_twitch_chat_bounds"]
+
+[[permission]]
+identifier = "deny-update-embedded-twitch-chat-bounds"
+description = "Denies the update_embedded_twitch_chat_bounds command without any pre-configured scope."
+commands.deny = ["update_embedded_twitch_chat_bounds"]

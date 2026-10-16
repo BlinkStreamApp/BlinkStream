@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
+import { LIVE_PLAYBACK_CONFIG } from '../../utils/livePlayback'
 import { measureInvoke } from '../../utils/perf'
 import { TauriPlaylistLoader } from '../../utils/tauriHls'
 import { useT, t as translate } from '../../utils/i18n'
@@ -89,13 +90,10 @@ export default function GridCell({
     if (Hls.isSupported()) {
       hls = new Hls({
         loader: TauriPlaylistLoader,
-        lowLatencyMode: true,
+        ...LIVE_PLAYBACK_CONFIG,
         backBufferLength: 15,
         maxBufferLength: 10,
         maxMaxBufferLength: 20,
-        liveSyncDurationCount: 2.5,
-        liveMaxLatencyDurationCount: 5,
-        maxLiveSyncPlaybackRate: 1.05,
         capLevelToPlayerSize: true,
         enableWorker: true,
       })

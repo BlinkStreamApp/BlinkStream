@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-twitch-drops-window"
+description = "Enables the open_twitch_drops_window command without any pre-configured scope."
+commands.allow = ["open_twitch_drops_window"]
+
+[[permission]]
+identifier = "deny-open-twitch-drops-window"
+description = "Denies the open_twitch_drops_window command without any pre-configured scope."
+commands.deny = ["open_twitch_drops_window"]

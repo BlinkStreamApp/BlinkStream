@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, UdpSocket};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
+use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +42,7 @@ pub struct CompanionServerState {
     pub ip: String,
     pub pin: String,
     pub state_data: CompanionStateData,
+    failures: HashMap<std::net::IpAddr, (u32, Instant)>,
 }
 
 static SERVER_STATE: OnceLock<Arc<Mutex<CompanionServerState>>> = OnceLock::new();
@@ -105,11 +108,13 @@ fn get_server_state() -> Arc<Mutex<CompanionServerState>> {
                 ip: detect_local_ip(),
                 pin: String::new(),
                 state_data: CompanionStateData::default(),
+                failures: HashMap::new(),
             }))
         })
         .clone()
 }
 
+#[cfg(test)]
 fn query_parameter<'a>(query: &'a str, key: &str) -> Option<&'a str> {
     query.split('&').find_map(|pair| {
         let (candidate, value) = pair.split_once('=')?;
@@ -121,6 +126,7 @@ fn request_body(req: &str) -> Option<&str> {
     req.split_once("\r\n\r\n").map(|(_, body)| body)
 }
 
+#[cfg(test)]
 fn supplied_pin(query: &str, req: &str) -> Option<String> {
     query_parameter(query, "pin")
         .map(str::to_owned)
@@ -135,31 +141,114 @@ fn supplied_pin(query: &str, req: &str) -> Option<String> {
 }
 
 fn generate_pin() -> Result<String, String> {
-    let value = getrandom::u32()
-        .map_err(|e| format!("No se pudo generar un PIN seguro para el mando: {e}"))?;
-    Ok(format!("{:06}", (value % 900_000) + 100_000))
+    let a = getrandom::u64().map_err(|_| "No se pudo generar el acceso seguro al mando")?;
+    let b = getrandom::u64().map_err(|_| "No se pudo generar el acceso seguro al mando")?;
+    Ok(format!("{a:016x}{b:016x}"))
+}
+
+fn header<'a>(request: &'a str, name: &str) -> Option<&'a str> {
+    request
+        .split("\r\n\r\n")
+        .next()?
+        .lines()
+        .skip(1)
+        .find_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            key.eq_ignore_ascii_case(name).then_some(value.trim())
+        })
+}
+
+fn trusted_request(request: &str, ip: &str, port: u16) -> bool {
+    for name in ["Host", "Origin", "Content-Length", "X-BlinkStream-Token"] {
+        if request
+            .split("\r\n\r\n")
+            .next()
+            .unwrap_or("")
+            .lines()
+            .skip(1)
+            .filter(|line| {
+                line.split_once(':')
+                    .is_some_and(|(key, _)| key.eq_ignore_ascii_case(name))
+            })
+            .count()
+            > 1
+        {
+            return false;
+        }
+    }
+    if header(request, "Transfer-Encoding").is_some() {
+        return false;
+    }
+    let Some(host) = header(request, "Host") else {
+        return false;
+    };
+    if ![
+        format!("{ip}:{port}"),
+        format!("127.0.0.1:{port}"),
+        format!("localhost:{port}"),
+    ]
+    .contains(&host.to_string())
+    {
+        return false;
+    }
+    header(request, "Origin").is_none_or(|origin| origin == format!("http://{host}"))
+}
+
+fn token_matches(actual: &str, expected: &str) -> bool {
+    !expected.is_empty()
+        && actual.len() == expected.len()
+        && actual
+            .bytes()
+            .zip(expected.bytes())
+            .fold(0u8, |difference, (a, b)| difference | (a ^ b))
+            == 0
+}
+
+fn valid_command(value: &serde_json::Value) -> bool {
+    match value.get("action").and_then(serde_json::Value::as_str) {
+        Some("send_chat") => value
+            .get("text")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|text| {
+                !text.trim().is_empty() && text.len() <= 500 && !text.contains(['\r', '\n', '\0'])
+            }),
+        Some("change_channel") => value
+            .get("channel")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|channel| crate::validate_channel(channel).is_ok()),
+        Some("set_volume") => value
+            .get("value")
+            .and_then(serde_json::Value::as_i64)
+            .is_some_and(|volume| (0..=100).contains(&volume)),
+        Some(
+            "take_snapshot" | "toggle_pause" | "toggle_theatre" | "toggle_multistream"
+            | "toggle_mute",
+        ) => true,
+        _ => false,
+    }
 }
 
 pub fn init_and_start_companion_server(app: AppHandle) -> Result<(), String> {
     let state_arc = get_server_state();
-    let (ip, port) = {
+    let (ip, port, session_token) = {
         let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
         if guard.is_running {
             return Ok(());
         }
         guard.pin = generate_pin()?;
+        guard.failures.clear();
         guard.is_running = true;
-        (guard.ip.clone(), guard.port)
+        (guard.ip.clone(), guard.port, guard.pin.clone())
     };
 
-    let bind_addr = format!("0.0.0.0:{port}");
+    let bind_addr = format!("{ip}:{port}");
     let listener = match TcpListener::bind(&bind_addr) {
         Ok(l) => l,
         Err(e) => {
             log::warn!("[Companion] El puerto {port} está en uso ({e}), intentando 9877...");
             let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
             guard.port = 9877;
-            match TcpListener::bind("0.0.0.0:9877") {
+            match TcpListener::bind(format!("{ip}:9877")) {
                 Ok(l2) => l2,
                 Err(e2) => {
                     log::error!("[Companion] Fallo crítico al enlazar servidor local: {e2}");
@@ -187,7 +276,7 @@ pub fn init_and_start_companion_server(app: AppHandle) -> Result<(), String> {
             let is_running = {
                 let state = get_server_state();
                 let guard = state.lock().unwrap_or_else(|e| e.into_inner());
-                guard.is_running
+                guard.is_running && guard.pin == session_token
             };
             if !is_running {
                 log::info!("[Companion] Servidor Remoto detenido");
@@ -227,12 +316,55 @@ fn handle_client_stream(
     stream.set_write_timeout(Some(std::time::Duration::from_secs(4)))?;
 
     let mut buf = [0u8; 8192];
-    let n = stream.read(&mut buf)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(4);
+    let mut n = 0;
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() || n == buf.len() {
+            stream.write_all(
+                b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            )?;
+            return Ok(());
+        }
+        stream.set_read_timeout(Some(remaining))?;
+        let read = stream.read(&mut buf[n..])?;
+        if read == 0 {
+            return Ok(());
+        }
+        n += read;
+        if let Some(end) = buf[..n].windows(4).position(|part| part == b"\r\n\r\n") {
+            let headers = String::from_utf8_lossy(&buf[..end]);
+            let body_size = match header(&headers, "Content-Length") {
+                Some(value) => match value.parse::<usize>() {
+                    Ok(size) if size <= buf.len().saturating_sub(end + 4) => size,
+                    _ => {
+                        stream.write_all(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")?;
+                        return Ok(());
+                    }
+                },
+                None => 0,
+            };
+            let total = end + 4 + body_size;
+            if n >= total {
+                n = total;
+                break;
+            }
+        }
+    }
     if n == 0 {
         return Ok(());
     }
 
     let req_str = String::from_utf8_lossy(&buf[..n]);
+    {
+        let guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
+        if !trusted_request(&req_str, &guard.ip, guard.port) {
+            stream.write_all(
+                b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            )?;
+            return Ok(());
+        }
+    }
     let mut lines = req_str.lines();
     let first_line = match lines.next() {
         Some(l) => l,
@@ -247,11 +379,6 @@ fn handle_client_stream(
     let path_and_query = parts[1];
 
     let path = path_and_query.split('?').next().unwrap_or("/");
-    let query = if let Some(idx) = path_and_query.find('?') {
-        &path_and_query[idx + 1..]
-    } else {
-        ""
-    };
 
     // La interfaz móvil se sirve desde este mismo origen. No habilitamos CORS:
     // así una web externa no puede usar el navegador para atacar la API LAN.
@@ -264,12 +391,30 @@ fn handle_client_stream(
     }
 
     if path.starts_with("/api/") {
-        let expected_pin = {
-            let guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
-            guard.pin.clone()
+        let peer = stream.peer_addr()?.ip();
+        let has_valid_pin = {
+            let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
+            guard
+                .failures
+                .retain(|_, (_, time)| time.elapsed() < Duration::from_secs(60));
+            let blocked = guard
+                .failures
+                .get(&peer)
+                .is_some_and(|(count, _)| *count >= 10);
+            let valid = guard.is_running
+                && !blocked
+                && token_matches(
+                    header(&req_str, "X-BlinkStream-Token").unwrap_or(""),
+                    &guard.pin,
+                );
+            if valid {
+                guard.failures.remove(&peer);
+            } else if guard.failures.len() < 1024 {
+                let attempt = guard.failures.entry(peer).or_insert((0, Instant::now()));
+                attempt.0 = attempt.0.saturating_add(1);
+            }
+            valid
         };
-
-        let has_valid_pin = supplied_pin(query, &req_str).as_deref() == Some(&expected_pin);
 
         if !has_valid_pin {
             let err_json = json!({"error": "Unauthorized", "message": "PIN de seguridad incorrecto u omitido. Escanea el código QR desde BlinkStream."}).to_string();
@@ -312,8 +457,16 @@ fn handle_client_stream(
     }
 
     if method == "POST" && path == "/api/command" {
-        if let Some(body) = request_body(&req_str) {
-            if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(body) {
+        let command = request_body(&req_str)
+            .and_then(|body| serde_json::from_str::<serde_json::Value>(body).ok());
+        match command.filter(valid_command) {
+            None => {
+                stream.write_all(
+                    b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )?;
+                return Ok(());
+            }
+            Some(json_val) => {
                 if let Some(action) = json_val.get("action").and_then(|v| v.as_str()) {
                     if action == "send_chat" {
                         let _ = app_handle.emit("companion_send_chat", &json_val);
@@ -348,7 +501,7 @@ fn handle_client_stream(
 pub fn get_companion_status() -> Result<serde_json::Value, String> {
     let state_arc = get_server_state();
     let guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
-    let url = format!("http://{}:{}/?pin={}", guard.ip, guard.port, guard.pin);
+    let url = format!("http://{}:{}/#pin={}", guard.ip, guard.port, guard.pin);
     Ok(json!({
         "isRunning": guard.is_running,
         "ip": guard.ip,
@@ -415,6 +568,7 @@ pub fn stop_companion_server_cmd() -> Result<serde_json::Value, String> {
     let state_arc = get_server_state();
     let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
     guard.is_running = false;
+    guard.pin.clear();
     Ok(json!({ "status": "stopped" }))
 }
 
@@ -430,6 +584,20 @@ pub fn update_companion_state(
     favorites_live: Option<Vec<serde_json::Value>>,
     avatar: Option<String>,
 ) -> Result<(), String> {
+    if channel
+        .as_ref()
+        .is_some_and(|value| !value.is_empty() && crate::validate_channel(value).is_err())
+        || title.as_ref().is_some_and(|value| value.len() > 1000)
+        || avatar.as_ref().is_some_and(|value| value.len() > 2048)
+        || view_mode.as_ref().is_some_and(|value| value.len() > 40)
+        || volume.is_some_and(|value| !(0..=100).contains(&value))
+        || favorites_live.as_ref().is_some_and(|value| {
+            value.len() > 100
+                || serde_json::to_string(value).map_or(true, |json| json.len() > 64_000)
+        })
+    {
+        return Err("Estado del mando fuera de límites".into());
+    }
     let state_arc = get_server_state();
     let mut guard = state_arc.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(c) = channel {
@@ -572,8 +740,9 @@ fn get_companion_html() -> &'static str {
     <div id="toast" class="toast"></div>
 
     <script>
-        const params = new URLSearchParams(window.location.search);
+        const params = new URLSearchParams(window.location.hash.slice(1));
         const pin = params.get('pin') || '';
+        history.replaceState(null, '', window.location.pathname);
 
         function showToast(msg) {
             const t = document.getElementById('toast');
@@ -582,12 +751,23 @@ fn get_companion_html() -> &'static str {
             setTimeout(() => { t.style.opacity = '0'; }, 2000);
         }
 
+        function makeAvatar(raw, name) {
+            const image = document.createElement('img');
+            try {
+                const url = new URL(raw);
+                if (url.protocol === 'https:' && (url.hostname === 'jtvnw.net' || url.hostname.endsWith('.jtvnw.net'))) image.src = url.href;
+            } catch { /* Invalid images are not rendered. */ }
+            image.alt = name;
+            image.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;';
+            return image;
+        }
+
         async function sendCommand(action, extra = {}) {
             try {
-                const res = await fetch(`/api/command?pin=${encodeURIComponent(pin)}`, {
+                const res = await fetch('/api/command', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin, action, ...extra })
+                    headers: { 'Content-Type': 'application/json', 'X-BlinkStream-Token': pin },
+                    body: JSON.stringify({ action, ...extra })
                 });
                 if (res.ok) {
                     if (action === 'take_snapshot') showToast('📸 Captura HD Guardada con Exito!');
@@ -621,7 +801,7 @@ fn get_companion_html() -> &'static str {
 
         async function pollState() {
             try {
-                const res = await fetch(`/api/state?pin=${encodeURIComponent(pin)}`);
+                const res = await fetch('/api/state', { headers: { 'X-BlinkStream-Token': pin } });
                 if (res.ok) {
                     const data = await res.json();
                     document.getElementById('statusBadge').style.color = '#2ecc71';
@@ -631,7 +811,8 @@ fn get_companion_html() -> &'static str {
                     if (data.channel) {
                         document.getElementById('chanName').textContent = data.channel.toUpperCase();
                         if (data.avatar) {
-                            document.getElementById('chanAvatar').innerHTML = `<img src="${data.avatar}" alt="${data.channel}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid #00e5ff;box-shadow:0 0 12px rgba(0,229,255,0.35);">`;
+                            const box = document.getElementById('chanAvatar');
+                            box.replaceChildren(makeAvatar(data.avatar, data.channel));
                         } else {
                             document.getElementById('chanAvatar').textContent = data.channel.charAt(0).toUpperCase();
                         }
@@ -653,20 +834,26 @@ fn get_companion_html() -> &'static str {
                     if (favs.length > 0) {
                         document.getElementById('favsCard').style.display = 'block';
                         const container = document.getElementById('favsContainer');
-                        container.innerHTML = favs.map(f => {
+                        container.replaceChildren(...favs.slice(0, 100).map(f => {
                             const name = typeof f === 'string' ? f : (f.name || f.user_name || f.user_login || 'Unknown');
                             const avatar = typeof f === 'object' ? (f.avatar || '') : '';
                             const isLive = typeof f === 'object' ? (f.live !== false) : true;
                             const initial = name.charAt(0).toUpperCase();
-                            const avatarImg = avatar
-                                ? `<img src="${avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;${isLive ? 'border:2px solid #2ecc71;' : 'filter:grayscale(70%);opacity:0.5;'}">`
-                                : initial;
-                            const badge = isLive ? `<span class="fav-live-dot" style="background:#2ecc71;box-shadow:0 0 8px #2ecc71;"></span>` : `<span class="fav-live-dot" style="background:#666;"></span>`;
-                            return `<div class="fav-item" onclick="sendCommand('change_channel', { channel: '${name}' }); showToast('📺 Cambiando a ${name}')" style="${isLive ? 'opacity:1;' : 'opacity:0.6;'}">
-                                <div class="fav-avatar" style="${avatar ? 'padding:0;overflow:hidden;background:transparent;border:none;' : ''}">${avatarImg}${badge}</div>
-                                <div class="fav-name" style="color:${isLive ? '#fff' : '#999'};">${name}</div>
-                            </div>`;
-                        }).join('');
+                            const item = document.createElement('button');
+                            item.type = 'button';
+                            item.className = 'fav-item';
+                            item.style.opacity = isLive ? '1' : '0.6';
+                            item.addEventListener('click', () => { sendCommand('change_channel', { channel: name }); showToast('📺 Cambiando a ' + name); });
+                            const picture = document.createElement('div');
+                            picture.className = 'fav-avatar';
+                            if (avatar) picture.appendChild(makeAvatar(avatar, name));
+                            else picture.textContent = initial;
+                            const label = document.createElement('div');
+                            label.className = 'fav-name';
+                            label.textContent = name;
+                            item.append(picture, label);
+                            return item;
+                        }));
                     } else {
                         document.getElementById('favsCard').style.display = 'none';
                     }
@@ -689,6 +876,39 @@ fn get_companion_html() -> &'static str {
 mod tests {
     use super::{query_parameter, request_body, supplied_pin, validate_drops_inventory};
     use serde_json::json;
+
+    #[test]
+    fn companion_rejects_rebinding_tokens_and_injected_commands() {
+        assert!(super::trusted_request(
+            "GET / HTTP/1.1\r\nHost: 192.168.1.2:9876\r\nOrigin: http://192.168.1.2:9876\r\n\r\n",
+            "192.168.1.2",
+            9876
+        ));
+        assert!(!super::trusted_request(
+            "GET / HTTP/1.1\r\nHost: evil.test:9876\r\n\r\n",
+            "192.168.1.2",
+            9876
+        ));
+        assert!(!super::trusted_request(
+            "GET / HTTP/1.1\r\nHost: 192.168.1.2:9876\r\nOrigin: https://evil.test\r\n\r\n",
+            "192.168.1.2",
+            9876
+        ));
+        let token = super::generate_pin().unwrap();
+        assert_eq!(token.len(), 32);
+        assert!(super::token_matches(&token, &token));
+        assert!(!super::token_matches("", ""));
+        assert!(!super::valid_command(
+            &json!({"action":"send_chat", "text":"hi\r\nJOIN #bad"})
+        ));
+        assert!(!super::valid_command(
+            &json!({"action":"set_volume", "value": 101})
+        ));
+        assert!(!super::valid_command(&json!({"action":"unknown"})));
+        assert!(super::valid_command(
+            &json!({"action":"send_chat", "text":"hello"})
+        ));
+    }
 
     #[test]
     fn pin_query_requires_exact_parameter_name() {

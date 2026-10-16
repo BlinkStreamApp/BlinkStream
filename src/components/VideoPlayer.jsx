@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
+import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
 import { measureInvoke } from '../utils/perf'
 import { TauriPlaylistLoader } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
@@ -429,8 +430,7 @@ export default function VideoPlayer({
 
     const hls = new Hls({
       loader: TauriPlaylistLoader,
-      lowLatencyMode: true,
-      startPosition: -1,
+      ...LIVE_PLAYBACK_CONFIG,
       backBufferLength: 15,
       maxBufferLength: 12,
       maxMaxBufferLength: 24,
@@ -443,10 +443,7 @@ export default function VideoPlayer({
       fragLoadingTimeOut: 20000,
       manifestLoadingTimeOut: 15000,
       levelLoadingTimeOut: 15000,
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 6,
       liveDurationInfinity: true,
-      maxLiveSyncPlaybackRate: 1.05,
       highBufferWatchdogPeriod: 3,
       nudgeOffset: 0.1,
       nudgeMaxRetry: 5,
@@ -503,24 +500,6 @@ export default function VideoPlayer({
           : (video.seekable.length ? video.seekable.end(video.seekable.length - 1) : 0)
         if (livePos > 0) {
           try { video.currentTime = livePos } catch {}
-        }
-      }
-    })
-
-    hls.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
-      if (data?.details?.live) {
-        const livePos = (typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0)
-          ? hls.liveSyncPosition
-          : (video.seekable.length ? video.seekable.end(video.seekable.length - 1) : 0)
-        if (livePos > 0) {
-          const diff = livePos - video.currentTime
-          if (diff > 3.0) {
-            try { video.currentTime = livePos } catch {}
-          } else if (diff > 2.0) {
-            video.playbackRate = 1.2
-          } else {
-            video.playbackRate = 1.0
-          }
         }
       }
     })

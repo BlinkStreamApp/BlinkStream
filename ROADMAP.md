@@ -7,10 +7,10 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-13 / v1.4.4 published
+## Execution status — 2026-10-16 / v1.5.0 Store baseline
 
 The historical phases below describe product direction, not proof of a published release.
-Source and latest published release are [1.4.4](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.4).
+Microsoft Store 1.5.0 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations and security hardening. Source 1.5.1 prepares the taskbar icon hotfix: transparent target-size light/dark variants, DPI assets and a compiled resource index. GitHub downloads/updater remain on [1.4.4](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.4) until new signed cross-platform builds are published. The user handles Partner Center; 1.5.1 has not been submitted by the agent.
 Candidate CI `38449215321` and tag CI `38451126905` passed all gates; downloaded public updater artifacts independently pass signature and SHA-256 verification.
 Signed builds are available for Windows x64, macOS Intel/Apple Silicon and Linux x64.
 The update adds category discovery, UI polish and unified grid chat, retaining account-scoped favorites/follows, logout cleanup and approved branding.
@@ -35,19 +35,19 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 
 Validation: 623 frontend tests pass, one skipped; 56 Rust Windows tests and 19 release/signature/documentation tests pass locally. Lint/legacy/fmt/Clippy, optimized GLib tests, signed four-target builds and NSIS smoke pass CI. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
-Now: 1.4.4 published; maintain documentation/site coherence and record outstanding live integration checks.
+Now: Store 1.5.0 published; prepare 1.5.1 icons and maintain separate GitHub 1.4.4 download/update status. Record outstanding live integration checks.
 Next: close 1.4.5 validation, then 1.5 organization/chat improvements and 1.6 VOD/workspaces/media.
 Then: 1.7 moderation, 1.8 integrations and 1.9 consolidation.
 2.0 centers on a complete interface redesign; AI, additional platforms and plugins remain conditional.
 
 ---
 
-## Next release fix list — 1.4.5 (not published)
+## Playback latency — included in Store 1.5.0
 
 - **Lower live video latency:** implemented locally in the main player and multistream grid. Shared HLS target of 2 seconds, bounded catch-up at 1.1× and removal of the competing manual live controller; preload buffers remain unchanged and manual DVR/pause disable catch-up.
 - **User evidence (2026-10-13):** main-player screenshot shows 2.5 seconds latency and 2.3 seconds buffer; the user accepts this result. This is one observed Twitch session, not a guaranteed latency across channels/networks.
 - **Validation:** 632 frontend tests pass/one skipped, 19 release/documentation tests, lint/legacy and local Windows build pass. Live grid, pause/DVR and sustained stability checks remain pending, alongside signed cross-platform release CI.
-- **Delivery:** queued for the next PATCH update; source/downloads/updater remain 1.4.4 until the release workflow is completed. Existing VOD/workspace priorities are unchanged.
+- **Delivery:** included in the Store 1.5.0 baseline; the formerly planned 1.4.5 label is superseded, not a separate published release. GitHub downloads/updater remain 1.4.4 until new signed builds are published. Existing VOD/workspace priorities are unchanged.
 
 ## 1.4.4 delivery — Category discovery and UI (2026-10-13)
 
@@ -158,7 +158,7 @@ Cada hito comienza con una entrega mínima; ampliaciones compatibles salen como 
 consecutivos cuando están probadas. No saltar de versión para cada idea ni esperar
 a terminar todo un hito para entregar una corrección validada.
 
-**Estado:** 1.4.4 publicada; 1.4.5 en cola. Todas las iniciativas nuevas son planificación.
+**Estado:** Store 1.5.0 publicada; hotfix 1.5.1 de iconos en preparación. GitHub descargas/updater siguen en 1.4.4. El resto de hitos continúa como planificación, sin dar por entregadas todas las ampliaciones de 1.5.x.
 Codex se encarga de implementación/regresiones; el usuario acepta los flujos reales.
 Antes de cada hito: revisar el código existente, reutilizarlo y verificar permisos,
 consumo, migraciones y límites del proveedor. Ninguna prueba simulada certifica Twitch real.
@@ -179,7 +179,9 @@ consumo, migraciones y límites del proveedor. Ninguna prueba simulada certifica
 
 **Entrega mínima (1.5.0):**
 - **Colecciones de canales — nuevo:** listas propias (Gaming, Esports, Para escuchar), orden manual y acceso rápido. No confundir con workspaces: no guardan layout ni lanzan varios streams automáticamente.
+- **Personalización de colecciones (ampliación solicitada):** tarjetas verticales 3:4 como categorías, color y portada local PNG/JPG/WebP reducida; al seleccionarlas aparecen canales con avatar y estado En vivo/Offline/Sin confirmar. Incluir canales no seguidos en la consulta existente; fallos/timeouts no equivalen a offline. Implementación local en prueba, todavía no publicada.
 - **Categorías favoritas y contenido oculto — nuevo:** fijar juegos y ocultar canales/categorías en Explorar; posibilidad de deshacer y gestionar exclusiones. Sin recomendaciones opacas ni filtros de Drops no verificables.
+  - Categorías implementadas localmente: fijar primero, filtro Solo favoritas, ocultar con deshacer y panel para restaurar; preferencias acotadas por cuenta y sin escrituras en Twitch. Pruebas automáticas correctas; aceptación nativa pendiente. Ocultar canales todavía no implementado.
 - **Búsqueda del chat de sesión — nuevo:** texto, usuario, enlaces y canal de origen en el chat unificado. Solo mensajes realmente recibidos y conservados; mantener los borrados de moderación y el límite de historial.
 
 **Ampliaciones posteriores del hito:** orden/filtros de colecciones y navegación con teclado, reutilizando la infraestructura existente. Sin persistir conversaciones por defecto.

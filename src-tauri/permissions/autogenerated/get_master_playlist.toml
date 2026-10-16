@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-master-playlist"
+description = "Enables the get_master_playlist command without any pre-configured scope."
+commands.allow = ["get_master_playlist"]
+
+[[permission]]
+identifier = "deny-get-master-playlist"
+description = "Denies the get_master_playlist command without any pre-configured scope."
+commands.deny = ["get_master_playlist"]

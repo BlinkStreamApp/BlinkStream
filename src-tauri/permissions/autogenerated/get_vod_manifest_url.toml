@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-vod-manifest-url"
+description = "Enables the get_vod_manifest_url command without any pre-configured scope."
+commands.allow = ["get_vod_manifest_url"]
+
+[[permission]]
+identifier = "deny-get-vod-manifest-url"
+description = "Denies the get_vod_manifest_url command without any pre-configured scope."
+commands.deny = ["get_vod_manifest_url"]

@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/immutability */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
 
 export function useLiveDVR(videoRef, hlsRef) {
   const [delayFromLive, setDelayFromLive] = useState(0)
@@ -10,6 +11,8 @@ export function useLiveDVR(videoRef, hlsRef) {
   const [currentTime, setCurrentTime] = useState(0)
 
   const animationFrameRef = useRef(null)
+  const manualDVRRef = useRef(false)
+  const activeHlsRef = useRef(null)
 
   const updateDVRMetrics = useCallback(() => {
     const video = videoRef?.current
@@ -20,6 +23,10 @@ export function useLiveDVR(videoRef, hlsRef) {
     let start = 0
 
     const hls = hlsRef?.current
+    if (activeHlsRef.current !== hls) {
+      activeHlsRef.current = hls
+      manualDVRRef.current = false
+    }
     if (hls && typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
       liveEnd = hls.liveSyncPosition
     } else if (seekable && seekable.length > 0) {
@@ -34,6 +41,14 @@ export function useLiveDVR(videoRef, hlsRef) {
     const delay = Math.max(0, liveEnd - current)
     const isLive = delay <= 2.5
     const totalBuf = Math.max(0, liveEnd - start)
+
+    // A deliberate rewind/pause must not be mistaken for unwanted live latency.
+    if (hls?.config) {
+      const followLive = !manualDVRRef.current && !video.paused
+      hls.config.liveMaxLatencyDuration = followLive ? LIVE_PLAYBACK_CONFIG.liveMaxLatencyDuration : Infinity
+      hls.config.maxLiveSyncPlaybackRate = followLive ? LIVE_PLAYBACK_CONFIG.maxLiveSyncPlaybackRate : 1
+      if (!followLive && video.playbackRate !== 1) video.playbackRate = 1
+    }
 
     setDelayFromLive(Math.floor(delay))
     setIsAtLiveEdge(isLive)
@@ -67,6 +82,7 @@ export function useLiveDVR(videoRef, hlsRef) {
     const hls = hlsRef?.current
     if (!video) return
 
+    manualDVRRef.current = false
     if (hls && typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
       video.currentTime = hls.liveSyncPosition
     } else if (video.seekable && video.seekable.length > 0) {
@@ -92,7 +108,9 @@ export function useLiveDVR(videoRef, hlsRef) {
       maxTime = video.seekable.end(video.seekable.length - 1)
     }
 
-    video.currentTime = Math.max(minTime, Math.min(maxTime, target))
+    const boundedTarget = Math.max(minTime, Math.min(maxTime, target))
+    manualDVRRef.current = boundedTarget < (liveEdgeTime || maxTime) - 2.5
+    video.currentTime = boundedTarget
     updateDVRMetrics()
   }, [videoRef, liveEdgeTime, updateDVRMetrics])
 
@@ -103,9 +121,10 @@ export function useLiveDVR(videoRef, hlsRef) {
     const clampedPercent = Math.max(0, Math.min(100, Number(percent) || 0)) / 100
     const target = bufferStart + (bufferDuration * clampedPercent)
 
+    manualDVRRef.current = target < liveEdgeTime - 2.5
     video.currentTime = target
     updateDVRMetrics()
-  }, [videoRef, bufferStart, bufferDuration, updateDVRMetrics])
+  }, [videoRef, bufferStart, bufferDuration, liveEdgeTime, updateDVRMetrics])
 
   return {
     delayFromLive,

@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
+
+test('standalone desktop builds use Tauri CLI to embed the frontend', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  assert.equal(pkg.scripts['build:desktop'], 'tauri build --no-bundle')
+})
 import { readReleaseDocs, validateReleaseDocs } from './check-release-docs.mjs'
 
 const docs = {
@@ -11,6 +17,14 @@ const docs = {
 
 test('current source documentation has matching version markers', () => {
   validateReleaseDocs(readReleaseDocs())
+})
+
+test('README and website expose official Store web and Windows deep links', () => {
+  const { readme, website } = readReleaseDocs()
+  for (const content of [readme, website]) {
+    assert.ok(content.includes('https://apps.microsoft.com/detail/9NQZ79VL630L'))
+    assert.ok(content.includes('ms-windows-store://pdp/?productid=9NQZ79VL630L'))
+  }
 })
 test('candidate may honestly retain previous published download links', () => {
   assert.doesNotThrow(() => validateReleaseDocs(docs))

@@ -60,3 +60,6 @@ lint_output_*.txt
 .gemini/
 .agents/
 scratch/
+
+# Local Python deploy tests; secrets must live outside the repository.
+deploy/pi-web/__pycache__/

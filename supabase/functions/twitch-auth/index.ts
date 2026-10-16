@@ -210,7 +210,16 @@ Deno.serve(async (req: Request) => {
   const fetchId = url.searchParams.get("fetch");
   const isPolling = !!fetchId;
   const requestIdParam = url.searchParams.get("request_id");
-  const refreshTokenParam = url.searchParams.get("refresh");
+  // Preserve the existing GET route temporarily for released desktop clients.
+  // New clients send credentials in a POST body, never in the URL.
+  let refreshTokenParam = url.searchParams.get("refresh");
+  if (req.method === "POST") {
+    const { readRefreshBody } = await import("./_refresh.ts");
+    refreshTokenParam = await readRefreshBody(req);
+    if (!refreshTokenParam) {
+      return json({ ok: false, error: "invalid_refresh_body" }, 400, securityHeaders, corsHeaders);
+    }
+  }
 
   // === Issue #4: Validar Origin/Referer ===
   // EXCEPCION: callback de Twitch (server-to-server, sin Origin), debug,

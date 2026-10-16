@@ -9,6 +9,9 @@ import StreamPreview from './StreamPreview'
 import { useT } from '../utils/i18n'
 import WelcomeScreen from './WelcomeScreen'
 import CategoryExplorer from './CategoryExplorer'
+import ChannelCollections from './ChannelCollections'
+import { getJSON } from '../utils/storage'
+import { collectionsKey, normalizeCollections } from '../utils/channelCollections'
 
 function exactViewers(n) {
   if (n == null) return null
@@ -39,7 +42,7 @@ function cacheSet(key, data) {
   } catch {  }
 }
 
-async function fetchAvatarsViaGQL(logins) {
+async function fetchAvatarsViaGQL(logins, signal) {
   if (!logins.length) return null
 
   const validLogins = logins
@@ -56,6 +59,7 @@ async function fetchAvatarsViaGQL(logins) {
     validLogins.forEach((l, i) => { variablesObj['login' + i] = l })
     const res = await fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
+      signal,
       headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: 'query(' + varDecls + ') { ' + aliases + ' }',
@@ -74,7 +78,7 @@ async function fetchAvatarsViaGQL(logins) {
   } catch { return null }
 }
 
-async function fetchStreamsViaGQL(logins) {
+async function fetchStreamsViaGQL(logins, signal) {
   if (!logins.length) return null
 
   const validLogins = logins
@@ -90,6 +94,7 @@ async function fetchStreamsViaGQL(logins) {
     validLogins.forEach((l, i) => { variablesObj['login' + i] = l })
     const res = await fetch('https://gql.twitch.tv/gql', {
       method: 'POST',
+      signal,
       headers: { 'Client-ID': PUBLIC_CLIENT_ID, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: 'query(' + varDecls + ') { ' + aliases + ' }',
@@ -99,6 +104,7 @@ async function fetchStreamsViaGQL(logins) {
     if (!res.ok) return null
     const json = await res.json()
     if (json?.errors) return null
+    if (!json?.data || validLogins.some((_, i) => !Object.hasOwn(json.data, 'a' + i))) return null
     const result = {}
     validLogins.forEach((l, i) => {
       const stream = json?.data?.['a' + i]?.stream
@@ -112,7 +118,7 @@ async function fetchStreamsViaGQL(logins) {
         }
       }
     })
-    return Object.keys(result).length ? result : null
+    return result
   } catch { return null }
 }
 
@@ -416,9 +422,11 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
   const cachedStatusRef = useRef({})
   const cachedLogosRef = useRef({})
 
-  const fetchLiveStatus = useCallback(async (canApply = () => true) => {
+  const fetchLiveStatus = useCallback(async (canApply = () => true, signal) => {
     if (!isLoggedIn) return
-    const allNames = [...new Set([...favorites, ...recentChannels])]
+    const collectionNames = categorySessionKey && categorySessionKey !== 'current'
+      ? normalizeCollections(getJSON(collectionsKey(categorySessionKey), [])).flatMap(item => item.channels) : []
+    const allNames = [...new Set([...favorites, ...recentChannels, ...collectionNames].map(name => name.toLowerCase()))]
     if (!allNames.length) {
       setLiveStatus({})
       setChannelLogos({})
@@ -438,20 +446,20 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
         try {
           const res = await fetch(
             `https://api.twitch.tv/helix/streams?${batch.map(n => `user_login=${encodeURIComponent(n)}`).join('&')}`,
-            { headers }
+            { headers, signal }
           )
           if (res.ok) {
             const data = await res.json()
-            return data.data || []
+            if (Array.isArray(data.data)) return { data: data.data, confirmed: batch }
           }
         } catch {  }
-        return []
+        return { data: [], confirmed: [] }
       })),
       Promise.all(batches.map(async (batch) => {
         try {
           const res = await fetch(
             `https://api.twitch.tv/helix/users?${batch.map(n => `login=${encodeURIComponent(n)}`).join('&')}`,
-            { headers }
+            { headers, signal }
           )
           if (res.ok) {
             const data = await res.json()
@@ -462,7 +470,8 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
       })),
     ])
 
-    const streamData = streamResults.flat()
+    const streamData = streamResults.flatMap(result => result.data)
+    const confirmed = new Set(streamResults.flatMap(result => result.confirmed))
     const logoMap = {}
     userResults.flat().forEach(u => {
       logoMap[u.login.toLowerCase()] = u.profile_image_url
@@ -471,15 +480,20 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
     let gqlStreams = null
     if (!streamData.length) {
       const gqlStreamResults = await Promise.all(
-        batches.map(b => fetchStreamsViaGQL(b))
+        batches.map(b => fetchStreamsViaGQL(b, signal))
       )
       gqlStreams = {}
-      gqlStreamResults.forEach(r => { if (r) Object.assign(gqlStreams, r) })
+      gqlStreamResults.forEach((r, index) => {
+        if (r) {
+          Object.assign(gqlStreams, r)
+          batches[index].forEach(name => confirmed.add(name))
+        }
+      })
     }
 
     if (!Object.keys(logoMap).length) {
       const gqlAvatarResults = await Promise.all(
-        batches.map(b => fetchAvatarsViaGQL(b))
+        batches.map(b => fetchAvatarsViaGQL(b, signal))
       )
       gqlAvatarResults.forEach(r => { if (r) Object.assign(logoMap, r) })
     }
@@ -508,7 +522,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
 
     allNames.forEach(n => {
       const key = n.toLowerCase()
-      if (!statusMap[key]) statusMap[key] = { live: false, logo: logoMap[key] }
+      if (!statusMap[key]) statusMap[key] = { live: confirmed.has(key) ? false : null, logo: logoMap[key] }
     })
 
     if (!canApply()) return
@@ -519,7 +533,7 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
     setChannelLogos(logoMap)
     cachedStatusRef.current = statusMap
     cachedLogosRef.current = logoMap
-  }, [isLoggedIn, favorites, recentChannels])
+  }, [isLoggedIn, favorites, recentChannels, categorySessionKey])
 
   useEffect(() => {
     const cachedStatus = cacheGet(CACHE_KEY_STATUS, STATUS_TTL_MS)
@@ -537,7 +551,17 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
     }
 
     let cancelled = false
-    const load = () => fetchLiveStatus(() => !cancelled)
+    let controller, generation = 0
+    const load = () => {
+      controller?.abort()
+      const current = ++generation
+      controller = new AbortController()
+      const active = controller
+      const timeout = setTimeout(() => active.abort(), 12000)
+      void fetchLiveStatus(() => !cancelled && current === generation, active.signal)
+        .catch(() => {})
+        .finally(() => clearTimeout(timeout))
+    }
     load()
     let timer
     const pollStatus = () => {
@@ -549,12 +573,18 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
     }
     pollStatus()
     window.addEventListener('blinkstream_auth_updated', load)
+    const onCollectionsChange = event => {
+      if (event.detail?.owner === categorySessionKey?.toLowerCase()) load()
+    }
+    window.addEventListener('blinkstream_collections_updated', onCollectionsChange)
     return () => { 
       cancelled = true
+      controller?.abort()
       clearTimeout(timer)
       window.removeEventListener('blinkstream_auth_updated', load)
+      window.removeEventListener('blinkstream_collections_updated', onCollectionsChange)
     }
-  }, [fetchLiveStatus])
+  }, [fetchLiveStatus, categorySessionKey])
 
 
   const sortedFavorites = useMemo(() => {
@@ -743,7 +773,8 @@ export default function HomeScreen({ isLoggedIn, onSelect, onToggleFavorite, onS
               )}
               <HeroCarousel streams={heroStreams} onSelect={onSelect} logos={channelLogos} currentIndex={heroIndex} onIndexChange={setHeroIndex} previewEnabled={true} />
 
-          <CategoryExplorer key={categorySessionKey} onSelect={onSelect} />
+          {isLoggedIn && <ChannelCollections owner={categorySessionKey} favorites={favorites} onSelect={onSelect} liveStatus={liveStatus} logos={channelLogos} />}
+          <CategoryExplorer key={categorySessionKey} owner={categorySessionKey} onSelect={onSelect} />
 
           {(() => {
             const liveChannels = favorites

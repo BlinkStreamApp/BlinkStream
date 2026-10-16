@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-recorder-get-global-state"
+description = "Enables the recorder_get_global_state command without any pre-configured scope."
+commands.allow = ["recorder_get_global_state"]
+
+[[permission]]
+identifier = "deny-recorder-get-global-state"
+description = "Denies the recorder_get_global_state command without any pre-configured scope."
+commands.deny = ["recorder_get_global_state"]

@@ -1,0 +1,34 @@
+BlinkStream — third-party runtime notices
+
+This package includes the unmodified Streamlink Windows portable distribution
+8.6.2-1 (Streamlink 8.6.2, embedded Python 3.14.8, FFmpeg GPL build).
+Provenance and the pinned download SHA256: runtime/streamlink/PROVENANCE.json.
+
+Streamlink: BSD-2-Clause; copyright and full license in
+runtime/streamlink/LICENSE.txt. Project: https://streamlink.github.io/
+
+Python: original notices in runtime/streamlink/Python/LICENSE.txt.
+Project: https://www.python.org/
+
+FFmpeg: GPL version 3 or later for this build (--enable-gpl --enable-version3).
+Full license: runtime/streamlink/ffmpeg/LICENSE.txt.
+Exact upstream build: runtime/streamlink/ffmpeg/BUILDINFO.txt.
+Project: https://ffmpeg.org/
+Build scripts: https://github.com/streamlink/FFmpeg-Builds/tree/7def83d2a56f837b9dbb4b46e0d8b4617fa44cca
+FFmpeg source: https://github.com/FFmpeg/FFmpeg/tree/9d4ca21220bfd3f06fc8bfc90ddf0f6d0a484611
+
+Additional Python dependency licenses/copyrights are retained in the original
+runtime/streamlink/pkgs/*dist-info and other upstream license directories.
+No ownership of these components is claimed by APX Studio.
+BlinkStream invokes these tools as separate processes, not linked Rust libraries.
+
+Corresponding source companion: BlinkStream-1.5.0-runtime-sources.zip, supplied
+separately from the MSIX. It contains pinned FFmpeg, Python and Streamlink source
+archives, upstream build scripts/patches, the upstream FFmpeg dependency source
+cache and a SHA256 inventory. See BUILDING_RUNTIME.md in that companion.
+
+Distributor: APX Studio, contacto.apxstudio@gmail.com.
+Before distributing this app publicly, the distributor must make the reviewed
+source companion available to recipients with clear download instructions.
+The upstream project links above are provenance links, not a replacement for
+that source distribution. This notice is not a claim of Store certification.

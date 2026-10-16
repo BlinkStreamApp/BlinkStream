@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mount-embedded-twitch-chat"
+description = "Enables the mount_embedded_twitch_chat command without any pre-configured scope."
+commands.allow = ["mount_embedded_twitch_chat"]
+
+[[permission]]
+identifier = "deny-mount-embedded-twitch-chat"
+description = "Denies the mount_embedded_twitch_chat command without any pre-configured scope."
+commands.deny = ["mount_embedded_twitch_chat"]

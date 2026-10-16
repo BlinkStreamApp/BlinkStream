@@ -6,6 +6,7 @@ import { getHelixClientId } from '../utils/twitch'
 import { measureInvoke } from '../utils/perf'
 import { logEvent } from '../utils/eventLog'
 import { archiveLegacyFavorites } from './useFavoriteChannels'
+import { useT } from '../utils/i18n'
 
 const EDGE_FN_URL = `${SUPABASE_URL}/functions/v1/twitch-auth`
 const LS_TOKEN = 'blinkstream_twitch_token'
@@ -84,6 +85,7 @@ async function openSystemBrowser(url) {
 }
 
 export function useAuth() {
+  const t = useT()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authing, setAuthing] = useState(false)
@@ -91,8 +93,13 @@ export function useAuth() {
   const [avatar, setAvatar] = useState(() => localStorage.getItem(LS_AVATAR) || null)
   const [keychainReady, setKeychainReady] = useState(false)
   const [cachedToken, setCachedToken] = useState(() => {
-    try { return localStorage.getItem(LS_TOKEN) || null } catch { return null }
+    try {
+      const legacy = localStorage.getItem(LS_TOKEN) || null
+      localStorage.removeItem(LS_TOKEN)
+      return legacy
+    } catch { return null }
   })
+  const initialToken = useRef(cachedToken)
   const abortRef = useRef(null)
   const sessionVersion = useRef(null)
   const secretQueue = useRef(Promise.resolve())
@@ -116,13 +123,13 @@ export function useAuth() {
         if (!current()) return
 
         if (!token) {
-          token = localStorage.getItem(LS_TOKEN) || ''
+          token = initialToken.current || localStorage.getItem(LS_TOKEN) || ''
           if (token) {
             try {
               await writeSecret('store_secret', { key: 'twitch_token', value: token })
               if (!current()) return
-              localStorage.removeItem(LS_TOKEN)
-            } catch {  }
+            } catch { setError('auth.memoryOnly') }
+            localStorage.removeItem(LS_TOKEN)
           }
         }
 
@@ -165,7 +172,8 @@ export function useAuth() {
         if (!current()) return
         logEvent('auth', 'session.restore.failed', { err: err?.message || String(err) })
         try {
-          const token = localStorage.getItem(LS_TOKEN)
+          const token = initialToken.current || localStorage.getItem(LS_TOKEN)
+          localStorage.removeItem(LS_TOKEN)
           if (token) {
             setCachedToken(token)
             const username = localStorage.getItem(LS_USERNAME) || 'twitch_user'
@@ -213,7 +221,7 @@ export function useAuth() {
           await writeSecret('store_secret', { key: 'twitch_token', value: result.access_token })
         } catch {
           if (!current()) return
-          localStorage.setItem(LS_TOKEN, result.access_token)
+          setError('auth.memoryOnly')
         }
         if (!current()) return
         setCachedToken(result.access_token)
@@ -269,7 +277,7 @@ export function useAuth() {
         await writeSecret('store_secret', { key: 'twitch_token', value: cleanToken })
       } catch {
         if (!current()) return
-        localStorage.setItem(LS_TOKEN, cleanToken)
+        setError('auth.memoryOnly')
       }
       if (!current()) return
       persistUserInfo(userInfo)
@@ -328,7 +336,7 @@ export function useAuth() {
     session: null,
     loading,
     authing,
-    error,
+    error: error ? t(error, error) : error,
     user,
     avatar,
     keychainReady,

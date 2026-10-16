@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-fetch-segment"
+description = "Enables the fetch_segment command without any pre-configured scope."
+commands.allow = ["fetch_segment"]
+
+[[permission]]
+identifier = "deny-fetch-segment"
+description = "Denies the fetch_segment command without any pre-configured scope."
+commands.deny = ["fetch_segment"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reset-embedded-twitch-drops"
+description = "Enables the reset_embedded_twitch_drops command without any pre-configured scope."
+commands.allow = ["reset_embedded_twitch_drops"]
+
+[[permission]]
+identifier = "deny-reset-embedded-twitch-drops"
+description = "Denies the reset_embedded_twitch_drops command without any pre-configured scope."
+commands.deny = ["reset_embedded_twitch_drops"]

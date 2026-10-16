@@ -1,19 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchCategories, fetchCategoryStreams } from '../utils/categories'
 import { useCategoryFeed } from '../hooks/useCategoryFeed'
-import { useT } from '../utils/i18n'
+import { useT, getLanguage } from '../utils/i18n'
 import PhosphorIcon from './icons/PhosphorIcon'
+import { getJSON, setJSON } from '../utils/storage'
+import { categoryPreferencesKey, normalizeCategoryPreferences, changeCategoryPreferences, visibleCategories } from '../utils/categoryPreferences'
 
 const languages = [['es', 'Español'], ['en', 'English'], ['fr', 'Français'], ['de', 'Deutsch'], ['pt', 'Português'], ['it', 'Italiano'], ['ja', '日本語'], ['ko', '한국어'], ['ru', 'Русский'], ['zh', '中文']]
 const art = (url, width, height) => url?.replace('{width}', width).replace('{height}', height) || ''
 
+function languageName(code) {
+  try {
+    const name = new Intl.DisplayNames([getLanguage()], { type: 'language' }).of(code)
+    return name[0].toLocaleUpperCase(getLanguage()) + name.slice(1)
+  }
+  catch { return languages.find(([value]) => value === code)?.[1] || code.toUpperCase() }
+}
+
 function LanguageBadge({ code }) {
   const t = useT()
   const normalized = code?.trim().toLowerCase() || ''
-  let name = languages.find(([value]) => value === normalized)?.[1]
-  if (!name && normalized && normalized !== 'other') {
-    try { name = new Intl.DisplayNames(['es'], { type: 'language' }).of(normalized) } catch { /* Unknown code: keep the original label. */ }
-  }
+  let name = normalized && normalized !== 'other' ? languageName(normalized) : ''
   name ||= normalized === 'other' ? t('browse.otherLanguage', 'Otros idiomas') : normalized.toUpperCase() || t('browse.unknownLanguage', 'Idioma no indicado')
   return <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-twitch/25 bg-twitch/10 px-2.5 py-1 text-[11px] font-semibold leading-none text-text-primary" title={`${t('set.language', 'Idioma')}: ${name}`}>
     <PhosphorIcon name="GlobeHemisphereWest" size={13} className="shrink-0 text-twitch-light" />
@@ -40,13 +47,25 @@ function FeedStatus({ feed, emptyMessage }) {
   return null
 }
 
-export default function CategoryExplorer({ onSelect }) {
+export default function CategoryExplorer({ onSelect, owner }) {
+  const account = owner && !['current', 'twitch_user'].includes(owner) ? owner.toLowerCase() : null
+  return <CategoryExplorerContent key={account || 'guest'} onSelect={onSelect} owner={account} />
+}
+
+function CategoryExplorerContent({ onSelect, owner }) {
   const t = useT()
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState(false)
   const [category, setCategory] = useState(null)
   const [language, setLanguage] = useState('')
   const [authVersion, setAuthVersion] = useState(0)
+  const [preferences, setPreferences] = useState(() => normalizeCategoryPreferences(owner ? getJSON(categoryPreferencesKey(owner), {}) : {}))
+  const preferencesRef = useRef(preferences)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [managing, setManaging] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
+  const [preferenceError, setPreferenceError] = useState('')
+  const [lastHidden, setLastHidden] = useState(null)
   const streamHeading = useRef(null)
   const lastCategoryButton = useRef(null)
   useEffect(() => {
@@ -61,6 +80,24 @@ export default function CategoryExplorer({ onSelect }) {
   const categories = useCategoryFeed({ scope: `${authVersion}:${search}`, request: categoryRequest, delay: search ? 300 : 0 })
   const streams = useCategoryFeed({ scope: `${authVersion}:${category?.id}:${language}`, request: streamRequest, enabled: !!category })
   const grid = expanded || !!search
+  const displayedCategories = visibleCategories(categories.items, preferences, { search, favoritesOnly })
+  function updatePreference(action) {
+    if (!owner) return
+    try {
+      const next = changeCategoryPreferences(preferencesRef.current, action)
+      if (!setJSON(categoryPreferencesKey(owner), next)) {
+        setPreferenceError(t('browse.preferenceError', 'No se pudieron guardar las preferencias. Inténtalo de nuevo.'))
+        return
+      }
+      preferencesRef.current = next
+      setPreferences(next)
+      setPreferenceError('')
+      if (action.type === 'hide') {
+        if (category?.id === action.game.id) setCategory(null)
+        setLastHidden(action.game)
+      } else if (action.type === 'restore' && action.id === lastHidden?.id) setLastHidden(null)
+    } catch (error) { setPreferenceError(error.message) }
+  }
   const closeCategory = () => {
     setCategory(null)
     lastCategoryButton.current?.focus()
@@ -80,20 +117,50 @@ export default function CategoryExplorer({ onSelect }) {
       <span className="sr-only">{t('browse.search', 'Buscar juego o categoría')}</span>
       <input type="search" value={query} onChange={event => { setQuery(event.target.value); setCategory(null) }} placeholder={t('browse.searchPlaceholder', 'Buscar juego o categoría…')} maxLength={100} className="min-w-0 w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted" />
     </label>
+    {owner && <div className="mb-3 flex flex-wrap items-center gap-2">
+      <button type="button" aria-pressed={managing} onClick={() => { setManaging(value => !value); setShowHidden(false) }} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer ${managing ? 'border-twitch/40 bg-twitch/15 text-twitch-light' : 'border-white/10 text-text-secondary hover:bg-hover'}`}>
+        <PhosphorIcon name={managing ? 'CheckCircle' : 'SlidersHorizontal'} size={15} />
+        {managing ? t('browse.finishManaging', 'Terminar edición') : t('browse.manage', 'Gestionar categorías')}
+      </button>
+      <button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(value => !value)} className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer ${favoritesOnly ? 'border-twitch/40 bg-twitch/15 text-twitch-light' : 'border-white/10 text-text-secondary hover:bg-hover'}`}>
+        <PhosphorIcon name="PushPin" size={15} />{t('browse.favoritesOnly', 'Solo favoritas')}
+      </button>
+      {managing && <>
+        <button type="button" aria-expanded={showHidden} onClick={() => setShowHidden(value => !value)} className="min-h-10 rounded-xl border border-white/10 px-3 py-2 text-[13px] font-medium text-text-secondary hover:bg-hover focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer">{t('browse.hidden', 'Categorías ocultas')} ({preferences.hidden.length})</button>
+        <span className="text-xs text-text-muted">{t('browse.localPreferences', 'Preferencias locales de esta cuenta')}</span>
+      </>}
+    </div>}
+    {preferenceError && <p role="alert" className="mb-3 text-sm text-red-400">{preferenceError}</p>}
+    {lastHidden && <div role="status" className="mb-3 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+      {lastHidden.name} · {t('browse.hiddenNotice', 'Categoría ocultada')}
+      <button className="min-h-9 rounded-lg border border-twitch/30 px-3 text-twitch-light cursor-pointer" onClick={() => updatePreference({ type: 'restore', id: lastHidden.id })}>{t('browse.undo', 'Deshacer')}</button>
+    </div>}
+    {managing && showHidden && <div className="mb-4 rounded-xl border border-white/10 bg-bg-secondary/50 p-3">
+      <h3 className="mb-2 text-sm font-semibold text-text-primary">{t('browse.hidden', 'Categorías ocultas')}</h3>
+      {!preferences.hidden.length && <p className="text-sm text-text-muted">{t('browse.noHidden', 'No tienes categorías ocultas.')}</p>}
+      <div className="flex flex-wrap gap-2">{preferences.hidden.map(game => <button key={game.id} onClick={() => updatePreference({ type: 'restore', id: game.id })} className="min-h-10 rounded-lg border border-white/10 px-3 text-sm text-text-secondary hover:bg-hover cursor-pointer">{t('browse.restore', 'Restaurar')} {game.name}</button>)}</div>
+    </div>}
     <p className="mb-3 flex items-center gap-2 text-[13px] font-medium leading-relaxed text-text-secondary sm:text-sm">
       <span aria-hidden="true" className="inline-flex shrink-0 text-twitch-light"><PhosphorIcon name={search ? 'MagnifyingGlass' : 'GameController'} size={17} /></span>
       {search ? t('browse.matches', 'Categorías que coinciden con tu búsqueda') : t('browse.popular', 'Categorías populares en Twitch')}
     </p>
-    <FeedStatus feed={categories} emptyMessage={t('browse.noCategories', 'No se encontraron categorías. Prueba otro nombre.')} />
-    {!categories.loading && <div className={grid ? 'grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3' : 'flex gap-3 overflow-x-auto pb-2 scrollbar-thin'}>
-      {categories.items.map(game => <button key={game.id} onClick={event => {
+    <FeedStatus feed={{ ...categories, items: displayedCategories }} emptyMessage={favoritesOnly || categories.items.length ? t('browse.noVisible', 'No hay categorías visibles con estos filtros. Revisa tus favoritas o restaura las ocultas.') : t('browse.noCategories', 'No se encontraron categorías. Prueba otro nombre.')} />
+    {(!categories.loading || !!displayedCategories.length) && <div className={grid ? 'grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3' : 'flex gap-3 overflow-x-auto pb-2 scrollbar-thin'}>
+      {displayedCategories.map(game => <div key={game.id} className={grid ? 'min-w-0' : 'shrink-0 w-[124px]'}>
+      <button aria-label={game.name} onClick={event => {
         lastCategoryButton.current = event.currentTarget
         if (category?.id === game.id) { closeCategory(); return }
         setCategory(game)
-      }} aria-pressed={category?.id === game.id} className={`flex flex-col items-center gap-2.5 rounded-2xl border p-2.5 text-left group cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-twitch ${grid ? 'min-w-0' : 'shrink-0 w-[124px]'} ${category?.id === game.id ? 'bg-twitch/10 border-twitch/60 ring-1 ring-twitch/30' : 'border-transparent hover:border-white/10 hover:bg-bg-secondary/70'}`}>
+      }} aria-pressed={category?.id === game.id} className={`relative flex w-full flex-col items-center gap-2.5 rounded-2xl border p-2.5 text-left group cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-twitch ${category?.id === game.id ? 'bg-twitch/10 border-twitch/60 ring-1 ring-twitch/30' : 'border-transparent hover:border-white/10 hover:bg-bg-secondary/70'}`}>
+        {preferences.favorites.some(item => item.id === game.id) && <span aria-hidden="true" className="absolute left-3 top-3 z-10 rounded-md bg-black/70 p-1 text-twitch-light"><PhosphorIcon name="PushPin" size={14} /></span>}
         {game.box_art_url ? <img src={art(game.box_art_url, '285', '380')} alt="" loading="lazy" className="w-full aspect-[3/4] rounded-xl object-cover shadow-sm motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:-translate-y-0.5" /> : <div className="w-full aspect-[3/4] rounded-xl bg-bg-tertiary flex items-center justify-center"><PhosphorIcon name="GameController" size={24} /></div>}
         <span className="w-full text-center text-[13px] font-semibold leading-snug text-text-primary break-words">{game.name}</span>
-      </button>)}
+      </button>
+      {owner && managing && <div className="mt-1 flex justify-center gap-1">
+        <button type="button" aria-label={`${t('browse.pin', 'Fijar')} ${game.name}`} aria-pressed={preferences.favorites.some(item => item.id === game.id)} onClick={() => updatePreference({ type: 'pin', game })} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-white/10 text-twitch-light hover:bg-twitch/15 focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer" title={t('browse.pinTip', 'Fijar o quitar de favoritas')}><PhosphorIcon name="PushPin" size={16} /></button>
+        <button type="button" aria-label={`${t('browse.hide', 'Ocultar')} ${game.name}`} onClick={() => updatePreference({ type: 'hide', game })} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-white/10 text-text-secondary hover:bg-hover focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer" title={t('browse.hide', 'Ocultar')}><PhosphorIcon name="X" size={15} /></button>
+      </div>}
+      </div>)}
     </div>}
     {!!categories.cursor && !categories.error && <button type="button" disabled={categories.loadingMore} aria-busy={categories.loadingMore} onClick={() => { setExpanded(true); categories.loadMore() }} className="mt-4 inline-flex min-h-11 items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-bg-secondary/70 px-4 py-2.5 text-sm font-semibold leading-snug text-text-primary transition-colors hover:border-twitch/50 hover:bg-twitch/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-twitch disabled:cursor-wait disabled:opacity-60 cursor-pointer">
       <span aria-hidden="true" className={`inline-flex shrink-0 text-twitch-light ${categories.loadingMore ? 'motion-safe:animate-spin' : ''}`}><PhosphorIcon name={categories.loadingMore ? 'SpinnerGap' : 'Plus'} size={18} /></span>
@@ -110,7 +177,7 @@ export default function CategoryExplorer({ onSelect }) {
             <PhosphorIcon name="GlobeHemisphereWest" size={16} className="text-twitch-light" />{t('set.language', 'Idioma')}
             <select value={language} onChange={event => setLanguage(event.target.value)} className="max-w-[180px] rounded-lg bg-bg-tertiary px-2 py-1.5 text-[13px] font-semibold text-text-primary focus-visible:outline-2 focus-visible:outline-twitch">
               <option value="">{t('browse.allLanguages', 'Todos los idiomas')}</option>
-              {languages.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+              {languages.map(([code]) => <option key={code} value={code}>{languageName(code)}</option>)}
             </select>
           </label>
           <button onClick={closeCategory} className="rounded-xl border border-white/10 px-3 py-2.5 text-xs font-medium text-text-secondary hover:bg-hover focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer">{t('close', 'Cerrar')}</button>

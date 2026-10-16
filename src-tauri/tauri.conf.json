@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "BlinkStream",
-  "version": "1.4.4",
+  "version": "1.5.0",
   "identifier": "com.blinkstream.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -25,7 +25,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://twitch.tv https://id.twitch.tv https://clips.twitch.tv https://player.twitch.tv https://*.gql.twitch.tv; child-src 'self' https://*.twitch.tv https://twitch.tv https://player.twitch.tv; worker-src 'self' blob:; connect-src 'self' http://ipc.localhost http://tauri.localhost https: wss://irc-ws.chat.twitch.tv:443 wss://irc.chat.twitch.tv:443 wss://eventsub.wss.twitch.tv; img-src 'self' https: data:; media-src 'self' https: blob:; font-src 'self' data:;"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https://oncbojnqxpxctwnhehau.supabase.co https://*.twitch.tv https://twitch.tv https://id.twitch.tv https://clips.twitch.tv https://player.twitch.tv https://*.gql.twitch.tv; child-src 'self' https://*.twitch.tv https://twitch.tv https://player.twitch.tv; worker-src 'self' blob:; connect-src 'self' http://ipc.localhost http://tauri.localhost https://api.twitch.tv https://id.twitch.tv https://gql.twitch.tv https://oncbojnqxpxctwnhehau.supabase.co https://*.ttvnw.net https://*.cloudfront.net https://*.akamaized.net https://*.jtvnw.net https://7tv.io https://cdn.7tv.app https://api.betterttv.net https://cdn.betterttv.net https://api.frankerfacez.com wss://irc-ws.chat.twitch.tv:443 wss://irc.chat.twitch.tv:443 wss://eventsub.wss.twitch.tv; img-src 'self' https: data:; media-src 'self' https: blob:; font-src 'self' data:;"
     }
   },
   "bundle": {

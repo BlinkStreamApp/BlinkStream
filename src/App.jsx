@@ -38,6 +38,7 @@ import { useLiveAlerts } from './hooks/useLiveAlerts'
 import { Toast } from './hooks/useLiveAlerts.Toast'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { check } from '@tauri-apps/plugin-updater'
+import { IS_STORE_BUILD } from './utils/distribution'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { logError } from './utils/errors'
 import { isTauri } from './utils/tauriEnv'
@@ -243,7 +244,7 @@ function MainApp() {
   }, [isLoggedIn, getTwitchToken, handleLogout])
 
   useEffect(() => {
-    if (!isTauri()) return
+    if (!isTauri() || IS_STORE_BUILD) return
     let cancelled = false
     const checkUpdate = async () => {
       try {

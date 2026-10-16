@@ -1,0 +1,17 @@
+[[permission]]
+identifier = "app-native-commands"
+description = "Native app commands for explicitly trusted bundled webviews only."
+commands.allow = [
+  "store_secret", "get_secret", "delete_secret", "get_stream_url", "ensure_stream_dependencies",
+  "get_available_qualities", "get_direct_stream_url", "get_master_playlist", "fetch_m3u8_content",
+  "fetch_segment", "get_twitch_clip_url", "get_vod_manifest_url", "download_media_range",
+  "set_click_through", "close_gamer_overlay", "open_gamer_overlay", "open_twitch_popout_window",
+  "open_twitch_drops_window", "start_drops_watcher", "sample_native_drops_watch", "stop_drops_watcher",
+  "fetch_twitch_gql", "mount_embedded_twitch_chat", "mount_embedded_twitch_drops",
+  "update_embedded_twitch_drops_bounds", "unmount_embedded_twitch_drops", "reset_embedded_twitch_drops",
+  "update_embedded_twitch_chat_bounds", "set_embedded_twitch_chat_visible", "unmount_embedded_twitch_chat",
+  "start_recording", "stop_recording", "get_app_token", "recorder_set_global_enabled",
+  "recorder_get_global_state", "recorder_list_active", "recorder_get_full_state", "get_companion_status",
+  "start_companion_server_cmd", "stop_companion_server_cmd", "update_companion_state",
+  "get_cached_drops_inventory", "claim_twitch_drop", "force_refresh_drops_watcher",
+]

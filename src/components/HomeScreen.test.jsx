@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import HomeScreen from './HomeScreen'
 
-vi.mock('../utils/i18n', () => ({ useT: () => (_key, fallback) => fallback }))
+vi.mock('../utils/i18n', async importOriginal => {
+  const actual = await importOriginal()
+  return { ...actual, useT: () => (key, fallback) => fallback || actual.t(key) }
+})
 vi.mock('../utils/twitch', () => ({
   PUBLIC_CLIENT_ID: 'test-client',
   getHeaders: vi.fn(async () => ({})),
@@ -15,6 +18,23 @@ const props = {
 }
 
 describe('HomeScreen después de cerrar sesión', () => {
+  it('checks collection-only channels and distinguishes offline from unknown status', async () => {
+    localStorage.setItem('blinkstream_collections_v1:alice', JSON.stringify([{ id: 'one', name: 'Gaming', channels: ['only_collection'] }]))
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async url => {
+      if (String(url).includes('/helix/streams?')) return { ok: true, json: async () => ({ data: [] }) }
+      return { ok: false }
+    })
+    const { unmount } = render(<HomeScreen {...props} isLoggedIn categorySessionKey="alice" />)
+    await waitFor(() => expect(screen.getByText('OFFLINE')).toBeInTheDocument())
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('user_login=only_collection'))).toBe(true)
+    unmount()
+    sessionStorage.clear()
+    fetchSpy.mockResolvedValue({ ok: false })
+    render(<HomeScreen {...props} isLoggedIn categorySessionKey="alice" />)
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+    expect(screen.queryByText('OFFLINE')).not.toBeInTheDocument()
+    expect(screen.getByText('Sin confirmar')).toBeInTheDocument()
+  })
   it('muestra bienvenida sin historial, favoritos, recomendaciones ni consultas aunque reciba datos antiguos', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     render(<HomeScreen {...props} isLoggedIn={false} />)

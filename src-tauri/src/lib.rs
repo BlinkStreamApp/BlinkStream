@@ -10,6 +10,7 @@ use wait_timeout::ChildExt;
 
 mod drops_watch;
 mod embedded_drops;
+mod media_security;
 mod recorder;
 pub use recorder::{start_recording, stop_recording};
 pub mod companion;
@@ -207,6 +208,11 @@ fn new_winget_command() -> std::process::Command {
 
 #[cfg(windows)]
 fn run_winget_install(package_id: &str) -> Result<(), String> {
+    if cfg!(feature = "microsoft-store") {
+        return Err(format!(
+            "La edición Store no instala dependencias externas automáticamente: {package_id}"
+        ));
+    }
     let mut command = new_winget_command();
     command.args([
         "install",
@@ -260,7 +266,27 @@ fn run_winget_install(package_id: &str) -> Result<(), String> {
     }
 }
 
+fn store_runtime_path(relative: &str) -> Option<PathBuf> {
+    Some(
+        std::env::current_exe()
+            .ok()?
+            .parent()?
+            .join("runtime/streamlink")
+            .join(relative),
+    )
+}
+
+pub(crate) fn configure_streamlink_runtime(command: &mut Command) {
+    if cfg!(feature = "microsoft-store") {
+        // WindowsApps is immutable; never attempt Python bytecode writes there.
+        command.env("PYTHONDONTWRITEBYTECODE", "1");
+    }
+}
+
 pub fn ensure_ffmpeg_path() -> Option<PathBuf> {
+    if cfg!(feature = "microsoft-store") {
+        return store_runtime_path("ffmpeg/ffmpeg.exe").filter(|path| path.is_file());
+    }
     #[cfg(windows)]
     {
         let mut where_cmd = std::process::Command::new("where.exe");
@@ -567,6 +593,7 @@ fn is_usable_streamlink(path: &Path) -> bool {
     #[cfg(windows)]
     {
         let mut command = std::process::Command::new(path);
+        configure_streamlink_runtime(&mut command);
         if let Some(parent) = path.parent() {
             command.current_dir(parent);
         }
@@ -611,6 +638,9 @@ fn is_usable_streamlink(path: &Path) -> bool {
 }
 
 pub fn find_bundled_streamlink(app: &AppHandle) -> Option<PathBuf> {
+    if cfg!(feature = "microsoft-store") {
+        return store_runtime_path("bin/streamlink.exe").filter(|path| is_usable_streamlink(path));
+    }
     let resource_dir = app.path().resource_dir().ok();
     let exe_dir = app.path().executable_dir().ok();
     let expected_names = [
@@ -661,6 +691,13 @@ static FFMPEG_INSTALL_ATTEMPTED: AtomicBool = AtomicBool::new(false);
 
 pub fn ensure_runtime_dependencies(app: &AppHandle) -> Result<(), String> {
     let bundled_streamlink = find_bundled_streamlink(app);
+    if cfg!(feature = "microsoft-store") {
+        return if bundled_streamlink.is_some() && ensure_ffmpeg_path().is_some() {
+            Ok(())
+        } else {
+            Err("El runtime incluido en el paquete Store falta o no funciona. Repara la aplicación desde Microsoft Store.".into())
+        };
+    }
     let system_streamlink = {
         #[cfg(windows)]
         {
@@ -825,6 +862,7 @@ fn run_streamlink_with_timeout(
     let binary = find_streamlink(app)?;
 
     let mut cmd = Command::new(&binary);
+    configure_streamlink_runtime(&mut cmd);
     let mut full_args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
     if let Some(ff_path) = ensure_ffmpeg_path() {
         if !full_args.iter().any(|arg| arg == "--ffmpeg-ffmpeg") {
@@ -1020,46 +1058,22 @@ fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String
         }
     }
 
-    log::warn!("get_master_playlist: formato inesperado, devolviendo variante: {variant_url}");
+    log::warn!("get_master_playlist: formato inesperado, devolviendo variante de medios");
     Ok(variant_url.to_string())
 }
 
 #[tauri::command]
 async fn fetch_m3u8_content(url: String) -> Result<String, String> {
-    if !url.starts_with("https://")
-        || (!url.contains("ttvnw.net")
-            && !url.contains("twitch.tv")
-            && !url.contains("cloudfront.net"))
-    {
-        return Err(format!("URL no permitida por seguridad: {url}"));
-    }
-
-    let client = reqwest::Client::builder()
-        .use_rustls_tls()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
-
+    let url = media_security::media_url(&url)?;
+    let client = media_security::client(&url, 15).await?;
     let response = client
-        .get(&url)
+        .get(url)
         .header("Client-ID", TWITCH_WEB_CLIENT_ID)
         .send()
         .await
-        .map_err(|e| format!("Error en fetch: {e}"))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        return Err(format!("HTTP {status}: {url}"));
-    }
-
-    let text = response
-        .text()
-        .await
-        .map_err(|e| format!("Error leyendo respuesta: {e}"))?;
-
-    log::info!("fetch_m3u8_content: OK ({} bytes, {})", text.len(), url);
-    Ok(text)
+        .map_err(|_| "No se pudo consultar el manifiesto de medios")?;
+    String::from_utf8(media_security::read_limited(response, 2 * 1024 * 1024).await?)
+        .map_err(|_| "Manifiesto no válido".into())
 }
 
 #[tauri::command]
@@ -1124,39 +1138,14 @@ async fn fetch_twitch_gql(
 
 #[tauri::command]
 async fn fetch_segment(url: String) -> Result<Vec<u8>, String> {
-    if !url.starts_with("https://")
-        || (!url.contains("ttvnw.net")
-            && !url.contains("twitch.tv")
-            && !url.contains("cloudfront.net")
-            && !url.contains("akamaized.net"))
-    {
-        return Err(format!("URL no permitida por seguridad: {url}"));
-    }
-
-    let client = reqwest::Client::builder()
-        .use_rustls_tls()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        .timeout(Duration::from_secs(20))
-        .build()
-        .map_err(|e| format!("Error creando cliente HTTP: {e}"))?;
-
+    let url = media_security::media_url(&url)?;
+    let client = media_security::client(&url, 20).await?;
     let response = client
-        .get(&url)
+        .get(url)
         .send()
         .await
-        .map_err(|e| format!("Error en fetch segment: {e}"))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        return Err(format!("HTTP {status}: {url}"));
-    }
-
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| format!("Error leyendo segmento: {e}"))?;
-
-    Ok(bytes.to_vec())
+        .map_err(|_| "No se pudo consultar el segmento de medios")?;
+    media_security::read_limited(response, 32 * 1024 * 1024).await
 }
 
 const DEFAULT_QUALITIES: &[&str] = &[
@@ -1485,6 +1474,10 @@ async fn get_direct_stream_url(channel: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn store_secret(key: String, value: String) -> Result<(), String> {
+    validate_secret_key(&key)?;
+    if value.len() > 8192 {
+        return Err("Secreto demasiado grande".into());
+    }
     let entry = Entry::new("blinkstream", &key)
         .map_err(|e| format!("Error creando entrada keychain: {e}"))?;
     entry
@@ -1494,6 +1487,7 @@ async fn store_secret(key: String, value: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn get_secret(key: String) -> Result<String, String> {
+    validate_secret_key(&key)?;
     let entry = Entry::new("blinkstream", &key)
         .map_err(|e| format!("Error creando entrada keychain: {e}"))?;
     match entry.get_password() {
@@ -1505,6 +1499,7 @@ async fn get_secret(key: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn delete_secret(key: String) -> Result<(), String> {
+    validate_secret_key(&key)?;
     let entry = Entry::new("blinkstream", &key)
         .map_err(|e| format!("Error creando entrada keychain: {e}"))?;
     match entry.delete_credential() {
@@ -1516,6 +1511,14 @@ async fn delete_secret(key: String) -> Result<(), String> {
 
 fn twitch_app_client_secret() -> Option<&'static str> {
     option_env!("TWITCH_APP_CLIENT_SECRET").filter(|secret| !secret.is_empty())
+}
+
+fn validate_secret_key(key: &str) -> Result<(), String> {
+    if matches!(key, "twitch_token" | "blinkstream_refresh_token") {
+        Ok(())
+    } else {
+        Err("Clave del almacén seguro no permitida".into())
+    }
 }
 
 // Aviso de una sola vez por sesion del proceso: si no hay secret
@@ -1658,8 +1661,18 @@ async fn download_media_range(
     end_time: f64,
     output_name: Option<String>,
 ) -> Result<String, String> {
-    if start_time < 0.0 || end_time <= start_time {
-        return Err("Rango de tiempo no válido: el tiempo final debe ser mayor al inicial.".into());
+    media_security::clip_range(start_time, end_time)?;
+    let source_url = media_security::media_url(&url)?;
+    let source_client = media_security::client(&source_url, 30).await?;
+    let response = source_client
+        .get(source_url)
+        .send()
+        .await
+        .map_err(|_| "No se pudo descargar el clip")?;
+    // FFmpeg receives a local MP4, never an arbitrary network URL or HLS playlist.
+    let source_bytes = media_security::read_limited(response, 128 * 1024 * 1024).await?;
+    if source_bytes.get(4..8) != Some(b"ftyp".as_slice()) {
+        return Err("El recorte seguro requiere un clip MP4 (máximo 128 MB)".into());
     }
 
     let ffmpeg_path = ensure_ffmpeg_path()
@@ -1688,46 +1701,91 @@ async fn download_media_range(
         format!("{sanitized_name}.mp4")
     };
 
-    let output_file = base_dir.join(final_name);
+    let nonce = getrandom::u64().map_err(|_| "No se pudo generar un nombre seguro")?;
+    let output_file = base_dir.join(format!(
+        "{nonce:016x}_{}",
+        final_name.chars().take(100).collect::<String>()
+    ));
     let start_str = format!("{start_time:.2}");
     let duration = end_time - start_time;
     let duration_str = format!("{duration:.2}");
 
     let output_file_str = output_file.to_string_lossy().to_string();
-    let url_clone = url.clone();
+    let attempt_output = output_file.clone();
     let ffmpeg_clone = ffmpeg_path.clone();
 
     tokio::task::spawn_blocking(move || -> Result<(), String> {
+        struct SourceFile(PathBuf);
+        impl Drop for SourceFile {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let source_path = std::env::temp_dir().join(format!("blinkstream_clip_{nonce:016x}.mp4"));
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&source_path)
+            .map_err(|_| "No se pudo crear el temporal del clip")?;
+        let source_guard = SourceFile(source_path);
+        file.write_all(&source_bytes)
+            .map_err(|_| "No se pudo guardar el temporal del clip")?;
+        drop(file);
+        let wait = |command: &mut Command| -> Result<bool, String> {
+            command
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+            let mut child = command.spawn().map_err(|_| "No se pudo iniciar FFmpeg")?;
+            match child.wait_timeout(Duration::from_secs(120)) {
+                Ok(Some(status)) => Ok(status.success()),
+                outcome => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    if outcome.is_err() {
+                        Err("No se pudo esperar a FFmpeg".into())
+                    } else {
+                        Err("FFmpeg superó el tiempo máximo de recorte".into())
+                    }
+                }
+            }
+        };
         let mut cmd = Command::new(&ffmpeg_clone);
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
 
-        cmd.arg("-y")
+        cmd.arg("-n")
+            .args(["-nostdin", "-protocol_whitelist", "file", "-f", "mov"])
             .arg("-ss")
             .arg(&start_str)
             .arg("-i")
-            .arg(&url_clone)
+            .arg(&source_guard.0)
             .arg("-t")
             .arg(&duration_str)
             .arg("-c")
             .arg("copy")
             .arg(&output_file_str);
 
-        let status = cmd
-            .status()
-            .map_err(|e| format!("Fallo al ejecutar FFmpeg: {e}"))?;
-
-        if !status.success() {
+        if !wait(&mut cmd)? {
+            // Only remove the randomly named file created by this attempt, not a symlink.
+            if let Ok(metadata) = std::fs::symlink_metadata(&attempt_output) {
+                if !metadata.file_type().is_file() {
+                    return Err("Salida del clip no segura".into());
+                }
+                std::fs::remove_file(&attempt_output)
+                    .map_err(|_| "No se pudo retirar el clip incompleto")?;
+            }
             let mut fallback_cmd = Command::new(&ffmpeg_clone);
             #[cfg(windows)]
             fallback_cmd.creation_flags(CREATE_NO_WINDOW);
 
             fallback_cmd
-                .arg("-y")
+                .arg("-n")
+                .args(["-nostdin", "-protocol_whitelist", "file", "-f", "mov"])
                 .arg("-ss")
                 .arg(&start_str)
                 .arg("-i")
-                .arg(&url_clone)
+                .arg(&source_guard.0)
                 .arg("-t")
                 .arg(&duration_str)
                 .arg("-c:v")
@@ -1738,10 +1796,7 @@ async fn download_media_range(
                 .arg("aac")
                 .arg(&output_file_str);
 
-            let fallback_status = fallback_cmd
-                .status()
-                .map_err(|e| format!("Fallo re-codificando con FFmpeg: {e}"))?;
-            if !fallback_status.success() {
+            if !wait(&mut fallback_cmd)? {
                 return Err("FFmpeg devolvió error al cortar el vídeo.".into());
             }
         }
@@ -2499,11 +2554,13 @@ async fn unmount_embedded_twitch_chat(app: AppHandle) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(not(feature = "microsoft-store"))]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    builder
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             store_secret,
@@ -2554,9 +2611,6 @@ pub fn run() {
         .setup(|app| {
             let mut labels_to_close = Vec::new();
             warn_legacy_client_id_once();
-            if let Err(error) = companion::init_and_start_companion_server(app.handle().clone()) {
-                log::error!("[Companion] No se pudo iniciar el servidor: {error}");
-            }
 
             recorder::init_global_state(app.handle());
 
@@ -2590,6 +2644,25 @@ pub fn run() {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn store_runtime_does_not_write_python_bytecode() {
+        let mut command = Command::new("streamlink");
+        configure_streamlink_runtime(&mut command);
+        let setting = command
+            .get_envs()
+            .find(|(key, _)| *key == "PYTHONDONTWRITEBYTECODE");
+        if cfg!(feature = "microsoft-store") {
+            assert_eq!(
+                setting.and_then(|(_, value)| value),
+                Some(std::ffi::OsStr::new("1"))
+            );
+            assert!(store_runtime_path("bin/streamlink.exe")
+                .is_some_and(|path| path.ends_with("runtime/streamlink/bin/streamlink.exe")));
+        } else {
+            assert!(setting.is_none());
+        }
+    }
 
     #[test]
     fn validate_slug_rejects_injection_payload() {

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sample-native-drops-watch"
+description = "Enables the sample_native_drops_watch command without any pre-configured scope."
+commands.allow = ["sample_native_drops_watch"]
+
+[[permission]]
+identifier = "deny-sample-native-drops-watch"
+description = "Denies the sample_native_drops_watch command without any pre-configured scope."
+commands.deny = ["sample_native_drops_watch"]

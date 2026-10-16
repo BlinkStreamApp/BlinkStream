@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-fetch-m3u8-content"
+description = "Enables the fetch_m3u8_content command without any pre-configured scope."
+commands.allow = ["fetch_m3u8_content"]
+
+[[permission]]
+identifier = "deny-fetch-m3u8-content"
+description = "Denies the fetch_m3u8_content command without any pre-configured scope."
+commands.deny = ["fetch_m3u8_content"]

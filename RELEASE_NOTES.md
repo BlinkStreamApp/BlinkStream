@@ -1,4 +1,20 @@
-# BlinkStream 1.4.4 — Interface, discovery and multistream update
+# BlinkStream 1.5.0 — Organization, security and Store
+
+Microsoft Store publication confirmed by the maintainer on 2026-10-16.
+
+- Account-scoped collections with custom covers, colors, ordering, undo and collapsible browsing.
+- Pinned/hidden category preferences behind an explicit management mode.
+- New interface messages translated into all eight supported languages.
+- Lower-latency HLS policy with bounded catch-up and preserved manual DVR/pause behavior.
+- Hardened native media requests, bounded FFmpeg trimming, secret storage, Companion, QR generation and IPC permissions.
+- Supabase permission migration and backward-compatible POST refresh deployed separately with authorization.
+- Dedicated Microsoft Store build: GitHub updater and automatic winget installation disabled; MSIX identity taken from Partner Center.
+
+Windows core flows and translations accepted by the user. Store acceptance was
+reported by the maintainer, not verified through Partner Center by the agent.
+GitHub downloads and updater stay on stable 1.4.4 until cross-platform signed release validation.
+
+## Previous stable: BlinkStream 1.4.4 — Interface, discovery and multistream update
 
 Date: 2026-10-13. Published incremental compatible update; signed cross-platform CI passed.
 

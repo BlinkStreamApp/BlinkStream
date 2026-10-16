@@ -281,6 +281,7 @@ pub fn start_recording(
     }
 
     let mut cmd = Command::new(&binary);
+    crate::configure_streamlink_runtime(&mut cmd);
     let mut args: Vec<String> = vec![
         url.clone(),
         "best".to_string(),
@@ -471,6 +472,18 @@ pub fn validate_output_path(
     };
     if !parent.exists() {
         return Err("El directorio de salida no existe".into());
+    }
+    if let Ok(metadata) = std::fs::symlink_metadata(path) {
+        if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
+            return Err("La salida no puede ser un enlace ni un directorio".into());
+        }
+        let existing =
+            std::fs::canonicalize(path).map_err(|_| "No se pudo verificar el archivo de salida")?;
+        if !allowed_dirs.iter().any(|allowed| {
+            std::fs::canonicalize(allowed).is_ok_and(|allowed| existing.starts_with(allowed))
+        }) {
+            return Err("El archivo de salida no pertenece al directorio permitido".into());
+        }
     }
     // Canonicalizamos el parent (no el archivo final, que aun no existe).
     let canonical_output = std::fs::canonicalize(parent)

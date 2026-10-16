@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-unmount-embedded-twitch-drops"
+description = "Enables the unmount_embedded_twitch_drops command without any pre-configured scope."
+commands.allow = ["unmount_embedded_twitch_drops"]
+
+[[permission]]
+identifier = "deny-unmount-embedded-twitch-drops"
+description = "Denies the unmount_embedded_twitch_drops command without any pre-configured scope."
+commands.deny = ["unmount_embedded_twitch_drops"]

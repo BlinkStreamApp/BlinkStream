@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-recorder-list-active"
+description = "Enables the recorder_list_active command without any pre-configured scope."
+commands.allow = ["recorder_list_active"]
+
+[[permission]]
+identifier = "deny-recorder-list-active"
+description = "Denies the recorder_list_active command without any pre-configured scope."
+commands.deny = ["recorder_list_active"]

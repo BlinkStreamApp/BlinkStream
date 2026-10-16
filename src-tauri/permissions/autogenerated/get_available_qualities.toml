@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-available-qualities"
+description = "Enables the get_available_qualities command without any pre-configured scope."
+commands.allow = ["get_available_qualities"]
+
+[[permission]]
+identifier = "deny-get-available-qualities"
+description = "Denies the get_available_qualities command without any pre-configured scope."
+commands.deny = ["get_available_qualities"]

@@ -2,16 +2,13 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "enables the default permissions",
-  "windows": [
-    "*"
-  ],
   "webviews": [
-    "*"
+    "main",
+    "gamer_overlay"
   ],
   "permissions": [
     "core:default",
     "core:webview:default",
-    "core:webview:allow-internal-toggle-devtools",
     "core:window:default",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
@@ -26,6 +23,7 @@
     "notification:default",
     "updater:default",
     "process:allow-restart",
-    "http:default"
+    "http:default",
+    "app-native-commands"
   ]
 }
