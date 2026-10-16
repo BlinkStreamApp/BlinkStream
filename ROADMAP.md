@@ -7,7 +7,7 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-16 / v1.5.0 Store baseline
+## Execution status — 2026-10-16 / v1.5.1 icon hotfix
 
 The historical phases below describe product direction, not proof of a published release.
 Microsoft Store 1.5.0 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations and security hardening. Source 1.5.1 prepares the taskbar icon hotfix: transparent target-size light/dark variants, DPI assets and a compiled resource index. GitHub downloads/updater remain on [1.4.4](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.4) until new signed cross-platform builds are published. The user handles Partner Center; 1.5.1 has not been submitted by the agent.

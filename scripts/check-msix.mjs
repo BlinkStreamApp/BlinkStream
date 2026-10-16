@@ -1,11 +1,27 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { packageVersion, manifest, storeProfile, publisherId } from './msix.mjs'
+import { packageVersion, manifest, storeProfile, publisherId, storeIconAssets } from './msix.mjs'
 
 const readJSON = path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
 const identity = readJSON('../src-tauri/msix/identity.json')
 
+test('Store taskbar assets cover exact target sizes and unplated light/dark themes', () => {
+  const assets = storeIconAssets()
+  assert.equal(new Set(assets.map(asset => asset.name)).size, 63)
+  for (const size of [16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256]) {
+    for (const theme of ['', '_altform-unplated', '_altform-lightunplated']) {
+      assert.deepEqual(assets.find(asset => asset.name === `Square44x44Logo.targetsize-${size}${theme}.png`), { name: `Square44x44Logo.targetsize-${size}${theme}.png`, size })
+    }
+  }
+  assert.equal(assets.find(asset => asset.name === 'Square150x150Logo.scale-400.png').size, 600)
+  const build = readFileSync(new URL('./build-msix.ps1', import.meta.url), 'utf8')
+  assert.match(build, /\$makePri new/)
+  assert.match(build, /\$makePri dump/)
+  assert.match(build, /Icon missing from PRI/)
+  assert.match(build, /Packaged icon mismatch/)
+  assert.match(build, /PRI resource path does not match manifest Assets path/)
+})
 test('Store manifest keeps Partner Center identity, desktop architecture and eight languages', () => {
   const result = manifest(identity, '1.5.0')
   assert.match(result, /APXStudio\.7806DADA0693/)

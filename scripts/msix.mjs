@@ -55,6 +55,12 @@ export function prepare(stage, root) {
   const identity = readJSON('src-tauri/msix/identity.json')
   const packageDir = resolve(stage, 'Package')
   mkdirSync(resolve(packageDir, 'Assets'), { recursive: true })
+  writeFileSync(resolve(stage, 'icon-assets.json'), JSON.stringify(storeIconAssets(), null, 2))
+  writeFileSync(resolve(stage, 'priconfig.xml'), `<?xml version="1.0" encoding="utf-8"?>
+<resources targetOsVersion="10.0.0" majorVersion="1"><index root="\\" startIndexAt="\\">
+<default><qualifier name="Language" value="en-US"/><qualifier name="Scale" value="100"/><qualifier name="Contrast" value="standard"/></default>
+<indexer-config type="folder" foldernameAsQualifier="true" filenameAsQualifier="true" qualifierDelimiter="."/>
+</index></resources>`)
   for (const [name, size] of [['StoreLogo.png', 50], ['Square150x150Logo.png', 150], ['Square44x44Logo.png', 44]]) {
     const source = resolve(root, 'src-tauri/icons', name)
     const bytes = readFileSync(source)
@@ -67,6 +73,14 @@ export function prepare(stage, root) {
   writeFileSync(resolve(stage, 'candidate.json'), JSON.stringify({ version: packageVersion(version), identity, channel: 'microsoft-store', status: 'unsigned candidate; certification pending' }, null, 2))
 }
 
+export function storeIconAssets() {
+  const targets = [16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256]
+  const assets = targets.flatMap(size => ['', '_altform-unplated', '_altform-lightunplated'].map(theme => ({ name: `Square44x44Logo.targetsize-${size}${theme}.png`, size })))
+  for (const [name, base] of [['Square44x44Logo', 44], ['Square150x150Logo', 150], ['StoreLogo', 50]]) {
+    for (const scale of [100, 125, 150, 200, 250, 300, 400]) assets.push({ name: `${name}.scale-${scale}.png`, size: Math.round(base * scale / 100) })
+  }
+  return assets
+}
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.length !== 3) throw new Error('Usage: node scripts/msix.mjs <staging-directory>')
