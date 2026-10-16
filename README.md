@@ -57,7 +57,7 @@ Store installations receive updates through Microsoft Store; GitHub installation
 use the separate signed updater below.
 
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-Microsoft Store 1.5.0 is published (confirmed by the maintainer). Source 1.5.1 prepares a Store icon hotfix with transparent taskbar assets for light/dark themes and DPI-aware resource indexing; see [MSIX packaging](docs/guides/MSIX_STORE.md). GitHub downloads/updater remain on 1.4.4 until new signed cross-platform builds are published. Do not confuse updater signatures with Windows Authenticode.
+Microsoft Store 1.5.0 is published (confirmed by the maintainer). GitHub stable is **1.5.1**, with verified updater-signed builds for Windows, macOS Intel/Apple Silicon and Linux. The source also includes the Store icon hotfix with transparent light/dark assets and DPI-aware resource indexing; the maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
 
 The Store edition includes Streamlink/Python/FFmpeg with their original notices;
 WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.0
@@ -65,17 +65,17 @@ is published in Store; the 1.5.1 icon update is prepared separately. Correspondi
 runtime sources and license-distribution details are documented in [the source guide](docs/guides/MSIX_RUNTIME_SOURCES.md).
 Updates require a compatible signing key and your confirmation.
 
-- ⭐ **`BlinkStream_1.4.4_Win_x64.exe`** *(Recommended NSIS installer, used by the updater)*
-- `BlinkStream_1.4.4_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream_1.5.1_Win_x64.exe`** *(Recommended NSIS installer, used by the updater)*
+- `BlinkStream_1.5.1_Win_x64.msi` *(Enterprise MSI installer)*
 
 Install streaming dependencies and download the official installer from PowerShell:
 
 ```powershell
 winget install --id Streamlink.Streamlink --exact
 winget install --id Gyan.FFmpeg --exact
-Invoke-WebRequest -Uri "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.4/BlinkStream_1.4.4_Win_x64.exe" -OutFile "BlinkStream_1.4.4_Win_x64.exe"
+Invoke-WebRequest -Uri "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.1/BlinkStream_1.5.1_Win_x64.exe" -OutFile "BlinkStream_1.5.1_Win_x64.exe"
 # Review the download and the warning below before running:
-.\BlinkStream_1.4.4_Win_x64.exe
+.\BlinkStream_1.5.1_Win_x64.exe
 ```
 
 Restart your terminal/application after installing dependencies so PATH changes are visible.
@@ -100,8 +100,8 @@ See [Microsoft's SmartScreen overview](https://learn.microsoft.com/en-us/windows
 ```bash
 brew install streamlink ffmpeg
 # Apple Silicon; for Intel replace arm64 with x64 in the filename and URL.
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.4/BlinkStream_1.4.4_macOS_arm64.dmg"
-open BlinkStream_1.4.4_macOS_arm64.dmg
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.1/BlinkStream_1.5.1_macOS_arm64.dmg"
+open BlinkStream_1.5.1_macOS_arm64.dmg
 ```
 
 Drag BlinkStream into Applications. macOS 11+ is configured as the minimum; choose the
@@ -112,16 +112,16 @@ installer matching your CPU. Updater signatures do not imply Apple notarization.
 ```bash
 sudo apt update
 sudo apt install streamlink ffmpeg
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.4/BlinkStream_1.4.4_Linux_x86_64.deb"
-sudo apt install ./BlinkStream_1.4.4_Linux_x86_64.deb
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.1/BlinkStream_1.5.1_Linux_x86_64.deb"
+sudo apt install ./BlinkStream_1.5.1_Linux_x86_64.deb
 ```
 
 Alternatively, use the x86_64 AppImage:
 
 ```bash
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.4.4/BlinkStream_1.4.4_Linux_x86_64.AppImage"
-chmod +x BlinkStream_1.4.4_Linux_x86_64.AppImage
-./BlinkStream_1.4.4_Linux_x86_64.AppImage
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.1/BlinkStream_1.5.1_Linux_x86_64.AppImage"
+chmod +x BlinkStream_1.5.1_Linux_x86_64.AppImage
+./BlinkStream_1.5.1_Linux_x86_64.AppImage
 ```
 
 AppImage may require FUSE support depending on the distribution.
@@ -153,7 +153,7 @@ pnpm install --frozen-lockfile
 ```
 
 Run subsequent commands from the repository root. To reproduce the published source,
-check out tag `v1.4.4` before installing dependencies; `master` includes later documentation/changes.
+check out tag `v1.5.1` before installing dependencies; `master` includes later documentation/changes.
 
 ### Configuration
 

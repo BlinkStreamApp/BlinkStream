@@ -6,8 +6,8 @@ Status: active
 ## Objective
 
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
-Store 1.5.0 publicada según confirma el usuario; preparar hotfix MSIX 1.5.1 de iconos.
-GitHub descargas/updater siguen en 1.4.4 hasta builds firmados nuevos.
+Store 1.5.0 publicada según confirma el usuario; MSIX 1.5.1 entregado para subida manual.
+GitHub 1.5.0 y 1.5.1 publicadas y verificadas; 1.5.1 es latest/descargas/updater.
 
 ## Stack
 
@@ -45,7 +45,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 
 - Web Pi5 — Actions notifica un receptor Docker por Cloudflare Tunnel con HMAC; solo fetch/fast-forward del clon servido por Nginx, sin SSH, reset ni socket Docker. Master real y main compatibles; secrets/configuración de la Pi pendientes, implementación local sin push.
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
-- DEC-002 — Fuente y latest publicados 1.4.4; CI firmado y cuatro artefactos públicos del updater verificados.
+- DEC-002 — GitHub latest/fuente 1.5.1; CI firmado y cuatro artefactos públicos del updater verificados. Históricas 1.5.0/1.4.4 conservadas; Store se actualiza por su propio canal.
 - Plan 2026-10-13 — Hitos consecutivos: 1.5 organización/chat, 1.6 continuidad/medios, 1.7 moderación, 1.8 integraciones, 1.9 consolidación, 2.0 rediseño completo. Entregas mínimas y ampliaciones PATCH; IA/plugins/Kick/YouTube condicionados y no bloqueantes de 2.0. Detalle en ROADMAP, sin nuevas fechas ni cambio de versión publicada.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
@@ -63,6 +63,8 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- GitHub 1.5.0/1.5.1 publicadas por autorización: base reconstruida sin icon fix `0fd0a5fef0a8cf0ab4152ea3f2ab3e612b37589b`, hotfix `f1a25f1fcadcbc8404ee3255f54617370a960550`. CI 38924898662/38925125890 correctos: calidad, cuatro builds firmados, NSIS smoke y verificación del manifiesto. Cada release tiene 15 assets/notas ES/EN; todos los bytes públicos coinciden por SHA256 con CI y las cuatro firmas públicas verifican. 1.5.0 histórica; 1.5.1 latest y manifiesto nuevo. README/roadmaps/web/descargas sincronizados. El intento de avanzar master antes de CI fue retenido por seguridad; no se saltó el control y se esperó a CI completo. Pi fuera del commit, ningún Actions eliminado.
+- Enlaces Store HTTPS y ms-windows-store añadidos al README/web; Pages 38924897652 correcto y web pública HTTP 200 con ambos enlaces verificada. 704 frontend/1 omitido, 30 release y lint completo correctos. Una copia temporal del índice para comprobar 1.5.0 se apartó a Temp para no duplicar pruebas; las suites reales pasan.
 - Hotfix 1.5.1 generado y validado: `target/msix/BlinkStream_1.5.1.0_x64.msix`, 94.712.117 bytes, SHA256 `5FEF473218DDA1408FC15D0DD2F4CBBF2326CE8627337A8FEB07C9B2CFE5535C`. Build Store, MakeAppx pack/unpack, hashes de 63 PNG/PRI/runtime y dump de qualifiers/ruta Files/Assets correcto; 702 frontend/1 omitido, 29 release, lint completo pasan. Vista previa transparente revisada; apariencia instalada pendiente del usuario. No instalación, push, envío ni publicación por el agente; runtime/fuentes 1.5.0 idénticos, sin duplicar ZIP de 2 GB.
 - 2026-10-16: usuario confirma 1.5.0 aceptada y publicada en Microsoft Store; Partner Center sigue a su cargo. Hotfix fuente/paquete 1.5.1/1.5.1.0: faltaban variantes unplated/target-size y resources.pri, causando fallback con placa/reducción en barra. Generar 63 variantes PNG del logo maestro aprobado, indexar con MakePRI y verificar hashes/variantes tras MakeAppx. README/notas/roadmaps/web actualizados sin anunciar instaladores GitHub inexistentes; conservar identidad Store. Validación visual instalada a cargo del usuario, no limpiar caché ni instalar en host.
 - 2026-10-15 entrega local MSIX: usuario gestiona Partner Center; no acceder/subir/enviar allí. Reconstruido `BlinkStream_1.5.0.0_x64.msix`, 93.565.748 bytes, SHA256 `58255335F510ED40EDB558D417C6C56366577479C45256F38CDE95941A602832`; MakeAppx pack/unpack y hashes internos correctos. Avisos Streamlink/Python/FFmpeg visibles en Acerca de (solo Store). 702 frontend pasan/1 omitido, 28 release y lint de archivos cambiados correctos. Sin instalar, firmar ni publicar; nueva hash no tiene aceptación guest/WACK propia.

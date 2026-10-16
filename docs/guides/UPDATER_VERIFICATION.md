@@ -1,6 +1,14 @@
 # Auto-updater verification
 
-## Current release: 1.4.4 (2026-10-13)
+## Current release: 1.5.1 (2026-10-16)
+
+- Historical 1.5.0 source: `0fd0a5fef0a8cf0ab4152ea3f2ab3e612b37589b`; CI `38924898662` passed quality, four signed builds, Windows NSIS smoke and manifest verification.
+- Latest 1.5.1 source: `f1a25f1fcadcbc8404ee3255f54617370a960550`; CI `38925125890` passed the same gates. It ran explicitly on the release branch before publication, not by bypassing a failed tag job.
+- Each public release has 15 assets and its own ES/EN notes. Each was published only after the exact-commit CI succeeded and local artifact signature verification passed. All public files were downloaded again and SHA256-compared to CI input; the four public updater binaries independently verified with the unchanged configured key.
+- `updater.json` is generated from those verified 1.5.1 artifacts and per-version notes; do not serve the unsigned Store MSIX through it. GitHub and Store remain separate update authorities.
+- No app, installer or downloaded release binary was installed/executed on the user's PC. Native GUI upgrade/settings persistence and installed Store taskbar appearance are not inferred from CI or cryptographic checks.
+
+## Historical release: 1.4.4 (2026-10-13)
 
 - Source tag `v1.4.4` resolves to `3ac7b7a54e78693f5a919f6f8a79b6e0524bd5de`.
 - Candidate CI `38449215321` and tag CI `38451126905` pass quality, four signed builds, Windows NSIS install/reinstall/restart smoke and cryptographic manifest verification.

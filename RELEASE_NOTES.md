@@ -1,11 +1,11 @@
 # BlinkStream 1.5.1 — Store taskbar icon hotfix
 
-Date: 2026-10-16. Local hotfix for the published Microsoft Store 1.5.0.
+Date: 2026-10-16. Published GitHub hotfix over 1.5.0; Store MSIX update handed to the maintainer.
 
 - Add transparent target-size assets for taskbar/Start in light and dark themes.
 - Provide DPI-scale assets and compile/verify their Windows resource index (PRI).
 - Preserve the approved logo and existing Store identity for an in-place update.
-- Align source version and project/website documentation; GitHub downloads/updater remain 1.4.4 until a separately verified release.
+- Align source version and project/website documentation; GitHub downloads/updater move to verified 1.5.1 builds for Windows, macOS Intel/Apple Silicon and Linux.
 
 Local package validation does not prove the icon's appearance in the installed Store
 update. The user uploads to Partner Center; the agent does not install or publish it.
@@ -24,7 +24,7 @@ Microsoft Store publication confirmed by the maintainer on 2026-10-16.
 
 Windows core flows and translations accepted by the user. Store acceptance was
 reported by the maintainer, not verified through Partner Center by the agent.
-GitHub downloads and updater stay on stable 1.4.4 until cross-platform signed release validation.
+GitHub 1.5.0 is retained as the historical baseline, with its own signed builds and notes; 1.5.1 is latest.
 
 ## Previous stable: BlinkStream 1.4.4 — Interface, discovery and multistream update
 

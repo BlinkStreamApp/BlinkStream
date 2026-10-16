@@ -1,6 +1,6 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-10-16. Microsoft Store 1.5.0 publicada según confirma el usuario. Fuente 1.5.1: hotfix de iconos de barra de tareas/Inicio, variantes transparentes claro/oscuro, escalas DPI e índice PRI verificado. El usuario gestiona la subida Store; no instalar ni publicar automáticamente. Ver `guides/MSIX_STORE.md`. GitHub estable/updater siguen en 1.4.4 hasta nuevos builds firmados multiplataforma.
+Actualizado: 2026-10-16. Microsoft Store 1.5.0 publicada según confirma el usuario. GitHub 1.5.0 y 1.5.1 publicadas tras CI firmado multiplataforma, NSIS smoke y verificación independiente de artefactos públicos; 1.5.1 latest/updater. Fuente 1.5.1 incluye el hotfix de iconos MSIX, variantes claro/oscuro/DPI y PRI verificado. El usuario gestiona la subida Store; no instalar en host ni enviar a Partner Center. Ver `guides/MSIX_STORE.md` y `guides/UPDATER_VERIFICATION.md`.
 
 ## Objetivo y reglas
 

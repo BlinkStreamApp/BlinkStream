@@ -7,10 +7,10 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-16 / v1.5.1 icon hotfix
+## Execution status — 2026-10-16 / v1.5.1 published
 
 The historical phases below describe product direction, not proof of a published release.
-Microsoft Store 1.5.0 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations and security hardening. Source 1.5.1 prepares the taskbar icon hotfix: transparent target-size light/dark variants, DPI assets and a compiled resource index. GitHub downloads/updater remain on [1.4.4](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.4.4) until new signed cross-platform builds are published. The user handles Partner Center; 1.5.1 has not been submitted by the agent.
+Microsoft Store 1.5.0 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations and security hardening. GitHub [1.5.0](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.0) and [1.5.1](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.1) are published with separate ES/EN notes, signed four-target builds and independently verified public artifacts. Latest GitHub/downloads/updater: 1.5.1. The Store taskbar fix includes transparent light/dark target-size variants, DPI assets and a compiled resource index. The user handles Partner Center; no Store update was submitted by the agent.
 Candidate CI `38449215321` and tag CI `38451126905` passed all gates; downloaded public updater artifacts independently pass signature and SHA-256 verification.
 Signed builds are available for Windows x64, macOS Intel/Apple Silicon and Linux x64.
 The update adds category discovery, UI polish and unified grid chat, retaining account-scoped favorites/follows, logout cleanup and approved branding.
@@ -35,7 +35,7 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 
 Validation: 623 frontend tests pass, one skipped; 56 Rust Windows tests and 19 release/signature/documentation tests pass locally. Lint/legacy/fmt/Clippy, optimized GLib tests, signed four-target builds and NSIS smoke pass CI. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
-Now: Store 1.5.0 published; prepare 1.5.1 icons and maintain separate GitHub 1.4.4 download/update status. Record outstanding live integration checks.
+Now: Store 1.5.0 published; GitHub 1.5.1 latest with verified download/update artifacts. Store 1.5.1 submission and installed icon acceptance remain with the maintainer.
 Next: close 1.4.5 validation, then 1.5 organization/chat improvements and 1.6 VOD/workspaces/media.
 Then: 1.7 moderation, 1.8 integrations and 1.9 consolidation.
 2.0 centers on a complete interface redesign; AI, additional platforms and plugins remain conditional.
@@ -158,7 +158,7 @@ Cada hito comienza con una entrega mínima; ampliaciones compatibles salen como 
 consecutivos cuando están probadas. No saltar de versión para cada idea ni esperar
 a terminar todo un hito para entregar una corrección validada.
 
-**Estado:** Store 1.5.0 publicada; hotfix 1.5.1 de iconos en preparación. GitHub descargas/updater siguen en 1.4.4. El resto de hitos continúa como planificación, sin dar por entregadas todas las ampliaciones de 1.5.x.
+**Estado:** Store 1.5.0 publicada; GitHub 1.5.0 y 1.5.1 publicadas, con 1.5.1 como latest. MSIX 1.5.1 entregado para subida manual. El resto de hitos continúa como planificación, sin dar por entregadas todas las ampliaciones de 1.5.x.
 Codex se encarga de implementación/regresiones; el usuario acepta los flujos reales.
 Antes de cada hito: revisar el código existente, reutilizarlo y verificar permisos,
 consumo, migraciones y límites del proveedor. Ninguna prueba simulada certifica Twitch real.
