@@ -7,14 +7,15 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-16 / v1.5.2 local candidate
+## Execution status — 2026-10-17 / v1.5.2 published on GitHub
 
-Source candidate 1.5.2 adds native session chat search. It is not published; stable
-GitHub downloads/updater and Microsoft Store remain at 1.5.1.
+GitHub 1.5.2 is published with native session chat search, eight-language controls
+and the unused ZIP extractor removed for security. Downloads/updater are verified
+at 1.5.2; Microsoft Store remains at 1.5.1 until the maintainer submits its separate MSIX.
 
 The historical phases below describe product direction, not proof of a published release.
-Microsoft Store 1.5.1 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations, security hardening and the Windows icon fix. GitHub [1.5.0](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.0) and [1.5.1](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.1) are published with separate ES/EN notes, signed four-target builds and independently verified public artifacts. Latest GitHub/downloads/updater: 1.5.1. The Store taskbar fix includes transparent light/dark target-size variants, DPI assets and a compiled resource index. The maintainer handles Partner Center.
-Release CI `38924898662` (1.5.0) and `38925125890` (1.5.1) passed all gates; downloaded public updater artifacts independently pass signature and SHA-256 verification.
+Microsoft Store 1.5.1 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations, security hardening and the Windows icon fix. GitHub [1.5.0](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.0) and [1.5.1](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.1) are published with separate ES/EN notes, signed four-target builds and independently verified public artifacts. Latest GitHub/downloads/updater: [1.5.2](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.2). The Store taskbar fix includes transparent light/dark target-size variants, DPI assets and a compiled resource index. The maintainer handles Partner Center.
+Release CI `38924898662` (1.5.0), `38925125890` (1.5.1) and `39060821359` (1.5.2) passed all gates. All 15 public 1.5.2 files match CI bytes and GitHub SHA-256 digests; four updater signatures independently verify. Candidate `39059837052` passed before the failed unpublished tag was recreated with explicit authorization.
 Signed builds are available for Windows x64, macOS Intel/Apple Silicon and Linux x64.
 The update adds category discovery, UI polish and unified grid chat, retaining account-scoped favorites/follows, logout cleanup and approved branding.
 Windows logout/welcome and real Twitch follow/unfollow refresh were accepted by the user.
@@ -186,9 +187,11 @@ consumo, migraciones y límites del proveedor. Ninguna prueba simulada certifica
 - **Categorías favoritas y ocultas:** fijar juegos y ocultar categorías en Explorar; posibilidad de deshacer y gestionar exclusiones. Sin recomendaciones opacas ni filtros de Drops no verificables.
   - Categorías publicadas: fijar primero, filtro Solo favoritas, ocultar con deshacer y panel para restaurar; preferencias acotadas por cuenta y sin escrituras en Twitch. Ocultar canales todavía no implementado.
 
+**Entregada en GitHub 1.5.2:**
+- **Búsqueda del chat de sesión:** chat nativo individual/unificado por texto, usuario, enlaces y canal de origen. Solo mensajes recibidos y conservados; mantiene borrados de moderación, filtros y límite de historial. Traducciones en ocho idiomas, Escape y aislamiento de sesión. Aceptada por el usuario; CI firmado y artefactos públicos verificados. Web oficial única: APX Studio; confirmación de login independiente conservada.
+
 **Pendiente en las siguientes entregas PATCH de 1.5.x:**
 - **Ocultación de canales:** ampliar las exclusiones sin modificar los follows de Twitch y con opción de restaurar.
-- **Búsqueda del chat de sesión — candidata 1.5.2:** implementada en chat nativo individual/unificado por texto, usuario, enlaces y canal de origen. Solo mensajes realmente recibidos y conservados; mantiene borrados de moderación, filtros existentes y límite de historial. Traducciones en ocho idiomas, Escape y aislamiento de sesión. Aceptada por el usuario; pendientes CI firmado y publicación. Web oficial única: APX Studio; Pages comercial retirado, confirmación de login independiente conservada.
 
 **Ampliaciones posteriores del hito:** orden/filtros de colecciones y navegación con teclado, reutilizando la infraestructura existente. Sin persistir conversaciones por defecto.
 

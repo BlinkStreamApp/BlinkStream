@@ -77,8 +77,11 @@ No application capability or package identity is added or changed.
 
 Security rebuild: updater defaults now exclude the unused ZIP feature and vulnerable
 `zip 4.6.1`; raw EXE/AppImage and macOS TAR.GZ support/TLS/signature checks remain.
-The failed v1.5.2 tag was not published as an app release; the new candidate requires
-fresh signed CI and explicit authorization before replacing that failed tag.
+The failed v1.5.2 tag was not published as an app release. After explicit maintainer
+authorization, corrected source `3a5908e` passed candidate CI `39059837052`; only
+that tag was recreated. Publication CI `39060821359` passed and all 15 public GitHub
+files/four updater signatures were independently verified. This is not Store
+certification or fresh installed/WACK acceptance of the separate MSIX above.
 
 The Python copyleft supplement is also public and byte-verified:
 [pycountry/iso-codes/certifi sources](https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.0/BlinkStream-1.5.0-python-copyleft-sources.zip),

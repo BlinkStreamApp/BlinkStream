@@ -1,5 +1,13 @@
 # Auto-updater verification
 
+## Current release: 1.5.2 (2026-10-17)
+
+- Source tag: `3a5908e1d965cc99b4e5e8fc4fb37c1d1e6b2fa5`. Candidate CI `39059837052` and publication CI `39060821359` passed quality, four signed builds, Windows NSIS smoke and manifest verification.
+- The maintainer explicitly authorized recreating only the failed, unpublished v1.5.2 tag after validation. The old tag object `414f439` targeted `397b59c`; replacement `bb195cf` targets `3a5908e`. Master advanced by fast-forward; no other tag or published release was replaced.
+- All 15 public assets were downloaded again, matching their CI inputs, sizes and GitHub SHA256 digests. Four updater signatures (including trusted comments) independently verify with the unchanged key. Detached signatures and per-version ES/EN notes exactly match the public manifest.
+- Public manifest SHA256: `933001b9fdfcca0fac9b9a5bac6e784d52b3882573be5c3d5f8251dda5299af5`. Master updater equals the downloaded manifest after JSON parsing; GitHub latest is v1.5.2. Detailed byte evidence is in `../reviews/RELEASE_READINESS_1.5.2.md`.
+- Store remains 1.5.1 until the maintainer submits and publishes the separate MSIX 1.5.2.0. Nothing was installed on the host, submitted to Store or deployed to Supabase/Pi. GitHub updater verification is not Authenticode/notarization, an installed GUI upgrade or a WACK report.
+
 ## 1.5.2 candidate security follow-up (2026-10-17)
 
 Tag run `39059259146` and master run `39059255638` blocked publication when the
@@ -17,11 +25,11 @@ advisories. A release regression guards both the dependency exclusion and the fo
 supported manifest formats. New native builds, four-platform signed CI and installer
 smoke are required before recreating the failed tag with explicit user authorization.
 
-## Current release: 1.5.1 (2026-10-16)
+## Historical release: 1.5.1 (2026-10-16)
 
 - Historical 1.5.0 source: `0fd0a5fef0a8cf0ab4152ea3f2ab3e612b37589b`; CI `38924898662` passed quality, four signed builds, Windows NSIS smoke and manifest verification.
 - Latest 1.5.1 source: `f1a25f1fcadcbc8404ee3255f54617370a960550`; CI `38925125890` passed the same gates. It ran explicitly on the release branch before publication, not by bypassing a failed tag job.
-- Each public release has 15 assets and its own ES/EN notes. Each was published only after the exact-commit CI succeeded and local artifact signature verification passed. All public files were downloaded again and SHA256-compared to CI input; the four public updater binaries independently verified with the unchanged configured key.
+- Each release originally had 15 app/updater assets and its own ES/EN notes. Two verified runtime source companions were later added to 1.5.0 without replacing any app asset. Each app release was published only after the exact-commit CI succeeded and local artifact signature verification passed. All public app files were downloaded again and SHA256-compared to CI input; the four public updater binaries independently verified with the unchanged configured key.
 - `updater.json` is generated from those verified 1.5.1 artifacts and per-version notes; do not serve the unsigned Store MSIX through it. GitHub and Store remain separate update authorities.
 - No app, installer or downloaded release binary was installed/executed on the user's PC. Native GUI upgrade/settings persistence and installed Store taskbar appearance are not inferred from CI or cryptographic checks.
 

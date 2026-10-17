@@ -1,6 +1,7 @@
-# BlinkStream 1.5.2 — Session chat search (candidate)
+# BlinkStream 1.5.2 — Session chat search
 
-Status: local candidate, not published. Stable GitHub and Microsoft Store version: 1.5.1.
+Published on GitHub: 2026-10-17. Latest/downloads/updater: 1.5.2. Microsoft Store remains 1.5.1; the maintainer submits its separate MSIX.
+Version-specific release body: [1.5.2 ES/EN](docs/releases/1.5.2.md).
 
 ## ES
 
@@ -9,7 +10,7 @@ Status: local candidate, not published. Stable GitHub and Microsoft Store versio
 - La búsqueda utiliza solo mensajes conservados en memoria; se limpia al cambiar de cuenta, cerrar sesión o cambiar los canales visibles.
 - Panel adaptable con traducciones en los ocho idiomas, foco automático y cierre con Escape.
 - Completadas las traducciones de pestañas, ayudas, estados vacíos, etiquetas accesibles y errores locales que rodean al buscador; cambiar de idioma conserva filtros, borrador y conexión.
-- Documentación y roadmap actualizados para reflejar la 1.5.1 publicada en GitHub y Microsoft Store, y las ampliaciones pendientes.
+- Documentación y roadmap actualizados: GitHub 1.5.2 publicada, Microsoft Store 1.5.1 y ampliaciones pendientes diferenciadas.
 - Avisos Store con acceso traducido al paquete de fuentes del runtime Streamlink/Python/FFmpeg; conserva una sola copia para el runtime compartido.
 - Retirado el soporte ZIP heredado no utilizado del actualizador: elimina `zip 4.6.1` y sus avisos RustSec de extracción sin cambiar los formatos EXE/AppImage/TAR.GZ publicados ni la verificación de firmas.
 
@@ -20,13 +21,14 @@ Status: local candidate, not published. Stable GitHub and Microsoft Store versio
 - Search only uses messages retained in memory and resets on account changes, sign-out or changes to visible source channels.
 - Responsive panel with all eight interface languages, automatic focus and Escape to close.
 - Completed surrounding chat tabs, hints, empty states, accessible labels and local error translations; language changes preserve filters, drafts and the connection.
-- Updated documentation and roadmap to reflect 1.5.1 published on GitHub and Microsoft Store and the remaining improvements.
+- Updated documentation and roadmap to distinguish published GitHub 1.5.2, Microsoft Store 1.5.1 and remaining improvements.
 - Store notices provide localized access to the Streamlink/Python/FFmpeg runtime source companion, retaining a single copy for the shared runtime.
 - Removed unused legacy ZIP updater support, excluding `zip 4.6.1` and its extraction advisories while retaining published EXE/AppImage/TAR.GZ formats and signature verification.
 
 Validation and Windows test-build details are tracked in `docs/PROJECT_STATE.md`.
-The maintainer accepted the translated candidate. Signed cross-platform release checks
-remain required before publication; local tests do not certify every live-service/platform flow.
+The maintainer accepted the translated candidate. Candidate CI `39059837052` and tag
+CI `39060821359` passed. All 15 public files match CI hashes and four updater signatures
+independently verify. These checks do not certify every live-service/platform flow.
 
 ## BlinkStream 1.5.1 — Store taskbar icon hotfix
 

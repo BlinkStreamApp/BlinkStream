@@ -1,13 +1,29 @@
 # Readiness — BlinkStream 1.5.2
 
 Reviewed: 2026-10-17 (Europe/Madrid)
-Status: local verification passed; signed cross-platform CI and distribution gates pending.
+Status: GitHub 1.5.2 published and independently verified; Store MSIX submission remains with the maintainer.
 
 Follow-up: the initial tag/master publication attempts were blocked by newly issued
 RUSTSEC-2026-0367/0368/0369. The fix removes unused optional ZIP support from the updater;
 it does not suppress advisories. Current OSV: 562 registry packages, zero vulnerabilities,
-nine informational unmaintained notices. New signed CI and user permission to recreate
-the unpublished failed tag are required; the previous green SHA is superseded for publication.
+nine informational unmaintained notices. Corrected commit `3a5908e` passed complete
+candidate CI `39059837052` and independent four-artifact signature verification.
+The user explicitly authorized recreating only the unpublished failed tag after validation;
+this was done atomically with the fast-forward of master. Publication CI `39060821359`
+passed. All 15 public files match CI bytes and GitHub hashes; the four public updater
+signatures independently verify. Master and public updater match; latest is 1.5.2.
+
+## Publication evidence
+
+- Release: https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.2
+- Exact source: `3a5908e1d965cc99b4e5e8fc4fb37c1d1e6b2fa5`; candidate CI `39059837052`, tag CI `39060821359`, both successful.
+- Public NSIS SHA256: `e063b9cedddcb50e3c5f4f88ad6ca143218bce7ddb5de104b9d477e37a62c598`.
+- Public macOS ARM updater SHA256: `1169f1c5c2636d8915e5581bca53b949542acdce8f89d83ae7d542fc96da76f5`.
+- Public macOS Intel updater SHA256: `f052a2b56d543792d9c3fa8e0476ce4783e94246a9d1ac4dec099e2936979966`.
+- Public Linux AppImage SHA256: `731e781edce7d259508ef12bd36b8cf8f81d503709cc10cc7c8012f4963ca590`.
+- Public manifest SHA256: `933001b9fdfcca0fac9b9a5bac6e784d52b3882573be5c3d5f8251dda5299af5`; notes equal version-specific ES/EN source, exactly four supported platforms, signatures equal detached files.
+- APX website source files synchronized only after public verification and baseline/hash checks; 56 staged browser cases passed. `deploy.ps1` unchanged, no SSH deployment. Login confirmation HTTP 200/Pages built; retired marketing Pages still absent.
+- No host installation, Store submission, WACK approval or authenticated GUI upgrade is implied by these checks.
 
 ## Scope and result
 
@@ -73,11 +89,10 @@ These failures were not suppressed or counted as passing evidence.
 
 ## Remaining gates
 
-1. Commit/push and run signed four-target CI, Windows installer smoke and updater
-   manifest verification on the exact candidate SHA. Then tag/publish and independently
-   verify public signatures/hashes before changing stable download links.
-2. Update and verify only the APX Studio website for publication; SSH deployment
-   remains with the maintainer. No website deployment was performed here.
+1. Closed: exact-commit candidate and tag CI, four-target signatures, Windows installer
+   smoke, publication and independent public-byte/signature checks.
+2. APX Studio website source files updated and checked; SSH deployment remains with
+   the maintainer. No website deployment was performed here.
 3. The source-distribution follow-up is technically complete: all six inventory inputs
    and 72 enabled-option mappings checked, one companion attached to v1.5.0, complete
    public bytes streamed and SHA256-verified, actual source URL/hash and translated
@@ -91,4 +106,5 @@ No app publication, remote cleanup, host installation or cloud deployment was pe
 during the initial review. Subsequent authorized release preparation committed and pushed
 the candidate to `codex/release-1.5.2`; CI run `38974680981` validates exact SHA
 `b1758d1d639f78b2ebabb4b7a00e48d3ad082ea7`. The source companion was published as a new
-v1.5.0 asset without replacing any existing installer. App publication remains gated on CI.
+v1.5.0 asset without replacing any existing installer. That historical candidate was
+superseded by the ZIP-fixed commit and successful publication recorded above.
