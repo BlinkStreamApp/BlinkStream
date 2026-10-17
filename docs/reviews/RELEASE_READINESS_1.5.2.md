@@ -3,6 +3,12 @@
 Reviewed: 2026-10-17 (Europe/Madrid)
 Status: local verification passed; signed cross-platform CI and distribution gates pending.
 
+Follow-up: the initial tag/master publication attempts were blocked by newly issued
+RUSTSEC-2026-0367/0368/0369. The fix removes unused optional ZIP support from the updater;
+it does not suppress advisories. Current OSV: 562 registry packages, zero vulnerabilities,
+nine informational unmaintained notices. New signed CI and user permission to recreate
+the unpublished failed tag are required; the previous green SHA is superseded for publication.
+
 ## Scope and result
 
 Reviewed the complete working-tree release diff, including new untracked search
@@ -18,8 +24,8 @@ No production auth, IPC, CSP, updater key, dependencies or native code changed.
 
 ## Checks performed
 
-- Frontend after the source-notice follow-up: 59 files, 740 tests passed, one existing skipped test; full ESLint passed.
-- Release/metadata/MSIX/manifest documentation: 32 tests passed; diff whitespace check passed.
+- Frontend after the ZIP security fix: 59 files, 742 tests passed, one existing skipped test; full ESLint passed.
+- Release/metadata/MSIX/manifest documentation: 33 tests passed; diff whitespace check passed.
 - Rust: format and Clippy all-targets/all-features with warnings denied passed.
   Default GitHub profile: 60 tests passed. Store profile: 61 tests passed.
   Linux-only optimized GLib test does not execute on Windows; CI remains required.
@@ -50,8 +56,8 @@ These failures were not suppressed or counted as passing evidence.
 ## Exact Store candidate
 
 - File: `src-tauri/target/msix/BlinkStream_1.5.2.0_x64.msix`
-- Bytes: 94,721,834
-- SHA256: `205777AC0351EC0CA00CCB521BCB92569DEA13368000539F6F9535DECB33068C`
+- Bytes: 94,725,975
+- SHA256: `7832CDA78728528BA1FF7EE13AB503E5A60F79E8657BA7AA286BE95267A47DA5`
 - Official package identity/PFN unchanged; no extra capabilities.
 - Unsigned local candidate. Not installed, uploaded, certified or published.
 - Runtime unchanged; retain the existing 1.5.0 source companion, do not duplicate it.

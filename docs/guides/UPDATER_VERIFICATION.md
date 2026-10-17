@@ -1,5 +1,22 @@
 # Auto-updater verification
 
+## 1.5.2 candidate security follow-up (2026-10-17)
+
+Tag run `39059259146` and master run `39059255638` blocked publication when the
+live OSV audit first reported RUSTSEC-2026-0367/0368/0369 for transitive `zip 4.6.1`.
+No release/update manifest was published by those failed runs. Earlier green CI
+is a dated snapshot, not evidence that the new advisories can be ignored.
+
+The crate entered through tauri-plugin-updater's default `zip` feature. Disable
+that unused feature, keeping `rustls-tls`: published Windows updates are raw NSIS
+EXE, Linux updates raw AppImage, and macOS uses TAR.GZ (the plugin's macOS tar/gzip
+dependencies are unconditional). Legacy Windows ZIP/Linux GZ updater containers
+are not published by this project. Signature verification remains enabled.
+This removes ZIP and two unused helper crates, without vendoring or suppressing
+advisories. A release regression guards both the dependency exclusion and the four
+supported manifest formats. New native builds, four-platform signed CI and installer
+smoke are required before recreating the failed tag with explicit user authorization.
+
 ## Current release: 1.5.1 (2026-10-16)
 
 - Historical 1.5.0 source: `0fd0a5fef0a8cf0ab4152ea3f2ab3e612b37589b`; CI `38924898662` passed quality, four signed builds, Windows NSIS smoke and manifest verification.

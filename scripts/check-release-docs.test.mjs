@@ -6,6 +6,17 @@ test('standalone desktop builds use Tauri CLI to embed the frontend', () => {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   assert.equal(pkg.scripts['build:desktop'], 'tauri build --no-bundle')
 })
+
+test('updater excludes the unused legacy ZIP extractor while retaining TLS', () => {
+  const cargo = readFileSync(new URL('../src-tauri/Cargo.toml', import.meta.url), 'utf8')
+  assert.match(cargo, /tauri-plugin-updater\s*=\s*\{[^}]*default-features\s*=\s*false[^}]*features\s*=\s*\["rustls-tls"\]/)
+  const lock = readFileSync(new URL('../src-tauri/Cargo.lock', import.meta.url), 'utf8')
+  assert.doesNotMatch(lock, /\nname = "zip"\r?\n/)
+  const manifest = readFileSync(new URL('./build-updater-manifest.mjs', import.meta.url), 'utf8')
+  for (const format of ['Win_x64.exe', 'Linux_x86_64.AppImage', 'macOS_arm64.app.tar.gz', 'macOS_x64.app.tar.gz']) {
+    assert.ok(manifest.includes(format), `Missing supported updater format: ${format}`)
+  }
+})
 import { readReleaseDocs, validateReleaseDocs } from './check-release-docs.mjs'
 
 const docs = {

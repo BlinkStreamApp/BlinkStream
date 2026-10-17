@@ -29,8 +29,8 @@ technical compliance tests. Our local WACK run produced no report and is not a p
 ## Candidate binding
 
 - File: `src-tauri/target/msix/BlinkStream_1.5.2.0_x64.msix`
-- Size: 94,721,834 bytes
-- SHA256: `205777AC0351EC0CA00CCB521BCB92569DEA13368000539F6F9535DECB33068C`
+- Size: 94,725,975 bytes
+- SHA256: `7832CDA78728528BA1FF7EE13AB503E5A60F79E8657BA7AA286BE95267A47DA5`
 - Identity Name: `APXStudio.7806DADA0693`
 - Publisher: `CN=3B464BD9-E8B7-489D-8127-EA042A644ED5`
 - Publisher display name: `APX Studio`
@@ -58,7 +58,7 @@ cache archive. See [review](../reviews/MSIX_SOURCE_CORRESPONDENCE.md). No exact 
 patent clearance or legal certification is claimed.
 
 The rebuilt MSIX passed MakeAppx pack/unpack, executable/manifest/runtime hash
-verification, 31 release tests, 740 frontend tests (one skipped), and full frontend
+verification, 33 release tests, 742 frontend tests (one skipped), and full frontend
 lint. All 63 generated PNG variants and resources.pri matched after unpacking;
 MakePRI dump confirmed target sizes and UNPLATED/LIGHTUNPLATED candidates. Third-party notices are available in About and in the package root. This
 new hash was not installed in Sandbox; earlier smoke results apply to the previous
@@ -74,6 +74,16 @@ deletions. Store runtime notices include the actual source URL/hash and a transl
 download link, visually checked in eight languages at 320/700 px. The existing
 transparent taskbar/Start icon variants and resource index remain.
 No application capability or package identity is added or changed.
+
+Security rebuild: updater defaults now exclude the unused ZIP feature and vulnerable
+`zip 4.6.1`; raw EXE/AppImage and macOS TAR.GZ support/TLS/signature checks remain.
+The failed v1.5.2 tag was not published as an app release; the new candidate requires
+fresh signed CI and explicit authorization before replacing that failed tag.
+
+The Python copyleft supplement is also public and byte-verified:
+[pycountry/iso-codes/certifi sources](https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.0/BlinkStream-1.5.0-python-copyleft-sources.zip),
+12,561,727 bytes, SHA256 `2601249875bdfb29b66f36fa06f4772c52f29f5f1d19ca1a453a4cdd3d6c2856`.
+Its build map and pinned generator are documented in [MSIX_PYTHON_SOURCES.md](MSIX_PYTHON_SOURCES.md).
 
 ## Distributor checklist
 

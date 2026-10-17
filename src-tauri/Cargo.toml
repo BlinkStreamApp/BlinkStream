@@ -38,7 +38,9 @@ wait-timeout = "0.2"
 regex-lite = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "native-tls", "rustls-tls", "rustls-tls-webpki-roots"] }
 urlencoding = "2"
-tauri-plugin-updater = "2"
+# Published updates use raw EXE/AppImage and macOS TAR.GZ, never legacy Windows ZIP.
+# Removing the optional ZIP feature excludes the vulnerable, unused zip 4.x extractor.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls"] }
 tauri-plugin-notification = "2"
 keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native"] }
 getrandom = "0.3"

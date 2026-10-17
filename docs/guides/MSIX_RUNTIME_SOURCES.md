@@ -49,6 +49,11 @@ trial binaries during later artifact cleanup.
 
 ## Required before public distribution
 
+Python copyleft dependencies are covered by the separate, public and SHA256-verified
+[pycountry/iso-codes/certifi supplement](MSIX_PYTHON_SOURCES.md) (12.56 MB). This supplies
+editable translations/data as well as package source and the pinned generator, without
+replacing or duplicating the original 2 GB runtime source companion.
+
 Technical source correspondence reviewed on 2026-10-17:
 [72 enabled options, original build scripts/cache and inventory checks](../reviews/MSIX_SOURCE_CORRESPONDENCE.md).
 The single runtime source companion is retained for 1.5.0/1.5.1/1.5.2; app/runtime
