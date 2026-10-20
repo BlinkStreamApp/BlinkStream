@@ -44,6 +44,12 @@ still request their scopes at login; progressive consent is not implemented.
 
 ## Evidence and remaining acceptance
 
+The first release run `39493604739` blocked publication on newly issued
+RUSTSEC-2026-0381/0382/0383. The lockfile now selects rustls-webpki 0.103.16 and
+webpki-roots/webpki-root-certs 1.0.10. OSV checks all 562 registry packages with
+zero known vulnerabilities and nine informational maintenance notices. No audit
+rule was suppressed.
+
 - Catalog verification: 0 rows after containment, 0 public policies/grants,
   forced RLS and mandatory Twitch identity. RPC execution limited to service_role.
 - Live HTTP: invalid UUID 400, invalid POST 400, GET refresh 410 and valid OAuth

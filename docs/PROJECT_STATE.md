@@ -65,6 +65,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- Primer CI 1.5.3 `39493604739` bloqueó RUSTSEC-2026-0381/0382/0383 en certificados TLS. Cargo.lock actualizado exclusivamente a rustls-webpki 0.103.16 y webpki-roots/webpki-root-certs 1.0.10; OSV actual: 562 paquetes, cero vulnerabilidades, nueve avisos informativos de mantenimiento. Revalidación nativa y nuevo CI en curso.
 - 1.5.3 candidata de seguridad autorizada por el usuario: base live con auth_tokens privada, RLS forzada, TTL/UUID/identidad obligatorios y 22 handoffs caducados purgados. twitch-auth v38 desplegada; refresh POST, identidad Twitch validada, migración legacy con prueba de sesión anterior y cliente de sesión aislado del service_role. Desktop: validación horaria/logout remoto implementados; publicación pendiente de suite completa y CI firmado. Cambios Acerca de pendientes incluidos en candidata.
 - Advisor live: sin avisos de rendimiento; INFO RLS sin políticas intencional en tabla privada. Protección de contraseñas filtradas sigue desactivada y requiere ajuste manual o API de gestión autorizada disponible. Login Twitch real completo pendiente de aceptación.
 - Validación candidata 1.5.3: 748 frontend/1 omitido, 33 release, 11 pruebas OAuth sobre código real y 60 Rust Windows correctos; lint y build frontend correctos. El navegador para el toggle de contraseñas quedó bloqueado por auto-review ante redirección ajena a Supabase; pendiente del usuario. No se certifica login/logout real con cuenta Twitch ni GUI instalada.
