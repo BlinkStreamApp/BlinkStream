@@ -10,6 +10,7 @@ Version-specific release body: [1.5.3 ES/EN](docs/releases/1.5.3.md).
 - Validación del token al iniciar y cada hora, limpieza de sesiones revocadas y revocación remota al cerrar sesión.
 - Refresh exclusivamente por POST y permisos OAuth innecesarios retirados.
 - Dependencias TLS actualizadas contra RUSTSEC-2026-0381/0382/0383, detectados por el gate de publicación.
+- Vite 8.2.4 corrige los tres avisos Dependabot del servidor de desarrollo; auditoría completa sin vulnerabilidades conocidas.
 - Acerca de muestra APX Studio, web y soporte con traducciones en ocho idiomas.
 
 ## EN
@@ -19,6 +20,7 @@ Version-specific release body: [1.5.3 ES/EN](docs/releases/1.5.3.md).
 - Token checks at startup and hourly, revoked-session cleanup and remote revocation on sign-out.
 - POST-only refresh and removal of unused OAuth permissions.
 - TLS dependencies updated for RUSTSEC-2026-0381/0382/0383, detected by the publication gate.
+- Vite 8.2.4 fixes the three development-server Dependabot advisories; full dependency audit reports no known vulnerabilities.
 - About credits APX Studio and links to the website and support in all eight interface languages.
 
 Cloud hardening is deployed. Desktop publication remains gated by complete validation and signed cross-platform CI.

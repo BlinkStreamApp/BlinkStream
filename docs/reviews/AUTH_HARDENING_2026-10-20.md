@@ -50,6 +50,12 @@ webpki-roots/webpki-root-certs 1.0.10. OSV checks all 562 registry packages with
 zero known vulnerabilities and nine informational maintenance notices. No audit
 rule was suppressed.
 
+GitHub also reported three development-scope Vite alerts (GHSA-r825-w8mm-5pxw,
+GHSA-587h-7wmj-h5pm, GHSA-698v-4r3x-3vcv). Vite is updated to 8.2.4 with its
+lockfile. Full pnpm audit, including development dependencies, reports no known
+vulnerabilities. Supabase leaked-password protection is a Pro-or-above feature;
+no plan upgrade was authorized or performed.
+
 - Catalog verification: 0 rows after containment, 0 public policies/grants,
   forced RLS and mandatory Twitch identity. RPC execution limited to service_role.
 - Live HTTP: invalid UUID 400, invalid POST 400, GET refresh 410 and valid OAuth
