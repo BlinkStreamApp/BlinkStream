@@ -1,6 +1,8 @@
 // Keep each new UI message complete across the eight supported interface languages.
 export const featureLanguages = ['es', 'en', 'fr', 'de', 'pt', 'ja', 'ko', 'ru']
 const rows = {
+  'about.website': 'Web oficial|Official website|Site officiel|Offizielle Website|Site oficial|公式サイト|공식 웹사이트|Официальный сайт',
+  'about.support': 'Soporte|Support|Assistance|Support|Suporte|サポート|지원|Поддержка',
   'about.runtimeSources': 'Código fuente del runtime (2,12 GB)|Runtime source code (2.12 GB)|Code source du runtime (2,12 Go)|Runtime-Quellcode (2,12 GB)|Código-fonte do runtime (2,12 GB)|ランタイムのソースコード (2.12 GB)|런타임 소스 코드 (2.12 GB)|Исходный код среды выполнения (2,12 ГБ)',
   'chat.search.title': 'Buscar en el chat|Search chat|Rechercher dans le chat|Chat durchsuchen|Pesquisar no chat|チャットを検索|채팅 검색|Поиск по чату',
   'chat.search.close': 'Cerrar búsqueda|Close search|Fermer la recherche|Suche schließen|Fechar pesquisa|検索を閉じる|검색 닫기|Закрыть поиск',

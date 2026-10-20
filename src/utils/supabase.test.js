@@ -11,6 +11,7 @@ import {
   LS_BLINKSTREAM_USER_ID,
   storeBlinkstreamRefreshToken,
   refreshBlinkstreamToken,
+  revokeBlinkstreamSessions,
   getBlinkstreamRefreshTokenSync,
 } from './supabase'
 
@@ -58,6 +59,31 @@ describe('refresh seguro', () => {
     expect(await pending).toBeNull()
     expect(getBlinkstreamToken()).toBeNull()
     expect(getBlinkstreamRefreshTokenSync()).toBeNull()
+  })
+
+  it('revoca Twitch y Supabase por POST sin credenciales en la URL', async () => {
+    const twitchToken = 'twitch-access-token-private'
+    const refreshToken = 'supabase-refresh-token-private'
+    localStorage.setItem(LS_BLINKSTREAM_JWT, 'supabase-jwt-private')
+    localStorage.setItem(LS_BLINKSTREAM_EXPIRES, String(Date.now() + 3_600_000))
+    await storeBlinkstreamRefreshToken(refreshToken)
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, twitch_revoked: true, supabase_revoked: true }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await revokeBlinkstreamSessions(twitchToken)).toBe(true)
+    const [url, options] = fetchMock.mock.calls[0]
+    expect(url).not.toContain(twitchToken)
+    expect(url).not.toContain(refreshToken)
+    expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body)).toMatchObject({
+      action: 'logout',
+      twitch_access_token: twitchToken,
+      supabase_access_token: 'supabase-jwt-private',
+      supabase_refresh_token: refreshToken,
+    })
   })
 })
 

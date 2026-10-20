@@ -27,6 +27,26 @@ describe('useAuth', () => {
     vi.restoreAllMocks()
   })
 
+  it('valida cada hora y elimina la sesión cuando Twitch la revoca', async () => {
+    let hourlyValidation
+    const realSetInterval = globalThis.setInterval
+    vi.spyOn(globalThis, 'setInterval').mockImplementation((callback, delay) => {
+      if (delay === 3_600_000) { hourlyValidation = callback; return 123 }
+      return realSetInterval(callback, delay)
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'))
+    invokeMock.mockImplementation(async (cmd, args) => cmd === 'get_secret' && args?.key === 'twitch_token' ? 'hourly-token' : null)
+    const { result, unmount } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.isLoggedIn).toBe(true)
+    expect(hourlyValidation).toBeTypeOf('function')
+    fetchMock.mockResolvedValue(mockResponse({ ok: false, status: 401 }))
+    await act(async () => { await hourlyValidation() })
+    expect(result.current.isLoggedIn).toBe(false)
+    expect(invokeMock).toHaveBeenCalledWith('delete_secret', { key: 'twitch_token' })
+    unmount()
+  })
+
   it('estado inicial: isLoggedIn false, sin user, loading true al montar', async () => {
     const { result } = renderHook(() => useAuth())
 
@@ -46,6 +66,7 @@ describe('useAuth', () => {
 
   it('con token en keychain al montar: isLoggedIn pasa a true', async () => {
 
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'))
     invokeMock.mockImplementation(async (cmd, args) => {
       if (cmd === 'get_secret' && args?.key === 'twitch_token') {
         return 'keychain_tok_abc'
@@ -65,8 +86,28 @@ describe('useAuth', () => {
     expect(result.current.getTwitchToken()).toBe('keychain_tok_abc')
   })
 
+  it('elimina una sesión restaurada cuando Twitch confirma 401', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse({ ok: false, status: 401 }))
+    invokeMock.mockImplementation(async (cmd, args) => {
+      if (cmd === 'get_secret' && args?.key === 'twitch_token') return 'revoked-token'
+      return null
+    })
+
+    const { result } = renderHook(() => useAuth())
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.isLoggedIn).toBe(false)
+    expect(result.current.user).toBeNull()
+    expect(invokeMock).toHaveBeenCalledWith('delete_secret', { key: 'twitch_token' })
+  })
+
   it('logout limpia tokens, user y avatar', async () => {
 
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse({
+      ok: true,
+      status: 200,
+      json: async () => ({ twitch_revoked: true, supabase_revoked: true }),
+    }))
     invokeMock.mockImplementation(async (cmd, args) => {
       if (cmd === 'get_secret' && args?.key === 'twitch_token') return 'tok_xyz'
       return null

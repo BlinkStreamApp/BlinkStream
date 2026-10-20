@@ -58,7 +58,7 @@ jobs:
       - name: Companion and refresh security regressions
         run: |
           node scripts/check-companion-security.mjs
-          node supabase/functions/twitch-auth/_refresh-test.mjs
+          node --test supabase/functions/twitch-auth/_refresh-test.mjs supabase/functions/twitch-auth/_twitch_identity-test.mjs supabase/functions/twitch-auth/_flow-test.mjs
 
       - name: Release manifest tests
         run: pnpm test:release

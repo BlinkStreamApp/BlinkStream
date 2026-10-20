@@ -3,18 +3,46 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import AboutDialog from './AboutDialog'
+import { safeOpenUrl } from '../utils/tauriEnv'
 
 vi.mock('../utils/i18n', () => ({ useT: () => (_key, fallback) => fallback }))
 vi.mock('../utils/errors', () => ({ logError: vi.fn() }))
+vi.mock('../utils/tauriEnv', async importOriginal => ({ ...await importOriginal(), safeOpenUrl: vi.fn() }))
 
 beforeEach(() => {
   vi.stubGlobal('isTauri', true)
   check.mockReset()
   relaunch.mockReset().mockResolvedValue(undefined)
+  vi.mocked(safeOpenUrl).mockReset()
 })
 afterEach(() => vi.unstubAllGlobals())
 
 describe('manual updater UI contract', () => {
+  it('opens Ko-fi, the official website and support externally without closing About or checking updates', () => {
+    const onClose = vi.fn()
+    render(<AboutDialog onClose={onClose} />)
+    for (const [name, href] of [
+      ['Invitar a un café', 'https://ko-fi.com/apxstudio'],
+      ['Web oficial', 'https://apxstudio.es/'],
+      ['Soporte', 'mailto:contacto.apxstudio@gmail.com'],
+    ]) {
+      const link = screen.getByRole('link', { name })
+      expect(link).toHaveAttribute('href', href)
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+      fireEvent.click(link)
+      expect(safeOpenUrl).toHaveBeenLastCalledWith(href)
+    }
+    expect(safeOpenUrl).toHaveBeenCalledTimes(3)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(check).not.toHaveBeenCalled()
+  })
+
+  it('credits APX Studio as the publisher', () => {
+    render(<AboutDialog onClose={() => {}} />)
+    expect(screen.getByText('© 2026 APX Studio')).toBeInTheDocument()
+    expect(screen.queryByText(/BlinkStream Team/)).not.toBeInTheDocument()
+  })
+
   it('does not install or relaunch merely because a new version is found', async () => {
     const downloadAndInstall = vi.fn().mockResolvedValue(undefined)
     check.mockResolvedValue({ version: '1.4.2', downloadAndInstall })

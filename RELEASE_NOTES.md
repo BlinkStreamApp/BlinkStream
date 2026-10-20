@@ -1,4 +1,27 @@
-# BlinkStream 1.5.2 — Session chat search
+# BlinkStream 1.5.3 — Authentication security
+
+Release candidate, 2026-10-20. Published downloads/updater and Store remain 1.5.2.
+Version-specific release body: [1.5.3 ES/EN](docs/releases/1.5.3.md).
+
+## ES
+
+- Handoffs OAuth privados, de un solo uso y con caducidad comprobada; retirado el acceso público a credenciales y purgados 22 intercambios caducados.
+- Identidad Twitch validada por aplicación, permisos y usuario inmutable; cuentas antiguas vinculadas solo con prueba de la sesión anterior.
+- Validación del token al iniciar y cada hora, limpieza de sesiones revocadas y revocación remota al cerrar sesión.
+- Refresh exclusivamente por POST y permisos OAuth innecesarios retirados.
+- Acerca de muestra APX Studio, web y soporte con traducciones en ocho idiomas.
+
+## EN
+
+- Private, single-use OAuth handoffs with enforced expiry; public credential access removed and 22 expired exchanges purged.
+- Twitch identity validated against the application, scopes and immutable user ID; legacy accounts require previous-session proof before linking.
+- Token checks at startup and hourly, revoked-session cleanup and remote revocation on sign-out.
+- POST-only refresh and removal of unused OAuth permissions.
+- About credits APX Studio and links to the website and support in all eight interface languages.
+
+Cloud hardening is deployed. Desktop publication remains gated by complete validation and signed cross-platform CI.
+
+## BlinkStream 1.5.2 — Session chat search
 
 Published on GitHub: 2026-10-17. Latest/downloads/updater: 1.5.2. Microsoft Store remains 1.5.1; the maintainer submits its separate MSIX.
 Version-specific release body: [1.5.2 ES/EN](docs/releases/1.5.2.md).

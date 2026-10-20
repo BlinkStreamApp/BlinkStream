@@ -42,11 +42,17 @@ export async function pollAuthToken(requestId, { signal, interval = 1500 } = {})
   const epoch = authEpoch
   const pollUrl = `${EDGE_FN}?fetch=${encodeURIComponent(requestId)}`
 
-  migrateLegacyRefreshToken().catch(() => {  })
+  await migrateLegacyRefreshToken().catch(() => {  })
+  // Preserve the old Supabase owner when reauthorizing a pre-user_id account,
+  // including after restart when only its refresh token is in the keychain.
+  const continuityJwt = getBlinkstreamToken() || await refreshBlinkstreamToken()
 
   while (!signal?.aborted) {
     try {
-      const res = await fetch(pollUrl)
+      const res = await fetch(pollUrl, {
+        signal,
+        headers: continuityJwt ? { Authorization: `Bearer ${continuityJwt}` } : undefined,
+      })
       if (!res.ok) {
         await sleep(interval, signal)
         continue
@@ -241,5 +247,44 @@ export async function refreshBlinkstreamToken() {
     return null
   } catch {
     return null
+  }
+}
+
+export async function revokeBlinkstreamSessions(twitchAccessToken, { timeoutMs = 5000 } = {}) {
+  const supabaseAccessToken = getBlinkstreamToken()
+  const memorySnapshot = getBlinkstreamRefreshTokenSync()
+  // Queue the read before clearBlinkstreamToken queues deletion. The native
+  // refresh token is still available after restarting the application.
+  const refreshSnapshot = memorySnapshot ? Promise.resolve(memorySnapshot)
+    : isTauri() ? secretOperation('get_secret', { key: KEYCHAIN_REFRESH_KEY }).catch(() => null)
+      : Promise.resolve(null)
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const supabaseRefreshToken = await Promise.race([
+      refreshSnapshot,
+      new Promise(resolve => controller.signal.addEventListener('abort', () => resolve(null), { once: true })),
+    ])
+    if (controller.signal.aborted) return false
+    if (!twitchAccessToken && !supabaseAccessToken && !supabaseRefreshToken) return true
+    const res = await fetch(EDGE_FN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'logout',
+        twitch_access_token: twitchAccessToken || undefined,
+        supabase_access_token: supabaseAccessToken || undefined,
+        supabase_refresh_token: supabaseRefreshToken || undefined,
+      }),
+      signal: controller.signal,
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    return data?.ok === true && data?.twitch_revoked === true && data?.supabase_revoked === true
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timeout)
   }
 }

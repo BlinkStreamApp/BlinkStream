@@ -16,14 +16,6 @@ import storeRuntimeNotices from '../../src-tauri/msix/THIRD_PARTY.txt?raw'
 
 function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> }
 
-function PayPalIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106z"/>
-    </svg>
-  )
-}
-
 export default function AboutDialog({ onClose }) {
 
   validateProps(
@@ -182,17 +174,37 @@ export default function AboutDialog({ onClose }) {
           </p>
 
           <a
-            href="https://paypal.me/AlbertPlayX"
+            href="https://ko-fi.com/apxstudio"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0070ba]/10 text-[#0070ba] hover:bg-[#0070ba]/20 text-[13px] font-medium transition-all cursor-pointer"
+            onClick={event => { event.preventDefault(); safeOpenUrl(event.currentTarget.href) }}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#ff5e5b]/10 px-4 py-2 text-[13px] font-medium text-[#ff5e5b] transition-all hover:bg-[#ff5e5b]/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5e5b]"
           >
-            <PayPalIcon />
+            <span aria-hidden="true"><PhosphorIcon name="Heart" size={16} weight="fill" /></span>
             {t('aboutCoffee', 'Invitar a un café')}
           </a>
 
+          <div className="mt-4 flex w-full flex-wrap justify-center gap-2">
+            {[
+              { href: 'https://apxstudio.es/', icon: 'GlobeHemisphereWest', label: t('about.website', 'Web oficial') },
+              { href: 'mailto:contacto.apxstudio@gmail.com', icon: 'ChatCircleDots', label: t('about.support', 'Soporte') },
+            ].map(({ href, icon, label }) => (
+              <a
+                key={href}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={event => { event.preventDefault(); safeOpenUrl(href) }}
+                className="inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-xl border border-twitch/20 bg-twitch/5 px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-twitch/50 hover:bg-twitch/10 hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-twitch"
+              >
+                <span aria-hidden="true" className="shrink-0 text-twitch-light"><PhosphorIcon name={icon} size={16} /></span>
+                <span className="min-w-0 break-words">{label}</span>
+              </a>
+            ))}
+          </div>
+
           <div className="mt-6 w-full border-t border-bg-tertiary/50 pt-4 text-[12px] text-text-muted/60">
-            <p>&copy; 2026 BlinkStream Team</p>
+            <p>&copy; 2026 APX Studio</p>
           </div>
 
           <div className="mt-3 flex gap-3 text-[12px]">

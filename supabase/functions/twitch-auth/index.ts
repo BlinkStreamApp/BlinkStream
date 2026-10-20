@@ -1,4 +1,4 @@
-// BlinkStream Twitch OAuth Helper v5
+// BlinkStream Twitch OAuth Helper v6
 // F-1 fix: ademas del access_token de Twitch, emite un JWT de Supabase
 // firmado por el service role. Este JWT lo valida blinkstream-data con
 // supabase.auth.getUser() (P0-2 hardening). El username viaja en
@@ -9,10 +9,11 @@
 //   GET /twitch-auth?request_id=ID     -> redirige a Twitch OAuth
 //   GET /twitch-auth?code=...&state=.. -> callback de Twitch
 //   GET /twitch-auth?fetch=ID          -> polling (JSON, incluye supabase_jwt)
-//   GET /twitch-auth?refresh=RT        -> intercambia refresh_token Supabase por nuevo par
+//   POST /twitch-auth                  -> refresh o revocacion de sesiones
 //   GET /twitch-auth?debug=1           -> diagnostico
 
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { readAuthBody, type AuthPostBody } from "./_refresh.ts";
 import {
   buildCorsHeaders,
   checkGeneralRate,
@@ -23,9 +24,16 @@ import {
   logSuspicious,
   validateOriginReferer,
 } from "./_security.ts";
+import {
+  parseTwitchIdentity,
+  REQUESTED_TWITCH_SCOPES,
+  type TwitchIdentity,
+} from "./_twitch_identity.ts";
 
 const TWITCH_AUTH_URL = "https://id.twitch.tv/oauth2/authorize";
 const TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
+const TWITCH_VALIDATE_URL = "https://id.twitch.tv/oauth2/validate";
+const TWITCH_REVOKE_URL = "https://id.twitch.tv/oauth2/revoke";
 const TWITCH_CLIENT_ID = Deno.env.get("TWITCH_CLIENT_ID") || "";
 const TWITCH_CLIENT_SECRET = Deno.env.get("TWITCH_CLIENT_SECRET") || "";
 // F-1 fix: envs para emitir Supabase JWT firmado. Si faltan, la emision
@@ -46,17 +54,6 @@ function buildSecurityHeaders(): Record<string, string> {
   };
 }
 
-// Headers CORS para polling: usa * porque el Tauri WebView puede no enviar
-// Origin header, lo que haria que buildCorsHeaders() devuelva null y la
-// respuesta sea opaque (ilegible para fetch en el frontend).
-const pollingCors: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Max-Age": "86400",
-  "Vary": "Origin",
-};
-
 // Pool global (reutilizado entre requests)
 // Cliente Supabase con service_role. SOLO se usa server-side para emitir
 // sesiones firmadas a usuarios legitimos (los que pasaron OAuth de Twitch).
@@ -70,14 +67,14 @@ const supabaseAdmin = SUPABASE_URL && SERVICE_ROLE_KEY
 
 // ============= F-1 fix: Emision de Supabase JWT =============
 //
-// Genera un usuario "virtual" unico por twitch login y emite una sesion
+// Genera un usuario "virtual" unico por Twitch user_id y emite una sesion
 // firmada con signInWithPassword usando una password random por sesion.
 // Es seguro porque:
 //   1. Solo emitimos tokens a usuarios que YA autenticaron con Twitch
 //      (probado por el code+state del callback de Twitch).
 //   2. La password random nunca sale del server ni se reutiliza.
-//   3. El user resultante tiene app_metadata.username = twitch login,
-//      que es exactamente lo que blinkstream-data espera comparar.
+//   3. La identidad estable vive en app_metadata.twitch_user_id; el login
+//      mutable se conserva solo como dato de presentacion/compatibilidad.
 //
 // Si SUPABASE_URL o SERVICE_ROLE_KEY faltan, supabaseAdmin es null y la
 // emision se omite silenciosamente. El polling seguira funcionando con
@@ -91,58 +88,102 @@ interface SupabaseSession {
   supabase_user_id: string;
 }
 
-async function issueSupabaseSession(twitchLogin: string): Promise<SupabaseSession | null> {
+async function lookupAuthUserId(
+  rpc: "get_user_id_by_email" | "get_user_id_by_twitch_id",
+  params: Record<string, string>,
+): Promise<string | null> {
   if (!supabaseAdmin) return null;
-  const email = `twitch-${twitchLogin.toLowerCase()}@blinkstream.local`;
+  const { data, error } = await supabaseAdmin.rpc(rpc, params);
+  if (error) {
+    console.error(`issueSupabaseSession ${rpc} error:`, error.message);
+    return null;
+  }
+  return typeof data === "string" && data ? data : null;
+}
+
+function sessionClient() {
+  return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
+
+async function issueSupabaseSession(
+  twitchUserId: string,
+  twitchLogin: string,
+  continuityJwt: string | null,
+): Promise<SupabaseSession | null> {
+  if (!supabaseAdmin) return null;
+  const login = twitchLogin.toLowerCase();
+  const stableEmail = `twitch-${twitchUserId}@blinkstream.local`;
+  const legacyEmail = `twitch-${login}@blinkstream.local`;
   const randomPwd = crypto.randomUUID() + crypto.randomUUID();
+  const appMetadata = {
+    username: login,
+    provider: "twitch",
+    twitch_user_id: twitchUserId,
+  };
 
   try {
-    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: randomPwd,
-      email_confirm: true,
-      app_metadata: { username: twitchLogin.toLowerCase(), provider: "twitch" },
-      user_metadata: { username: twitchLogin.toLowerCase(), provider: "twitch" },
-    });
+    let userId = await lookupAuthUserId(
+      "get_user_id_by_twitch_id",
+      { target_twitch_user_id: twitchUserId },
+    );
+    let email = stableEmail;
 
-    if (createErr) {
-      // "User already registered" o similar: rotar password.
-      // Usamos RPC get_user_id_by_email (SQL directo, O(1) con indice)
-      // en vez de paginar listUsers (que era O(n) y degradaba con escala).
-      let existing: { id: string; email?: string } | null = null;
-      try {
-        const { data: userId, error: rpcErr } = await supabaseAdmin.rpc(
-          "get_user_id_by_email",
-          { target_email: email },
-        );
-        if (rpcErr) {
-          console.error("issueSupabaseSession rpc error:", rpcErr.message);
-        } else if (userId) {
-          existing = { id: userId as string, email };
-        }
-      } catch (e) {
-        console.error("issueSupabaseSession rpc error:", (e as Error).message);
-      }
-      if (existing) {
-        const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
-          existing.id,
-          {
-            password: randomPwd,
-            app_metadata: { username: twitchLogin.toLowerCase(), provider: "twitch" },
-            user_metadata: { username: twitchLogin.toLowerCase(), provider: "twitch" },
-          },
-        );
-        if (updateErr) {
-          console.error("issueSupabaseSession update error:", updateErr.message);
-          return null;
-        }
-      } else {
-        console.error("issueSupabaseSession create error:", createErr.message);
+    if (userId) {
+      const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (error || !data?.user?.email) {
+        console.error("issueSupabaseSession get user error:", error?.message);
         return null;
+      }
+      email = data.user.email;
+    } else {
+      userId = await lookupAuthUserId(
+        "get_user_id_by_email",
+        { target_email: stableEmail },
+      );
+      if (!userId && continuityJwt) {
+        // A recycled login is not proof of ownership of the old account.
+        // Linking requires both current Twitch OAuth and its previous
+        // authenticated Supabase session.
+        const { data: previous, error } = await supabaseAdmin.auth.getUser(continuityJwt);
+        const previousId = previous?.user?.app_metadata?.twitch_user_id;
+        if (!error && previous?.user?.email === legacyEmail &&
+            (!previousId || previousId === twitchUserId)) {
+          userId = previous.user.id;
+          email = legacyEmail;
+        }
       }
     }
 
-    const { data, error: signInErr } = await supabaseAdmin.auth.signInWithPassword({
+    if (userId) {
+      const { data: existing, error: existingError } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const boundId = existing?.user?.app_metadata?.twitch_user_id;
+      if (existingError || !existing?.user || (boundId && boundId !== twitchUserId)) return null;
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: randomPwd,
+        app_metadata: appMetadata,
+      });
+      if (updateErr) {
+        console.error("issueSupabaseSession update error:", updateErr.message);
+        return null;
+      }
+    } else {
+      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email: stableEmail,
+        password: randomPwd,
+        email_confirm: true,
+        app_metadata: appMetadata,
+      });
+      if (createErr || !created?.user) {
+        console.error("issueSupabaseSession create error:", createErr?.message);
+        return null;
+      }
+      userId = created.user.id;
+      email = stableEmail;
+    }
+
+    const { data, error: signInErr } = await sessionClient().auth.signInWithPassword({
       email,
       password: randomPwd,
     });
@@ -167,7 +208,7 @@ async function issueSupabaseSession(twitchLogin: string): Promise<SupabaseSessio
 async function refreshSupabaseSession(refreshToken: string): Promise<SupabaseSession | null> {
   if (!supabaseAdmin || !refreshToken) return null;
   try {
-    const { data, error } = await supabaseAdmin.auth.refreshSession({
+    const { data, error } = await sessionClient().auth.refreshSession({
       refresh_token: refreshToken,
     });
     if (error || !data?.session || !data?.user) {
@@ -184,6 +225,56 @@ async function refreshSupabaseSession(refreshToken: string): Promise<SupabaseSes
     console.error("refreshSupabaseSession unhandled:", (err as Error).message || err);
     return null;
   }
+}
+
+async function validateTwitchAccessToken(accessToken: string): Promise<TwitchIdentity | null> {
+  try {
+    const response = await fetch(TWITCH_VALIDATE_URL, {
+      headers: { Authorization: `OAuth ${accessToken}` },
+    });
+    if (!response.ok) return null;
+    return parseTwitchIdentity(await response.json(), TWITCH_CLIENT_ID);
+  } catch {
+    return null;
+  }
+}
+
+async function revokeSessions(body: Extract<AuthPostBody, { action: "logout" }>) {
+  let twitchRevoked = !body.twitchAccessToken;
+  let supabaseRevoked = !body.supabaseAccessToken && !body.supabaseRefreshToken;
+
+  if (body.twitchAccessToken) {
+    try {
+      const response = await fetch(TWITCH_REVOKE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: TWITCH_CLIENT_ID,
+          token: body.twitchAccessToken,
+        }),
+      });
+      twitchRevoked = response.ok;
+    } catch {
+      twitchRevoked = false;
+    }
+  }
+
+  if (supabaseAdmin && (body.supabaseAccessToken || body.supabaseRefreshToken)) {
+    try {
+      let jwt = body.supabaseAccessToken;
+      if (!jwt && body.supabaseRefreshToken) {
+        jwt = (await refreshSupabaseSession(body.supabaseRefreshToken))?.supabase_jwt ?? null;
+      }
+      if (jwt) {
+        const { error } = await supabaseAdmin.auth.admin.signOut(jwt, "global");
+        supabaseRevoked = !error;
+      }
+    } catch {
+      supabaseRevoked = false;
+    }
+  }
+
+  return { twitchRevoked, supabaseRevoked };
 }
 
 // ============= Router principal (P0-3 hardened) =============
@@ -210,14 +301,12 @@ Deno.serve(async (req: Request) => {
   const fetchId = url.searchParams.get("fetch");
   const isPolling = !!fetchId;
   const requestIdParam = url.searchParams.get("request_id");
-  // Preserve the existing GET route temporarily for released desktop clients.
-  // New clients send credentials in a POST body, never in the URL.
-  let refreshTokenParam = url.searchParams.get("refresh");
+  const hasLegacyRefresh = url.searchParams.has("refresh");
+  let postBody: AuthPostBody | null = null;
   if (req.method === "POST") {
-    const { readRefreshBody } = await import("./_refresh.ts");
-    refreshTokenParam = await readRefreshBody(req);
-    if (!refreshTokenParam) {
-      return json({ ok: false, error: "invalid_refresh_body" }, 400, securityHeaders, corsHeaders);
+    postBody = await readAuthBody(req);
+    if (!postBody) {
+      return json({ ok: false, error: "invalid_request_body" }, 400, securityHeaders, corsHeaders);
     }
   }
 
@@ -313,20 +402,27 @@ Deno.serve(async (req: Request) => {
 
   // === Issue #3 + Polling: ?fetch=ID ===
   if (isPolling) {
-    return await handleFetch(fetchId!, securityHeaders, pollingCors);
+    const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
+    return await handleFetch(fetchId!, securityHeaders, corsHeaders, bearer);
+  }
+
+  // Credentials are accepted only in bounded POST JSON, never in URLs.
+  if (hasLegacyRefresh) {
+    return json({ ok: false, error: "refresh_get_removed" }, 410, securityHeaders, corsHeaders);
+  }
+
+  if (postBody?.action === "logout") {
+    const revoked = await revokeSessions(postBody);
+    return json({
+      ok: revoked.twitchRevoked && revoked.supabaseRevoked,
+      twitch_revoked: revoked.twitchRevoked,
+      supabase_revoked: revoked.supabaseRevoked,
+    }, 200, securityHeaders, corsHeaders);
   }
 
   // === F-1 fix: Refresh de Supabase JWT ===
-  if (refreshTokenParam) {
-    if (refreshTokenParam.length < 20 || refreshTokenParam.length > 500) {
-      return json(
-        { ok: false, error: "invalid_refresh_token_format" },
-        400,
-        securityHeaders,
-        corsHeaders,
-      );
-    }
-    const fresh = await refreshSupabaseSession(refreshTokenParam);
+  if (postBody?.action === "refresh") {
+    const fresh = await refreshSupabaseSession(postBody.refreshToken);
     if (fresh) {
       return json({
         ok: true,
@@ -381,6 +477,7 @@ async function handleFetch(
   fetchId: string,
   securityHeaders: Record<string, string>,
   corsHeaders: Record<string, string>,
+  continuityJwt: string | null,
 ) {
   if (!isValidUuidV4(fetchId)) {
     return json(
@@ -399,14 +496,26 @@ async function handleFetch(
     );
   }
   try {
-    // Atomic delete-and-return (single-use pattern)
+    // Atomic delete-and-return (single-use pattern). Expired bearer tokens
+    // are never returned, even if cleanup has not run yet.
     const { data, error } = await supabaseAdmin
       .from("auth_tokens")
       .delete()
-      .match({ request_id: fetchId })
+      .eq("request_id", fetchId)
+      .gt("expires_at", new Date().toISOString())
       .select();
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.error("[twitch-auth] handoff consume error:", error.message);
+      return json({ found: false, error: "handoff_unavailable" }, 503, securityHeaders, corsHeaders);
+    }
+
+    if (!data || data.length === 0) {
+      await supabaseAdmin
+        .from("auth_tokens")
+        .delete()
+        .eq("request_id", fetchId)
+        .lte("expires_at", new Date().toISOString());
       return json(
         { found: false },
         404,
@@ -419,7 +528,12 @@ async function handleFetch(
       access_token: string;
       refresh_token: string | null;
       username: string;
+      twitch_user_id: string | null;
     };
+
+    if (!row.twitch_user_id) {
+      return json({ found: false }, 404, securityHeaders, corsHeaders);
+    }
 
     // F-1: emitir Supabase JWT firmado
     const response: Record<string, unknown> = {
@@ -427,7 +541,7 @@ async function handleFetch(
       access_token: row.access_token,
       username: row.username,
     };
-    const session = await issueSupabaseSession(row.username);
+    const session = await issueSupabaseSession(row.twitch_user_id, row.username, continuityJwt);
     if (session) {
       response.supabase_jwt = session.supabase_jwt;
       response.supabase_refresh_token = session.supabase_refresh_token;
@@ -495,26 +609,26 @@ async function handleCallback(
       ? String(tokenData.refresh_token)
       : null;
 
-    // Obtener username via Twitch Helix
-    let username = "desconocido";
-    try {
-      const userRes = await fetch("https://api.twitch.tv/helix/users", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Client-ID": TWITCH_CLIENT_ID,
-        },
-      });
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        username = userData?.data?.[0]?.login || username;
-      }
-    } catch { /* ok, mantener default */ }
+    // The token itself is the authority for identity. Fail closed if Twitch
+    // cannot validate it, it belongs to another app, or baseline scopes are
+    // missing. Never create a fallback/shared "unknown" identity.
+    const identity = await validateTwitchAccessToken(accessToken);
+    if (!identity) {
+      return redirectError("Twitch no pudo validar la identidad", securityHeaders, corsHeaders);
+    }
+    const username = identity.login;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 5 * 60_000);
 
     // Guardar en DB con ON CONFLICT para idempotencia
     if (!supabaseAdmin) {
       return redirectError("Base de datos no disponible", securityHeaders, corsHeaders);
     }
     try {
+      await supabaseAdmin
+        .from("auth_tokens")
+        .delete()
+        .lte("expires_at", now.toISOString());
       const { error: dbErr } = await supabaseAdmin
         .from('auth_tokens')
         .upsert({
@@ -522,8 +636,10 @@ async function handleCallback(
           access_token: accessToken,
           refresh_token: refreshToken,
           username: username,
+          twitch_user_id: identity.userId,
           consumed_at: null,
-          created_at: new Date().toISOString(),
+          created_at: now.toISOString(),
+          expires_at: expiresAt.toISOString(),
         }, { onConflict: 'request_id', ignoreDuplicates: false })
       if (dbErr) {
         console.error("[twitch-auth] DB upsert error:", dbErr.message);
@@ -567,14 +683,12 @@ function handleAuthRedirect(
   authUrl.searchParams.set("client_id", TWITCH_CLIENT_ID);
   authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
   authUrl.searchParams.set("response_type", "code");
-  // F-2 fix: scopes actualizados (chat + moderacion + channel points).
-  // === TWITCH OAUTH SCOPES (11 total) ===
+  // Scopes usados por chat, follows, moderacion y channel points. Los grants
+  // obsoletos/no usados se excluyen para reducir privilegios de la sesion.
   // Chat (IRC):
   //   chat:read                       - leer mensajes via IRC (USERSTATE, PRIVMSG, etc.)
   //   chat:edit                       - enviar mensajes via IRC
-  // Follows:
-  //   user:edit:follows               - follow/unfollow programatico
-  //   user:read:follows               - listar follows del usuario
+  // Follows: user:read:follows - listar follows del usuario
   // Moderation (requiere ser mod en el canal objetivo):
   //   moderator:manage:chat_messages  - /delete, /clear, pin/unpin
   //   moderator:manage:banned_users   - /ban, /unban, /timeout, /untimeout
@@ -583,15 +697,7 @@ function handleAuthRedirect(
   // Channel Points (requiere ser broadcaster del canal):
   //   channel:read:redemptions        - listar rewards y redenciones
   //   channel:manage:redemptions      - crear/editar rewards, fulfill/cancel redenciones
-  //   channel:read:subscriptions      - subs (gating de features por sub)
-  //
-  // RE-AUTH REQUERIDA: usuarios existentes deben re-autorizar para obtener
-  // los nuevos scopes. Twitch omite silenciosamente scopes que el usuario
-  // no puede tener (no es mod / no es broadcaster); NO genera error.
-  authUrl.searchParams.set(
-    "scope",
-    "chat:read chat:edit user:edit:follows user:read:follows moderator:manage:chat_messages moderator:manage:banned_users moderator:manage:chat_settings moderation:read channel:read:redemptions channel:manage:redemptions channel:read:subscriptions channel:read:predictions channel:manage:predictions channel:read:polls channel:manage:polls moderator:read:automod_settings moderator:manage:automod moderator:read:unban_requests moderator:manage:unban_requests",
-  );
+  authUrl.searchParams.set("scope", REQUESTED_TWITCH_SCOPES.join(" "));
   authUrl.searchParams.set("state", requestId);
   authUrl.searchParams.set("force_verify", "true");
 

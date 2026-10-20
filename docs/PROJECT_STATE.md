@@ -1,14 +1,14 @@
 # PROJECT_STATE
 
-Updated: 2026-10-17
+Updated: 2026-10-20
 Status: active
 
 ## Objective
 
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
-Store 1.5.1 publicada según confirma el usuario el 2026-10-16.
+Store 1.5.2 indicada por el usuario el 2026-10-17 al actualizar la web.
 GitHub 1.5.2 publicada y verificada; latest/descargas/updater 1.5.2.
-Búsqueda del chat nativo y traducciones aceptadas y entregadas; MSIX 1.5.2.0 listo para que el usuario gestione Store.
+Búsqueda del chat nativo y traducciones aceptadas y entregadas; Store y GitHub alineados en 1.5.2 según el usuario.
 
 ## Stack
 
@@ -16,7 +16,7 @@ Búsqueda del chat nativo y traducciones aceptadas y entregadas; MSIX 1.5.2.0 li
 - Native: Tauri 2, Rust 1.88.0 fijado; Streamlink/FFmpeg externos en GitHub, runtime portable incluido en MSIX
 - Cloud: Supabase/Postgres, OAuth y Edge Functions Deno
 - Packaging: NSIS/MSI, DMG/app archive, AppImage/deb
-- Microsoft Store: 1.5.1 publicada (confirmación usuario); MSIX x64 1.5.1.0; ADR-015
+- Microsoft Store: 1.5.2 indicada por el usuario; MSIX x64 1.5.2.0; ADR-015
 - Testing: Vitest, Node, Cargo y Deno; package manager: pnpm 10
 
 ## Architecture
@@ -42,12 +42,12 @@ de updater con la clave configurada y solo publica desde un tag validado.
 
 ## Current Decisions
 
-- Web oficial única — `https://apxstudio.es/`, dominio confirmado el 2026-10-17; privacidad en `/privacy.html`. Pages del repositorio BlinkStream desactivado (API 404), sin eliminar fuentes históricas ni tocar Releases/updater. EXCEPCIÓN: conservar Pages del repositorio `auth`, confirmación OAuth en `https://blinkstreamapp.github.io/auth/` (HTTP 200, Pages built). No cambiar redirects ni desplegar OAuth. Mantener solo `../BlinkStreamWeb` como web comercial activa, con despliegue SSH a cargo del usuario y `deploy.ps1` intacto.
+- Web oficial única — `https://apxstudio.es/`, dominio confirmado el 2026-10-17; privacidad en `/privacy.html`. Pages de BlinkStream desactivado; conservar Pages del repositorio `auth`, confirmación OAuth en `https://blinkstreamapp.github.io/auth/` (HTTP 200). No cambiar redirects ni desplegar OAuth. Carpeta actual `../APXStudioWeb` (antes BlinkStreamWeb); `deploy.ps1` intacto. El usuario permite ejecutar el script y desplegar por SSH cuando lo solicite, no automáticamente.
 - DEC-015 — Microsoft Store MSIX separado de NSIS/updater GitHub; updater nativo/IPC/UI desactivado y sin winget automático. Identidad oficial en `src-tauri/msix/identity.json`; ver ADR-015.
 
-- Web Pi5 — El usuario gestiona el despliegue SSH desde `../BlinkStreamWeb/deploy.ps1`, conservado sin cambios. Automatización Actions/webhook descartada y borradores eliminados por autorización; no retomarla ni acceder a la Pi durante la revisión local.
+- Web Pi5 — Despliegue por petición explícita usando `../APXStudioWeb/deploy.ps1`, sin modificarlo. Automatización Actions/webhook descartada; no retomarla. No cambiar permisos, claves ni configuración del servidor sin autorización aparte.
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
-- DEC-002 — GitHub latest/fuente 1.5.2; CI firmado, 15 archivos públicos comparados con CI y cuatro firmas del updater verificadas. Históricas conservadas; Store 1.5.1 se actualiza por su propio canal.
+- DEC-002 — GitHub latest/fuente 1.5.2; CI firmado, 15 archivos públicos comparados con CI y cuatro firmas del updater verificadas. Históricas conservadas; Store 1.5.2 se actualiza por su propio canal.
 - Plan 2026-10-13 — Hitos consecutivos: 1.5 organización/chat, 1.6 continuidad/medios, 1.7 moderación, 1.8 integraciones, 1.9 consolidación, 2.0 rediseño completo. Entregas mínimas y ampliaciones PATCH; IA/plugins/Kick/YouTube condicionados y no bloqueantes de 2.0. Detalle en ROADMAP, sin nuevas fechas ni cambio de versión publicada.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
@@ -65,18 +65,22 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
-- GitHub 1.5.2 publicada, commit `3a5908e1d965cc99b4e5e8fc4fb37c1d1e6b2fa5`: búsqueda de chat nativo individual/unificado y traducciones aceptadas. CI candidato `39059837052` y publicación `39060821359` correctos; 15 archivos públicos coinciden con CI y hashes, cuatro firmas verificadas. Latest/master/public updater 1.5.2 coherentes. Store permanece en 1.5.1.
+- 1.5.3 candidata de seguridad autorizada por el usuario: base live con auth_tokens privada, RLS forzada, TTL/UUID/identidad obligatorios y 22 handoffs caducados purgados. twitch-auth v38 desplegada; refresh POST, identidad Twitch validada, migración legacy con prueba de sesión anterior y cliente de sesión aislado del service_role. Desktop: validación horaria/logout remoto implementados; publicación pendiente de suite completa y CI firmado. Cambios Acerca de pendientes incluidos en candidata.
+- Advisor live: sin avisos de rendimiento; INFO RLS sin políticas intencional en tabla privada. Protección de contraseñas filtradas sigue desactivada y requiere ajuste manual o API de gestión autorizada disponible. Login Twitch real completo pendiente de aceptación.
+- Validación candidata 1.5.3: 748 frontend/1 omitido, 33 release, 11 pruebas OAuth sobre código real y 60 Rust Windows correctos; lint y build frontend correctos. El navegador para el toggle de contraseñas quedó bloqueado por auto-review ante redirección ajena a Supabase; pendiente del usuario. No se certifica login/logout real con cuenta Twitch ni GUI instalada.
+- Próxima actualización: Acerca de muestra `© 2026 APX Studio` y enlaces externos a la web oficial y soporte por correo, con etiquetas en ocho idiomas y compartidos por GitHub/Store. Pendiente de incluir en el siguiente PATCH; sin publicar ni cambiar la versión solo por estos ajustes.
+- GitHub 1.5.2 publicada, commit `3a5908e1d965cc99b4e5e8fc4fb37c1d1e6b2fa5`: búsqueda de chat nativo individual/unificado y traducciones aceptadas. CI candidato `39059837052` y publicación `39060821359` correctos; 15 archivos públicos coinciden con CI y hashes, cuatro firmas verificadas. Latest/master/public updater 1.5.2 coherentes. Store 1.5.2 indicada posteriormente por el usuario.
 - CI previo de master/tag bloqueó los nuevos RUSTSEC-2026-0367/0368/0369. Fix: retirar feature ZIP opcional no utilizada del updater, conservando TLS, firmas y formatos EXE/AppImage/TAR.GZ. Auditoría actual: 562 paquetes, cero vulnerabilidades conocidas, nueve avisos de mantenimiento. No se ignoran avisos ni cambia la clave.
 - Tras autorización explícita y CI verde se promovió master por fast-forward y se recreó únicamente v1.5.2 no publicado: anterior objeto `414f439` sobre `397b59c`, nuevo `bb195cf` sobre `3a5908e`. No se movieron otros tags ni releases publicadas.
 - Validación local actual: 742 frontend/1 omitido, 33 release, Rust GitHub 60/Store 61, lint/fmt/Clippy correctos. Navegador: 66 casos de chat y 16 de enlaces Store; datos simulados, no prueba Twitch real ni desktop multiplataforma.
 - MSIX vigente `src-tauri/target/msix/BlinkStream_1.5.2.0_x64.msix`: 94.725.975 bytes, SHA256 `7832cda78728528ba1ff7ee13ab503e5a60f79e8657ba7aa286be95267a47da5`. Pack/unpack/PRI/iconos/runtime verificados; unsigned, sin instalación en host, envío Store ni WACK del nuevo paquete. Sustituye hashes de candidatos anteriores. Evergreen externo por elección del usuario.
 - Fuentes runtime publicadas una sola vez en v1.5.0: companion 2.116.378.839 bytes/SHA256 `f3bd70b2068668b6cfaa035ad405e1fb4d9b78a3327e90b586884d141befe0db`; suplemento Python LGPL/MPL 12.561.727 bytes/SHA256 `2601249875bdfb29b66f36fa06f4772c52f29f5f1d19ca1a453a4cdd3d6c2856`. Descargas públicas completas verificadas. Ver `reviews/MSIX_SOURCE_CORRESPONDENCE.md` y `guides/MSIX_PYTHON_SOURCES.md`; no certificación legal ni rebuild reproducible demostrado.
-- Web APX 1.5.2 validada (56 casos) y copiada a `../BlinkStreamWeb` tras comprobar la release pública y hashes originales/finales. ES/EN distinguen GitHub 1.5.2 de Store 1.5.1. `deploy.ps1` intacto; despliegue SSH pendiente del usuario. Confirmación Pages/auth comprobada HTTP 200/built, Pages comercial continúa desactivado.
+- Web APX desplegada el 2026-10-17 con el script original desde `APXStudioWeb`, por petición del usuario. GitHub/Store 1.5.2 ES/EN y caché 20261017.2 públicos; once hashes SSH iguales a locales, contenido HTTPS comprobado (solo transformación de correos de Cloudflare), portada y auth HTTP 200. Script intacto; sin cambios de permisos/claves ni Git remoto. Copia previa temporal en la Pi `/tmp/apxstudio-web-backup-qXyuV3jd`.
 - Limpieza Actions pausada: el usuario rechazó borrar los 355 artefactos seleccionados. No ejecutar `scratch/actions-artifact-cleanup.json` sin renovar inventario/autorización. Sin instalaciones en host, despliegues cloud ni acceso a Partner Center.
 NEXT:
 - Prueba GUI voluntaria desde 1.4.1 y de conservación de settings/sesión, sin instalar automáticamente en el PC del usuario. Linux updater integrado requiere AppImage; `.deb` se actualiza manualmente/mediante paquetes.
 - Validar canje EventSub real, Auto-Claim independiente y pausa/aislamiento del reporte nativo.
-- Usuario: desplegar web por su SSH y gestionar MSIX 1.5.2.0 en Store. App 1.5.x: ocultación de canales y refinamientos de colecciones; colecciones/categorías/búsqueda ya publicadas. Luego 1.6 VOD/bookmarks, workspaces y audio principal antes de ahorro/replay/biblioteca.
+- App 1.5.x: ocultación de canales y refinamientos de colecciones; colecciones/categorías/búsqueda ya publicadas. Luego 1.6 VOD/bookmarks, workspaces y audio principal antes de ahorro/replay/biblioteca. Próximos despliegues web solo por solicitud del usuario.
 - Supabase: desplegar funciones/migración solo con autorización aparte.
 
 LATER:
@@ -86,7 +90,7 @@ LATER:
 
 ## Known Risks
 
-- Seguridad: endurecimiento original incluido desde 1.5.0; corrección ZIP publicada en 1.5.2. Companion HTTP carece de confidencialidad y puede sufrir DoS local; refresh GET temporal por compatibilidad. Nueve avisos de mantenimiento Rust transitivos en la consulta actual; las pruebas locales no certifican todos los flujos reales DNS/CDN, recorte y auth. Auditoría en `docs/reviews/SECURITY_AUDIT_2026-10-14.md`.
+- Seguridad: endurecimiento original incluido desde 1.5.0; corrección ZIP publicada en 1.5.2. Companion HTTP carece de confidencialidad y puede sufrir DoS local; refresh GET retirado el 2026-10-20 (clientes anteriores a POST deben actualizar). Las pruebas locales no certifican todos los flujos reales DNS/CDN, recorte y auth. Auditoría en `docs/reviews/SECURITY_AUDIT_2026-10-14.md`.
 - La lista legacy mezclaba follows/pins sin procedencia. Se archiva recuperablemente (`blinkstream_favorites_legacy`), solo se migra a su propietario conocido y se excluyen follows observados del import cloud. Un follow antiguo ya eliminado antes de esta migración no puede distinguirse automáticamente de un pin; no se borran filas cloud ni preferencias/cookies.
 - Firmas históricas 1.4.1 usan otro ID; clientes con una clave antigua no recuperable necesitan transición manual verificada. El smoke actual no prueba una migración histórica ni persistencia autenticada.
 - Upgrades durante grabación activa y GUI instalada end-to-end siguen sin validar.

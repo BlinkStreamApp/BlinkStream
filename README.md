@@ -9,10 +9,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/source_version-1.5.2-e94560" alt="Published GitHub version 1.5.2">
+  <img src="https://img.shields.io/badge/source_version-1.5.3-e94560" alt="BlinkStream 1.5.3 release candidate source">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
   <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
+</p>
+
+<p align="center">
+  <a href="https://ko-fi.com/apxstudio"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support BlinkStream on Ko-fi"></a>
 </p>
 
 ---
@@ -48,7 +52,7 @@ keeps its own interface. All new search controls support the eight interface lan
 | 🎨 **Theme Studio** | Deep theme customization (AMOLED Black, Cyberpunk Gold, Emerald) with selectable Google Fonts |
 | 📊 **Pro Telemetry (Nerd Stats)** | Real-time live HUD measuring exact live broadcast delay, RAM buffer ahead, bitrate, resolution, FPS, and dropped frames |
 | 📱 **Mobile Wi-Fi Remote** | Control playback, channel switching, and volume wirelessly from any smartphone or tablet |
-| 🔒 **Hardened Security** | Strict Content Security Policy (CSP), rustls TLS, and secure OS keychain storage |
+| 🔒 **Hardened Security** | Strict CSP, rustls TLS, secure OS keychain storage, hourly Twitch token validation and revocation on logout |
 | 🔄 **Over-The-Air Updates** | Background/manual checks, user-confirmed installation and signature verification via GitHub Releases; legacy clients with a different trusted key need a manual transition |
 
 ---
@@ -62,11 +66,11 @@ Store installations receive updates through Microsoft Store; GitHub installation
 use the separate signed updater below.
 
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-**GitHub 1.5.2 is published and verified; Microsoft Store remains on 1.5.1** (Store confirmed by the maintainer). GitHub builds have verified updater signatures for Windows, macOS Intel/Apple Silicon and Linux. The Store icon hotfix includes transparent light/dark assets and DPI-aware resource indexing; the maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
+**Source 1.5.3 is a release candidate; GitHub and Microsoft Store remain on verified 1.5.2** (Store version confirmed by the maintainer). Published GitHub builds have verified updater signatures for Windows, macOS Intel/Apple Silicon and Linux. The maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
 
 The Store edition includes Streamlink/Python/FFmpeg with their original notices;
-WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.1
-is published in Store, including the Windows icon update. Corresponding
+WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.2
+is published in Store. Corresponding
 runtime sources are public: [Streamlink/Python/FFmpeg companion](https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.0/BlinkStream-1.5.0-runtime-sources.zip)
 and [Python copyleft supplement](https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.0/BlinkStream-1.5.0-python-copyleft-sources.zip).
 Pinned hashes and distribution details are documented in [the source guide](docs/guides/MSIX_RUNTIME_SOURCES.md)

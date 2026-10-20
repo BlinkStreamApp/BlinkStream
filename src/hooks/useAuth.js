@@ -1,7 +1,7 @@
 
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { SUPABASE_URL, pollAuthToken, clearBlinkstreamToken } from '../utils/supabase'
+import { SUPABASE_URL, pollAuthToken, clearBlinkstreamToken, revokeBlinkstreamSessions } from '../utils/supabase'
 import { getHelixClientId } from '../utils/twitch'
 import { measureInvoke } from '../utils/perf'
 import { logEvent } from '../utils/eventLog'
@@ -13,6 +13,19 @@ const LS_TOKEN = 'blinkstream_twitch_token'
 const LS_USERNAME = 'blinkstream_twitch_username'
 const LS_AVATAR = 'blinkstream_twitch_avatar'
 const LS_CLIENT_ID = 'blinkstream_oauth_client_id'
+const TWITCH_VALIDATION_INTERVAL_MS = 60 * 60 * 1000
+
+async function isTwitchTokenInvalid(token) {
+  try {
+    const cleanToken = token.replace(/^oauth:/i, '')
+    const response = await fetch('https://id.twitch.tv/oauth2/validate', {
+      headers: { 'Authorization': `OAuth ${cleanToken}` },
+    })
+    return response.status === 401
+  } catch {
+    return false
+  }
+}
 
 async function fetchUserInfo(token) {
   try {
@@ -110,6 +123,31 @@ export function useAuth() {
     return next
   }, [])
 
+  const resetLocalSession = useCallback(async () => {
+    sessionVersion.current = null
+    abortRef.current?.abort()
+    archiveLegacyFavorites()
+    localStorage.removeItem(LS_TOKEN)
+    localStorage.removeItem(LS_USERNAME)
+    localStorage.removeItem(LS_CLIENT_ID)
+    localStorage.removeItem(LS_AVATAR)
+    localStorage.removeItem('bs.twitch.viewer_userid')
+    localStorage.removeItem('blinkstream_recent')
+    sessionStorage.removeItem('blinkstream_live_status_v1')
+    sessionStorage.removeItem('blinkstream_logos_v1')
+
+    clearBlinkstreamToken()
+    setCachedToken(null)
+    setUser(null)
+    setError(null)
+    setAuthing(false)
+    setAvatar(null)
+    setLoading(false)
+    try {
+      await writeSecret('delete_secret', { key: 'twitch_token' })
+    } catch {  }
+  }, [writeSecret])
+
   useEffect(() => {
     const version = {}
     sessionVersion.current = version
@@ -152,6 +190,8 @@ export function useAuth() {
           if (userInfo?.invalid) {
 
             logEvent('auth', 'session.invalid', {})
+            await resetLocalSession()
+            return
           } else if (userInfo?.username && userInfo.username !== 'twitch_user') {
             persistUserInfo(userInfo)
             if (userInfo.avatar) setAvatar(userInfo.avatar)
@@ -193,7 +233,7 @@ export function useAuth() {
       sessionVersion.current = null
       abortRef.current?.abort()
     }
-  }, [writeSecret])
+  }, [resetLocalSession, writeSecret])
 
   const login = useCallback(async () => {
     const version = {}
@@ -300,31 +340,30 @@ export function useAuth() {
   }, [writeSecret])
 
   const logout = useCallback(async () => {
-    sessionVersion.current = null
-    abortRef.current?.abort()
-    archiveLegacyFavorites()
-    localStorage.removeItem(LS_TOKEN)
-    localStorage.removeItem(LS_USERNAME)
-    localStorage.removeItem(LS_CLIENT_ID)
+    const tokenToRevoke = cachedToken
     logEvent('auth', 'logout', null)
+    const remoteRevocation = revokeBlinkstreamSessions(tokenToRevoke).catch(() => false)
+    await resetLocalSession()
+    if (!await remoteRevocation) logEvent('auth', 'logout.remote.failed', {})
+  }, [cachedToken, resetLocalSession])
 
-    localStorage.removeItem(LS_AVATAR)
-    localStorage.removeItem('bs.twitch.viewer_userid')
-    localStorage.removeItem('blinkstream_recent')
-    sessionStorage.removeItem('blinkstream_live_status_v1')
-    sessionStorage.removeItem('blinkstream_logos_v1')
-
-    clearBlinkstreamToken()
-    setCachedToken(null)
-    setUser(null)
-    setError(null)
-    setAuthing(false)
-    setAvatar(null)
-    setLoading(false)
-    try {
-      await writeSecret('delete_secret', { key: 'twitch_token' })
-    } catch {  }
-  }, [writeSecret])
+  useEffect(() => {
+    if (!cachedToken) return undefined
+    let active = true
+    const validate = async () => {
+      if (await isTwitchTokenInvalid(cachedToken)) {
+        if (active) {
+          logEvent('auth', 'session.invalid', { source: 'hourly_validation' })
+          await logout()
+        }
+      }
+    }
+    const timer = setInterval(validate, TWITCH_VALIDATION_INTERVAL_MS)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [cachedToken, logout])
 
   const getTwitchToken = useCallback(() => {
     return cachedToken

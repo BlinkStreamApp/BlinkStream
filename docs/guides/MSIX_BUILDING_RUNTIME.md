@@ -1,6 +1,6 @@
 # Bundled runtime: source and build map
 
-Applies to BlinkStream 1.5.0/1.5.1/1.5.2 MSIX, portable runtime 8.6.2-1. The tools are unmodified
+Applies to BlinkStream 1.5.0/1.5.1/1.5.2/1.5.3 MSIX, portable runtime 8.6.2-1. The tools are unmodified
 upstream executables launched as separate processes. Source archives are shipped
 in the separate `BlinkStream-1.5.0-runtime-sources.zip`; SHA256 values and upstream
 locations are in `source-inventory.json`. This is not a claim of bit-for-bit

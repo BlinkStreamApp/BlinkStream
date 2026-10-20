@@ -7,11 +7,16 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-17 / v1.5.2 published on GitHub
+## Execution status — 2026-10-20 / v1.5.3 release candidate
+
+1.5.3 hardens OAuth handoff access, expiry, immutable identity and session lifecycle.
+The database fix and twitch-auth v38 are deployed; desktop validation and signed
+cross-platform CI gate publication. Downloads/updater remain 1.5.2. Microsoft
+Store 1.5.2 was confirmed by the maintainer; its next submission is separate.
 
 GitHub 1.5.2 is published with native session chat search, eight-language controls
 and the unused ZIP extractor removed for security. Downloads/updater are verified
-at 1.5.2; Microsoft Store remains at 1.5.1 until the maintainer submits its separate MSIX.
+at 1.5.2; Microsoft Store 1.5.2 was subsequently confirmed by the maintainer.
 
 The historical phases below describe product direction, not proof of a published release.
 Microsoft Store 1.5.1 is published, confirmed by the maintainer: customizable collections, account-scoped category preferences, translations, security hardening and the Windows icon fix. GitHub [1.5.0](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.0) and [1.5.1](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.1) are published with separate ES/EN notes, signed four-target builds and independently verified public artifacts. Latest GitHub/downloads/updater: [1.5.2](https://github.com/BlinkStreamApp/BlinkStream/releases/tag/v1.5.2). The Store taskbar fix includes transparent light/dark target-size variants, DPI assets and a compiled resource index. The maintainer handles Partner Center.

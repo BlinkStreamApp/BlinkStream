@@ -56,7 +56,7 @@ replacing or duplicating the original 2 GB runtime source companion.
 
 Technical source correspondence reviewed on 2026-10-17:
 [72 enabled options, original build scripts/cache and inventory checks](../reviews/MSIX_SOURCE_CORRESPONDENCE.md).
-The single runtime source companion is retained for 1.5.0/1.5.1/1.5.2; app/runtime
+The single runtime source companion is retained for 1.5.0/1.5.1/1.5.2/1.5.3; app/runtime
 notices now identify its exact v1.5.0 download URL and SHA256. Public availability
 and the complete public bytes were verified on 2026-10-17 (HTTP 200 and SHA256 match).
 No exact offline rebuild or legal
