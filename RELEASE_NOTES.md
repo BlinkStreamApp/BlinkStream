@@ -11,6 +11,7 @@ Version-specific release body: [1.5.3 ES/EN](docs/releases/1.5.3.md).
 - Refresh exclusivamente por POST y permisos OAuth innecesarios retirados.
 - Dependencias TLS actualizadas contra RUSTSEC-2026-0381/0382/0383, detectados por el gate de publicación.
 - Vite 8.2.4 corrige los tres avisos Dependabot del servidor de desarrollo; auditoría completa sin vulnerabilidades conocidas.
+- Vitest 4.1.12 corrige los dos avisos nuevos detectados el 2026-10-22; CI incluye la auditoría de dependencias de desarrollo.
 - Acerca de muestra APX Studio, web y soporte con traducciones en ocho idiomas.
 
 ## EN
@@ -21,6 +22,7 @@ Version-specific release body: [1.5.3 ES/EN](docs/releases/1.5.3.md).
 - POST-only refresh and removal of unused OAuth permissions.
 - TLS dependencies updated for RUSTSEC-2026-0381/0382/0383, detected by the publication gate.
 - Vite 8.2.4 fixes the three development-server Dependabot advisories; full dependency audit reports no known vulnerabilities.
+- Vitest 4.1.12 fixes two new advisories detected on 2026-10-22; CI includes development dependency auditing.
 - About credits APX Studio and links to the website and support in all eight interface languages.
 
 Cloud hardening is deployed. Desktop publication remains gated by complete validation and signed cross-platform CI.

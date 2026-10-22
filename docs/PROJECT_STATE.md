@@ -1,6 +1,6 @@
 # PROJECT_STATE
 
-Updated: 2026-10-20
+Updated: 2026-10-22
 Status: active
 
 ## Objective
@@ -65,6 +65,8 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- CI candidato `39494468806` sobre `0b212c2` terminó correctamente: calidad, cuatro builds, smoke Windows y manifiesto firmado. Antes del tag, auditoría del 2026-10-22 detectó dos avisos nuevos de @vitest/mocker; Vitest/ui/coverage actualizados a 4.1.12, auditoría completa limpia y gate CI ampliado a dependencias de desarrollo. Revalidación final en curso.
+- MSIX 1.5.3.0 generado y pack/unpack/PRI/iconos/runtime comprobados: `src-tauri/target/msix/BlinkStream_1.5.3.0_x64.msix`, 94.728.426 bytes, SHA256 `cd8a3c64163518a423ed414217934847cec2c9680201c2f09f91c9dc17245c2d`. No instalado, firmado, enviado ni certificado.
 - Dependabot detectó tres avisos del servidor de desarrollo Vite 8.2.0 (GHSA-r825-w8mm-5pxw, GHSA-587h-7wmj-h5pm, GHSA-698v-4r3x-3vcv); actualizado a 8.2.4 y lockfile compatible. pnpm audit completo (producción/desarrollo): cero vulnerabilidades. Protección de contraseñas filtradas requiere Pro o superior según documentación oficial; no cambiar de plan automáticamente.
 - Primer CI 1.5.3 `39493604739` bloqueó RUSTSEC-2026-0381/0382/0383 en certificados TLS. Cargo.lock actualizado exclusivamente a rustls-webpki 0.103.16 y webpki-roots/webpki-root-certs 1.0.10; OSV actual: 562 paquetes, cero vulnerabilidades, nueve avisos informativos de mantenimiento. Revalidación nativa y nuevo CI en curso.
 - 1.5.3 candidata de seguridad autorizada por el usuario: base live con auth_tokens privada, RLS forzada, TTL/UUID/identidad obligatorios y 22 handoffs caducados purgados. twitch-auth v38 desplegada; refresh POST, identidad Twitch validada, migración legacy con prueba de sesión anterior y cliente de sesión aislado del service_role. Desktop: validación horaria/logout remoto implementados; publicación pendiente de suite completa y CI firmado. Cambios Acerca de pendientes incluidos en candidata.

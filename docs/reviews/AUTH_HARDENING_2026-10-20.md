@@ -56,6 +56,12 @@ lockfile. Full pnpm audit, including development dependencies, reports no known
 vulnerabilities. Supabase leaked-password protection is a Pro-or-above feature;
 no plan upgrade was authorized or performed.
 
+Candidate CI `39494468806` passed quality, all four signed builds, Windows
+installer smoke and manifest verification on `0b212c2`. Before tagging, the
+2026-10-22 refresh found GHSA-qxg6-89mg-rqv8 and GHSA-xp26-3454-mjgp in
+@vitest/mocker. Vitest/ui/coverage are updated to 4.1.12, and release CI now runs
+full pnpm audit, including development dependencies. No new runtime code changed.
+
 - Catalog verification: 0 rows after containment, 0 public policies/grants,
   forced RLS and mandatory Twitch identity. RPC execution limited to service_role.
 - Live HTTP: invalid UUID 400, invalid POST 400, GET refresh 410 and valid OAuth

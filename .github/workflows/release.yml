@@ -52,7 +52,7 @@ jobs:
 
       - name: Dependency vulnerability checks
         run: |
-          pnpm audit --prod
+          pnpm audit
           python3 scripts/audit-rust-osv.py
 
       - name: Companion and refresh security regressions
