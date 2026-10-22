@@ -7,7 +7,7 @@ Status: active
 
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
 Store 1.5.2 indicada por el usuario el 2026-10-17 al actualizar la web.
-GitHub 1.5.2 publicada y verificada; latest/descargas/updater 1.5.2.
+GitHub 1.5.3 publicada y verificada; latest/descargas/updater 1.5.3.
 Búsqueda del chat nativo y traducciones aceptadas y entregadas; Store y GitHub alineados en 1.5.2 según el usuario.
 
 ## Stack
@@ -47,7 +47,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 
 - Web Pi5 — Despliegue por petición explícita usando `../APXStudioWeb/deploy.ps1`, sin modificarlo. Automatización Actions/webhook descartada; no retomarla. No cambiar permisos, claves ni configuración del servidor sin autorización aparte.
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
-- DEC-002 — GitHub latest/fuente 1.5.2; CI firmado, 15 archivos públicos comparados con CI y cuatro firmas del updater verificadas. Históricas conservadas; Store 1.5.2 se actualiza por su propio canal.
+- DEC-002 — GitHub latest/fuente 1.5.3; CI firmado, 15 archivos públicos comparados con CI y cuatro firmas del updater verificadas. Históricas conservadas; Store 1.5.2 se actualiza por su propio canal.
 - Plan 2026-10-13 — Hitos consecutivos: 1.5 organización/chat, 1.6 continuidad/medios, 1.7 moderación, 1.8 integraciones, 1.9 consolidación, 2.0 rediseño completo. Entregas mínimas y ampliaciones PATCH; IA/plugins/Kick/YouTube condicionados y no bloqueantes de 2.0. Detalle en ROADMAP, sin nuevas fechas ni cambio de versión publicada.
 - DEC-003 — Updater falla cerrado: cuatro artefactos, firmas/comentarios, tag/config y clave coherentes.
 - DEC-004 — IPC/capabilities mínimos; vistas remotas de Twitch no heredan permisos de la aplicación.
@@ -65,19 +65,19 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
-- CI candidato `39494468806` sobre `0b212c2` terminó correctamente: calidad, cuatro builds, smoke Windows y manifiesto firmado. Antes del tag, auditoría del 2026-10-22 detectó dos avisos nuevos de @vitest/mocker; Vitest/ui/coverage actualizados a 4.1.12, auditoría completa limpia y gate CI ampliado a dependencias de desarrollo. Revalidación final en curso.
-- MSIX 1.5.3.0 generado y pack/unpack/PRI/iconos/runtime comprobados: `src-tauri/target/msix/BlinkStream_1.5.3.0_x64.msix`, 94.728.426 bytes, SHA256 `cd8a3c64163518a423ed414217934847cec2c9680201c2f09f91c9dc17245c2d`. No instalado, firmado, enviado ni certificado.
+- GitHub 1.5.3 publicada sobre `0eae25e`; CI candidato `39793015683`, CodeQL `39793022538` y publicación `39796091712`. Los 15 archivos públicos coinciden con CI y SHA-256; cuatro firmas del updater verificadas independientemente. Latest/master/updater coherentes en 1.5.3. Vitest/ui/coverage 4.1.12 corrige los dos avisos nuevos de @vitest/mocker del 2026-10-22; auditoría completa limpia y gate CI ampliado a dependencias de desarrollo.
+- MSIX final 1.5.3.0 generado desde `0eae25e` y pack/unpack/PRI/iconos/runtime comprobados: `src-tauri/target/msix/BlinkStream_1.5.3.0_x64.msix`, 94.728.466 bytes, SHA256 `5cbc35ac0419cc11c18ca6d55bdd27b54cab5936d204edba4f8f2f3838550e5e`. No instalado, firmado, enviado ni certificado.
 - Dependabot detectó tres avisos del servidor de desarrollo Vite 8.2.0 (GHSA-r825-w8mm-5pxw, GHSA-587h-7wmj-h5pm, GHSA-698v-4r3x-3vcv); actualizado a 8.2.4 y lockfile compatible. pnpm audit completo (producción/desarrollo): cero vulnerabilidades. Protección de contraseñas filtradas requiere Pro o superior según documentación oficial; no cambiar de plan automáticamente.
-- Primer CI 1.5.3 `39493604739` bloqueó RUSTSEC-2026-0381/0382/0383 en certificados TLS. Cargo.lock actualizado exclusivamente a rustls-webpki 0.103.16 y webpki-roots/webpki-root-certs 1.0.10; OSV actual: 562 paquetes, cero vulnerabilidades, nueve avisos informativos de mantenimiento. Revalidación nativa y nuevo CI en curso.
-- 1.5.3 candidata de seguridad autorizada por el usuario: base live con auth_tokens privada, RLS forzada, TTL/UUID/identidad obligatorios y 22 handoffs caducados purgados. twitch-auth v38 desplegada; refresh POST, identidad Twitch validada, migración legacy con prueba de sesión anterior y cliente de sesión aislado del service_role. Desktop: validación horaria/logout remoto implementados; publicación pendiente de suite completa y CI firmado. Cambios Acerca de pendientes incluidos en candidata.
+- Primer CI 1.5.3 `39493604739` bloqueó RUSTSEC-2026-0381/0382/0383 en certificados TLS. Cargo.lock publicado con rustls-webpki 0.103.16 y webpki-roots/webpki-root-certs 1.0.10; OSV: 562 paquetes, cero vulnerabilidades, nueve avisos informativos de mantenimiento. Revalidación nativa/CI completada sin suprimir reglas.
+- Seguridad 1.5.3 autorizada y desplegada: auth_tokens privada, RLS forzada, TTL/UUID/identidad obligatorios y 22 handoffs caducados purgados. twitch-auth v38: refresh POST, identidad Twitch validada, migración legacy con prueba de sesión anterior y cliente de sesión aislado del service_role. Desktop publicado con validación horaria/logout remoto; Acerca de APX Studio en ocho idiomas.
 - Advisor live: sin avisos de rendimiento; INFO RLS sin políticas intencional en tabla privada. Protección de contraseñas filtradas sigue desactivada y requiere ajuste manual o API de gestión autorizada disponible. Login Twitch real completo pendiente de aceptación.
-- Validación candidata 1.5.3: 748 frontend/1 omitido, 33 release, 11 pruebas OAuth sobre código real y 60 Rust Windows correctos; lint y build frontend correctos. El navegador para el toggle de contraseñas quedó bloqueado por auto-review ante redirección ajena a Supabase; pendiente del usuario. No se certifica login/logout real con cuenta Twitch ni GUI instalada.
-- Próxima actualización: Acerca de muestra `© 2026 APX Studio` y enlaces externos a la web oficial y soporte por correo, con etiquetas en ocho idiomas y compartidos por GitHub/Store. Pendiente de incluir en el siguiente PATCH; sin publicar ni cambiar la versión solo por estos ajustes.
+- Validación candidata final 1.5.3: 749 frontend/1 omitido, 33 release, 11 pruebas OAuth sobre código real y 60 Rust Windows correctos; lint y build frontend correctos. Advisor del 2026-10-22 mantiene solo INFO de tabla privada y WARN de contraseñas filtradas (Pro+). El navegador para ese toggle quedó bloqueado por auto-review ante redirección ajena a Supabase. No se certifica login/logout real con cuenta Twitch ni GUI instalada.
+- Fuentes web APX ES/EN actualizadas para GitHub 1.5.3/Store 1.5.2, roadmap, descargas y caché 20261020.1; 46 comprobaciones DOM correctas. Sin desplegar: web pública 1.5.2, requiere solicitud explícita del usuario. Script intacto y copia local previa en `scratch/apxstudio-before-1.5.3`.
 - GitHub 1.5.2 publicada, commit `3a5908e1d965cc99b4e5e8fc4fb37c1d1e6b2fa5`: búsqueda de chat nativo individual/unificado y traducciones aceptadas. CI candidato `39059837052` y publicación `39060821359` correctos; 15 archivos públicos coinciden con CI y hashes, cuatro firmas verificadas. Latest/master/public updater 1.5.2 coherentes. Store 1.5.2 indicada posteriormente por el usuario.
 - CI previo de master/tag bloqueó los nuevos RUSTSEC-2026-0367/0368/0369. Fix: retirar feature ZIP opcional no utilizada del updater, conservando TLS, firmas y formatos EXE/AppImage/TAR.GZ. Auditoría actual: 562 paquetes, cero vulnerabilidades conocidas, nueve avisos de mantenimiento. No se ignoran avisos ni cambia la clave.
 - Tras autorización explícita y CI verde se promovió master por fast-forward y se recreó únicamente v1.5.2 no publicado: anterior objeto `414f439` sobre `397b59c`, nuevo `bb195cf` sobre `3a5908e`. No se movieron otros tags ni releases publicadas.
-- Validación local actual: 742 frontend/1 omitido, 33 release, Rust GitHub 60/Store 61, lint/fmt/Clippy correctos. Navegador: 66 casos de chat y 16 de enlaces Store; datos simulados, no prueba Twitch real ni desktop multiplataforma.
-- MSIX vigente `src-tauri/target/msix/BlinkStream_1.5.2.0_x64.msix`: 94.725.975 bytes, SHA256 `7832cda78728528ba1ff7ee13ab503e5a60f79e8657ba7aa286be95267a47da5`. Pack/unpack/PRI/iconos/runtime verificados; unsigned, sin instalación en host, envío Store ni WACK del nuevo paquete. Sustituye hashes de candidatos anteriores. Evergreen externo por elección del usuario.
+- Evidencia histórica 1.5.2: 742 frontend/1 omitido, 33 release, Rust GitHub 60/Store 61, lint/fmt/Clippy correctos. Navegador: 66 casos de chat y 16 de enlaces Store; datos simulados, no prueba Twitch real ni desktop multiplataforma.
+- MSIX histórico 1.5.2.0: SHA256 `7832cda78728528ba1ff7ee13ab503e5a60f79e8657ba7aa286be95267a47da5`; sustituido como candidato local por 1.5.3.0. Store pública sigue en 1.5.2, sin nuevo envío automático.
 - Fuentes runtime publicadas una sola vez en v1.5.0: companion 2.116.378.839 bytes/SHA256 `f3bd70b2068668b6cfaa035ad405e1fb4d9b78a3327e90b586884d141befe0db`; suplemento Python LGPL/MPL 12.561.727 bytes/SHA256 `2601249875bdfb29b66f36fa06f4772c52f29f5f1d19ca1a453a4cdd3d6c2856`. Descargas públicas completas verificadas. Ver `reviews/MSIX_SOURCE_CORRESPONDENCE.md` y `guides/MSIX_PYTHON_SOURCES.md`; no certificación legal ni rebuild reproducible demostrado.
 - Web APX desplegada el 2026-10-17 con el script original desde `APXStudioWeb`, por petición del usuario. GitHub/Store 1.5.2 ES/EN y caché 20261017.2 públicos; once hashes SSH iguales a locales, contenido HTTPS comprobado (solo transformación de correos de Cloudflare), portada y auth HTTP 200. Script intacto; sin cambios de permisos/claves ni Git remoto. Copia previa temporal en la Pi `/tmp/apxstudio-web-backup-qXyuV3jd`.
 - Limpieza Actions pausada: el usuario rechazó borrar los 355 artefactos seleccionados. No ejecutar `scratch/actions-artifact-cleanup.json` sin renovar inventario/autorización. Sin instalaciones en host, despliegues cloud ni acceso a Partner Center.
@@ -90,7 +90,7 @@ NEXT:
 LATER:
 - 1.7–1.9: consolidación de moderación, agenda/enlaces/privacidad e integraciones opcionales; baseline, migraciones y prototipos antes de rediseñar todas las pantallas en 2.0, conservando marca/paridad funcional. Ver ROADMAP.
 - Retirar vendor GLib cuando GTK/Tauri tengan una dependencia oficial corregida compatible.
-- Activar protección de contraseñas filtradas en Supabase tras autorización.
+- Protección de contraseñas filtradas: requiere Pro+ y acceso al Dashboard; no cambiar el plan sin autorización de coste.
 
 ## Known Risks
 
@@ -135,6 +135,7 @@ LATER:
 
 ## Recent Changes
 
+- 1.5.3: OAuth privado/single-use, identidad inmutable, continuidad legacy probada y logout remoto; backend live y release pública verificados. TLS/Vite/Vitest parcheados y auditoría CI completa. Store/web pública siguen en 1.5.2.
 - 1.5.2: búsqueda nativa de sesión individual/unificada, filtros por texto/usuario/enlaces/origen, borrados de moderación y aislamiento entre cuentas/canales. Catálogo y cambio de idioma en ocho idiomas aceptados; sin persistir historial adicional.
 - Retirada feature ZIP opcional del updater para excluir tres avisos nuevos de extracción, sin suprimir auditorías, cambiar confianza ni formatos publicados. CI candidato/tag y firmas públicas correctos; tag recreado con autorización específica, 1.5.2 latest.
 - Notas por versión ES/EN en `docs/releases/X.Y.Z.md`, consumidas por release y manifiesto con regresión. Avisos Store con acceso a fuentes del runtime; companions publicados y verificados sin duplicar 2 GB.

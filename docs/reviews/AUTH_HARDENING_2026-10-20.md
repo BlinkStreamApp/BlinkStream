@@ -62,11 +62,18 @@ installer smoke and manifest verification on `0b212c2`. Before tagging, the
 @vitest/mocker. Vitest/ui/coverage are updated to 4.1.12, and release CI now runs
 full pnpm audit, including development dependencies. No new runtime code changed.
 
+Final candidate `39793015683` and CodeQL `39793022538` passed on `0eae25e`.
+Tag pipeline `39796091712` published v1.5.3 on 2026-10-22. All 15 public
+assets were downloaded and matched tag CI bytes, sizes and GitHub SHA-256
+digests; all four updater signatures verified independently. The root updater
+matches the public manifest and GitHub latest is v1.5.3. Microsoft Store remains
+on 1.5.2; no installation, Store submission or website deployment was performed.
+
 - Catalog verification: 0 rows after containment, 0 public policies/grants,
   forced RLS and mandatory Twitch identity. RPC execution limited to service_role.
 - Live HTTP: invalid UUID 400, invalid POST 400, GET refresh 410 and valid OAuth
   redirect with state and reduced scopes.
-- 748 frontend tests pass, 1 skipped; 33 release tests, 11 actual-source OAuth
+- 749 frontend tests pass, 1 skipped; 33 release tests, 11 actual-source OAuth
   regressions and 60 Rust Windows tests pass. Frontend lint/build pass.
 - Performance Advisor clean. Security Advisor's no-policy INFO is intentional
   for a backend-only table; leaked-password protection remains a manual setting.

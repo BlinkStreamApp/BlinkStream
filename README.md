@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/source_version-1.5.3-e94560" alt="BlinkStream 1.5.3 release candidate source">
+  <img src="https://img.shields.io/badge/source_version-1.5.3-e94560" alt="BlinkStream 1.5.3">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
   <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
@@ -66,7 +66,7 @@ Store installations receive updates through Microsoft Store; GitHub installation
 use the separate signed updater below.
 
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-**Source 1.5.3 is a release candidate; GitHub and Microsoft Store remain on verified 1.5.2** (Store version confirmed by the maintainer). Published GitHub builds have verified updater signatures for Windows, macOS Intel/Apple Silicon and Linux. The maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
+**GitHub 1.5.3 is published and verified; Microsoft Store remains on 1.5.2** (Store version confirmed by the maintainer). All 15 public GitHub assets match CI and SHA-256 digests; four updater signatures verify for Windows, macOS Intel/Apple Silicon and Linux. The maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
 
 The Store edition includes Streamlink/Python/FFmpeg with their original notices;
 WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.2
@@ -77,17 +77,17 @@ Pinned hashes and distribution details are documented in [the source guide](docs
 and [Python source guide](docs/guides/MSIX_PYTHON_SOURCES.md). The unchanged runtime shares these sources across Store updates.
 Updates require a compatible signing key and your confirmation.
 
-- ⭐ **`BlinkStream_1.5.2_Win_x64.exe`** *(Recommended NSIS installer, used by the updater)*
-- `BlinkStream_1.5.2_Win_x64.msi` *(Enterprise MSI installer)*
+- ⭐ **`BlinkStream_1.5.3_Win_x64.exe`** *(Recommended NSIS installer, used by the updater)*
+- `BlinkStream_1.5.3_Win_x64.msi` *(Enterprise MSI installer)*
 
 Install streaming dependencies and download the official installer from PowerShell:
 
 ```powershell
 winget install --id Streamlink.Streamlink --exact
 winget install --id Gyan.FFmpeg --exact
-Invoke-WebRequest -Uri "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.2/BlinkStream_1.5.2_Win_x64.exe" -OutFile "BlinkStream_1.5.2_Win_x64.exe"
+Invoke-WebRequest -Uri "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.3/BlinkStream_1.5.3_Win_x64.exe" -OutFile "BlinkStream_1.5.3_Win_x64.exe"
 # Review the download and the warning below before running:
-.\BlinkStream_1.5.2_Win_x64.exe
+.\BlinkStream_1.5.3_Win_x64.exe
 ```
 
 Restart your terminal/application after installing dependencies so PATH changes are visible.
@@ -112,8 +112,8 @@ See [Microsoft's SmartScreen overview](https://learn.microsoft.com/en-us/windows
 ```bash
 brew install streamlink ffmpeg
 # Apple Silicon; for Intel replace arm64 with x64 in the filename and URL.
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.2/BlinkStream_1.5.2_macOS_arm64.dmg"
-open BlinkStream_1.5.2_macOS_arm64.dmg
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.3/BlinkStream_1.5.3_macOS_arm64.dmg"
+open BlinkStream_1.5.3_macOS_arm64.dmg
 ```
 
 Drag BlinkStream into Applications. macOS 11+ is configured as the minimum; choose the
@@ -124,16 +124,16 @@ installer matching your CPU. Updater signatures do not imply Apple notarization.
 ```bash
 sudo apt update
 sudo apt install streamlink ffmpeg
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.2/BlinkStream_1.5.2_Linux_x86_64.deb"
-sudo apt install ./BlinkStream_1.5.2_Linux_x86_64.deb
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.3/BlinkStream_1.5.3_Linux_x86_64.deb"
+sudo apt install ./BlinkStream_1.5.3_Linux_x86_64.deb
 ```
 
 Alternatively, use the x86_64 AppImage:
 
 ```bash
-curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.2/BlinkStream_1.5.2_Linux_x86_64.AppImage"
-chmod +x BlinkStream_1.5.2_Linux_x86_64.AppImage
-./BlinkStream_1.5.2_Linux_x86_64.AppImage
+curl -fLO "https://github.com/BlinkStreamApp/BlinkStream/releases/download/v1.5.3/BlinkStream_1.5.3_Linux_x86_64.AppImage"
+chmod +x BlinkStream_1.5.3_Linux_x86_64.AppImage
+./BlinkStream_1.5.3_Linux_x86_64.AppImage
 ```
 
 AppImage may require FUSE support depending on the distribution.
@@ -165,7 +165,7 @@ pnpm install --frozen-lockfile
 ```
 
 Run subsequent commands from the repository root. To reproduce the published source,
-check out tag `v1.5.2` before installing dependencies; `master` includes later documentation/changes.
+check out tag `v1.5.3` before installing dependencies; `master` includes later documentation/changes.
 
 ### Configuration
 

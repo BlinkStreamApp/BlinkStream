@@ -1,6 +1,6 @@
 # BlinkStream 1.5.3 — Authentication security
 
-Release candidate, 2026-10-20. Published downloads/updater and Store remain 1.5.2.
+Published on GitHub: 2026-10-22. Downloads/updater verified at 1.5.3; Store remains on 1.5.2.
 Version-specific release body: [1.5.3 ES/EN](docs/releases/1.5.3.md).
 
 ## ES
@@ -25,7 +25,7 @@ Version-specific release body: [1.5.3 ES/EN](docs/releases/1.5.3.md).
 - Vitest 4.1.12 fixes two new advisories detected on 2026-10-22; CI includes development dependency auditing.
 - About credits APX Studio and links to the website and support in all eight interface languages.
 
-Cloud hardening is deployed. Desktop publication remains gated by complete validation and signed cross-platform CI.
+Cloud hardening is deployed. Candidate CI `39793015683` passed; tag pipeline `39796091712` published 15 public files independently checked against CI and GitHub SHA-256 digests. All four updater signatures verify. Real-account login/logout and installed GUI acceptance remain separate; no Store submission or website deployment was performed.
 
 ## BlinkStream 1.5.2 — Session chat search
 
