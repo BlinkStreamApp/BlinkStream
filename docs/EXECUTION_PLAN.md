@@ -10,7 +10,7 @@ Consolidar reproducción, chat y eventos de Twitch antes de ampliar la experienc
 Responsables: Codex implementa y verifica; el usuario valida el comportamiento en su sesión real.
 El usuario autoriza entregar fixes y mejoras incrementales como PATCH consecutivos después de las pruebas pertinentes; reservar MINOR para hitos mayores acordados.
 Antes de publicar, alinear README, notas, roadmap del repo y de la web, y versiones package/Tauri/Cargo. No crear tags hasta CI firmado correcto; no anunciar descargas inexistentes.
-La autorización no incluye instalación en su PC, cambios de permisos/secretos ni despliegues Supabase. Una pausa o modo solo local posterior prevalece.
+Desde el 2026-10-22, el usuario autoriza el despliegue completo de cada nuevo PATCH validado, incluida la web por SSH, sin pedir aprobación repetida. Ver límites y controles en `PROJECT_STATE.md`: preservar `deploy.ps1`, respaldo remoto y verificación pública; sin instalaciones en su PC, cambios de permisos/secretos, costes nuevos ni operaciones destructivas. Una pausa o modo solo local posterior prevalece.
 
 ## Orden de ejecución
 
@@ -52,14 +52,14 @@ La autorización no incluye instalación en su PC, cambios de permisos/secretos 
 
 El detalle funcional y las reasignaciones de la antigua 1.5/1.6 están en [ROADMAP.md](../ROADMAP.md); no mantener listas paralelas divergentes.
 
-1. 1.5.2 publicada y verificada en GitHub; mantener las regresiones de texto/usuario/enlaces/origen, borrados de moderación, cambio de cuenta y ventanas estrechas. El usuario gestiona el envío MSIX y el despliegue SSH de la web actualizada.
+1. Mantener las regresiones de texto/usuario/enlaces/origen, borrados de moderación, cambio de cuenta y ventanas estrechas. Cada PATCH validado incluye su despliegue completo, MSIX preparado y web actualizada por SSH; distinguir generación, envío y aprobación de Microsoft Store.
 2. Colecciones y categorías: base publicada; mejorar orden/filtros/teclado e incorporar ocultación de canales mediante incrementos PATCH separados.
 3. Mantener pruebas reales de grid, pausa/DVR, estabilidad y Twitch como validación transversal. La mejora de latencia ya se distribuye desde 1.5.0; no crear una entrega 1.4.5 posterior.
 4. Dimensionar VOD/workspaces antes de abrir el bloque de medios; no activar todo 1.6 simultáneamente.
 
 Cada hito distingue entrega mínima de ampliaciones posteriores. IA/plugins/nuevas plataformas se investigan aparte y no bloquean el rediseño 2.0. Agenda depende de horarios publicados; VOD chat requiere una fuente permitida verificada. No hay fechas cerradas ni garantía universal de latencia.
 
-Fuente/latest/updater GitHub 1.5.2; Store 1.5.1. La planificación no despliega cloud ni autoriza instalaciones. README/roadmaps/web/notas y metadata sincronizados; evitar que un cambio documental arrastre código sin validar.
+Estado de versiones y entregas: `PROJECT_STATE.md`. La planificación por sí sola no autoriza instalaciones ni operaciones destructivas; los despliegues asociados a parches validados siguen la autorización permanente anterior. README/roadmaps/web/notas y metadata sincronizados; evitar que un cambio documental arrastre código sin validar.
 
 Fuentes de integración: [EventSub WebSocket](https://dev.twitch.tv/docs/eventsub/handling-websocket-events/),
 [tipos de suscripción](https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/) y

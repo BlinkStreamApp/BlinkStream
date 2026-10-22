@@ -42,10 +42,10 @@ de updater con la clave configurada y solo publica desde un tag validado.
 
 ## Current Decisions
 
-- Web oficial única — `https://apxstudio.es/`, dominio confirmado el 2026-10-17; privacidad en `/privacy.html`. Pages de BlinkStream desactivado; conservar Pages del repositorio `auth`, confirmación OAuth en `https://blinkstreamapp.github.io/auth/` (HTTP 200). No cambiar redirects ni desplegar OAuth. Carpeta actual `../APXStudioWeb` (antes BlinkStreamWeb); `deploy.ps1` intacto. El usuario permite ejecutar el script y desplegar por SSH cuando lo solicite, no automáticamente.
+- Web oficial única — `https://apxstudio.es/`, privacidad en `/privacy.html`. Pages de BlinkStream desactivado; conservar Pages del repositorio `auth` y su confirmación OAuth. Carpeta `C:/Users/alber/Desktop/IA Project/APXStudioWeb`; `deploy.ps1` intacto. Desde el 2026-10-22, cada PATCH validado incluye autorización permanente de despliegue completo, también web por SSH; no pedir aprobación repetida para ese flujo.
 - DEC-015 — Microsoft Store MSIX separado de NSIS/updater GitHub; updater nativo/IPC/UI desactivado y sin winget automático. Identidad oficial en `src-tauri/msix/identity.json`; ver ADR-015.
 
-- Web Pi5 — Despliegue por petición explícita usando `../APXStudioWeb/deploy.ps1`, sin modificarlo. Automatización Actions/webhook descartada; no retomarla. No cambiar permisos, claves ni configuración del servidor sin autorización aparte.
+- Web Pi5 — Desplegar como parte de cada PATCH validado mediante `C:/Users/alber/Desktop/IA Project/APXStudioWeb/deploy.ps1`, sin modificarlo. Comprobar acceso/escritura, guardar copia remota previa y verificar hashes/HTTPS después. No cambiar permisos, claves ni configuración del servidor; detenerse si el script fuera a necesitar esa reparación. Actions/webhook descartado: autorización permanente no implica crear otra automatización.
 - DEC-001 — NSIS reemplaza al instalador personalizado; no mantener dos autoridades.
 - DEC-002 — GitHub latest/fuente 1.5.3; CI firmado, 15 archivos públicos comparados con CI y cuatro firmas del updater verificadas. Históricas conservadas; Store 1.5.2 se actualiza por su propio canal.
 - Plan 2026-10-13 — Hitos consecutivos: 1.5 organización/chat, 1.6 continuidad/medios, 1.7 moderación, 1.8 integraciones, 1.9 consolidación, 2.0 rediseño completo. Entregas mínimas y ampliaciones PATCH; IA/plugins/Kick/YouTube condicionados y no bloqueantes de 2.0. Detalle en ROADMAP, sin nuevas fechas ni cambio de versión publicada.
@@ -72,7 +72,7 @@ NOW:
 - Seguridad 1.5.3 autorizada y desplegada: auth_tokens privada, RLS forzada, TTL/UUID/identidad obligatorios y 22 handoffs caducados purgados. twitch-auth v38: refresh POST, identidad Twitch validada, migración legacy con prueba de sesión anterior y cliente de sesión aislado del service_role. Desktop publicado con validación horaria/logout remoto; Acerca de APX Studio en ocho idiomas.
 - Advisor live: sin avisos de rendimiento; INFO RLS sin políticas intencional en tabla privada. Protección de contraseñas filtradas sigue desactivada y requiere ajuste manual o API de gestión autorizada disponible. Login Twitch real completo pendiente de aceptación.
 - Validación candidata final 1.5.3: 749 frontend/1 omitido, 33 release, 11 pruebas OAuth sobre código real y 60 Rust Windows correctos; lint y build frontend correctos. Advisor del 2026-10-22 mantiene solo INFO de tabla privada y WARN de contraseñas filtradas (Pro+). El navegador para ese toggle quedó bloqueado por auto-review ante redirección ajena a Supabase. No se certifica login/logout real con cuenta Twitch ni GUI instalada.
-- Fuentes web APX ES/EN actualizadas para GitHub 1.5.3/Store 1.5.2, roadmap, descargas y caché 20261020.1; 46 comprobaciones DOM correctas. Sin desplegar: web pública 1.5.2, requiere solicitud explícita del usuario. Script intacto y copia local previa en `scratch/apxstudio-before-1.5.3`.
+- Fuentes web APX ES/EN actualizadas para GitHub 1.5.3/Store 1.5.2, roadmap, descargas y caché 20261020.1; 46 comprobaciones DOM correctas. Despliegue 1.5.3 todavía no realizado; la autorización permanente nueva se aplica a próximos parches y no prueba un despliegue existente. Script intacto y copia local previa en `scratch/apxstudio-before-1.5.3`.
 - GitHub 1.5.2 publicada, commit `3a5908e1d965cc99b4e5e8fc4fb37c1d1e6b2fa5`: búsqueda de chat nativo individual/unificado y traducciones aceptadas. CI candidato `39059837052` y publicación `39060821359` correctos; 15 archivos públicos coinciden con CI y hashes, cuatro firmas verificadas. Latest/master/public updater 1.5.2 coherentes. Store 1.5.2 indicada posteriormente por el usuario.
 - CI previo de master/tag bloqueó los nuevos RUSTSEC-2026-0367/0368/0369. Fix: retirar feature ZIP opcional no utilizada del updater, conservando TLS, firmas y formatos EXE/AppImage/TAR.GZ. Auditoría actual: 562 paquetes, cero vulnerabilidades conocidas, nueve avisos de mantenimiento. No se ignoran avisos ni cambia la clave.
 - Tras autorización explícita y CI verde se promovió master por fast-forward y se recreó únicamente v1.5.2 no publicado: anterior objeto `414f439` sobre `397b59c`, nuevo `bb195cf` sobre `3a5908e`. No se movieron otros tags ni releases publicadas.
@@ -84,8 +84,8 @@ NOW:
 NEXT:
 - Prueba GUI voluntaria desde 1.4.1 y de conservación de settings/sesión, sin instalar automáticamente en el PC del usuario. Linux updater integrado requiere AppImage; `.deb` se actualiza manualmente/mediante paquetes.
 - Validar canje EventSub real, Auto-Claim independiente y pausa/aislamiento del reporte nativo.
-- App 1.5.x: ocultación de canales y refinamientos de colecciones; colecciones/categorías/búsqueda ya publicadas. Luego 1.6 VOD/bookmarks, workspaces y audio principal antes de ahorro/replay/biblioteca. Próximos despliegues web solo por solicitud del usuario.
-- Supabase: desplegar funciones/migración solo con autorización aparte.
+- App 1.5.x: ocultación de canales y refinamientos de colecciones; colecciones/categorías/búsqueda ya publicadas. Luego 1.6 VOD/bookmarks, workspaces y audio principal antes de ahorro/replay/biblioteca. Próximos PATCH incluyen despliegue completo y web SSH tras validar.
+- Despliegues backend asociados a cada PATCH: validar cambios y rollback antes de aplicar; operaciones destructivas, costes nuevos o cambios ajenos al parche requieren autorización específica.
 
 LATER:
 - 1.7–1.9: consolidación de moderación, agenda/enlaces/privacidad e integraciones opcionales; baseline, migraciones y prototipos antes de rediseñar todas las pantallas en 2.0, conservando marca/paridad funcional. Ver ROADMAP.
@@ -119,7 +119,7 @@ LATER:
 - 2026-10-13: el usuario levanta el modo solo local para publicar 1.4.4 tras pruebas. Regla permanente: fixes/mejoras compatibles se suben como PATCH consecutivos tras validar; MINOR para entregas mayores acordadas. Actualizar siempre README, notas, roadmap del repo y web, junto a versiones nativas. Una instrucción posterior de pausa/solo local prevalece.
 - Hotfix 1.4.3 autorizado el 2026-10-08; PATCH estable en lugar de 1.4.2-a (prerelease anterior). Guía: `docs/guides/HOTFIX_RELEASES.md`.
 - Publicación 1.4.2 autorizada el 2026-10-07 tras validar las tres plataformas; no excluir Linux.
-- No instalar nada en el PC del usuario ni desplegar Supabase sin autorización.
+- 2026-10-22: autorización permanente para desplegar cada nuevo PATCH validado, incluida la web por SSH. No incluye instalaciones en el PC del usuario, cambios de claves/permisos/infraestructura, costes nuevos ni operaciones destructivas. No anunciar un envío/aprobación Store solo por generar el MSIX. Pausa/solo local posterior prevalece.
 - Sin ventanas aparte/segundo player para Drops; conservar controles oficiales de integridad/vinculación.
 - No exponer/persistir secretos Twitch en frontend ni repositorio.
 - No publicar firmas vacías, históricas incompatibles o manifiestos sin artefactos reales.
