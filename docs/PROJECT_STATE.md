@@ -1,6 +1,6 @@
 # PROJECT_STATE
 
-Updated: 2026-10-22
+Updated: 2026-10-23
 Status: active
 
 ## Objective
@@ -116,6 +116,7 @@ LATER:
 
 ## Constraints
 
+- Web APX: no añadir comentarios en archivos HTML publicados, incluidos CSS/JavaScript incrustados; documentación de mantenimiento en Markdown. Regla del usuario 2026-10-23, también en `APXStudioWeb/AGENTS.md`. Siete páginas limpiadas (162 comentarios), DOM/AST equivalentes y despliegue SSH/HTTPS verificado; copia previa temporal `/tmp/apxstudio-web-no-comments-9JaFAIkv`.
 - Toda incorporación/corrección debe salir traducida a los ocho idiomas, incluyendo botones, ayudas, etiquetas accesibles, errores y estados vacíos. Verificar cambio de idioma sin perder estado y conservar contenido del usuario. La pausa de traducciones quedó levantada tras su aceptación; el 2026-10-17 el usuario autorizó publicación y recrear solo el tag 1.5.2 fallido después de validar.
 
 - 2026-10-13: el usuario levanta el modo solo local para publicar 1.4.4 tras pruebas. Regla permanente: fixes/mejoras compatibles se suben como PATCH consecutivos tras validar; MINOR para entregas mayores acordadas. Actualizar siempre README, notas, roadmap del repo y web, junto a versiones nativas. Una instrucción posterior de pausa/solo local prevalece.
