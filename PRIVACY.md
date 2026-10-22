@@ -1,12 +1,12 @@
 # Política de privacidad de BlinkStream
 
-Última actualización: 14 de octubre de 2026.
+Última actualización: 22 de octubre de 2026.
 
 ## 1. Editor y contacto
 
 BlinkStream es una aplicación de escritorio desarrollada y publicada por **APX Studio**. Permite acceder a contenido de Twitch, reproducir directos, utilizar el chat y otras funciones relacionadas.
 
-Para consultas sobre privacidad o solicitudes relativas a tus datos, escribe a **[contacto.apxstudio@gmail.com](mailto:contacto.apxstudio@gmail.com)**.
+Para consultas sobre privacidad o solicitudes relativas a tus datos, escribe a **[soporte@apxstudio.es](mailto:soporte@apxstudio.es)**.
 
 Esta política describe el tratamiento de datos realizado para prestar las funciones de BlinkStream. Twitch, Microsoft y los demás servicios externos tienen sus propias políticas para el tratamiento que realizan de forma independiente. BlinkStream no es un producto oficial de Twitch.
 
@@ -73,7 +73,7 @@ Cerrar sesión no equivale a solicitar la eliminación de la cuenta en la nube n
 
 Puedes cerrar sesión, desactivar funciones opcionales, eliminar favoritos y gestionar los archivos que has creado. Para retirar los permisos de Twitch, utiliza la gestión de conexiones de tu cuenta de Twitch.
 
-Para acceder, corregir o solicitar la eliminación de datos gestionados por APX Studio, escribe a **contacto.apxstudio@gmail.com** e indica tu nombre de usuario de Twitch y el objeto de la solicitud. Podemos pedir una comprobación proporcionada de identidad para evitar que otra persona actúe sobre tu cuenta. No envíes contraseñas, tokens ni documentos de identidad salvo que se acuerde un medio adecuado y sean realmente necesarios.
+Para acceder, corregir o solicitar la eliminación de datos gestionados por APX Studio, escribe a **[soporte@apxstudio.es](mailto:soporte@apxstudio.es)** e indica tu nombre de usuario de Twitch y el objeto de la solicitud. Podemos pedir una comprobación proporcionada de identidad para evitar que otra persona actúe sobre tu cuenta. No envíes contraseñas, tokens ni documentos de identidad salvo que se acuerde un medio adecuado y sean realmente necesarios.
 
 Según la legislación aplicable, puedes tener derechos de acceso, rectificación, supresión, oposición, limitación, portabilidad y retirada del consentimiento. La retirada no afecta al tratamiento anterior lícito. También puedes presentar una reclamación ante la autoridad de protección de datos competente. Las solicitudes se atenderán conforme a los requisitos y plazos legales aplicables.
 
@@ -89,6 +89,6 @@ Esta política se actualizará cuando cambien las funciones o el tratamiento de 
 
 ## 10. Contacto de privacidad
 
-**APX Studio** · **[contacto.apxstudio@gmail.com](mailto:contacto.apxstudio@gmail.com)**.
+**APX Studio** · **[soporte@apxstudio.es](mailto:soporte@apxstudio.es)**.
 
 No publiques información personal, credenciales ni solicitudes de eliminación de cuenta en los issues públicos del repositorio.
