@@ -1,3 +1,25 @@
+# BlinkStream 1.5.4 — Mod View and enhanced-broadcast playback
+
+Release candidate, 2026-10-25. Public downloads/updater remain 1.5.3 pending
+real-account Mod View and 1440p acceptance and release gates.
+Version-specific release body: [1.5.4 ES/EN](docs/releases/1.5.4.md).
+
+## ES
+
+- Corregida la pantalla negra de Mod View por configuración inicial o antigua incompleta, conservando las preferencias válidas.
+- Reproducción y listado de calidades solicitan H.264, HEVC y AV1, sin limitar los canales de alta resolución a H.264.
+- Streamlink usa la cabecera OAuth documentada y puede aprovechar la sesión oficial integrada solo cuando su identidad validada coincide con la cuenta de la aplicación.
+- Corregido el procesamiento de calidades y los mensajes de reproducción, fuente de vídeo inaccesible y códec incompatible en ocho idiomas.
+
+## EN
+
+- Fixed Mod View black screens caused by incomplete fresh or legacy settings while preserving valid preferences.
+- Playback and quality discovery request H.264, HEVC and AV1 instead of limiting high-resolution channels to H.264.
+- Streamlink uses its documented OAuth header and can reuse the embedded official session only when its validated identity matches the app account.
+- Fixed quality parsing and playback, inaccessible-video-source and unsupported-codec messages in all eight languages.
+
+## Previous release
+
 # BlinkStream 1.5.3 — Authentication security
 
 Published on GitHub: 2026-10-22. Downloads/updater verified at 1.5.3; Store remains on 1.5.2.

@@ -1,6 +1,6 @@
 # PROJECT_STATE
 
-Updated: 2026-10-23
+Updated: 2026-10-25
 Status: active
 
 ## Objective
@@ -8,7 +8,7 @@ Status: active
 Cliente desktop de Twitch con reproducción, chat, grabación y Companion.
 Store 1.5.2 indicada por el usuario el 2026-10-17 al actualizar la web.
 GitHub 1.5.3 publicada y verificada; latest/descargas/updater 1.5.3.
-Búsqueda del chat nativo y traducciones aceptadas y entregadas; Store y GitHub alineados en 1.5.2 según el usuario.
+Fuente 1.5.4 candidata: corregir pantalla negra de Mod View y acceso a emisiones solo 1440p.
 
 ## Stack
 
@@ -66,14 +66,17 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- Candidata 1.5.4: Mod View reproducido con cinco configuraciones iniciales/legacy; normalización conserva preferencias válidas y evita el crash de enabledTabs. Streamlink solicita h264/h265/av1 tanto en reproducción como en listado; cabecera OAuth documentada y sesión web oficial solo con identidad Twitch validada coincidente con la cuenta nativa. Cookies permanecen nativas, sin nuevos IPC/permisos. Calidades parseadas desde stdout/stderr sin fragmentos de alias; errores de reproducción/fuente inaccesible/códec en ocho idiomas.
+- Hook 1.5.4: falsos positivos verificados contra HEAD en identificadores públicos Twitch preexistentes y CSP Supabase pública sin cambios; excepción por commit solo `twitch-clientid,supabase-url`. Sin omitir escáner ni reglas de tokens/claves privadas.
+- Validación 1.5.4: 778 frontend correctos/1 omitido, 33 de entrega, 64 Rust y Clippy todos los targets/features sin avisos. Compilación candidata Windows en curso. Prueba anónima de zappingolyt con Streamlink 8.6.2 devuelve solo audio aun solicitando todos los códecs; no demuestra reproducción 1440p autenticada. Usuario confirma misma cuenta en chat oficial, y fallo tanto GitHub como Store. Falta aceptación real de Mod View y 1440p antes de publicar/tag/desplegar web; descargas/updater permanecen 1.5.3.
 - Contactos separados por petición del usuario: privacidad/contacto `contacto@apxstudio.es`, soporte técnico `soporte@apxstudio.es`. Desplegado y verificado por SSH/HTTPS en ES/EN; seis enlaces de privacidad y política del repositorio alineados. Copia previa temporal: `/tmp/apxstudio-web-privacy-contact-5BCPu3QT`.
 - GitHub 1.5.3 publicada sobre `0eae25e`; CI candidato `39793015683`, CodeQL `39793022538` y publicación `39796091712`. Los 15 archivos públicos coinciden con CI y SHA-256; cuatro firmas del updater verificadas independientemente. Latest/master/updater coherentes en 1.5.3. Vitest/ui/coverage 4.1.12 corrige los dos avisos nuevos de @vitest/mocker del 2026-10-22; auditoría completa limpia y gate CI ampliado a dependencias de desarrollo.
 - MSIX final 1.5.3.0 generado desde `0eae25e` y pack/unpack/PRI/iconos/runtime comprobados: `src-tauri/target/msix/BlinkStream_1.5.3.0_x64.msix`, 94.728.466 bytes, SHA256 `5cbc35ac0419cc11c18ca6d55bdd27b54cab5936d204edba4f8f2f3838550e5e`. No instalado, firmado, enviado ni certificado.
 - Dependabot detectó tres avisos del servidor de desarrollo Vite 8.2.0 (GHSA-r825-w8mm-5pxw, GHSA-587h-7wmj-h5pm, GHSA-698v-4r3x-3vcv); actualizado a 8.2.4 y lockfile compatible. pnpm audit completo (producción/desarrollo): cero vulnerabilidades. Protección de contraseñas filtradas requiere Pro o superior según documentación oficial; no cambiar de plan automáticamente.
 - Primer CI 1.5.3 `39493604739` bloqueó RUSTSEC-2026-0381/0382/0383 en certificados TLS. Cargo.lock publicado con rustls-webpki 0.103.16 y webpki-roots/webpki-root-certs 1.0.10; OSV: 562 paquetes, cero vulnerabilidades, nueve avisos informativos de mantenimiento. Revalidación nativa/CI completada sin suprimir reglas.
 - Seguridad 1.5.3 autorizada y desplegada: auth_tokens privada, RLS forzada, TTL/UUID/identidad obligatorios y 22 handoffs caducados purgados. twitch-auth v38: refresh POST, identidad Twitch validada, migración legacy con prueba de sesión anterior y cliente de sesión aislado del service_role. Desktop publicado con validación horaria/logout remoto; Acerca de APX Studio en ocho idiomas.
-- Advisor live: sin avisos de rendimiento; INFO RLS sin políticas intencional en tabla privada. Protección de contraseñas filtradas sigue desactivada y requiere ajuste manual o API de gestión autorizada disponible. Login Twitch real completo pendiente de aceptación.
-- Validación candidata final 1.5.3: 749 frontend/1 omitido, 33 release, 11 pruebas OAuth sobre código real y 60 Rust Windows correctos; lint y build frontend correctos. Advisor del 2026-10-22 mantiene solo INFO de tabla privada y WARN de contraseñas filtradas (Pro+). El navegador para ese toggle quedó bloqueado por auto-review ante redirección ajena a Supabase. No se certifica login/logout real con cuenta Twitch ni GUI instalada.
+- Advisor live: sin avisos de rendimiento; INFO RLS sin políticas intencional en tabla privada. Protección de contraseñas filtradas requiere Pro+; no cambiar de plan automáticamente. Login y logout de 1.5.3 aceptados explícitamente por el usuario.
+- Validación candidata final 1.5.3: 749 frontend/1 omitido, 33 release, 11 pruebas OAuth sobre código real y 60 Rust Windows correctos; lint y build frontend correctos. Advisor del 2026-10-22 mantiene solo INFO de tabla privada y WARN de contraseñas filtradas (Pro+). El navegador para ese toggle quedó bloqueado por auto-review ante redirección ajena a Supabase. Posteriormente el usuario confirmó login/logout reales correctos; no instalar automáticamente la app.
 - Web APX 1.5.3 desplegada por SSH el 2026-10-22 con autorización explícita para este parche. «Current Version» solo v1.5.3 en ES/EN; caché 20261022.2, roadmap y descargas actualizados. Privacidad ES/EN y `PRIVACY.md` con `contacto@apxstudio.es`, fecha 2026-10-22; badges actuales sin versión separada de Store. 46 checks DOM y regresiones de contacto/versiones en siete páginas; once hashes remotos iguales a locales; once recursos HTTPS y home/auth HTTP 200. DOM público equivalente descontando únicamente transformaciones conocidas de correo/JSD de Cloudflare y formato. `deploy.ps1` intacto; sin cambios de permisos/claves. Copia previa 1.5.2: `/tmp/apxstudio-web-backup-1.5.3-EpgFDbOa`; previa al ajuste del campo: `/tmp/apxstudio-web-current-version-k0QiFVbQ`; previa a correcciones de coherencia: `/tmp/apxstudio-web-coherence-UAjZSMaM` (temporales).
 - GitHub 1.5.2 publicada, commit `3a5908e1d965cc99b4e5e8fc4fb37c1d1e6b2fa5`: búsqueda de chat nativo individual/unificado y traducciones aceptadas. CI candidato `39059837052` y publicación `39060821359` correctos; 15 archivos públicos coinciden con CI y hashes, cuatro firmas verificadas. Latest/master/public updater 1.5.2 coherentes. Store 1.5.2 indicada posteriormente por el usuario.
 - CI previo de master/tag bloqueó los nuevos RUSTSEC-2026-0367/0368/0369. Fix: retirar feature ZIP opcional no utilizada del updater, conservando TLS, firmas y formatos EXE/AppImage/TAR.GZ. Auditoría actual: 562 paquetes, cero vulnerabilidades conocidas, nueve avisos de mantenimiento. No se ignoran avisos ni cambia la clave.

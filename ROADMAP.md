@@ -7,7 +7,13 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
-## Execution status — 2026-10-22 / v1.5.3 published
+## Execution status — 2026-10-25 / v1.5.4 release candidate
+
+1.5.4 normalizes fresh/legacy Mod View settings, requests H.264/HEVC/AV1 consistently
+and uses the official Twitch web session only after validating that it belongs to
+the same signed-in account. Playback errors are distinguished from recording errors.
+Local regression tests do not establish real-account 1440p playback: candidate
+acceptance is required before publication. Public downloads/updater remain 1.5.3.
 
 1.5.3 hardens OAuth handoff access, expiry, immutable identity and session lifecycle.
 The database fix and twitch-auth v38 are deployed. GitHub downloads/updater are

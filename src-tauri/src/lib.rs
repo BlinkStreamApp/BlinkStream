@@ -938,6 +938,126 @@ fn run_streamlink(app: &AppHandle, args: &[&str]) -> Result<(String, String), St
     run_streamlink_with_timeout(app, args, 60)
 }
 
+const TWITCH_PLAYBACK_CODECS: &str = "h264,h265,av1";
+
+fn streamlink_playback_args(channel: &str, quality: Option<&str>) -> Vec<String> {
+    let mut args = vec![format!("twitch.tv/{channel}")];
+    if let Some(quality) = quality {
+        args.push(quality.to_string());
+    }
+    args.extend(
+        [
+            "--stream-url",
+            "--twitch-low-latency",
+            "--hls-live-edge",
+            "1",
+            "--twitch-supported-codecs",
+            TWITCH_PLAYBACK_CODECS,
+        ]
+        .into_iter()
+        .map(str::to_string),
+    );
+    args
+}
+
+fn streamlink_authenticated_args(args: &[String], token: Option<&str>) -> Vec<String> {
+    let mut authenticated = args.to_vec();
+    if let Some(token) = token.filter(|token| !token.is_empty()) {
+        authenticated.extend([
+            "--twitch-api-header".to_string(),
+            format!("Authorization=OAuth {token}"),
+        ]);
+    }
+    authenticated
+}
+
+fn playback_identities_match(app_id: Option<&str>, web_id: Option<&str>) -> bool {
+    app_id.is_some_and(|id| {
+        !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_digit()) && web_id == Some(id)
+    })
+}
+
+async fn playback_user_id(client: &reqwest::Client, token: &str) -> Option<String> {
+    let response = client
+        .get("https://id.twitch.tv/oauth2/validate")
+        .header("Authorization", format!("OAuth {token}"))
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let identity: serde_json::Value = response.json().await.ok()?;
+    identity.get("user_id")?.as_str().map(str::to_string)
+}
+
+async fn resolve_streamlink_user_token(app: &AppHandle) -> Option<String> {
+    let app_token = get_secret("twitch_token".to_string())
+        .await
+        .ok()
+        .filter(|token| !token.is_empty())?;
+    let Some(webview) = app.get_webview("main") else {
+        return Some(app_token);
+    };
+    let Some(web_token) = twitch_webview_auth_token(&webview).await.ok().flatten() else {
+        return Some(app_token);
+    };
+    if app_token == web_token {
+        return Some(app_token);
+    }
+    if let Ok(client) = reqwest::Client::builder()
+        .use_native_tls()
+        .timeout(Duration::from_secs(6))
+        .build()
+    {
+        let (app_id, web_id) = tokio::join!(
+            playback_user_id(&client, &app_token),
+            playback_user_id(&client, &web_token),
+        );
+        // A shared WebView profile must never borrow another account's session.
+        if playback_identities_match(app_id.as_deref(), web_id.as_deref()) {
+            return Some(web_token);
+        }
+    }
+    Some(app_token)
+}
+
+fn parse_streamlink_qualities(stdout: &str, stderr: &str) -> Vec<String> {
+    let mut qualities = Vec::new();
+    for line in stdout.lines().chain(stderr.lines()) {
+        let Some((_, available)) = line.split_once("Available streams:") else {
+            continue;
+        };
+        let mut aliases = false;
+        let names: String = available
+            .chars()
+            .filter(|character| match character {
+                '(' => {
+                    aliases = true;
+                    false
+                }
+                ')' => {
+                    aliases = false;
+                    false
+                }
+                _ => !aliases,
+            })
+            .collect();
+        for name in names
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+        {
+            if name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && !qualities.iter().any(|quality| quality == name)
+            {
+                qualities.push(name.to_string());
+            }
+        }
+    }
+    qualities
+}
+
 #[tauri::command]
 async fn get_stream_url(
     app: AppHandle,
@@ -946,24 +1066,9 @@ async fn get_stream_url(
 ) -> Result<String, String> {
     validate_channel(&channel)?;
 
-    let args: Vec<String> = vec![
-        format!("twitch.tv/{}", channel),
-        quality.clone(),
-        "--stream-url".to_string(),
-        "--twitch-low-latency".to_string(),
-        "--hls-live-edge".to_string(),
-        "1".to_string(),
-        "--twitch-supported-codecs".to_string(),
-        "h264".to_string(),
-    ];
+    let args = streamlink_playback_args(&channel, Some(&quality));
 
-    let mut resolved_token: Option<String> = None;
-
-    if let Ok(token) = get_secret("twitch_token".to_string()).await {
-        if !token.is_empty() {
-            resolved_token = Some(token);
-        }
-    }
+    let mut resolved_token = resolve_streamlink_user_token(&app).await;
 
     if resolved_token.is_none() {
         match get_app_token().await {
@@ -981,10 +1086,8 @@ async fn get_stream_url(
         }
     }
 
-    let mut auth_args = args.clone();
-    let mut res_sl = if let Some(token) = resolved_token {
-        auth_args.push("--twitch-api-header".to_string());
-        auth_args.push(format!("Authorization=Bearer {token}"));
+    let auth_args = streamlink_authenticated_args(&args, resolved_token.as_deref());
+    let mut res_sl = if resolved_token.is_some() {
         let arg_refs_auth: Vec<&str> = auth_args.iter().map(String::as_str).collect();
         run_streamlink(&app, &arg_refs_auth)
     } else {
@@ -1009,10 +1112,12 @@ async fn get_stream_url(
     let (stdout, stderr) = res_sl?;
     let url = stdout.trim().to_string();
 
+    if quality != "audio_only" && parse_streamlink_qualities(&stdout, &stderr) == ["audio_only"] {
+        return Err("VIDEO_SOURCE_UNAVAILABLE".to_string());
+    }
+
     if url.starts_with("error:") {
-        return Err(format!(
-            "Streamlink fallo: {url}. Usa 'worst' o 'best' como quality para evitar este error (las qualities exactas como '480p' o '480p30' dependen del canal)."
-        ));
+        return Err(format!("Streamlink fallo: {url}"));
     }
     if url.is_empty() {
         return Err(format!(
@@ -1027,17 +1132,9 @@ async fn get_stream_url(
 fn get_master_playlist(app: AppHandle, channel: String) -> Result<String, String> {
     validate_channel(&channel)?;
 
-    let (stdout, stderr) = run_streamlink(
-        &app,
-        &[
-            &format!("twitch.tv/{channel}"),
-            "best",
-            "--stream-url",
-            "--twitch-low-latency",
-            "--hls-live-edge",
-            "1",
-        ],
-    )?;
+    let args = streamlink_playback_args(&channel, Some("best"));
+    let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let (stdout, stderr) = run_streamlink(&app, &refs)?;
     let variant_url = stdout.trim();
 
     if variant_url.is_empty() {
@@ -1164,68 +1261,27 @@ const DEFAULT_QUALITIES: &[&str] = &[
 #[tauri::command]
 async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String> {
     let defaults: Vec<String> = DEFAULT_QUALITIES.iter().map(|&s| s.to_string()).collect();
-
-    if let Err(e) = validate_channel(&channel) {
-        log::error!("get_available_qualities: validate_channel error: {e}");
+    if validate_channel(&channel).is_err() {
         return defaults;
     }
-
-    let channel_for_blocking = channel.clone();
-    let join_result = tokio::task::spawn_blocking(move || {
-        run_streamlink_with_timeout(
-            &app,
-            &[&format!("twitch.tv/{channel_for_blocking}"), "--stream-url"],
-            15,
-        )
+    let token = resolve_streamlink_user_token(&app).await;
+    let result = tokio::task::spawn_blocking(move || {
+        let args = streamlink_playback_args(&channel, None);
+        let authenticated = streamlink_authenticated_args(&args, token.as_deref());
+        let refs: Vec<&str> = authenticated.iter().map(String::as_str).collect();
+        let (stdout, stderr) = run_streamlink_with_timeout(&app, &refs, 15)?;
+        let qualities = parse_streamlink_qualities(&stdout, &stderr);
+        if !qualities.is_empty() || token.is_none() {
+            return Ok::<_, String>(qualities);
+        }
+        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        let (stdout, stderr) = run_streamlink_with_timeout(&app, &refs, 15)?;
+        Ok(parse_streamlink_qualities(&stdout, &stderr))
     })
     .await;
-
-    let run_result = match join_result {
-        Ok(r) => r,
-        Err(e) => {
-            log::error!("get_available_qualities: spawn_blocking join error: {e}");
-            return defaults;
-        }
-    };
-
-    match run_result {
-        Ok((_stdout, stderr)) => {
-            let qualities: Vec<String> = stderr
-                .lines()
-                .filter_map(|line| {
-                    let line = line.trim();
-                    if !line.contains("Available streams:") {
-                        return None;
-                    }
-                    let parts = line.split("Available streams:").nth(1)?;
-                    Some(
-                        parts
-                            .split(',')
-                            .filter_map(|s| {
-                                let s = s.trim();
-                                let name = s.split_whitespace().next()?;
-                                if name.is_empty() || name.contains('[') {
-                                    return None;
-                                }
-                                Some(name.to_string())
-                            })
-                            .collect::<Vec<String>>(),
-                    )
-                })
-                .flatten()
-                .collect();
-
-            if qualities.is_empty() {
-                log::info!("get_available_qualities: parsing empty, usando defaults");
-                defaults
-            } else {
-                qualities
-            }
-        }
-        Err(e) => {
-            log::error!("get_available_qualities: streamlink error: {e}");
-            defaults
-        }
+    match result {
+        Ok(Ok(qualities)) if !qualities.is_empty() => qualities,
+        _ => defaults,
     }
 }
 
@@ -2644,6 +2700,61 @@ pub fn run() {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn playback_web_session_requires_the_same_validated_twitch_identity() {
+        assert!(playback_identities_match(Some("123"), Some("123")));
+        for (app_id, web_id) in [
+            (None, Some("123")),
+            (Some("123"), None),
+            (Some("123"), Some("456")),
+            (Some(""), Some("")),
+            (Some("name"), Some("name")),
+        ] {
+            assert!(!playback_identities_match(app_id, web_id));
+        }
+    }
+
+    #[test]
+    fn streamlink_uses_its_documented_oauth_header_without_mutating_clean_args() {
+        let args = streamlink_playback_args("testchannel", Some("best"));
+        let authenticated = streamlink_authenticated_args(&args, Some("unit-test"));
+        assert_eq!(
+            authenticated.last().map(String::as_str),
+            Some("Authorization=OAuth unit-test")
+        );
+        assert!(!args.iter().any(|arg| arg.contains("Authorization=")));
+        assert_eq!(streamlink_authenticated_args(&args, None), args);
+        assert_eq!(streamlink_authenticated_args(&args, Some("")), args);
+    }
+
+    #[test]
+    fn playback_and_discovery_request_enhanced_broadcast_codecs() {
+        for quality in [None, Some("best"), Some("1440p60"), Some("audio_only")] {
+            let args = streamlink_playback_args("testchannel", quality);
+            assert_eq!(args[0], "twitch.tv/testchannel");
+            assert!(args
+                .windows(2)
+                .any(|pair| pair == ["--twitch-supported-codecs", "h264,h265,av1"]));
+            if let Some(quality) = quality {
+                assert_eq!(args[1], quality);
+            } else {
+                assert_eq!(args[1], "--stream-url");
+            }
+        }
+    }
+
+    #[test]
+    fn quality_discovery_reads_both_outputs_without_alias_fragments() {
+        assert_eq!(
+            parse_streamlink_qualities(
+                "Available streams: audio_only (worst-unfiltered, best-unfiltered), 1440p60 (worst, best)",
+                "[cli][info] Available streams: 1440p60 (best), 720p60 (worst)",
+            ),
+            vec!["audio_only", "1440p60", "720p60"],
+        );
+        assert!(parse_streamlink_qualities("error: No streams found", "").is_empty());
+    }
 
     #[test]
     fn store_runtime_does_not_write_python_bytecode() {

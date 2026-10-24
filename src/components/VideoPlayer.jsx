@@ -23,6 +23,7 @@ import { useLiveDVR } from '../hooks/useLiveDVR'
 import DropsModal from './drops/DropsModal'
 import { startDropsWatcher, stopDropsWatcher, watchNativeDropsPlayback } from '../utils/dropsWatcher'
 import { getPlayerShortcut } from '../utils/keyboard'
+import { formatPlayerError } from '../utils/playerErrors'
 
 function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
@@ -36,31 +37,6 @@ function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="reg
 
 const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '936p60', '963p60', '1080p60', '1440p60']
 
-function formatPlayerError(rawError, channelName, t) {
-  if (!rawError) return null
-  const str = String(rawError)
-  const lower = str.toLowerCase()
-  if (
-    lower.includes('no playable streams found') ||
-    lower.includes('offline') ||
-    lower.includes('no streams found') ||
-    lower.includes('stream is offline') ||
-    lower.includes('is not live')
-  ) {
-    const rawTitle = t ? t('player.offlineTitle', '{channel} está Offline') : '{channel} está Offline'
-    const title = rawTitle.replace('{channel}', channelName || (t ? t('player.channelDefault', 'El canal') : 'El canal'))
-    return {
-      isOffline: true,
-      title,
-      desc: t ? t('player.offlineDesc', 'Este canal no está transmitiendo en directo en este momento.') : 'Este canal no está transmitiendo en directo en este momento.',
-    }
-  }
-  return {
-    isOffline: false,
-    title: t ? t('player.recordingError', 'Error de reproducción') : 'Error de reproducción',
-    desc: str.replace(/^No se pudo cargar [^:]+:\s*/i, '').replace(/Streamlink fallo:\s*error:\s*/i, ''),
-  }
-}
 
 function PlayerSettingsPanel({
   onClose,
@@ -474,7 +450,10 @@ export default function VideoPlayer({
         4: 'MEDIA_ERR_SRC_NOT_SUPPORTED',
       }[errCode] || `code ${errCode}`
       console.error(`[VideoPlayer] video.error: ${errMsg} (channel=${channel}, quality=${quality})`)
-      if (errCode === 3) {
+      if (errCode === 4) {
+        setError('VIDEO_CODEC_UNSUPPORTED')
+        setHlsDebug('Native MEDIA_ERR_SRC_NOT_SUPPORTED')
+      } else if (errCode === 3) {
         if (quality !== 'best') {
           console.warn(`[VideoPlayer] decode error at ${quality}, falling back to best`)
           onQualityChange('best')
@@ -483,9 +462,6 @@ export default function VideoPlayer({
           setError(`Fallo de decodificación de vídeo (Hardware/Codec). Intenta actualizar tus drivers o instalar el Media Feature Pack si usas Windows N.`)
           setHlsDebug('Native MEDIA_ERR_DECODE ignorado/mostrado')
         }
-      } else if (errCode === 4) {
-        setError(`Formato de vídeo no soportado por tu sistema: ${errMsg}`)
-        setHlsDebug('Native MEDIA_ERR_SRC_NOT_SUPPORTED')
       }
     }
     video.addEventListener('error', handleVideoError)
@@ -550,6 +526,13 @@ export default function VideoPlayer({
         if (import.meta.env.DEV) {
           console.warn(`[HLS] non-fatal ${data.type}: ${data.details}`)
         }
+        return
+      }
+
+      if (data.details === 'manifestIncompatibleCodecsError' || data.details === 'bufferIncompatibleCodecsError') {
+        setError('VIDEO_CODEC_UNSUPPORTED')
+        setHlsDebug(`UNSUPPORTED_CODEC: ${data.details}`)
+        hls.destroy()
         return
       }
 

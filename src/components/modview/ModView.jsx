@@ -17,16 +17,12 @@ import { TwitchChatPopout } from '../chat/TwitchChatPopout'
 import { openTwitchChatPopoutWindow } from '../../utils/twitchPopout'
 import { getUserIdByLogin } from '../../utils/twitch'
 import { useT } from '../../utils/i18n'
+import { normalizeModViewConfig } from '../../utils/modViewConfig'
 
 const VideoPlayer = lazy(() => import('../VideoPlayer'))
 const Chat = lazy(() => import('../Chat'))
 
 const CONFIG_STORAGE_KEY = 'bs.modview.config.v4'
-
-const DEFAULT_CONFIG = {
-  preset: 'mod_focus', // 'classic' | 'mod_focus' | 'chat_only' | 'no_player'
-  activeTab: 'audit',
-}
 
 export function ModView({
   channel,
@@ -110,12 +106,12 @@ export function ModView({
     try {
       const saved = localStorage.getItem(CONFIG_STORAGE_KEY)
       if (saved) {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(saved) }
+        return normalizeModViewConfig(JSON.parse(saved))
       }
     } catch {
       // ignore
     }
-    return DEFAULT_CONFIG
+    return normalizeModViewConfig()
   })
 
   const [rightPanelTab, setRightPanelTab] = useState(config.activeTab || 'audit')
@@ -186,7 +182,7 @@ export function ModView({
   }, [])
 
   const handleResetDefaults = () => {
-    setConfig(DEFAULT_CONFIG)
+    setConfig(normalizeModViewConfig())
     setRightPanelTab('audit')
     try {
       localStorage.removeItem(CONFIG_STORAGE_KEY)
@@ -573,7 +569,7 @@ export function ModView({
         isOpen={isLayoutDrawerOpen}
         onClose={() => setIsLayoutDrawerOpen(false)}
         config={config}
-        onChangeConfig={setConfig}
+        onChangeConfig={next => setConfig(normalizeModViewConfig(next))}
         onResetDefaults={handleResetDefaults}
       />
     </div>

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/source_version-1.5.3-e94560" alt="BlinkStream 1.5.3">
+  <img src="https://img.shields.io/badge/source_version-1.5.4-e94560" alt="BlinkStream 1.5.4">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f3460" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20v2%20%2B%20React%2019-16213e" alt="Stack">
   <img src="https://img.shields.io/badge/languages-8%20Supported-9147ff" alt="Languages">
@@ -66,7 +66,7 @@ Store installations receive updates through Microsoft Store; GitHub installation
 use the separate signed updater below.
 
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-**GitHub 1.5.3 is published and verified; Microsoft Store remains on 1.5.2** (Store version confirmed by the maintainer). All 15 public GitHub assets match CI and SHA-256 digests; four updater signatures verify for Windows, macOS Intel/Apple Silicon and Linux. The maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
+**Source 1.5.4 is a release candidate for Mod View and enhanced-broadcast playback fixes.** Real-account 1440p playback acceptance is still required before publication. GitHub downloads/updater remain on verified 1.5.3; Microsoft Store submissions are separate (last confirmed public version: 1.5.2). The maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
 
 The Store edition includes Streamlink/Python/FFmpeg with their original notices;
 WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.2
