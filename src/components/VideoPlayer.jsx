@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
-import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
+import { LIVE_PLAYBACK_CONFIG, stabilizeHighResolutionPlayback } from '../utils/livePlayback'
 import { measureInvoke } from '../utils/perf'
 import { TauriPlaylistLoader } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
@@ -430,15 +430,10 @@ export default function VideoPlayer({
     hls.loadSource(streamUrl)
     hls.attachMedia(video)
 
-    const resizeObserver = new ResizeObserver(() => {
-      if (hls && typeof hls.startLoad === 'function') {
-
-        try { hls.startLoad() } catch {  }
-      }
-    })
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current)
-    }
+    const updatePlaybackPolicy = () => stabilizeHighResolutionPlayback(hls, video)
+    video.addEventListener('loadedmetadata', updatePlaybackPolicy)
+    video.addEventListener('resize', updatePlaybackPolicy)
+    updatePlaybackPolicy()
 
     const handleVideoError = () => {
       if (!video.error) return
@@ -642,7 +637,8 @@ export default function VideoPlayer({
       clearTimeout(statsTimer)
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
 
-      resizeObserver.disconnect()
+      video.removeEventListener('loadedmetadata', updatePlaybackPolicy)
+      video.removeEventListener('resize', updatePlaybackPolicy)
       video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }

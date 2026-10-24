@@ -45,12 +45,12 @@ export function ModView({
     if (broadcasterId || !channel) return
     let cancelled = false
     getUserIdByLogin(channel).then(id => {
-      if (!cancelled && id) setResolvedBroadcasterId(id)
+      if (!cancelled && id) setResolvedBroadcasterId({ channel, id })
     }).catch(() => {})
     return () => { cancelled = true }
   }, [channel, broadcasterId])
 
-  const effectiveBroadcasterId = broadcasterId || resolvedBroadcasterId
+  const effectiveBroadcasterId = broadcasterId || (resolvedBroadcasterId?.channel === channel ? resolvedBroadcasterId.id : null)
 
   const modState = useModeration({ broadcasterId: effectiveBroadcasterId, userId })
   const roleState = useChannelRole({ broadcasterId: effectiveBroadcasterId, userId, channel })
@@ -300,12 +300,13 @@ export function ModView({
           <Suspense fallback={<div className="h-full w-full flex items-center justify-center text-text-muted text-xs">{t('mod.chat.loading', 'Cargando chat...')}</div>}>
             <Chat
               channel={channel}
-              broadcasterId={broadcasterId}
+              broadcasterId={effectiveBroadcasterId}
               userId={userId}
               isLoggedIn={isLoggedIn}
               twitchToken={twitchToken}
               twitchUsername={twitchUsername}
               isMod={true}
+              isModerator={roleState.isModerator}
               isBroadcaster={roleState.isBroadcaster}
               viewerLogin={twitchUsername}
               onLoginWithToken={onLoginWithToken}
@@ -515,6 +516,7 @@ export function ModView({
           />
         ) : (
           <RewardsQueuePanel
+            error={rewardsState.error}
             realtime={rewardsState.realtime}
             pendingRedemptions={rewardsState.pendingRedemptions}
             fulfilledRedemptions={rewardsState.fulfilledRedemptions}

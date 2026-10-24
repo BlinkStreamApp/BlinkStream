@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { RedemptionConnectionNotice } from '../channelpoints/RedemptionConnectionNotice'
+import { ModDataNotice } from './ModDataNotice'
 
 export function RewardsQueuePanel({
   pendingRedemptions = [],
@@ -11,6 +12,7 @@ export function RewardsQueuePanel({
   onRefresh,
   onInspectUser,
   realtime,
+  error,
 }) {
   const [tab, setTab] = useState('all') // 'all' | 'pending' | 'fulfilled'
   const [actionPending, setActionPending] = useState({})
@@ -44,6 +46,7 @@ export function RewardsQueuePanel({
   return (
     <div className="h-full flex flex-col font-sans">
       <RedemptionConnectionNotice connection={realtime} />
+      <ModDataNotice error={error} />
       {actionError && <p role="alert" className="px-3 py-2 text-xs text-red-400">{actionError}</p>}
       {/* Header */}
       <div className="shrink-0 p-2.5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">

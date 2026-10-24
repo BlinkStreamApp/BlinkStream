@@ -11,6 +11,9 @@ Version-specific release body: [1.5.4 ES/EN](docs/releases/1.5.4.md).
 - Streamlink usa la cabecera OAuth documentada y puede aprovechar la sesión oficial integrada solo cuando su identidad validada coincide con la cuenta de la aplicación.
 - Corregido el procesamiento de calidades y los mensajes de reproducción, fuente de vídeo inaccesible y códec incompatible en ocho idiomas.
 - Zod transitivo de las herramientas de desarrollo actualizado a 4.6.7 para corregir GHSA-mrhx-c7xc-m3w5; auditoría sin excepciones.
+- Perfil de estabilidad para vídeo 1440p o superior: velocidad normal, objetivo de latencia de seis segundos y sin reiniciar HLS al redimensionar el reproductor. Pendiente de aceptación real.
+- Mod View deja de ocultar consultas denegadas/fallidas como si fueran listas vacías; auditoría local y cola AutoMod sin eventos identificadas explícitamente. Esto no concede permisos ni conecta AutoMod.
+- Tokio actualizado a 1.53.3 contra RUSTSEC-2026-0386.
 
 ## EN
 
@@ -19,6 +22,9 @@ Version-specific release body: [1.5.4 ES/EN](docs/releases/1.5.4.md).
 - Streamlink uses its documented OAuth header and can reuse the embedded official session only when its validated identity matches the app account.
 - Fixed quality parsing and playback, inaccessible-video-source and unsupported-codec messages in all eight languages.
 - Updated development tooling's transitive Zod dependency to 4.6.7 for GHSA-mrhx-c7xc-m3w5 without audit exceptions.
+- Stability profile for 1440p and higher: normal playback speed, a six-second target latency and no HLS restart on player resize. Real playback acceptance pending.
+- Mod View distinguishes denied/failed reads from empty results and explicitly identifies its local audit and disconnected AutoMod queue. This does not grant permissions or connect AutoMod.
+- Updated Tokio to 1.53.3 for RUSTSEC-2026-0386.
 
 ## Previous release
 

@@ -209,9 +209,10 @@ describe('ModActionFeed', () => {
 })
 
 describe('AutoModQueue', () => {
-  it('renders empty state when no held messages exist', () => {
+  it('does not pretend the disconnected AutoMod queue has no pending Twitch messages', () => {
     render(<AutoModQueue heldMessages={[]} />)
-    expect(screen.getByText('Sin mensajes retenidos')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('AutoMod no está conectado')
+    expect(screen.queryByText('Sin mensajes retenidos')).not.toBeInTheDocument()
   })
 
   it('renders held message and triggers ALLOW / DENY callbacks', async () => {

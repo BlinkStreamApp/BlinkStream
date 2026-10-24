@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { getModerators, getVips, getChatters } from '../../utils/twitch'
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { ModDataNotice } from './ModDataNotice'
 
 export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], onInspectUser }) {
   const [tab, setTab] = useState('chatters') // 'chatters' | 'mods' | 'vips'
@@ -9,28 +10,39 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
   const [chatters, setChatters] = useState([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [errors, setErrors] = useState({})
+  const requestRef = useRef(0)
 
   const loadData = useCallback(async () => {
-    if (!broadcasterId) return
+    const request = ++requestRef.current
+    setMods([]); setVips([]); setChatters([]); setErrors({})
+    if (!broadcasterId) { setLoading(false); return }
     setLoading(true)
     try {
-      const [modRes, vipRes, chattersRes] = await Promise.all([
+      const results = await Promise.allSettled([
         getModerators(broadcasterId),
         getVips(broadcasterId),
         getChatters(broadcasterId, userId),
       ])
-      if (modRes.success) setMods(modRes.value || [])
-      if (vipRes.success) setVips(vipRes.value || [])
-      if (chattersRes.success) setChatters(chattersRes.value || [])
-    } catch {
-      // ignore
+      if (request !== requestRef.current) return
+      const failures = {}
+      results.forEach((result, index) => {
+        const key = ['mods', 'vips', 'chatters'][index]
+        if (result.status === 'fulfilled' && result.value.success) {
+          const setList = [setMods, setVips, setChatters][index]
+          setList(result.value.value || [])
+        } else failures[key] = result.status === 'rejected' ? result.reason || {} : result.value.error || {}
+      })
+      setErrors(failures)
+    } finally {
+      if (request === requestRef.current) setLoading(false)
     }
-    setLoading(false)
   }, [broadcasterId, userId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData()
+    return () => { requestRef.current += 1 }
   }, [loadData])
 
   // Unificar chatters de API con los que han hablado en chat en esta sesión
@@ -153,6 +165,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
       </div>
 
       {/* Search filter */}
+      <ModDataNotice error={errors[tab]} />
       <div className="p-2 border-b border-white/5">
         <input
           type="text"
@@ -170,7 +183,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
             <div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin mr-2" />
             <span>Cargando lista...</span>
           </div>
-        ) : filteredList.length === 0 ? (
+        ) : filteredList.length === 0 && !errors[tab] ? (
           <p className="text-center p-4 text-xs text-text-muted/60 italic">
             No se encontraron {tab === 'chatters' ? 'espectadores' : tab === 'mods' ? 'moderadores' : 'VIPs'}.
           </p>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { getUnbanRequests, resolveUnbanRequest } from '../../utils/twitch'
+import { ModDataNotice } from './ModDataNotice'
 
 export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = true, onLoginWithToken, onInspectUser }) {
   const [requests, setRequests] = useState([])
@@ -10,23 +11,23 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
   const [resolutionTextMap, setResolutionTextMap] = useState({})
   const [showInputFor, setShowInputFor] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [readError, setReadError] = useState(null)
 
   const loadRequests = useCallback(async () => {
     if (!broadcasterId || !userId || !isLoggedIn) return
     setLoading(true)
     setErrorMsg('')
+    setReadError(null)
     try {
       const res = await getUnbanRequests(broadcasterId, userId, statusFilter, 50, token)
       if (res.success) {
         setRequests(res.value || [])
       } else {
         setRequests([])
-        if (res.error?.status >= 500) {
-          setErrorMsg('Error de red al consultar solicitudes')
-        }
+        setReadError(res.error || {})
       }
-    } catch {
-      // Ignorar fallo de red en lectura pasiva
+    } catch (error) {
+      setReadError(error || {})
     }
     setLoading(false)
   }, [broadcasterId, userId, statusFilter, isLoggedIn, token])
@@ -102,6 +103,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
         </button>
       </div>
 
+      <ModDataNotice error={readError} />
       {errorMsg && (
         <div className="p-2 bg-red-500/10 border-b border-red-500/20 text-[11px] text-red-300">
           {errorMsg}
@@ -134,7 +136,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
             <div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin mr-2" />
             <span>Cargando solicitudes...</span>
           </div>
-        ) : requests.length === 0 ? (
+        ) : readError ? null : requests.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-6 text-center text-text-muted select-none">
             <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-2 text-white/30">
               <PhosphorIcon name="ChatCircleSlash" size={20} weight="duotone" />

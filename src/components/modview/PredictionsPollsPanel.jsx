@@ -10,6 +10,7 @@ import {
   getUserIdByLogin,
 } from '../../utils/twitch'
 import { useT } from '../../utils/i18n'
+import { ModDataNotice } from './ModDataNotice'
 
 export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, isLoggedIn = true, onLoginWithToken }) {
   const t = useT()
@@ -20,6 +21,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [actionPending, setActionPending] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
+  const [readError, setReadError] = useState(null)
 
   // Form State for creating prediction
   const [predTitle, setPredTitle] = useState('')
@@ -36,6 +38,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
     if (!broadcasterId || !isLoggedIn) return
     setLoading(true)
     setStatusMessage('')
+    setReadError(null)
     try {
       if (subTab === 'predictions') {
         const res = await getPredictions(broadcasterId, 20, token)
@@ -43,9 +46,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
           setPredictions(res.value || [])
         } else {
           setPredictions([])
-          if (res.error?.status >= 500) {
-            setStatusMessage('Error del servidor de Twitch al cargar predicciones')
-          }
+          setReadError(res.error || {})
         }
       } else {
         const res = await getPolls(broadcasterId, 20, token)
@@ -53,13 +54,11 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
           setPolls(res.value || [])
         } else {
           setPolls([])
-          if (res.error?.status >= 500) {
-            setStatusMessage('Error del servidor de Twitch al cargar encuestas')
-          }
+          setReadError(res.error || {})
         }
       }
-    } catch {
-      // Ignorar fallo de red en lectura pasiva
+    } catch (error) {
+      setReadError(error || {})
     }
     setLoading(false)
   }, [broadcasterId, subTab, isLoggedIn, token])
@@ -197,6 +196,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
         </div>
       </div>
 
+      <ModDataNotice error={readError} />
       {statusMessage && (
         <div className="px-3 py-2 bg-purple-950/40 border-b border-purple-500/20 text-[11px] text-purple-200 flex items-center justify-between gap-2 animate-fade-in">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -386,7 +386,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
             <div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin mr-2" />
             <span>Cargando {subTab === 'predictions' ? 'predicciones' : 'encuestas'}...</span>
           </div>
-        ) : subTab === 'predictions' ? (
+        ) : readError ? null : subTab === 'predictions' ? (
           predictions.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-6 text-center text-text-muted select-none">
               <PhosphorIcon name="Coins" size={24} className="text-white/20 mb-2" />

@@ -14,6 +14,10 @@ and uses the official Twitch web session only after validating that it belongs t
 the same signed-in account. Playback errors are distinguished from recording errors.
 Local regression tests do not establish real-account 1440p playback: candidate
 acceptance is required before publication. Public downloads/updater remain 1.5.3.
+Initial live feedback confirms video access but reports dropped frames and empty
+moderation panels. The second candidate adds a normal-speed 1440p stability profile,
+passes the moderator role to chat, and exposes failed/denied reads and disconnected
+data sources honestly. Live acceptance is still pending.
 
 1.5.3 hardens OAuth handoff access, expiry, immutable identity and session lifecycle.
 The database fix and twitch-auth v38 are deployed. GitHub downloads/updater are

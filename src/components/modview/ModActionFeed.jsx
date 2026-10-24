@@ -11,7 +11,7 @@ export function ModActionFeed({ auditLog = [], onInspectUser }) {
         </div>
         <p className="text-xs font-semibold text-white/70">{t('mod.audit.empty', 'Sin acciones recientes')}</p>
         <p className="text-[10px] text-text-muted mt-0.5">
-          {t('mod.audit.emptyDesc', 'Las sanciones y cambios de moderación se registrarán aquí en vivo.')}
+          {t('mod.audit.localSource')}
         </p>
       </div>
     )
@@ -38,6 +38,7 @@ export function ModActionFeed({ auditLog = [], onInspectUser }) {
 
   return (
     <div className="h-full overflow-y-auto space-y-2 p-3 font-sans">
+      <p className="text-xs text-text-muted">{t('mod.audit.localSource')}</p>
       {auditLog.slice().reverse().map((entry, index) => {
         const style = formatActionTitle(entry)
         const timeStr = entry.timestamp
