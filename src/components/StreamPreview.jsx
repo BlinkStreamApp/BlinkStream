@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Hls from 'hls.js'
 import { invoke } from '@tauri-apps/api/core'
-import { TauriPlaylistLoader } from '../utils/tauriHls'
+import { TauriPlaylistLoader, HLS_WORKER_CONFIG } from '../utils/tauriHls'
 
 export default function StreamPreview({ stream, enabled, quality = 'best' }) {
   const videoRef = useRef(null)
@@ -63,11 +63,11 @@ export default function StreamPreview({ stream, enabled, quality = 'best' }) {
 
       console.log(`[StreamPreview] Creando instancia HLS para ${channel}`)
       hls = new Hls({
+        ...HLS_WORKER_CONFIG,
         loader: TauriPlaylistLoader,
         maxBufferLength: 30,        
         maxMaxBufferLength: 60,     
         capLevelToPlayerSize: true, 
-        enableWorker: true,        
         lowLatencyMode: false,      
         backBufferLength: 30,       
         debug: false,

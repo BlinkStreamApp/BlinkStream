@@ -5,7 +5,7 @@ import { measureInvoke } from '../../utils/perf'
 import GridCell from './GridCell'
 
 vi.mock('../../utils/perf', () => ({ measureInvoke: vi.fn() }))
-vi.mock('../../utils/tauriHls', () => ({ TauriPlaylistLoader: class {} }))
+vi.mock('../../utils/tauriHls', () => ({ TauriPlaylistLoader: class {}, HLS_WORKER_CONFIG: { enableWorker: true, workerPath: '/hls.worker.js' } }))
 vi.mock('../../utils/i18n', () => {
   const translate = (_key, fallback) => fallback
   return { useT: () => translate, t: translate }

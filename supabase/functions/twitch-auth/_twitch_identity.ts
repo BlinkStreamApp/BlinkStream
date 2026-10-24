@@ -13,6 +13,7 @@ export const REQUESTED_TWITCH_SCOPES = [
   "moderator:manage:banned_users",
   "moderator:manage:chat_settings",
   "moderation:read",
+  "moderator:read:chatters",
   "channel:read:redemptions",
   "channel:manage:redemptions",
   "channel:read:predictions",

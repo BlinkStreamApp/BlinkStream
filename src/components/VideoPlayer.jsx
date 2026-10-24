@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
 import { LIVE_PLAYBACK_CONFIG, stabilizeHighResolutionPlayback } from '../utils/livePlayback'
 import { measureInvoke } from '../utils/perf'
-import { TauriPlaylistLoader } from '../utils/tauriHls'
+import { TauriPlaylistLoader, HLS_WORKER_CONFIG } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
 import { safeOpenUrl } from '../utils/tauriEnv'
@@ -405,6 +405,7 @@ export default function VideoPlayer({
     }
 
     const hls = new Hls({
+      ...HLS_WORKER_CONFIG,
       loader: TauriPlaylistLoader,
       ...LIVE_PLAYBACK_CONFIG,
       backBufferLength: 15,
@@ -415,7 +416,6 @@ export default function VideoPlayer({
       abrEwmaDefaultEstimate: 6_000_000,
       abrBandWidthFactor: 0.9,
       abrBandWidthUpFactor: 0.7,
-      enableWorker: true,
       fragLoadingTimeOut: 20000,
       manifestLoadingTimeOut: 15000,
       levelLoadingTimeOut: 15000,

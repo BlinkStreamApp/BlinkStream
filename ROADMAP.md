@@ -18,6 +18,11 @@ Initial live feedback confirms video access but reports dropped frames and empty
 moderation panels. The second candidate adds a normal-speed 1440p stability profile,
 passes the moderator role to chat, and exposes failed/denied reads and disconnected
 data sources honestly. Live acceptance is still pending.
+The third candidate bundles the missing ESM HLS worker across live/grid/preview/VOD;
+worker initialization is verified in Edge under the production CSP. With explicit
+authorization, twitch-auth v39 now requests chatter-read access for new OAuth
+consent; existing sessions require reauthorization. Real playback/panel acceptance
+remains a publication gate.
 
 1.5.3 hardens OAuth handoff access, expiry, immutable identity and session lifecycle.
 The database fix and twitch-auth v38 are deployed. GitHub downloads/updater are

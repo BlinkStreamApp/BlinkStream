@@ -3,6 +3,7 @@ import { PUBLIC_CLIENT_ID, getHeaders, sanitizeChannelForGraphQL } from '../util
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../utils/tauriEnv'
 import Hls from 'hls.js'
+import { HLS_WORKER_CONFIG } from '../utils/tauriHls'
 import PhosphorIcon from './icons/PhosphorIcon'
 import TimeRangeSnipper from './clips/TimeRangeSnipper'
 
@@ -65,7 +66,7 @@ function VodVideo({ video }) {
     const v = videoRef.current
     if (!url || !v) return
     if (Hls.isSupported()) {
-      const hls = new Hls(); hlsRef.current = hls
+      const hls = new Hls(HLS_WORKER_CONFIG); hlsRef.current = hls
       hls.loadSource(url); hls.attachMedia(v)
     } else if (v.canPlayType('application/vnd.apple.mpegurl')) { v.src = url }
     else {

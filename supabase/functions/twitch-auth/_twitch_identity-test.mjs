@@ -36,3 +36,9 @@ test('requested scopes exclude obsolete and unused account-wide grants', () => {
   assert.equal(REQUESTED_TWITCH_SCOPES.includes('user:edit:follows'), false)
   assert.equal(REQUESTED_TWITCH_SCOPES.includes('channel:read:subscriptions'), false)
 })
+
+test('requests chatter access without making it mandatory for existing sessions', () => {
+  assert.equal(REQUESTED_TWITCH_SCOPES.includes('moderator:read:chatters'), true)
+  assert.notEqual(parseTwitchIdentity(valid, 'own-client'), null)
+  assert.notEqual(parseTwitchIdentity({ ...valid, scopes: [...valid.scopes, 'moderator:read:chatters'] }, 'own-client'), null)
+})

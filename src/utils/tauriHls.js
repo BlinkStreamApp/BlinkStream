@@ -1,5 +1,8 @@
 import Hls from 'hls.js'
 import { invoke } from '@tauri-apps/api/core'
+import hlsWorkerUrl from 'hls.js/dist/hls.worker.js?url'
+
+export const HLS_WORKER_CONFIG = Object.freeze({ enableWorker: true, workerPath: hlsWorkerUrl })
 
 function absolutizePlaylist(text, baseUrl) {
   return text.split(/\r?\n/).map(line => {

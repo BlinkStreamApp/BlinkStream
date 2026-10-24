@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
 import { LIVE_PLAYBACK_CONFIG } from '../../utils/livePlayback'
 import { measureInvoke } from '../../utils/perf'
-import { TauriPlaylistLoader } from '../../utils/tauriHls'
+import { TauriPlaylistLoader, HLS_WORKER_CONFIG } from '../../utils/tauriHls'
 import { useT, t as translate } from '../../utils/i18n'
 import { useStereoPanner } from '../../hooks/useStereoPanner'
 import PhosphorIcon from '../icons/PhosphorIcon'
@@ -89,13 +89,13 @@ export default function GridCell({
     let disposed = false
     if (Hls.isSupported()) {
       hls = new Hls({
+        ...HLS_WORKER_CONFIG,
         loader: TauriPlaylistLoader,
         ...LIVE_PLAYBACK_CONFIG,
         backBufferLength: 15,
         maxBufferLength: 10,
         maxMaxBufferLength: 20,
         capLevelToPlayerSize: true,
-        enableWorker: true,
       })
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (!disposed) video.play().catch(() => {})

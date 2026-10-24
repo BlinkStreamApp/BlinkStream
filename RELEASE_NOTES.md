@@ -14,6 +14,8 @@ Version-specific release body: [1.5.4 ES/EN](docs/releases/1.5.4.md).
 - Perfil de estabilidad para vídeo 1440p o superior: velocidad normal, objetivo de latencia de seis segundos y sin reiniciar HLS al redimensionar el reproductor. Pendiente de aceptación real.
 - Mod View deja de ocultar consultas denegadas/fallidas como si fueran listas vacías; auditoría local y cola AutoMod sin eventos identificadas explícitamente. Esto no concede permisos ni conecta AutoMod.
 - Tokio actualizado a 1.53.3 contra RUSTSEC-2026-0386.
+- Worker de HLS empaquetado explícitamente para el build ESM en directo, grid, previsualización y VOD; se evita el procesamiento de segmentos en el hilo de la interfaz por falta de workerPath.
+- Login solicita moderator:read:chatters tras consentimiento; twitch-auth v39 desplegada con autorización expresa. Las sesiones anteriores siguen siendo válidas, pero requieren nuevo login para conceder el permiso.
 
 ## EN
 
@@ -25,6 +27,8 @@ Version-specific release body: [1.5.4 ES/EN](docs/releases/1.5.4.md).
 - Stability profile for 1440p and higher: normal playback speed, a six-second target latency and no HLS restart on player resize. Real playback acceptance pending.
 - Mod View distinguishes denied/failed reads from empty results and explicitly identifies its local audit and disconnected AutoMod queue. This does not grant permissions or connect AutoMod.
 - Updated Tokio to 1.53.3 for RUSTSEC-2026-0386.
+- Explicitly bundled the HLS worker for ESM in live, grid, preview and VOD playback, avoiding main-thread segment processing caused by a missing workerPath.
+- Login requests moderator:read:chatters with consent; twitch-auth v39 deployed with explicit authorization. Existing sessions remain valid but need a new login to grant this permission.
 
 ## Previous release
 
