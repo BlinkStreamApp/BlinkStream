@@ -13,19 +13,19 @@ export function OfficialModView({ channel, volume, onVolumeChange, quality, onQu
   const [attempt, setAttempt] = useState(0)
   const [failed, setFailed] = useState(false)
   const [showVideo, setShowVideo] = useState(false)
-  const [videoHeight, setVideoHeight] = useState(() => {
+  const [videoWidth, setVideoWidth] = useState(() => {
     try {
-      const saved = Number(localStorage.getItem('bs.modview.hybrid.height') || 35)
-      return Number.isFinite(saved) ? Math.max(20, Math.min(60, saved)) : 35
-    } catch { return 35 }
+      const saved = Number(localStorage.getItem('bs.modview.hybrid.width') || 40)
+      return Number.isFinite(saved) ? Math.max(25, Math.min(55, saved)) : 40
+    } catch { return 40 }
   })
   const cleanChannel = (channel || '').trim().toLowerCase()
   const valid = isValidTwitchLogin(cleanChannel)
-  const changeHeight = value => {
-    const height = Math.max(20, Math.min(60, Number(value)))
-    if (!Number.isFinite(height)) return
-    setVideoHeight(height)
-    try { localStorage.setItem('bs.modview.hybrid.height', String(height)) } catch { /* storage unavailable */ }
+  const changeWidth = value => {
+    const width = Math.max(25, Math.min(55, Number(value)))
+    if (!Number.isFinite(width)) return
+    setVideoWidth(width)
+    try { localStorage.setItem('bs.modview.hybrid.width', String(width)) } catch { /* storage unavailable */ }
   }
 
   useEffect(() => {
@@ -100,23 +100,25 @@ export function OfficialModView({ channel, volume, onVolumeChange, quality, onQu
       <span className="flex-1">{t('mod.official.session')}</span>
       <button type="button" disabled={!valid} aria-pressed={showVideo} className="px-2 py-1 rounded bg-white/10 aria-pressed:bg-twitch text-white cursor-pointer disabled:opacity-50" onClick={() => setShowVideo(value => !value)}>{t(showVideo ? 'mod.hybrid.hide' : 'mod.hybrid.show')}</button>
       {showVideo && <label className="flex items-center gap-2">
-        {t('mod.hybrid.height')}
-        <input type="range" min="20" max="60" step="5" value={videoHeight} aria-label={t('mod.hybrid.height')} onChange={event => changeHeight(event.target.value)} className="w-24 accent-twitch cursor-pointer" />
+        {t('mod.hybrid.width')}
+        <input type="range" min="25" max="55" step="5" value={videoWidth} aria-label={t('mod.hybrid.width')} onChange={event => changeWidth(event.target.value)} className="w-24 accent-twitch cursor-pointer" />
       </label>}
       <button type="button" className="text-white cursor-pointer" onClick={() => { setFailed(false); setAttempt(value => value + 1) }}>{t('mod.official.reload')}</button>
       {valid && <button type="button" className="text-twitch cursor-pointer" onClick={() => safeOpenUrl(`https://www.twitch.tv/moderator/${encodeURIComponent(cleanChannel)}`)}>{t('mod.official.browser')}</button>}
     </div>
     {(failed || !valid || !isTauri()) && <p role="alert" className="px-3 py-2 text-sm text-amber-300">{t(!isTauri() ? 'mod.official.desktop' : 'mod.official.failed')}</p>}
-    {showVideo && <p className="shrink-0 px-3 py-1 text-xs text-amber-200 bg-amber-400/5">{t('mod.hybrid.hint')}</p>}
-    <div className="flex flex-col flex-1 min-h-0">
-      {showVideo && valid && <div data-testid="hybrid-video-panel" className="shrink-0 min-h-0 overflow-hidden bg-black border-b border-white/10" style={{ height: `${videoHeight}%` }}>
-        <Suspense fallback={<p role="status" className="p-3 text-sm text-text-muted">{t('mod.hybrid.loading')}</p>}>
+    <div className="flex flex-row flex-1 min-h-0 min-w-0">
+      {showVideo && valid && <div data-testid="hybrid-video-panel" className="flex flex-col justify-center shrink-0 min-w-0 min-h-0 overflow-hidden bg-[#0a0a0f] border-r border-white/10 p-2 gap-3" style={{ width: `${videoWidth}%` }}>
+        <div className="aspect-video max-h-full w-full overflow-hidden rounded-lg bg-black">
+          <Suspense fallback={<p role="status" className="p-3 text-sm text-text-muted">{t('mod.hybrid.loading')}</p>}>
           <VideoPlayer channel={cleanChannel} volume={volume} onVolumeChange={onVolumeChange} quality={quality} onQualityChange={onQualityChange}
             isLoggedIn={isLoggedIn} twitchToken={twitchToken} twitchUsername={twitchUsername} broadcasterId={broadcasterId} onLoginWithToken={onLoginWithToken}
-            theatreMode={true} onToggleTheatre={() => changeHeight(videoHeight >= 60 ? 35 : 60)} />
-        </Suspense>
+            theatreMode={true} onToggleTheatre={() => changeWidth(videoWidth >= 55 ? 40 : 55)} />
+          </Suspense>
+        </div>
+        <p className="shrink-0 px-2 text-xs leading-relaxed text-text-muted">{t('mod.hybrid.hint')}</p>
       </div>}
-      <div ref={containerRef} data-testid="official-modview-host" className="flex-1 min-h-0 w-full" />
+      <div ref={containerRef} data-testid="official-modview-host" className="flex-1 min-w-0 min-h-0 h-full" />
     </div>
   </div>
 }

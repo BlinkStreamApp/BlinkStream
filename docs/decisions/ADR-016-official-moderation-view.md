@@ -36,8 +36,11 @@ Reload, browser fallback and the prior custom interface remain available.
 
 The user requested BlinkStream video alongside the official tools after observing
 that docking Twitch's widget leaves a playing mini-player. An explicit button
-mounts the existing BlinkStream player above the tools, with a bounded height
-control. Video starts disabled on entry/channel change; only its size is saved.
+mounts the existing BlinkStream player to the left of the tools, with a bounded
+width control (25–55%, initially 40%). Video keeps its 16:9 shape and tools retain
+the available height. The previous top strip was rejected in the user's real
+test because it wasted width and compressed moderation panels.
+Video starts disabled on entry/channel change; only its width is saved.
 Hide/exit unmounts the player. Visibility/size changes update the existing official
 host without navigating or replacing its session. Unchanged bounds do not generate
 native resize calls for player DOM updates.

@@ -35,12 +35,12 @@ describe('Official moderation host', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test volume' }))
     expect(onQualityChange).toHaveBeenCalledWith('720p')
     expect(onVolumeChange).toHaveBeenCalledWith(25)
-    fireEvent.change(screen.getByRole('slider', { name: 'Tamaño del vídeo' }), { target: { value: '60' } })
-    expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ height: '60%' })
-    expect(localStorage.getItem('bs.modview.hybrid.height')).toBe('60')
-    HTMLElement.prototype.getBoundingClientRect.mockReturnValue({ left: 10, top: 350, right: 810, bottom: 580, width: 800, height: 230 })
+    fireEvent.change(screen.getByRole('slider', { name: 'Ancho del vídeo' }), { target: { value: '55' } })
+    expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ width: '55%' })
+    expect(localStorage.getItem('bs.modview.hybrid.width')).toBe('55')
+    HTMLElement.prototype.getBoundingClientRect.mockReturnValue({ left: 350, top: 80, right: 810, bottom: 580, width: 460, height: 500 })
     fireEvent(window, new Event('resize'))
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ y: 350, height: 230, visible: true })))
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ x: 350, height: 500, visible: true })))
     fireEvent.click(screen.getByRole('button', { name: 'Ocultar vídeo BlinkStream' }))
     expect(screen.queryByTestId('hybrid-player')).not.toBeInTheDocument()
     expect(screen.getByTestId('official-modview-host')).toBe(host)
@@ -48,11 +48,11 @@ describe('Official moderation host', () => {
     expect(invoke.mock.calls.filter(([command]) => command === 'unmount_official_modview')).toHaveLength(0)
   })
 
-  it.each([['invalid', '35%'], ['NaN', '35%'], ['100', '60%'], ['-10', '20%']])('bounds a saved video size of %s', async (saved, expected) => {
-    localStorage.setItem('bs.modview.hybrid.height', saved)
+  it.each([['invalid', '40%'], ['NaN', '40%'], ['100', '55%'], ['-10', '25%']])('bounds a saved video size of %s', async (saved, expected) => {
+    localStorage.setItem('bs.modview.hybrid.width', saved)
     render(<OfficialModView channel="testchannel" />)
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
-    expect(await screen.findByTestId('hybrid-video-panel')).toHaveStyle({ height: expected })
+    expect(await screen.findByTestId('hybrid-video-panel')).toHaveStyle({ width: expected })
   })
 
   it('mounts the official channel without tokens and resizes without navigating again', async () => {
