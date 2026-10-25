@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+.player-control-container { container-type: inline-size; container-name: player; }
+
+@container player (max-width: 900px) {
+  .player-controls { left: 8px; right: 8px; bottom: 8px; padding: 8px; flex-wrap: wrap; gap: 8px; }
+  .player-controls > div { min-width: 0; gap: 8px; flex-wrap: wrap; }
+  .player-controls > div > div { gap: 8px; }
+  .player-controls button { flex-shrink: 0; }
+  .player-controls input[type="range"] { width: 56px; }
+  .player-settings-panel { padding: 8px; }
+  .player-settings-toggles > div { padding-block: 2px; gap: 8px; }
+  .player-settings-panel [role="switch"] { height: 32px; }
+}
+
+.player-surface[data-compact="true"] .player-controls { left: 8px; right: 8px; bottom: 8px; padding: 6px; gap: 6px; flex-wrap: wrap; }
+
+@container player (max-width: 550px) {
+  .player-controls > div { width: 100%; justify-content: space-between; gap: 4px; }
+  .player-controls > div > div { gap: 4px; }
+  .player-settings-panel { bottom: 88px; max-height: calc(100% - 96px) !important; }
+}
+
 @theme {
   --color-twitch: #9146ff;
   --color-twitch-dark: #772ce8;

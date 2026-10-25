@@ -10,23 +10,35 @@ const VideoPlayer = lazy(() => import('../VideoPlayer'))
 export function OfficialModView({ channel, volume, onVolumeChange, quality, onQualityChange, isLoggedIn, twitchToken, twitchUsername, broadcasterId, onLoginWithToken }) {
   const t = useT()
   const containerRef = useRef(null)
+  const syncRef = useRef(null)
   const [attempt, setAttempt] = useState(0)
   const [failed, setFailed] = useState(false)
   const [showVideo, setShowVideo] = useState(false)
+  const [compactVideo, setCompactVideo] = useState(false)
+  const [toolsZoom, setToolsZoom] = useState(() => {
+    try { const saved = localStorage.getItem('bs.modview.tools.zoom'); return ['1', '0.9', '0.8', '0.7'].includes(saved) ? saved : 'auto' } catch { return 'auto' }
+  })
+  const zoomRef = useRef(toolsZoom === 'auto' ? null : Number(toolsZoom))
   const [videoWidth, setVideoWidth] = useState(() => {
     try {
-      const saved = Number(localStorage.getItem('bs.modview.hybrid.width') || 40)
-      return Number.isFinite(saved) ? Math.max(25, Math.min(55, saved)) : 40
-    } catch { return 40 }
+      const saved = Number(localStorage.getItem('bs.modview.hybrid.width') || 35)
+      return Number.isFinite(saved) ? Math.max(25, Math.min(45, saved)) : 35
+    } catch { return 35 }
   })
   const cleanChannel = (channel || '').trim().toLowerCase()
   const valid = isValidTwitchLogin(cleanChannel)
   const changeWidth = value => {
-    const width = Math.max(25, Math.min(55, Number(value)))
+    const width = Math.max(25, Math.min(45, Number(value)))
     if (!Number.isFinite(width)) return
     setVideoWidth(width)
     try { localStorage.setItem('bs.modview.hybrid.width', String(width)) } catch { /* storage unavailable */ }
   }
+
+  useEffect(() => {
+    zoomRef.current = toolsZoom === 'auto' ? null : Number(toolsZoom)
+    syncRef.current?.()
+    try { localStorage.setItem('bs.modview.tools.zoom', toolsZoom) } catch { /* storage unavailable */ }
+  }, [toolsZoom])
 
   useEffect(() => {
     if (!isTauri() || !valid) return undefined
@@ -56,10 +68,11 @@ export function OfficialModView({ channel, volume, onVolumeChange, quality, onQu
         const current = bounds()
         if (current) lastBounds = current
         const visible = Boolean(current) && !covered()
-        const signature = `${lastBounds.x},${lastBounds.y},${lastBounds.width},${lastBounds.height},${visible}`
+        const zoom = zoomRef.current
+        const signature = `${lastBounds.x},${lastBounds.y},${lastBounds.width},${lastBounds.height},${visible},${zoom}`
         if (signature === lastSync) return
         lastSync = signature
-        void invoke('update_official_modview_bounds', { session, ...lastBounds, visible }).catch(fail)
+        void invoke('update_official_modview_bounds', { session, ...lastBounds, visible, zoom }).catch(fail)
       })
     }
     const mounting = (async () => {
@@ -67,12 +80,13 @@ export function OfficialModView({ channel, volume, onVolumeChange, quality, onQu
         const initial = bounds()
         if (!initial) throw new Error('No visible bounds')
         lastBounds = initial
-        await invoke('mount_official_modview', { session, channel: cleanChannel, ...initial })
+        await invoke('mount_official_modview', { session, channel: cleanChannel, ...initial, zoom: zoomRef.current })
         if (disposed) return
         mounted = true
         sync()
       } catch { fail() }
     })()
+    syncRef.current = sync
     const resize = new ResizeObserver(sync)
     resize.observe(containerRef.current)
     const modals = new MutationObserver(sync)
@@ -83,6 +97,7 @@ export function OfficialModView({ channel, volume, onVolumeChange, quality, onQu
     document.addEventListener('fullscreenchange', sync)
     return () => {
       disposed = true
+      if (syncRef.current === sync) syncRef.current = null
       resize.disconnect()
       modals.disconnect()
       if (frame !== null) cancelAnimationFrame(frame)
@@ -101,22 +116,28 @@ export function OfficialModView({ channel, volume, onVolumeChange, quality, onQu
       <button type="button" disabled={!valid} aria-pressed={showVideo} className="px-2 py-1 rounded bg-white/10 aria-pressed:bg-twitch text-white cursor-pointer disabled:opacity-50" onClick={() => setShowVideo(value => !value)}>{t(showVideo ? 'mod.hybrid.hide' : 'mod.hybrid.show')}</button>
       {showVideo && <label className="flex items-center gap-2">
         {t('mod.hybrid.width')}
-        <input type="range" min="25" max="55" step="5" value={videoWidth} aria-label={t('mod.hybrid.width')} onChange={event => changeWidth(event.target.value)} className="w-24 accent-twitch cursor-pointer" />
+        <input type="range" min="25" max="45" step="5" value={videoWidth} aria-label={t('mod.hybrid.width')} onChange={event => changeWidth(event.target.value)} className="w-24 accent-twitch cursor-pointer" />
       </label>}
+      <label className="flex items-center gap-2">{t('mod.official.scale')}
+        <select aria-label={t('mod.official.scale')} value={toolsZoom} onChange={event => setToolsZoom(event.target.value)} className="bg-bg-secondary rounded border border-white/15 px-2 py-1 text-white">
+          <option value="auto">{t('mod.official.autoScale')}</option>
+          {['1', '0.9', '0.8', '0.7'].map(value => <option key={value} value={value}>{Math.round(Number(value) * 100)}%</option>)}
+        </select>
+      </label>
       <button type="button" className="text-white cursor-pointer" onClick={() => { setFailed(false); setAttempt(value => value + 1) }}>{t('mod.official.reload')}</button>
       {valid && <button type="button" className="text-twitch cursor-pointer" onClick={() => safeOpenUrl(`https://www.twitch.tv/moderator/${encodeURIComponent(cleanChannel)}`)}>{t('mod.official.browser')}</button>}
     </div>
     {(failed || !valid || !isTauri()) && <p role="alert" className="px-3 py-2 text-sm text-amber-300">{t(!isTauri() ? 'mod.official.desktop' : 'mod.official.failed')}</p>}
     <div className="flex flex-row flex-1 min-h-0 min-w-0">
-      {showVideo && valid && <div data-testid="hybrid-video-panel" className="flex flex-col justify-center shrink-0 min-w-0 min-h-0 overflow-hidden bg-[#0a0a0f] border-r border-white/10 p-2 gap-3" style={{ width: `${videoWidth}%` }}>
+      {showVideo && valid && <div data-testid="hybrid-video-panel" className={`flex flex-col justify-center shrink-0 min-w-0 min-h-0 overflow-hidden bg-[#0a0a0f] border-r border-white/10 ${compactVideo ? 'p-1 gap-1' : 'p-2 gap-3'}`} style={{ width: `${videoWidth}%` }}>
         <div className="aspect-video max-h-full w-full overflow-hidden rounded-lg bg-black">
           <Suspense fallback={<p role="status" className="p-3 text-sm text-text-muted">{t('mod.hybrid.loading')}</p>}>
           <VideoPlayer channel={cleanChannel} volume={volume} onVolumeChange={onVolumeChange} quality={quality} onQualityChange={onQualityChange}
             isLoggedIn={isLoggedIn} twitchToken={twitchToken} twitchUsername={twitchUsername} broadcasterId={broadcasterId} onLoginWithToken={onLoginWithToken}
-            theatreMode={true} onToggleTheatre={() => changeWidth(videoWidth >= 55 ? 40 : 55)} />
+            compact={compactVideo} onToggleCompact={() => setCompactVideo(value => !value)} theatreMode={true} onToggleTheatre={() => changeWidth(videoWidth >= 45 ? 35 : 45)} />
           </Suspense>
         </div>
-        <p className="shrink-0 px-2 text-xs leading-relaxed text-text-muted">{t('mod.hybrid.hint')}</p>
+        {!compactVideo && <p className="shrink-0 px-2 text-xs leading-relaxed text-text-muted">{t('mod.hybrid.hint')}</p>}
       </div>}
       <div ref={containerRef} data-testid="official-modview-host" className="flex-1 min-w-0 min-h-0 h-full" />
     </div>

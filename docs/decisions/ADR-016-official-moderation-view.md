@@ -37,7 +37,7 @@ Reload, browser fallback and the prior custom interface remain available.
 The user requested BlinkStream video alongside the official tools after observing
 that docking Twitch's widget leaves a playing mini-player. An explicit button
 mounts the existing BlinkStream player to the left of the tools, with a bounded
-width control (25–55%, initially 40%). Video keeps its 16:9 shape and tools retain
+width control (25–45%, initially 35%). Video keeps its 16:9 shape and tools retain
 the available height. The previous top strip was rejected in the user's real
 test because it wasted width and compressed moderation panels.
 Video starts disabled on entry/channel change; only its width is saved.
@@ -48,3 +48,19 @@ native resize calls for player DOM updates.
 Twitch's video must be paused and muted manually using its own controls. Docking
 does not imply playback/ads stopped. No scripts alter Twitch's player or ad flow;
 this layout does not guarantee the absence of ads or concurrent playback.
+
+Real screenshots showed unreadable widget columns in the reduced official host.
+Use native webview zoom: automatic mode targets a 1440 CSS-pixel workspace, bounded
+to 65–100%, and manual 70/80/90/100% choices remain available. This is browser
+scaling, without modifying Twitch's DOM, controls, permissions or session. Scale
+updates reuse the existing host rather than navigating. Validate authenticated
+widget reflow with the user; local tests only verify dimensions, zoom bounds and
+request lifecycle.
+
+The shared player uses container queries for controls, and its settings menu is
+bounded by the player height with scrolling and a sticky close header. Compact
+mode in the hybrid has a real handler. Switch clicks stop propagation so row and
+switch handlers cannot toggle twice.
+Containment is limited to the controls layer so fixed media dialogs retain their
+window-sized layout. Clips and VOD dialogs identify themselves as dialogs, allowing
+the official native host to hide behind them.

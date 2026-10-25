@@ -35,9 +35,9 @@ describe('Official moderation host', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test volume' }))
     expect(onQualityChange).toHaveBeenCalledWith('720p')
     expect(onVolumeChange).toHaveBeenCalledWith(25)
-    fireEvent.change(screen.getByRole('slider', { name: 'Ancho del vídeo' }), { target: { value: '55' } })
-    expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ width: '55%' })
-    expect(localStorage.getItem('bs.modview.hybrid.width')).toBe('55')
+    fireEvent.change(screen.getByRole('slider', { name: 'Ancho del vídeo' }), { target: { value: '45' } })
+    expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ width: '45%' })
+    expect(localStorage.getItem('bs.modview.hybrid.width')).toBe('45')
     HTMLElement.prototype.getBoundingClientRect.mockReturnValue({ left: 350, top: 80, right: 810, bottom: 580, width: 460, height: 500 })
     fireEvent(window, new Event('resize'))
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ x: 350, height: 500, visible: true })))
@@ -48,7 +48,7 @@ describe('Official moderation host', () => {
     expect(invoke.mock.calls.filter(([command]) => command === 'unmount_official_modview')).toHaveLength(0)
   })
 
-  it.each([['invalid', '40%'], ['NaN', '40%'], ['100', '55%'], ['-10', '25%']])('bounds a saved video size of %s', async (saved, expected) => {
+  it.each([['invalid', '35%'], ['NaN', '35%'], ['100', '45%'], ['-10', '25%']])('bounds a saved video size of %s', async (saved, expected) => {
     localStorage.setItem('bs.modview.hybrid.width', saved)
     render(<OfficialModView channel="testchannel" />)
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
@@ -58,7 +58,7 @@ describe('Official moderation host', () => {
   it('mounts the official channel without tokens and resizes without navigating again', async () => {
     const view = render(<OfficialModView channel="AlbertPlayXD" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('mount_official_modview', {
-      session: expect.stringMatching(/^[a-f0-9]{32}$/), channel: 'albertplayxd', x: 10, y: 80, width: 800, height: 500,
+      session: expect.stringMatching(/^[a-f0-9]{32}$/), channel: 'albertplayxd', x: 10, y: 80, width: 800, height: 500, zoom: null,
     }))
     fireEvent(window, new Event('resize'))
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ visible: true })))
@@ -79,6 +79,16 @@ describe('Official moderation host', () => {
     await act(async () => finish())
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('unmount_official_modview', { session: oldSession }))
     expect(invoke).not.toHaveBeenCalledWith('unmount_official_modview', { session: newSession })
+  })
+
+  it('changes Twitch scale without remounting the page or player', async () => {
+    render(<OfficialModView channel="testchannel" />)
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ zoom: null })))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Escala de Twitch' }), { target: { value: '0.8' } })
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ zoom: 0.8 })))
+    expect(localStorage.getItem('bs.modview.tools.zoom')).toBe('0.8')
+    expect(invoke.mock.calls.filter(([command]) => command === 'mount_official_modview')).toHaveLength(1)
+    expect(invoke.mock.calls.filter(([command]) => command === 'unmount_official_modview')).toHaveLength(0)
   })
 
   it('avoids native resize calls for unrelated player DOM changes', async () => {

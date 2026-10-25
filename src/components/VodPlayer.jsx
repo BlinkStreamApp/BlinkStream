@@ -133,7 +133,7 @@ export default function VodPlayer({ channel, onClose }) {
   const fv = (n) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 animate-fade-in" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-label="VODs" className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 animate-fade-in" onClick={onClose}>
       <div className="bg-bg-secondary border border-bg-tertiary/50 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-bg-tertiary/30 shrink-0">
           <h2 className="text-white text-sm font-bold">VODs de {channel}</h2>

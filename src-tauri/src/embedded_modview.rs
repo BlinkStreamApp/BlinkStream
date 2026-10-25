@@ -26,6 +26,14 @@ fn allowed_navigation(url: &tauri::Url) -> bool {
             .is_some_and(|host| host == "twitch.tv" || host.ends_with(".twitch.tv"))
 }
 
+fn zoom_factor(width: f64, requested: Option<f64>) -> Result<f64, String> {
+    match requested {
+        Some(value) if value.is_finite() && (0.65..=1.1).contains(&value) => Ok(value),
+        Some(_) => Err("Invalid moderation zoom".into()),
+        None => Ok((width / 1440.0).clamp(0.65, 1.0)),
+    }
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn mount_official_modview(
@@ -37,11 +45,13 @@ pub async fn mount_official_modview(
     y: f64,
     width: f64,
     height: f64,
+    zoom: Option<f64>,
 ) -> Result<(), String> {
     crate::embedded_drops::require_ui(&webview)?;
     let label = host_label(&session)?;
     let url = official_url(&channel)?;
     crate::embedded_drops::check_bounds(&app, x, y, width, height)?;
+    let zoom = zoom_factor(width, zoom)?;
     let _guard = HOST_LOCK.lock().await;
     if app.get_webview(&label).is_some() {
         return Ok(());
@@ -63,7 +73,8 @@ pub async fn mount_official_modview(
             }
             tauri::webview::NewWindowResponse::Deny
         });
-    app.get_window("main")
+    let child = app
+        .get_window("main")
         .ok_or("Main window unavailable")?
         .add_child(
             builder,
@@ -71,6 +82,10 @@ pub async fn mount_official_modview(
             tauri::LogicalSize::new(width, height),
         )
         .map_err(|_| "Could not open Twitch moderation".to_string())?;
+    if child.set_zoom(zoom).is_err() {
+        let _ = child.close();
+        return Err("Could not scale Twitch moderation".into());
+    }
     Ok(())
 }
 
@@ -85,6 +100,7 @@ pub async fn update_official_modview_bounds(
     width: f64,
     height: f64,
     visible: bool,
+    zoom: Option<f64>,
 ) -> Result<(), String> {
     crate::embedded_drops::require_ui(&webview)?;
     let label = host_label(&session)?;
@@ -96,10 +112,13 @@ pub async fn update_official_modview_bounds(
                 .map_err(|_| "Could not hide Twitch moderation".into());
         }
         crate::embedded_drops::check_bounds(&app, x, y, width, height)?;
+        let zoom = zoom_factor(width, zoom)?;
         view.set_position(tauri::LogicalPosition::new(x, y))
             .map_err(|_| "Could not position Twitch moderation")?;
         view.set_size(tauri::LogicalSize::new(width, height))
             .map_err(|_| "Could not resize Twitch moderation")?;
+        view.set_zoom(zoom)
+            .map_err(|_| "Could not scale Twitch moderation")?;
         view.show()
             .map_err(|_| "Could not show Twitch moderation")?;
     }
@@ -125,6 +144,16 @@ pub async fn unmount_official_modview(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn zoom_is_bounded_and_automatic_layout_keeps_tool_columns_wider() {
+        assert_eq!(zoom_factor(1152.0, None).unwrap(), 0.8);
+        assert_eq!(zoom_factor(1920.0, None).unwrap(), 1.0);
+        assert_eq!(zoom_factor(500.0, None).unwrap(), 0.65);
+        assert_eq!(zoom_factor(1152.0, Some(1.0)).unwrap(), 1.0);
+        for value in [f64::NAN, f64::INFINITY, 0.0, 0.1, 2.0] {
+            assert!(zoom_factor(1152.0, Some(value)).is_err());
+        }
+    }
     #[test]
     fn only_fixed_twitch_moderation_routes() {
         assert_eq!(

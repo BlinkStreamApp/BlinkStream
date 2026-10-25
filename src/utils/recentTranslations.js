@@ -1,6 +1,8 @@
 // Keep each new UI message complete across the eight supported interface languages.
 export const featureLanguages = ['es', 'en', 'fr', 'de', 'pt', 'ja', 'ko', 'ru']
 const rows = {
+  'mod.official.scale': 'Escala de Twitch|Twitch scale|Échelle Twitch|Twitch-Skalierung|Escala da Twitch|Twitchの表示倍率|Twitch 배율|Масштаб Twitch',
+  'mod.official.autoScale': 'Automática|Automatic|Automatique|Automatisch|Automática|自動|자동|Автоматически',
   'mod.hybrid.show': 'Mostrar vídeo BlinkStream|Show BlinkStream video|Afficher la vidéo BlinkStream|BlinkStream-Video anzeigen|Mostrar vídeo BlinkStream|BlinkStreamの映像を表示|BlinkStream 영상 표시|Показать видео BlinkStream',
   'mod.hybrid.hide': 'Ocultar vídeo BlinkStream|Hide BlinkStream video|Masquer la vidéo BlinkStream|BlinkStream-Video ausblenden|Ocultar vídeo BlinkStream|BlinkStreamの映像を非表示|BlinkStream 영상 숨기기|Скрыть видео BlinkStream',
   'mod.hybrid.width': 'Ancho del vídeo|Video width|Largeur de la vidéo|Videobreite|Largura do vídeo|映像の幅|영상 너비|Ширина видео',

@@ -39,7 +39,7 @@ function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="reg
 const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '936p60', '963p60', '1080p60', '1440p60']
 
 
-function PlayerSettingsPanel({
+export function PlayerSettingsPanel({
   onClose,
   compact,
   onToggleCompact,
@@ -59,10 +59,11 @@ function PlayerSettingsPanel({
   availableQualities,
 }) {
   const compactValue = compact || false
+  const toggleOnce = action => event => { event.stopPropagation(); action?.() }
 
   return (
-    <div className="absolute bottom-14 right-3 z-50 w-64 max-h-[75vh] overflow-y-auto custom-scrollbar bg-[#0f1016]/95 backdrop-blur-2xl border border-white/15 rounded-xl p-3 text-text-primary shadow-[0_10px_35px_rgba(0,0,0,0.95)] animate-fade-in space-y-2 text-xs select-none">
-      <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
+    <div className="player-settings-panel pointer-events-auto absolute bottom-14 right-3 z-50 w-64 overflow-y-auto custom-scrollbar bg-[#0f1016]/95 backdrop-blur-2xl border border-white/15 rounded-xl p-3 text-text-primary shadow-[0_10px_35px_rgba(0,0,0,0.95)] animate-fade-in space-y-2 text-xs select-none" style={{ maxHeight: 'calc(100% - 4.25rem)', maxWidth: 'calc(100% - 1.5rem)' }}>
+      <div className="sticky top-0 z-10 bg-[#0f1016] flex items-center justify-between pb-2 border-b border-white/[0.08]">
         <div className="flex items-center gap-1.5">
           <PhosphorIcon name="SlidersHorizontal" size={15} weight="duotone" className="text-twitch" />
           <span className="text-xs font-extrabold text-white tracking-wide">Ajustes de Vídeo</span>
@@ -79,13 +80,13 @@ function PlayerSettingsPanel({
             <PhosphorIcon name="MonitorPlay" size={15} weight="duotone" />
             <span className="font-bold text-[11px] text-white">Calidad</span>
           </div>
-          <div className="w-36">
+          <div className="w-36 min-w-0 flex-1">
             <QualitySelector current={quality} onChange={onQualityChange} qualities={availableQualities} isSettings={true} />
           </div>
         </div>
       )}
 
-      <div className="space-y-0.5 text-[11px]">
+      <div className="player-settings-toggles space-y-0.5 text-[11px]">
         {}
         <div 
           onClick={onToggleNightMode}
@@ -96,7 +97,7 @@ function PlayerSettingsPanel({
             <PhosphorIcon name="Moon" size={15} weight="duotone" className={isNightMode ? "text-amber-300" : "text-text-muted"} />
             <span className="font-semibold text-white/90">Modo Nocturno (Audio)</span>
           </div>
-          <ToggleSwitch active={isNightMode} onClick={onToggleNightMode} />
+          <ToggleSwitch active={isNightMode} label="Modo Nocturno (Audio)" onClick={toggleOnce(onToggleNightMode)} />
         </div>
 
         {}
@@ -109,7 +110,7 @@ function PlayerSettingsPanel({
             <PhosphorIcon name="Headphones" size={15} weight="duotone" className={audioOnly ? "text-twitch" : "text-text-muted"} />
             <span className="font-semibold text-white/90">Modo Solo Audio</span>
           </div>
-          <ToggleSwitch active={audioOnly} onClick={onToggleAudioOnly} />
+          <ToggleSwitch active={audioOnly} label="Modo Solo Audio" onClick={toggleOnce(onToggleAudioOnly)} />
         </div>
 
         {}
@@ -122,7 +123,7 @@ function PlayerSettingsPanel({
             <PhosphorIcon name="ChartBar" size={15} weight="duotone" className={showStats ? "text-twitch" : "text-text-muted"} />
             <span className="font-semibold text-white/90">Estadísticas de Vídeo</span>
           </div>
-          <ToggleSwitch active={showStats} onClick={onToggleStats} />
+          <ToggleSwitch active={showStats} label="Estadísticas de Vídeo" onClick={toggleOnce(onToggleStats)} />
         </div>
 
         {}
@@ -135,7 +136,7 @@ function PlayerSettingsPanel({
             <PhosphorIcon name="ChatsCircle" size={15} weight="duotone" className={showOverlayChat ? "text-twitch" : "text-text-muted"} />
             <span className="font-semibold text-white/90">Chat en Pantalla</span>
           </div>
-          <ToggleSwitch active={showOverlayChat} onClick={onToggleOverlayChat} />
+          <ToggleSwitch active={showOverlayChat} label="Chat en Pantalla" onClick={toggleOnce(onToggleOverlayChat)} />
         </div>
 
         {}
@@ -148,11 +149,11 @@ function PlayerSettingsPanel({
             <PhosphorIcon name="Sparkle" size={15} weight="duotone" className={showEmoteEffects ? "text-twitch" : "text-text-muted"} />
             <span className="font-semibold text-white/90">Lluvia de Emotes</span>
           </div>
-          <ToggleSwitch active={showEmoteEffects} onClick={onToggleEmoteEffects} />
+          <ToggleSwitch active={showEmoteEffects} label="Lluvia de Emotes" onClick={toggleOnce(onToggleEmoteEffects)} />
         </div>
 
         {}
-        <div 
+        {onToggleCompact && <div
           onClick={onToggleCompact}
           title="Reduce márgenes de la interfaz"
           className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/[0.05] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]"
@@ -161,8 +162,8 @@ function PlayerSettingsPanel({
             <PhosphorIcon name="ArrowsInSimple" size={15} weight="duotone" className={compactValue ? "text-twitch" : "text-text-muted"} />
             <span className="font-semibold text-white/90">Modo Compacto</span>
           </div>
-          <ToggleSwitch active={compactValue} onClick={onToggleCompact} />
-        </div>
+          <ToggleSwitch active={compactValue} label="Modo Compacto" onClick={toggleOnce(onToggleCompact)} />
+        </div>}
       </div>
 
       {onOpenAppSettings && (
@@ -810,7 +811,7 @@ export default function VideoPlayer({
     captureSnapshot, seekRelative, dvrSeekToLive])
 
   return (
-    <div ref={containerRef} className={`relative bg-black overflow-hidden group/player ${theatreMode ? 'w-full h-full' : 'w-full'}`} style={theatreMode ? {} : { aspectRatio: '16/9', maxHeight: '100%' }}
+    <div ref={containerRef} data-compact={compact ? 'true' : undefined} className={`player-surface relative bg-black overflow-hidden group/player ${theatreMode ? 'w-full h-full' : 'w-full'}`} style={theatreMode ? {} : { aspectRatio: '16/9', maxHeight: '100%' }}
       onMouseMove={handleMouseMove} onMouseEnter={() => setShowControls(true)} onMouseLeave={() => setShowControls(false)}>
 
       {showTheatreToast && (
@@ -954,8 +955,9 @@ export default function VideoPlayer({
       )}
 
       {/* Controls Bar (only shown when stream is active) */}
+      <div className="player-control-container absolute inset-0 z-50 pointer-events-none">
       {!error && !loading && (
-        <div className={`absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
+        <div className={`player-controls absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
         <div className="flex items-center gap-3 text-white">
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
           <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? t('player.unmute', 'Activar sonido') : t('player.mute', 'Silenciar')}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
@@ -1086,6 +1088,7 @@ export default function VideoPlayer({
           onOpenAppSettings={onOpenAppSettings}
         />
       )}
+      </div>
 
       <EmoteRainOverlay active={showEmoteEffects} />
 
