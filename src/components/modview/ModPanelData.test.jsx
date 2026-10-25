@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ActiveModsPanel } from './ActiveModsPanel'
 import { PredictionsPollsPanel } from './PredictionsPollsPanel'
 import { UnbanRequestsPanel } from './UnbanRequestsPanel'
+import { ModDataNotice } from './ModDataNotice'
 import { getModerators, getVips, getChatters, getPredictions, getUnbanRequests } from '../../utils/twitch'
 
 vi.mock('../../utils/twitch', () => ({
@@ -16,6 +17,11 @@ const denied = status => ({ success: false, error: { context: { status } } })
 beforeEach(() => vi.resetAllMocks())
 
 describe('moderation data is not confused with unavailable data', () => {
+  it('does not recommend reauthentication for a broadcaster-only query', () => {
+    render(<ModDataNotice error={{ context: { status: 401, twitchMsg: 'The ID in broadcaster_id must match the user ID found in the access token.' } }} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('requiere la cuenta del creador')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Vuelve a iniciar sesión')
+  })
   it('renders permitted chatters while reporting each denied tab separately', async () => {
     getModerators.mockResolvedValue(denied(401))
     getVips.mockResolvedValue(denied(403))

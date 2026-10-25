@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/immutability */
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
+import { getLivePlaybackPolicy } from '../utils/livePlayback'
 
 export function useLiveDVR(videoRef, hlsRef) {
   const [delayFromLive, setDelayFromLive] = useState(0)
@@ -45,8 +45,9 @@ export function useLiveDVR(videoRef, hlsRef) {
     // A deliberate rewind/pause must not be mistaken for unwanted live latency.
     if (hls?.config) {
       const followLive = !manualDVRRef.current && !video.paused
-      hls.config.liveMaxLatencyDuration = followLive ? LIVE_PLAYBACK_CONFIG.liveMaxLatencyDuration : Infinity
-      hls.config.maxLiveSyncPlaybackRate = followLive ? LIVE_PLAYBACK_CONFIG.maxLiveSyncPlaybackRate : 1
+      const policy = getLivePlaybackPolicy(video.videoHeight)
+      hls.config.liveMaxLatencyDuration = followLive ? policy.liveMaxLatencyDuration : Infinity
+      hls.config.maxLiveSyncPlaybackRate = followLive ? policy.maxLiveSyncPlaybackRate : 1
       if (!followLive && video.playbackRate !== 1) video.playbackRate = 1
     }
 

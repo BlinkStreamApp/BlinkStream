@@ -24,6 +24,7 @@ import DropsModal from './drops/DropsModal'
 import { startDropsWatcher, stopDropsWatcher, watchNativeDropsPlayback } from '../utils/dropsWatcher'
 import { getPlayerShortcut } from '../utils/keyboard'
 import { formatPlayerError } from '../utils/playerErrors'
+import { createPlaybackProbe } from '../utils/playbackDiagnostics'
 
 function PlayIcon() { return <PhosphorIcon name="Play" size={24} weight="fill" /> }
 function PauseIcon() { return <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="2"/><rect x="14" y="4" width="5" height="16" rx="2"/></svg> }
@@ -231,6 +232,8 @@ export default function VideoPlayer({
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
   const [isPiP, setIsPiP] = useState(false)
   const [showStats, setShowStats] = useState(false)
+  const playbackProbeRef = useRef(null)
+  const [copyDiagnosticsState, setCopyDiagnosticsState] = useState('')
   const [audioOnly, setAudioOnly] = useState(false)
   const prevQualityRef = useRef('best')
   const audioOnlyRef = useRef(false)
@@ -427,6 +430,8 @@ export default function VideoPlayer({
       debug: false,
     })
     hlsRef.current = hls
+    const playbackProbe = createPlaybackProbe(video, hls)
+    playbackProbeRef.current = playbackProbe
     hls.loadSource(streamUrl)
     hls.attachMedia(video)
 
@@ -601,19 +606,15 @@ export default function VideoPlayer({
 
           const w = v.videoWidth || level?.width || 0
           const h = v.videoHeight || level?.height || 0
-          const fpsVal = level?.attrs?.FRAME_RATE || level?.attrs?.['FRAME-RATE'] || level?.frameRate || (v.webkitDecodedFrameCount ? '60' : '')
-          const fpsStr = fpsVal ? `@${Math.round(Number(fpsVal) || 60)}fps` : '@60fps'
-          const resolutionStr = (w && h) ? `${w}x${h}${fpsStr}` : (quality && quality !== 'best' ? `${quality}` : '1920x1080@60fps')
+          const fpsVal = Number(level?.attrs?.FRAME_RATE || level?.attrs?.['FRAME-RATE'] || level?.frameRate || 0)
+          const fpsStr = fpsVal > 0 ? `@${Math.round(fpsVal)}fps` : ''
+          const resolutionStr = (w && h) ? `${w}x${h}${fpsStr}` : (quality && quality !== 'best' ? `${quality}` : '—')
 
           const pbQuality = typeof v.getVideoPlaybackQuality === 'function' ? v.getVideoPlaybackQuality() : null
           const droppedVal = pbQuality ? pbQuality.droppedVideoFrames : (hlsInst.stats?.droppedFrames || 0)
 
-          let bufferAhead = '0.0s'
-          if (v.buffered.length > 0) {
-            const end = v.buffered.end(v.buffered.length - 1)
-            const diff = Math.max(0, end - v.currentTime)
-            bufferAhead = `${diff.toFixed(1)}s`
-          }
+          const probe = playbackProbe.sample()
+          const bufferAhead = `${(probe?.bufferAhead || 0).toFixed(1)}s`
 
           const latVal = typeof hlsInst.latency === 'number' && !isNaN(hlsInst.latency) && hlsInst.latency >= 0
             ? `${hlsInst.latency.toFixed(1)}s`
@@ -625,6 +626,7 @@ export default function VideoPlayer({
             dropped: droppedVal,
             buffer: bufferAhead,
             latency: latVal,
+            probe,
           })
         }
         if (!cancelled) updateStats()
@@ -635,6 +637,8 @@ export default function VideoPlayer({
     return () => {
       cancelled = true
       clearTimeout(statsTimer)
+      playbackProbe.stop()
+      if (playbackProbeRef.current === playbackProbe) playbackProbeRef.current = null
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
 
       video.removeEventListener('loadedmetadata', updatePlaybackPolicy)
@@ -841,6 +845,14 @@ export default function VideoPlayer({
             <div className="truncate">⏱️ <span className="text-white font-semibold ml-0.5">{stats.latency || 'En vivo'} latencia</span></div>
             <div className="truncate">🎞️ <span className="text-white font-semibold ml-0.5">{stats.buffer} buffer</span></div>
             <div className="truncate col-span-2 text-text-muted text-[10px]">📉 <span className="text-white/80 font-medium ml-0.5">{stats.dropped} frames perdidos</span></div>
+            <div className="col-span-2 text-white/80">FPS {stats.probe?.presentedFps?.toFixed(1) ?? '—'} · {stats.probe?.playbackRate ?? 1}× · Δ {stats.probe?.droppedInterval ?? '—'}</div>
+            <div className="col-span-2 text-white/80 break-all">{stats.probe?.codec || '—'} · Worker {stats.probe?.workerActive ? '✓' : '—'}</div>
+            <button type="button" className="pointer-events-auto col-span-2 text-left text-twitch cursor-pointer" onClick={async () => {
+              const report = playbackProbeRef.current?.export()
+              if (!report) return
+              try { await navigator.clipboard.writeText(report); setCopyDiagnosticsState('player.diagnosticsCopied') }
+              catch { setCopyDiagnosticsState('player.diagnosticsCopyFailed') }
+            }}>{t(copyDiagnosticsState || 'player.copyDiagnostics')}</button>
           </div>
         </div>
       )}

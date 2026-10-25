@@ -23,6 +23,10 @@ worker initialization is verified in Edge under the production CSP. With explici
 authorization, twitch-auth v39 now requests chatter-read access for new OAuth
 consent; existing sessions require reauthorization. Real playback/panel acceptance
 remains a publication gate.
+Fourth candidate work reproduces and fixes a DVR polling loop that overwrote the
+high-resolution latency policy. Bounded video diagnostics now expose actual frame
+deltas, contiguous buffer, codec, waits/seeks and worker state for live acceptance.
+This is not evidence that the reported stutter has been resolved.
 
 1.5.3 hardens OAuth handoff access, expiry, immutable identity and session lifecycle.
 The database fix and twitch-auth v38 are deployed. GitHub downloads/updater are

@@ -8,12 +8,20 @@ export const LIVE_PLAYBACK_CONFIG = Object.freeze({
   maxLiveSyncPlaybackRate: 1.1,
 })
 
+const HIGH_RESOLUTION_PLAYBACK_CONFIG = Object.freeze({
+  liveSyncDuration: 6,
+  liveMaxLatencyDuration: 12,
+  maxLiveSyncPlaybackRate: 1,
+})
+
+export function getLivePlaybackPolicy(videoHeight) {
+  return videoHeight >= 1440 ? HIGH_RESOLUTION_PLAYBACK_CONFIG : LIVE_PLAYBACK_CONFIG
+}
+
 // High-resolution decoders should not be asked to render 60fps video at 66fps.
 export function stabilizeHighResolutionPlayback(hls, video) {
   if (!(video.videoHeight >= 1440)) return false
-  hls.config.maxLiveSyncPlaybackRate = 1
-  hls.config.liveSyncDuration = 6
-  hls.config.liveMaxLatencyDuration = 12
+  Object.assign(hls.config, getLivePlaybackPolicy(video.videoHeight))
   if (video.playbackRate > 1) video.playbackRate = 1
   return true
 }
