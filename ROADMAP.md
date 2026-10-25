@@ -27,6 +27,11 @@ Fourth candidate work reproduces and fixes a DVR polling loop that overwrote the
 high-resolution latency policy. Bounded video diagnostics now expose actual frame
 deltas, contiguous buffer, codec, waits/seeks and worker state for live acceptance.
 This is not evidence that the reported stutter has been resolved.
+The maintainer subsequently confirmed smooth playback in a French 1440p HEVC
+channel: 29 seconds of supplied diagnostics show about 60fps, normal speed and
+no new dropped frames, waits or seeks. Original-channel and remaining Mod View
+acceptance are still separate. A lower-latency 1440p policy (3s target, 1x speed)
+is being validated without replacing the known-smooth candidate.
 
 1.5.3 hardens OAuth handoff access, expiry, immutable identity and session lifecycle.
 The database fix and twitch-auth v38 are deployed. GitHub downloads/updater are

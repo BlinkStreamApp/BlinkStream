@@ -9,8 +9,8 @@ export const LIVE_PLAYBACK_CONFIG = Object.freeze({
 })
 
 const HIGH_RESOLUTION_PLAYBACK_CONFIG = Object.freeze({
-  liveSyncDuration: 6,
-  liveMaxLatencyDuration: 12,
+  liveSyncDuration: 3,
+  liveMaxLatencyDuration: 8,
   maxLiveSyncPlaybackRate: 1,
 })
 

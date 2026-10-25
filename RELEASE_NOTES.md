@@ -11,12 +11,13 @@ Version-specific release body: [1.5.4 ES/EN](docs/releases/1.5.4.md).
 - Streamlink usa la cabecera OAuth documentada y puede aprovechar la sesión oficial integrada solo cuando su identidad validada coincide con la cuenta de la aplicación.
 - Corregido el procesamiento de calidades y los mensajes de reproducción, fuente de vídeo inaccesible y códec incompatible en ocho idiomas.
 - Zod transitivo de las herramientas de desarrollo actualizado a 4.6.7 para corregir GHSA-mrhx-c7xc-m3w5; auditoría sin excepciones.
-- Perfil de estabilidad para vídeo 1440p o superior: velocidad normal, objetivo de latencia de seis segundos y sin reiniciar HLS al redimensionar el reproductor. Pendiente de aceptación real.
+- Perfil de estabilidad para vídeo 1440p o superior: velocidad normal, objetivo de latencia de tres segundos y sin reiniciar HLS al redimensionar el reproductor. Pendiente de aceptación del ajuste de latencia.
 - Mod View deja de ocultar consultas denegadas/fallidas como si fueran listas vacías; auditoría local y cola AutoMod sin eventos identificadas explícitamente. Esto no concede permisos ni conecta AutoMod.
 - Tokio actualizado a 1.53.3 contra RUSTSEC-2026-0386.
 - Worker de HLS empaquetado explícitamente para el build ESM en directo, grid, previsualización y VOD; se evita el procesamiento de segmentos en el hilo de la interfaz por falta de workerPath.
 - Login solicita moderator:read:chatters tras consentimiento; twitch-auth v39 desplegada con autorización expresa. Las sesiones anteriores siguen siendo válidas, pero requieren nuevo login para conceder el permiso.
 - DVR conserva la política de reproducción activa en vez de restablecer 1.1x cada medio segundo. Diagnóstico de vídeo acotado y sin credenciales disponible desde estadísticas; búfer continuo y FPS medidos, sin inventar resolución o FPS de origen.
+- Objetivo de latencia de alta resolución reducido a tres segundos, manteniendo velocidad normal; la latencia real depende también del canal y Twitch. Ajuste pendiente de aceptación real.
 
 ## EN
 
@@ -25,12 +26,13 @@ Version-specific release body: [1.5.4 ES/EN](docs/releases/1.5.4.md).
 - Streamlink uses its documented OAuth header and can reuse the embedded official session only when its validated identity matches the app account.
 - Fixed quality parsing and playback, inaccessible-video-source and unsupported-codec messages in all eight languages.
 - Updated development tooling's transitive Zod dependency to 4.6.7 for GHSA-mrhx-c7xc-m3w5 without audit exceptions.
-- Stability profile for 1440p and higher: normal playback speed, a six-second target latency and no HLS restart on player resize. Real playback acceptance pending.
+- Stability profile for 1440p and higher: normal playback speed, a three-second target latency and no HLS restart on player resize. Acceptance of the latency adjustment is pending.
 - Mod View distinguishes denied/failed reads from empty results and explicitly identifies its local audit and disconnected AutoMod queue. This does not grant permissions or connect AutoMod.
 - Updated Tokio to 1.53.3 for RUSTSEC-2026-0386.
 - Explicitly bundled the HLS worker for ESM in live, grid, preview and VOD playback, avoiding main-thread segment processing caused by a missing workerPath.
 - Login requests moderator:read:chatters with consent; twitch-auth v39 deployed with explicit authorization. Existing sessions remain valid but need a new login to grant this permission.
 - DVR preserves the active playback policy instead of restoring 1.1x every half-second. Bounded, credential-free video diagnostics available in statistics; contiguous buffer and measured FPS without invented source resolution or frame rate.
+- High-resolution target latency reduced to three seconds at normal speed; actual latency also depends on the channel and Twitch. Live acceptance of this adjustment remains pending.
 
 ## Previous release
 

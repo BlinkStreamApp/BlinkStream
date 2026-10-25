@@ -18,12 +18,14 @@ describe('DVR respects the active player latency policy', () => {
     try {
       act(() => vi.advanceTimersByTime(1500))
       expect(hls.config.maxLiveSyncPlaybackRate).toBe(1)
-      expect(hls.config.liveMaxLatencyDuration).toBe(12)
+      expect(hls.config.liveMaxLatencyDuration).toBe(8)
+      expect(hls.config.liveSyncDuration).toBe(3)
       act(() => hook.result.current.seekRelative(-5))
       expect(hls.config.liveMaxLatencyDuration).toBe(Infinity)
       act(() => hook.result.current.seekToLive())
       expect(hls.config.maxLiveSyncPlaybackRate).toBe(1)
-      expect(hls.config.liveMaxLatencyDuration).toBe(12)
+      expect(hls.config.liveMaxLatencyDuration).toBe(8)
+      expect(hls.config.liveSyncDuration).toBe(3)
     } finally { hook.unmount(); hls.destroy() }
   })
 })
