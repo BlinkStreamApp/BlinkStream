@@ -10,6 +10,7 @@ use wait_timeout::ChildExt;
 
 mod drops_watch;
 mod embedded_drops;
+mod embedded_modview;
 mod media_security;
 mod recorder;
 pub use recorder::{start_recording, stop_recording};
@@ -2646,6 +2647,9 @@ pub fn run() {
             embedded_drops::update_embedded_twitch_drops_bounds,
             embedded_drops::unmount_embedded_twitch_drops,
             embedded_drops::reset_embedded_twitch_drops,
+            embedded_modview::mount_official_modview,
+            embedded_modview::update_official_modview_bounds,
+            embedded_modview::unmount_official_modview,
             update_embedded_twitch_chat_bounds,
             set_embedded_twitch_chat_visible,
             unmount_embedded_twitch_chat,

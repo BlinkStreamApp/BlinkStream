@@ -9,6 +9,7 @@ commands.allow = [
   "open_twitch_drops_window", "start_drops_watcher", "sample_native_drops_watch", "stop_drops_watcher",
   "fetch_twitch_gql", "mount_embedded_twitch_chat", "mount_embedded_twitch_drops",
   "update_embedded_twitch_drops_bounds", "unmount_embedded_twitch_drops", "reset_embedded_twitch_drops",
+  "mount_official_modview", "update_official_modview_bounds", "unmount_official_modview",
   "update_embedded_twitch_chat_bounds", "set_embedded_twitch_chat_visible", "unmount_embedded_twitch_chat",
   "start_recording", "stop_recording", "get_app_token", "recorder_set_global_enabled",
   "recorder_get_global_state", "recorder_list_active", "recorder_get_full_state", "get_companion_status",

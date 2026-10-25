@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-update-official-modview-bounds"
+description = "Enables the update_official_modview_bounds command without any pre-configured scope."
+commands.allow = ["update_official_modview_bounds"]
+
+[[permission]]
+identifier = "deny-update-official-modview-bounds"
+description = "Denies the update_official_modview_bounds command without any pre-configured scope."
+commands.deny = ["update_official_modview_bounds"]

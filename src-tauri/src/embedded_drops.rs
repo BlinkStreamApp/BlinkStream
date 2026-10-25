@@ -37,7 +37,13 @@ fn valid_bounds(x: f64, y: f64, width: f64, height: f64) -> bool {
         && height > 0.0
 }
 
-fn check_bounds(app: &AppHandle, x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
+pub(crate) fn check_bounds(
+    app: &AppHandle,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
     if !valid_bounds(x, y, width, height) {
         return Err("Dimensiones del inventario inválidas".to_string());
     }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import ModView from './ModView'
 
 vi.mock('../../hooks/useModeration', () => ({ useModeration: () => ({ auditLog: [], remainingActions: 20 }) }))
@@ -17,6 +17,19 @@ const props = {
 describe('ModView mounting and saved-layout recovery', () => {
   beforeEach(() => localStorage.clear())
 
+  it('opens the official view first and unmounts the custom player when switching back', async () => {
+    render(<ModView {...props} />)
+    expect(screen.getByTestId('official-modview-host')).toBeInTheDocument()
+    expect(screen.queryByTestId('modview-player')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'BlinkStream', exact: true }))
+    expect(await screen.findByTestId('modview-player')).toBeInTheDocument()
+    expect(screen.queryByTestId('official-modview-host')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Twitch oficial' }))
+    expect(screen.getByTestId('official-modview-host')).toBeInTheDocument()
+    expect(screen.queryByTestId('modview-player')).not.toBeInTheDocument()
+    expect(localStorage.getItem('bs.modview.surface')).toBe('official')
+  })
+
   it.each([
     ['first launch', undefined],
     ['legacy partial layout', { preset: 'mod_focus', activeTab: 'audit' }],
@@ -24,6 +37,7 @@ describe('ModView mounting and saved-layout recovery', () => {
     ['invalid tabs type', { enabledTabs: 'audit' }],
     ['empty tabs', { enabledTabs: [] }],
   ])('renders player, chat and tools with %s', async (_label, saved) => {
+    localStorage.setItem('bs.modview.surface', 'blinkstream')
     if (saved !== undefined) localStorage.setItem('bs.modview.config.v4', JSON.stringify(saved))
     render(<ModView {...props} />)
     expect(await screen.findByTestId('modview-player')).toBeInTheDocument()

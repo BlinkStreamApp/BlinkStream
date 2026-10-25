@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-unmount-official-modview"
+description = "Enables the unmount_official_modview command without any pre-configured scope."
+commands.allow = ["unmount_official_modview"]
+
+[[permission]]
+identifier = "deny-unmount-official-modview"
+description = "Denies the unmount_official_modview command without any pre-configured scope."
+commands.deny = ["unmount_official_modview"]
