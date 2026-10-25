@@ -5,7 +5,7 @@ import ModView from './ModView'
 vi.mock('../../hooks/useModeration', () => ({ useModeration: () => ({ auditLog: [], remainingActions: 20 }) }))
 vi.mock('../../hooks/useChannelRole', () => ({ useChannelRole: () => ({ isBroadcaster: false, isModerator: true }) }))
 vi.mock('../../hooks/useManageRewards', () => ({ useManageRewards: () => ({ pendingRedemptions: [], fulfilledRedemptions: [] }) }))
-vi.mock('../VideoPlayer', () => ({ default: () => <div data-testid="modview-player" /> }))
+vi.mock('../VideoPlayer', () => ({ default: ({ channel, volume, quality }) => <div data-testid="modview-player" data-channel={channel} data-volume={volume} data-quality={quality} /> }))
 vi.mock('../Chat', () => ({ default: ({ isModerator, broadcasterId }) => <div data-testid="modview-chat" data-moderator={isModerator} data-broadcaster={broadcasterId} /> }))
 
 const props = {
@@ -28,6 +28,18 @@ describe('ModView mounting and saved-layout recovery', () => {
     expect(screen.getByTestId('official-modview-host')).toBeInTheDocument()
     expect(screen.queryByTestId('modview-player')).not.toBeInTheDocument()
     expect(localStorage.getItem('bs.modview.surface')).toBe('official')
+  })
+
+  it('forwards playback settings in combined mode and requires opting in again on channel change', async () => {
+    const view = render(<ModView {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    const player = await screen.findByTestId('modview-player')
+    expect(player).toHaveAttribute('data-channel', 'testchannel')
+    expect(player).toHaveAttribute('data-volume', '50')
+    expect(player).toHaveAttribute('data-quality', 'best')
+    view.rerender(<ModView {...props} channel="otherchannel" />)
+    expect(screen.queryByTestId('modview-player')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it.each([

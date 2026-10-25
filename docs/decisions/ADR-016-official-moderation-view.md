@@ -31,3 +31,17 @@ validation; local build/tests do not establish authenticated functionality.
 The official surface includes Twitch's player and layout. Main BlinkStream
 playback and the existing Drops policy remain unchanged.
 Reload, browser fallback and the prior custom interface remain available.
+
+## Hybrid testing option
+
+The user requested BlinkStream video alongside the official tools after observing
+that docking Twitch's widget leaves a playing mini-player. An explicit button
+mounts the existing BlinkStream player above the tools, with a bounded height
+control. Video starts disabled on entry/channel change; only its size is saved.
+Hide/exit unmounts the player. Visibility/size changes update the existing official
+host without navigating or replacing its session. Unchanged bounds do not generate
+native resize calls for player DOM updates.
+
+Twitch's video must be paused and muted manually using its own controls. Docking
+does not imply playback/ads stopped. No scripts alter Twitch's player or ad flow;
+this layout does not guarantee the absence of ads or concurrent playback.

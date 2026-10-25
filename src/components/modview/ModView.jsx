@@ -43,7 +43,7 @@ export function ModView({
       {mode === 'official' && <button type="button" className="ml-auto cursor-pointer text-sm" onClick={props.onExit}>{t('mod.official.exit')}</button>}
     </div>
     <div className="flex flex-col flex-1 min-h-0">
-      {mode === 'official' ? <OfficialModView key={props.channel} channel={props.channel} /> : <BlinkStreamModView {...props} />}
+      {mode === 'official' ? <OfficialModView key={props.channel} {...props} /> : <BlinkStreamModView {...props} />}
     </div>
   </div>
 }

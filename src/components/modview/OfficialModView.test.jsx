@@ -5,6 +5,10 @@ import { OfficialModView } from './OfficialModView'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../../utils/tauriEnv', () => ({ isTauri: () => true, safeOpenUrl: vi.fn() }))
+vi.mock('../VideoPlayer', () => ({ default: props => <div data-testid="hybrid-player" data-channel={props.channel} data-quality={props.quality} data-volume={props.volume}>
+  <button onClick={() => props.onQualityChange('720p')}>Test quality</button>
+  <button onClick={() => props.onVolumeChange(25)}>Test volume</button>
+</div> }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -15,6 +19,42 @@ beforeEach(() => {
 })
 
 describe('Official moderation host', () => {
+  it('adds and removes the BlinkStream player without remounting the official page', async () => {
+    const onQualityChange = vi.fn()
+    const onVolumeChange = vi.fn()
+    render(<OfficialModView channel="AlbertPlayXD" quality="best" volume={50} onQualityChange={onQualityChange} onVolumeChange={onVolumeChange} />)
+    expect(screen.queryByTestId('hybrid-player')).not.toBeInTheDocument()
+    const host = screen.getByTestId('official-modview-host')
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    const player = await screen.findByTestId('hybrid-player')
+    expect(player).toHaveAttribute('data-channel', 'albertplayxd')
+    expect(player).toHaveAttribute('data-volume', '50')
+    expect(player).toHaveAttribute('data-quality', 'best')
+    expect(screen.getByText(/Anclarlo no detiene/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Test quality' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Test volume' }))
+    expect(onQualityChange).toHaveBeenCalledWith('720p')
+    expect(onVolumeChange).toHaveBeenCalledWith(25)
+    fireEvent.change(screen.getByRole('slider', { name: 'Tamaño del vídeo' }), { target: { value: '60' } })
+    expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ height: '60%' })
+    expect(localStorage.getItem('bs.modview.hybrid.height')).toBe('60')
+    HTMLElement.prototype.getBoundingClientRect.mockReturnValue({ left: 10, top: 350, right: 810, bottom: 580, width: 800, height: 230 })
+    fireEvent(window, new Event('resize'))
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ y: 350, height: 230, visible: true })))
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar vídeo BlinkStream' }))
+    expect(screen.queryByTestId('hybrid-player')).not.toBeInTheDocument()
+    expect(screen.getByTestId('official-modview-host')).toBe(host)
+    expect(invoke.mock.calls.filter(([command]) => command === 'mount_official_modview')).toHaveLength(1)
+    expect(invoke.mock.calls.filter(([command]) => command === 'unmount_official_modview')).toHaveLength(0)
+  })
+
+  it.each([['invalid', '35%'], ['NaN', '35%'], ['100', '60%'], ['-10', '20%']])('bounds a saved video size of %s', async (saved, expected) => {
+    localStorage.setItem('bs.modview.hybrid.height', saved)
+    render(<OfficialModView channel="testchannel" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    expect(await screen.findByTestId('hybrid-video-panel')).toHaveStyle({ height: expected })
+  })
+
   it('mounts the official channel without tokens and resizes without navigating again', async () => {
     const view = render(<OfficialModView channel="AlbertPlayXD" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('mount_official_modview', {
@@ -41,6 +81,20 @@ describe('Official moderation host', () => {
     expect(invoke).not.toHaveBeenCalledWith('unmount_official_modview', { session: newSession })
   })
 
+  it('avoids native resize calls for unrelated player DOM changes', async () => {
+    render(<OfficialModView channel="testchannel" />)
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ visible: true })))
+    invoke.mockClear()
+    const progress = document.createElement('div')
+    await act(async () => {
+      document.body.appendChild(progress)
+      progress.style.width = '10%'
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
+    expect(invoke).not.toHaveBeenCalled()
+    progress.remove()
+  })
+
   it('hides the native surface behind visible dialogs', async () => {
     render(<OfficialModView channel="testchannel" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ visible: true })))
@@ -62,6 +116,20 @@ describe('Official moderation host', () => {
     await waitFor(() => expect(invoke.mock.calls.filter(([command]) => command === 'mount_official_modview')).toHaveLength(2))
     const sessions = invoke.mock.calls.filter(([command]) => command === 'mount_official_modview').map(([, args]) => args.session)
     expect(sessions[1]).not.toBe(oldSession)
+  })
+
+  it('hides official tools during BlinkStream fullscreen and restores them on exit', async () => {
+    render(<OfficialModView channel="testchannel" />)
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ visible: true })))
+    try {
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: document.createElement('video') })
+      fireEvent(document, new Event('fullscreenchange'))
+      await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ visible: false })))
+    } finally { delete document.fullscreenElement }
+    invoke.mockClear()
+    fireEvent(document, new Event('fullscreenchange'))
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ visible: true })))
+    expect(invoke).not.toHaveBeenCalledWith('mount_official_modview', expect.anything())
   })
 
   it('never passes arbitrary URLs as channels to the native host', () => {
