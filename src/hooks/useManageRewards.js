@@ -255,7 +255,7 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
       logEvent('channel_points', 'redemption.fulfilled', { broadcasterId, rewardId: pending.reward_id })
       return { ok: true }
     }
-    return { ok: false, error: res.error }
+    return { ok: false, error: res.error, code: res.code }
   }, [broadcasterId, pendingRedemptions, effectiveToken, applyRedemption])
 
   const cancelRedemption = useCallback(async (id, _reason) => {
@@ -268,7 +268,7 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
       logEvent('channel_points', 'redemption.canceled', { broadcasterId, rewardId: pending.reward_id })
       return { ok: true }
     }
-    return { ok: false, error: res.error }
+    return { ok: false, error: res.error, code: res.code }
   }, [broadcasterId, pendingRedemptions, effectiveToken, applyRedemption])
 
   const bulkFulfill = useCallback(async (ids) => {

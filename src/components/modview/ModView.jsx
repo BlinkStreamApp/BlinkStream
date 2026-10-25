@@ -516,6 +516,8 @@ export function ModView({
           />
         ) : (
           <RewardsQueuePanel
+            key={effectiveBroadcasterId}
+            channel={channel}
             error={rewardsState.error}
             realtime={rewardsState.realtime}
             pendingRedemptions={rewardsState.pendingRedemptions}

@@ -266,6 +266,19 @@ describe('ActivityFeed', () => {
 })
 
 describe('RewardsQueuePanel', () => {
+  it('explains app ownership restrictions and preserves the pending redemption', async () => {
+    const onFulfill = vi.fn().mockResolvedValue({ ok: false, code: 'CHANNEL_POINTS_REDEMPTION_NOT_MANAGEABLE' })
+    render(<RewardsQueuePanel channel="albertplayxd" pendingRedemptions={[{
+      id: 'external', reward_id: 'external-reward', reward: { title: 'Hidratación' }, user_name: 'Alice', status: 'UNFULFILLED',
+    }]} onFulfillRedemption={onFulfill} />)
+    await act(async () => fireEvent.click(screen.getByText('Cumplir')))
+    expect(screen.getByRole('alert')).toHaveTextContent('recompensas creadas por esta aplicación')
+    expect(screen.getByText('Gestionar en Twitch')).toBeInTheDocument()
+    expect(screen.getByText('Hidratación')).toBeInTheDocument()
+    expect(screen.getByText('Cumplir').closest('button')).toBeDisabled()
+    expect(screen.getByText('Rechazar').closest('button')).toBeDisabled()
+  })
+
   it('shows failed updates and enables the action again', async () => {
     const onFulfill = vi.fn().mockResolvedValue({ ok: false, error: 'Sin permisos para actualizar este canje.' })
     render(<RewardsQueuePanel pendingRedemptions={[{
@@ -273,7 +286,7 @@ describe('RewardsQueuePanel', () => {
     }]} onFulfillRedemption={onFulfill} realtime={{ state: 'unavailable', message: 'Se requiere autorización del creador.' }} />)
     expect(screen.getByRole('status')).toHaveTextContent('Se requiere autorización del creador.')
     await act(async () => fireEvent.click(screen.getByText('Cumplir')))
-    expect(screen.getByRole('alert')).toHaveTextContent('Sin permisos para actualizar este canje.')
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo confirmar el cambio del canje.')
     expect(screen.getByText('Cumplir').closest('button')).not.toBeDisabled()
   })
 

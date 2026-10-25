@@ -2,6 +2,17 @@ import { useState } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { RedemptionConnectionNotice } from '../channelpoints/RedemptionConnectionNotice'
 import { ModDataNotice } from './ModDataNotice'
+import { useT } from '../../utils/i18n'
+import { safeOpenUrl } from '../../utils/tauriEnv'
+import { isValidTwitchLogin } from '../../utils/twitch'
+import { ErrorCode } from '../../utils/errors'
+
+const ERROR_KEYS = {
+  [ErrorCode.CHANNEL_POINTS_REDEMPTION_NOT_MANAGEABLE]: 'points.action.notManageable',
+  [ErrorCode.CHANNEL_POINTS_REDEMPTION_FORBIDDEN]: 'points.action.forbidden',
+  [ErrorCode.CHANNEL_POINTS_REDEMPTION_NOT_PENDING]: 'points.action.notPending',
+  [ErrorCode.AUTH_FAILED]: 'points.action.authorization',
+}
 
 export function RewardsQueuePanel({
   pendingRedemptions = [],
@@ -13,10 +24,13 @@ export function RewardsQueuePanel({
   onInspectUser,
   realtime,
   error,
+  channel,
 }) {
+  const t = useT()
   const [tab, setTab] = useState('all') // 'all' | 'pending' | 'fulfilled'
   const [actionPending, setActionPending] = useState({})
   const [actionError, setActionError] = useState(null)
+  const [blockedRewards, setBlockedRewards] = useState(() => new Set())
 
   const handleAction = async (redemption, action) => {
     if (!redemption?.id) return
@@ -26,9 +40,15 @@ export function RewardsQueuePanel({
       const result = action === 'FULFILLED'
         ? await onFulfillRedemption?.(redemption.id)
         : await onCancelRedemption?.(redemption.id)
-      if (result?.ok === false) setActionError(result.error || 'No se pudo actualizar el canje.')
+      if (result?.ok === false) {
+        setActionError(t(ERROR_KEYS[result.code] || 'points.action.failed'))
+        if (result.code === ErrorCode.CHANNEL_POINTS_REDEMPTION_NOT_MANAGEABLE) {
+          const rewardKey = redemption.reward_id || redemption.reward?.id || `redemption:${redemption.id}`
+          setBlockedRewards(previous => new Set([...previous, rewardKey]))
+        }
+      }
     } catch {
-      setActionError('No se pudo actualizar el canje. Inténtalo de nuevo.')
+      setActionError(t('points.action.failed'))
     } finally {
       setActionPending(prev => ({ ...prev, [redemption.id]: false }))
     }
@@ -48,6 +68,7 @@ export function RewardsQueuePanel({
       <RedemptionConnectionNotice connection={realtime} />
       <ModDataNotice error={error} />
       {actionError && <p role="alert" className="px-3 py-2 text-xs text-red-400">{actionError}</p>}
+      {actionError && isValidTwitchLogin(channel) && <button type="button" className="px-3 py-2 text-left text-xs text-twitch cursor-pointer" onClick={() => safeOpenUrl(`https://dashboard.twitch.tv/u/${encodeURIComponent(channel.toLowerCase())}/viewer-rewards/channel-points`)}>{t('points.action.openTwitch')}</button>}
       {/* Header */}
       <div className="shrink-0 p-2.5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
         <div className="flex items-center gap-1.5">
@@ -130,6 +151,7 @@ export function RewardsQueuePanel({
         ) : (
           displayedList.map(item => {
             const isPending = actionPending[item.id]
+            const blocked = blockedRewards.has(item.reward_id || item.reward?.id || `redemption:${item.id}`)
             const isUnfulfilled = item.status !== 'FULFILLED' && item.status !== 'CANCELED'
             const username = item.user_login || item.user_name || 'Espectador'
             const rewardTitle = item.reward_title || item.reward?.title || 'Recompensa'
@@ -188,7 +210,7 @@ export function RewardsQueuePanel({
                   <div className="flex items-center justify-end gap-1.5 pt-1">
                     <button
                       onClick={() => handleAction(item, 'CANCELED')}
-                      disabled={isPending}
+                      disabled={isPending || blocked}
                       className="flex items-center gap-1 px-2.5 py-1 bg-red-500/15 hover:bg-red-500/30 text-red-300 border border-red-500/30 hover:border-red-500/50 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
                       title="Rechazar y reembolsar puntos"
                     >
@@ -197,7 +219,7 @@ export function RewardsQueuePanel({
                     </button>
                     <button
                       onClick={() => handleAction(item, 'FULFILLED')}
-                      disabled={isPending}
+                      disabled={isPending || blocked}
                       className="flex items-center gap-1 px-2.5 py-1 bg-green-500/15 hover:bg-green-500/30 text-green-300 border border-green-500/30 hover:border-green-500/50 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
                       title="Marcar como cumplida"
                     >

@@ -205,6 +205,20 @@ describe('useManageRewards', () => {
     expect(result.current.pendingRedemptions[0].id).toBe('rd-2')
   })
 
+  it.each(['fulfillRedemption', 'cancelRedemption'])('%s preserves pending state and the API error on failure', async action => {
+    cpMocks.getCustomRewards.mockResolvedValue({ ok: true, data: [{ id: 'r1' }] })
+    cpMocks.getRedemptions.mockImplementation(async (_broadcaster, _reward, status) => ({ ok: true, data: { data: status === 'FULFILLED' ? [] : [{ id: 'rd-1', reward_id: 'r1', status: 'UNFULFILLED' }], cursor: null } }))
+    const failure = { ok: false, error: 'Not manageable', code: 'CHANNEL_POINTS_REDEMPTION_NOT_MANAGEABLE' }
+    cpMocks.updateRedemptionStatus.mockResolvedValue(failure)
+    const { result } = renderHook(() => useManageRewards({ broadcasterId: '123', pollIntervalMs: 0 }))
+    await waitFor(() => expect(result.current.pendingRedemptions).toHaveLength(1))
+    let response
+    await act(async () => { response = await result.current[action]('rd-1') })
+    expect(response).toMatchObject(failure)
+    expect(result.current.pendingRedemptions).toHaveLength(1)
+    expect(result.current.fulfilledRedemptions).toHaveLength(0)
+  })
+
   it('bulkFulfill: agrupa por reward_id y aprueba en bloque', async () => {
     const pendingByReward = {
       r1: [

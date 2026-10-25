@@ -836,8 +836,27 @@ export async function updateRedemptionStatus(broadcasterId, rewardId, redemption
   if (status !== 'FULFILLED' && status !== 'CANCELED') {
     return _cpResult(false, undefined, 'status debe ser FULFILLED o CANCELED', ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
   }
-  const tokenRes = manageToken ? _cpResult(true, manageToken) : await getAppToken()
-  if (!tokenRes.ok) return _cpResult(false, undefined, tokenRes.error, tokenRes.code)
+  const token = (manageToken || await getStoredToken() || '').replace(/^oauth:/i, '')
+  if (!token || token === 'viewer') return _cpResult(false, undefined, 'Se requiere la sesión del creador con permisos para gestionar canjes.', ErrorCode.AUTH_FAILED)
+  const headers = { 'Client-ID': getHelixClientId(), Authorization: `Bearer ${token}` }
+  const failure = httpStatus => _cpResult(false, undefined, `Twitch HTTP ${httpStatus}`,
+    httpStatus === 401 ? ErrorCode.AUTH_FAILED
+      : httpStatus === 403 ? ErrorCode.CHANNEL_POINTS_REDEMPTION_FORBIDDEN
+      : httpStatus === 404 ? ErrorCode.CHANNEL_POINTS_REDEMPTION_NOT_PENDING
+      : ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+
+  try {
+    const params = new URLSearchParams({ broadcaster_id: broadcasterId, only_manageable_rewards: 'true' })
+    const response = await measureFetch(`https://api.twitch.tv/helix/channel_points/custom_rewards?${params}`, { headers, signal: safeTimeout(CP_TIMEOUT_MS) })
+    if (!response.ok) return failure(response.status)
+    const catalog = await response.json()
+    if (!Array.isArray(catalog?.data)) return _cpResult(false, undefined, 'Respuesta de Twitch inválida.', ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+    if (!catalog.data.some(reward => reward.id === rewardId)) {
+      return _cpResult(false, undefined, 'Esta recompensa no es gestionable por BlinkStream. Gestiona el canje en Twitch.', ErrorCode.CHANNEL_POINTS_REDEMPTION_NOT_MANAGEABLE)
+    }
+  } catch {
+    return _cpResult(false, undefined, 'No se pudo comprobar si la recompensa es gestionable.', ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+  }
 
   const chunks = []
   for (let i = 0; i < redemptionIds.length; i += 50) {
@@ -847,7 +866,6 @@ export async function updateRedemptionStatus(broadcasterId, rewardId, redemption
     const params = new URLSearchParams()
     params.set('broadcaster_id', broadcasterId)
     params.set('reward_id', rewardId)
-    params.set('status', status)
     ids.forEach(id => params.append('id', id))
     try {
       const res = await measureFetch(
@@ -855,16 +873,15 @@ export async function updateRedemptionStatus(broadcasterId, rewardId, redemption
         {
           method: 'PATCH',
           headers: {
-            'Client-ID': getHelixClientId(),
-            'Authorization': `Bearer ${tokenRes.data}`,
+            ...headers,
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ status }),
           signal: safeTimeout(CP_TIMEOUT_MS),
         },
       )
       if (!res.ok) {
-        const err = new AppError(ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED, `Twitch HTTP ${res.status}`, { action: 'update_redemption', chunkSize: ids.length })
-        logError(err, { context: 'channel-points', action: 'update_redemption' })
-        return _cpResult(false, ids, formatUserMessage(err), ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED)
+        return { ...failure(res.status), data: ids }
       }
       logEvent('channel_points', `redemption.${status.toLowerCase()}`, { broadcasterId, rewardId, count: ids.length })
       return _cpResult(true, ids)
