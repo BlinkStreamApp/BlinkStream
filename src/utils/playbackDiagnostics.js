@@ -45,6 +45,7 @@ export function createPlaybackProbe(video, hls, clock = () => performance.now())
         latencyCap: Number.isFinite(hls.config?.liveMaxLatencyDuration) ? hls.config.liveMaxLatencyDuration : null,
         targetDuration: Number.isFinite(hls.latestLevelDetails?.targetduration) ? hls.latestLevelDetails.targetduration : null,
         targetLatency: Number.isFinite(hls.targetLatency) ? hls.targetLatency : null,
+        latency: Number.isFinite(hls.latency) ? hls.latency : null,
         liveSyncPosition: Number.isFinite(hls.liveSyncPosition) ? hls.liveSyncPosition : null,
         lastError, events: { ...events },
       }

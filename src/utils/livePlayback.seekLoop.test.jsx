@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import Hls from 'hls.js'
-import { LIVE_PLAYBACK_CONFIG, applyLivePlaybackPolicy } from './livePlayback'
+import { LIVE_PLAYBACK_CONFIG, applyLivePlaybackPolicy, createLiveStartAlignment } from './livePlayback'
 import { useLiveDVR } from '../hooks/useLiveDVR'
 
 afterEach(() => vi.useRealTimers())
@@ -22,6 +22,33 @@ function fixture(seeking = false) {
 }
 
 describe('actual HLS live synchronization with buffered 1080p', () => {
+  it('can start three seconds from downloaded live media without returning to the six-second HLS clamp', () => {
+    vi.useFakeTimers()
+    const f = fixture()
+    f.video.buffered = { length: 1, start: () => 46, end: () => f.details.edge }
+    const hook = renderHook(() => useLiveDVR({ current: f.video }, { current: f.hls }))
+    const alignment = createLiveStartAlignment(f.video, hook.result.current.isFollowingLive)
+    try {
+      expect(f.hls.liveSyncPosition).toBe(66)
+      expect(alignment.tryAlign()).toBe(true)
+      expect(f.video.currentTime).toBe(69)
+      act(() => hook.result.current.updateDVRMetrics())
+      expect(f.hls.config.liveMaxLatencyDuration).toBe(Infinity)
+      f.video.seeking = false
+      f.video.readyState = 3
+      act(() => hook.result.current.updateDVRMetrics())
+      for (let i = 0; i < 15; i++) {
+        f.advance()
+        f.hls.streamController.synchronizeToLiveEdge(f.details)
+        expect(alignment.tryAlign()).toBe(false)
+        act(() => vi.advanceTimersByTime(2000))
+      }
+      expect(f.seeks()).toBe(1)
+      expect(f.details.edge - f.video.currentTime).toBe(3)
+      expect(f.video.playbackRate).toBe(1)
+    } finally { alignment.cancel(); hook.unmount(); f.hls.destroy() }
+  })
+
   it('does not start a chain of seeks when minimum live position is six seconds from the edge', () => {
     vi.useFakeTimers()
     const f = fixture()

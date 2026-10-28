@@ -102,6 +102,16 @@ describe('useLiveDVR', () => {
     expect(mockVideo.currentTime).toBe(100)
   })
 
+  it('LIVE prefers downloaded video over the nominal segment-clamped target', () => {
+    mockVideo.currentTime = 49
+    mockVideo.buffered = { length: 1, start: () => 34, end: () => 56 }
+    mockHls.liveSyncPosition = 50
+    const { result } = renderHook(() => useLiveDVR({ current: mockVideo }, { current: mockHls }))
+    act(() => result.current.seekToLive())
+    expect(mockVideo.currentTime).toBe(53)
+    expect(mockVideo.paused).toBe(false)
+  })
+
   it('seekRelative seeks backward and forward within boundaries', () => {
     mockVideo.currentTime = 50
     const videoRef = { current: mockVideo }

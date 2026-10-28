@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
-import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
+import { LIVE_PLAYBACK_CONFIG, createLiveStartAlignment } from '../utils/livePlayback'
 import { measureInvoke } from '../utils/perf'
 import { TauriPlaylistLoader, HLS_WORKER_CONFIG } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
@@ -251,6 +251,7 @@ export default function VideoPlayer({
     seekRelative,
     seekToPercent,
     updateDVRMetrics: updatePlaybackPolicy,
+    isFollowingLive,
   } = useLiveDVR(videoRef, hlsRef)
 
   const {
@@ -468,19 +469,10 @@ export default function VideoPlayer({
     }
     video.addEventListener('error', handleVideoError)
 
-    let hasSeekedToLive = false
-
-    hls.on(Hls.Events.FRAG_BUFFERED, () => {
-      if (!hasSeekedToLive) {
-        hasSeekedToLive = true
-        const livePos = (typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0)
-          ? hls.liveSyncPosition
-          : (video.seekable.length ? video.seekable.end(video.seekable.length - 1) : 0)
-        if (livePos > 0) {
-          try { video.currentTime = livePos } catch {}
-        }
-      }
-    })
+    const startAlignment = createLiveStartAlignment(video, isFollowingLive)
+    hls.on(Hls.Events.FRAG_BUFFERED, startAlignment.tryAlign)
+    video.addEventListener('playing', startAlignment.tryAlign)
+    video.addEventListener('pause', startAlignment.cancel)
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
       const playPromise = video.play()
@@ -644,11 +636,15 @@ export default function VideoPlayer({
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
 
       policyEvents.forEach(event => video.removeEventListener(event, updatePlaybackPolicy))
+      startAlignment.cancel()
+      hls.off(Hls.Events.FRAG_BUFFERED, startAlignment.tryAlign)
+      video.removeEventListener('playing', startAlignment.tryAlign)
+      video.removeEventListener('pause', startAlignment.cancel)
       hls.off(Hls.Events.LEVEL_UPDATED, updatePlaybackPolicy)
       video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }
-  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy])
+  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy, isFollowingLive])
 
   useEffect(() => { const v = videoRef.current; if (v) v.volume = muted ? 0 : volume / 100 }, [volume, muted, streamUrl])
 

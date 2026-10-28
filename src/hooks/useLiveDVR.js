@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/immutability */
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { applyLivePlaybackPolicy } from '../utils/livePlayback'
+import { applyLivePlaybackPolicy, getBufferedLivePosition } from '../utils/livePlayback'
 
 export function useLiveDVR(videoRef, hlsRef) {
   const [delayFromLive, setDelayFromLive] = useState(0)
@@ -80,7 +80,10 @@ export function useLiveDVR(videoRef, hlsRef) {
     if (!video) return
 
     manualDVRRef.current = false
-    if (hls && typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
+    const bufferedPosition = getBufferedLivePosition(video)
+    if (bufferedPosition !== null) {
+      video.currentTime = bufferedPosition
+    } else if (hls && typeof hls.liveSyncPosition === 'number' && hls.liveSyncPosition > 0) {
       video.currentTime = hls.liveSyncPosition
     } else if (video.seekable && video.seekable.length > 0) {
       video.currentTime = Math.max(0, video.seekable.end(video.seekable.length - 1) - 0.5)
@@ -89,6 +92,8 @@ export function useLiveDVR(videoRef, hlsRef) {
     }
     updateDVRMetrics()
   }, [videoRef, hlsRef, liveEdgeTime, updateDVRMetrics])
+
+  const isFollowingLive = useCallback(() => !manualDVRRef.current, [])
 
   const seekRelative = useCallback((deltaSeconds) => {
     const video = videoRef?.current
@@ -134,5 +139,6 @@ export function useLiveDVR(videoRef, hlsRef) {
     seekRelative,
     seekToPercent,
     updateDVRMetrics,
+    isFollowingLive,
   }
 }

@@ -37,3 +37,36 @@ export function applyLivePlaybackPolicy(hls, video, followLive = true) {
   })
   if (video.playbackRate > maxRate) video.playbackRate = maxRate
 }
+
+export function getBufferedLivePosition(video, { currentRangeOnly = false } = {}) {
+  const ranges = video?.buffered
+  if (!ranges) return null
+  for (let index = ranges.length - 1; index >= 0; index--) {
+    const start = ranges.start(index)
+    const end = ranges.end(index)
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 3.5 || end <= video.currentTime) continue
+    if (currentRangeOnly && start > video.currentTime) continue
+    // Use actual downloaded media rather than HLS's targetduration-clamped position.
+    return Math.max(video.currentTime, start + 0.1, end - 3)
+  }
+  return null
+}
+
+export function createLiveStartAlignment(video, isFollowingLive, clock = () => performance.now()) {
+  const deadline = clock() + 15000
+  let finished = false
+  return {
+    tryAlign() {
+      if (finished || clock() > deadline) return false
+      if (!isFollowingLive()) { finished = true; return false }
+      if (video.paused || video.seeking || video.readyState < 3) return false
+      if (video.getVideoPlaybackQuality?.().totalVideoFrames === 0) return false
+      const position = getBufferedLivePosition(video, { currentRangeOnly: true })
+      if (position === null || position - video.currentTime < 1.5) return false
+      finished = true
+      video.currentTime = position
+      return true
+    },
+    cancel() { finished = true },
+  }
+}
