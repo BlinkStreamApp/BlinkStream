@@ -10,7 +10,7 @@ import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { safeOpenUrl, isTauri } from '../utils/tauriEnv'
 import { invoke } from '@tauri-apps/api/core'
 import { TwitchChatPopout } from './chat/TwitchChatPopout'
-import { openTwitchChatPopoutWindow } from '../utils/twitchPopout'
+import { openTwitchChatPopoutWindow, requiresOfficialChatWindow } from '../utils/twitchPopout'
 import { normalizeChatChannels, parseIrcEnvelope } from '../utils/chatChannels'
 import ChannelLabel from './chat/ChannelLabel'
 import ChatSearchPanel from './chat/ChatSearchPanel'
@@ -492,8 +492,9 @@ export default function Chat({
   useEffect(() => {
     onMessagesUpdate?.(messages)
   }, [messages, onMessagesUpdate])
+  const officialChatWindowOnly = requiresOfficialChatWindow()
   const [useTwitchPopout, setUseTwitchPopout] = useState(() => {
-    if (isMod) return false
+    if (isMod || officialChatWindowOnly) return false
     try {
       return localStorage.getItem('bs.chat.use_twitch_popout') === 'true'
     } catch {
@@ -1764,7 +1765,7 @@ export default function Chat({
 
   return (
     <div className={`h-full min-h-0 flex flex-col relative transition-colors ${isOverlay ? 'bg-black/65 backdrop-blur-md border border-white/15 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.85)] text-shadow-sm' : 'bg-chat'}`}>
-      {!isMod && !isUnified && useTwitchPopout && (
+      {!isMod && !isUnified && !officialChatWindowOnly && useTwitchPopout && (
         <TwitchChatPopout
           channelName={channel}
           twitchToken={auth.token}
@@ -1775,7 +1776,7 @@ export default function Chat({
           }}
         />
       )}
-      <div className={`h-full min-h-0 flex flex-col ${!isMod && !isUnified && useTwitchPopout ? 'invisible pointer-events-none absolute inset-0' : ''}`}>
+      <div className={`h-full min-h-0 flex flex-col ${!isMod && !isUnified && !officialChatWindowOnly && useTwitchPopout ? 'invisible pointer-events-none absolute inset-0' : ''}`}>
         <div className="shrink-0 px-2.5 py-1.5 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center justify-between gap-1.5 select-none">
           {/* Left: Channel indicator */}
           <div className="flex items-center gap-1.5 min-w-0">
@@ -1792,16 +1793,20 @@ export default function Chat({
           </button>
           {!isOverlay && !isUnified && (
             <>
-              {/* Twitch Popout Button (Toggles Embedded Native Child Webview) */}
+              {/* Use the official window where inline composition disrupts video. */}
               <button
                 type="button"
                 onClick={() => {
+                  if (officialChatWindowOnly) {
+                    openTwitchChatPopoutWindow(channel, false, auth.token, auth.username)
+                    return
+                  }
                   setUseTwitchPopout(true)
                   try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
                 }}
                 className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg border border-twitch/40 bg-twitch/15 hover:bg-twitch/30 text-white transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95"
-                title={t('chat.ui.officialHint', 'Incrustar Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)')}
-                aria-label={t('chat.ui.official', 'Incrustar Popout Oficial de Twitch')}
+                title={officialChatWindowOnly ? t('chat.ui.floatingHint', 'Abrir Chat de Twitch en Ventana Flotante (Popout)') : t('chat.ui.officialHint', 'Incrustar Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)')}
+                aria-label={officialChatWindowOnly ? t('chat.ui.floating', 'Abrir Popout Flotante') : t('chat.ui.official', 'Incrustar Popout Oficial de Twitch')}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-twitch shrink-0">
                   <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z" />
@@ -1810,7 +1815,7 @@ export default function Chat({
               </button>
 
               {/* Popout Floating Window Button */}
-              <button
+              {!officialChatWindowOnly && <button
                 type="button"
                 onClick={() => openTwitchChatPopoutWindow(channel, false, auth.token, auth.username)}
                 className="p-1.5 rounded-lg text-text-muted hover:text-cyan-300 hover:bg-white/10 transition-colors cursor-pointer"
@@ -1818,7 +1823,7 @@ export default function Chat({
                 aria-label={t('chat.ui.floating', 'Abrir Popout Flotante')}
               >
                 <PhosphorIcon name="ArrowSquareOut" size={15} weight="bold" />
-              </button>
+              </button>}
 
               {/* Gamer Overlay Launcher */}
               {isTauri() && (

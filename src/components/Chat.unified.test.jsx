@@ -2,9 +2,11 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Chat from './Chat'
 import { banUser } from '../utils/twitch'
+import { requiresOfficialChatWindow, openTwitchChatPopoutWindow } from '../utils/twitchPopout'
 
 vi.mock('../utils/twitch', () => ({ PUBLIC_CLIENT_ID: 'test-client', sanitizeChannelForGraphQL: value => value, getHeaders: vi.fn(async () => ({})), banUser: vi.fn(), unbanUser: vi.fn(), clearChatMessages: vi.fn(), updateChatSettings: vi.fn(), getUserIdByLogin: vi.fn() }))
 vi.mock('../utils/tauriEnv', () => ({ isTauri: () => false, safeOpenUrl: vi.fn() }))
+vi.mock('../utils/twitchPopout', () => ({ requiresOfficialChatWindow: vi.fn(() => false), openTwitchChatPopoutWindow: vi.fn() }))
 vi.mock('../utils/i18n', () => {
   const translate = (_key, fallback) => fallback
   return { useT: () => translate }
@@ -32,6 +34,8 @@ const start = async () => {
 
 describe('unified native Chat', () => {
   beforeEach(() => {
+    vi.mocked(requiresOfficialChatWindow).mockReturnValue(false)
+    vi.mocked(openTwitchChatPopoutWindow).mockClear()
     FakeSocket.instances.length = 0
     vi.stubGlobal('WebSocket', FakeSocket)
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ data: [], emotes: [], sets: {} }) })))
@@ -165,6 +169,21 @@ describe('unified native Chat', () => {
     expect(socket.send).toHaveBeenCalledWith('JOIN #alpha')
     expect(screen.getByTestId('official-popout')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Canal de destino' })).not.toBeInTheDocument()
+  })
+  it('keeps Windows chat visible despite a saved embedded preference and opens official chat separately', async () => {
+    vi.mocked(requiresOfficialChatWindow).mockReturnValue(true)
+    localStorage.setItem('bs.chat.use_twitch_popout', 'true')
+    render(<Chat {...props} channels={undefined} />)
+    const socket = await start()
+    expect(screen.queryByTestId('official-popout')).not.toBeInTheDocument()
+    expect(screen.getByRole('log')).toBeVisible()
+    const official = screen.getAllByRole('button', { name: 'Abrir Popout Flotante' })
+    expect(official).toHaveLength(1)
+    fireEvent.click(official[0])
+    expect(openTwitchChatPopoutWindow).toHaveBeenCalledWith('alpha', false, 'test-token', 'viewer')
+    expect(screen.queryByTestId('official-popout')).not.toBeInTheDocument()
+    act(() => socket.receive(message('alpha', 'after-window', 'still receiving')))
+    await screen.findByText('still receiving')
   })
 
   it('combines text, user, links and source while keeping the send destination independent', async () => {
