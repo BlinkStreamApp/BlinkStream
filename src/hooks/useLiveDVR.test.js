@@ -11,6 +11,7 @@ describe('useLiveDVR', () => {
     mockVideo = {
       currentTime: 100,
       duration: 100,
+      readyState: 3, paused: false, seeking: false, videoHeight: 720, playbackRate: 1,
       seekable: {
         length: 1,
         start: vi.fn(() => 0),

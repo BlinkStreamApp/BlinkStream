@@ -15,13 +15,25 @@ const HIGH_RESOLUTION_PLAYBACK_CONFIG = Object.freeze({
 })
 
 export function getLivePlaybackPolicy(videoHeight) {
-  return videoHeight >= 1440 ? HIGH_RESOLUTION_PLAYBACK_CONFIG : LIVE_PLAYBACK_CONFIG
+  return videoHeight >= 1080 ? HIGH_RESOLUTION_PLAYBACK_CONFIG : LIVE_PLAYBACK_CONFIG
 }
 
-// High-resolution decoders should not be asked to render 60fps video at 66fps.
-export function stabilizeHighResolutionPlayback(hls, video) {
-  if (!(video.videoHeight >= 1440)) return false
-  Object.assign(hls.config, getLivePlaybackPolicy(video.videoHeight))
-  if (video.playbackRate > 1) video.playbackRate = 1
-  return true
+export function applyLivePlaybackPolicy(hls, video, followLive = true) {
+  if (!hls?.config || !video) return
+  const policy = getLivePlaybackPolicy(video.videoHeight)
+  hls.config.liveSyncDuration = policy.liveSyncDuration
+  const duration = hls.latestLevelDetails?.targetduration
+  const targetDuration = Number.isFinite(duration) && duration > 0 ? duration : 0
+  const target = hls.targetLatency
+  const targetLatency = Number.isFinite(target) && target > 0 ? target : policy.liveSyncDuration
+  // HLS clamps its sync position to at least one segment behind the edge.
+  // A cap at that same distance repeatedly seeks to a moving target instead of playing.
+  const cap = Math.max(policy.liveMaxLatencyDuration, targetDuration * 2, targetLatency + targetDuration)
+  const canSync = followLive && !video.paused && !video.seeking && video.readyState >= 2
+  const maxRate = canSync ? policy.maxLiveSyncPlaybackRate : 1
+  Object.assign(hls.config, {
+    liveMaxLatencyDuration: canSync ? cap : Infinity,
+    maxLiveSyncPlaybackRate: maxRate,
+  })
+  if (video.playbackRate > maxRate) video.playbackRate = maxRate
 }

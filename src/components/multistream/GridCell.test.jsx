@@ -15,7 +15,7 @@ vi.mock('hls.js', () => {
   class MockHls {
     static instances = []
     static isSupported = () => true
-    static Events = { MANIFEST_PARSED: 'manifest', ERROR: 'error' }
+    static Events = { MANIFEST_PARSED: 'manifest', ERROR: 'error', LEVEL_UPDATED: 'level-updated' }
     handlers = {}
     loadSource = vi.fn()
     attachMedia = vi.fn()
@@ -23,6 +23,7 @@ vi.mock('hls.js', () => {
     stopLoad = vi.fn()
     startLoad = vi.fn()
     on = (event, handler) => { this.handlers[event] = handler }
+    off = vi.fn((event) => { delete this.handlers[event] })
     constructor(config) { this.config = config; MockHls.instances.push(this) }
   }
   return { default: MockHls }
@@ -44,15 +45,38 @@ describe('GridCell', () => {
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
   })
 
-  it('uses the shared two-second live latency target', async () => {
+  it('waits for playable data before enabling the shared live latency cap', async () => {
     render(<GridCell {...props} />)
     await waitFor(() => expect(Hls.instances).toHaveLength(1))
     expect(Hls.instances[0].config).toMatchObject({
       liveSyncDuration: 2,
-      liveMaxLatencyDuration: 6,
-      maxLiveSyncPlaybackRate: 1.1,
+      liveMaxLatencyDuration: Infinity,
+      maxLiveSyncPlaybackRate: 1,
     })
+    const video = document.querySelector('video')
+    Object.defineProperties(video, { readyState: { configurable: true, value: 3 }, paused: { configurable: true, value: false } })
+    fireEvent(video, new Event('canplay'))
+    expect(Hls.instances[0].config).toMatchObject({ liveSyncDuration: 2, liveMaxLatencyDuration: 6, maxLiveSyncPlaybackRate: 1.1 })
     expect(Hls.instances[0].config).not.toHaveProperty('liveSyncDurationCount')
+  })
+
+  it('adapts live synchronization to segment duration and disables it during an unfinished seek', async () => {
+    render(<GridCell {...props} />)
+    await waitFor(() => expect(Hls.instances).toHaveLength(1))
+    const video = document.querySelector('video')
+    let seeking = false
+    Object.defineProperties(video, { readyState: { configurable: true, value: 3 }, paused: { configurable: true, value: false }, videoHeight: { configurable: true, value: 1080 }, seeking: { configurable: true, get: () => seeking } })
+    const hls = Hls.instances[0]
+    hls.latestLevelDetails = { targetduration: 6 }
+    hls.targetLatency = 3
+    act(() => hls.handlers[Hls.Events.LEVEL_UPDATED]())
+    expect(hls.config).toMatchObject({ liveSyncDuration: 3, liveMaxLatencyDuration: 12, maxLiveSyncPlaybackRate: 1 })
+    seeking = true
+    fireEvent(video, new Event('seeking'))
+    expect(hls.config.liveMaxLatencyDuration).toBe(Infinity)
+    seeking = false
+    fireEvent(video, new Event('seeked'))
+    expect(hls.config.liveMaxLatencyDuration).toBe(12)
   })
 
   it('positions loading over the video instead of beside it', async () => {

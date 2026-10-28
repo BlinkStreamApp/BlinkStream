@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
-import { LIVE_PLAYBACK_CONFIG } from '../../utils/livePlayback'
+import { LIVE_PLAYBACK_CONFIG, applyLivePlaybackPolicy } from '../../utils/livePlayback'
 import { measureInvoke } from '../../utils/perf'
 import { TauriPlaylistLoader, HLS_WORKER_CONFIG } from '../../utils/tauriHls'
 import { useT, t as translate } from '../../utils/i18n'
@@ -86,6 +86,8 @@ export default function GridCell({
     const video = videoRef.current
     if (!video || !streamUrl) return
     let hls = null
+    const updatePolicy = () => applyLivePlaybackPolicy(hls, video)
+    const policyEvents = ['loadedmetadata', 'resize', 'seeking', 'seeked', 'canplay', 'playing', 'pause']
     let disposed = false
     if (Hls.isSupported()) {
       hls = new Hls({
@@ -107,6 +109,9 @@ export default function GridCell({
         }
       })
       hlsRef.current = hls
+      hls.on(Hls.Events.LEVEL_UPDATED, updatePolicy)
+      policyEvents.forEach(event => video.addEventListener(event, updatePolicy))
+      updatePolicy()
       hls.loadSource(streamUrl)
       hls.attachMedia(video)
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -114,6 +119,8 @@ export default function GridCell({
     }
     return () => {
       disposed = true
+      policyEvents.forEach(event => video.removeEventListener(event, updatePolicy))
+      hls?.off(Hls.Events.LEVEL_UPDATED, updatePolicy)
       hls?.destroy()
       if (hlsRef.current === hls) hlsRef.current = null
       video.pause()

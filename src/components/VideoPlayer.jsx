@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
-import { LIVE_PLAYBACK_CONFIG, stabilizeHighResolutionPlayback } from '../utils/livePlayback'
+import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
 import { measureInvoke } from '../utils/perf'
 import { TauriPlaylistLoader, HLS_WORKER_CONFIG } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
@@ -250,6 +250,7 @@ export default function VideoPlayer({
     seekToLive: dvrSeekToLive,
     seekRelative,
     seekToPercent,
+    updateDVRMetrics: updatePlaybackPolicy,
   } = useLiveDVR(videoRef, hlsRef)
 
   const {
@@ -436,9 +437,9 @@ export default function VideoPlayer({
     hls.loadSource(streamUrl)
     hls.attachMedia(video)
 
-    const updatePlaybackPolicy = () => stabilizeHighResolutionPlayback(hls, video)
-    video.addEventListener('loadedmetadata', updatePlaybackPolicy)
-    video.addEventListener('resize', updatePlaybackPolicy)
+    const policyEvents = ['loadedmetadata', 'resize', 'seeking', 'seeked', 'canplay', 'playing', 'pause']
+    policyEvents.forEach(event => video.addEventListener(event, updatePlaybackPolicy))
+    hls.on(Hls.Events.LEVEL_UPDATED, updatePlaybackPolicy)
     updatePlaybackPolicy()
 
     const handleVideoError = () => {
@@ -642,12 +643,12 @@ export default function VideoPlayer({
       if (playbackProbeRef.current === playbackProbe) playbackProbeRef.current = null
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
 
-      video.removeEventListener('loadedmetadata', updatePlaybackPolicy)
-      video.removeEventListener('resize', updatePlaybackPolicy)
+      policyEvents.forEach(event => video.removeEventListener(event, updatePlaybackPolicy))
+      hls.off(Hls.Events.LEVEL_UPDATED, updatePlaybackPolicy)
       video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }
-  }, [streamUrl, channel, fetchStream, onQualityChange, quality])
+  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy])
 
   useEffect(() => { const v = videoRef.current; if (v) v.volume = muted ? 0 : volume / 100 }, [volume, muted, streamUrl])
 

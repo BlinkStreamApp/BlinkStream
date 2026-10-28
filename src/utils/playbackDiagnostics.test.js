@@ -45,4 +45,14 @@ describe('bounded playback diagnostics', () => {
     expect(hls.off).toHaveBeenCalledTimes(2)
     expect(probe.sample()).toBeNull()
   })
+
+  it('captures only numeric segment and sync targets to diagnose repeated seeks', () => {
+    const { hls, probe } = fixture()
+    hls.latestLevelDetails = { targetduration: 6, url: 'https://secret.invalid/token' }
+    hls.targetLatency = 6.5
+    hls.liveSyncPosition = 64
+    expect(probe.sample()).toMatchObject({ targetDuration: 6, targetLatency: 6.5, liveSyncPosition: 64 })
+    expect(probe.export()).not.toMatch(/secret|https:|token/)
+    probe.stop()
+  })
 })

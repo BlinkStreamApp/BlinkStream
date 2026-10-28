@@ -2,17 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import Hls from 'hls.js'
 import { useLiveDVR } from './useLiveDVR'
-import { LIVE_PLAYBACK_CONFIG, stabilizeHighResolutionPlayback } from '../utils/livePlayback'
+import { LIVE_PLAYBACK_CONFIG, applyLivePlaybackPolicy } from '../utils/livePlayback'
 
 afterEach(() => vi.useRealTimers())
 
 describe('DVR respects the active player latency policy', () => {
   it('does not undo the high-resolution policy on its next polling tick', () => {
     vi.useFakeTimers()
-    const video = { videoHeight: 1440, currentTime: 10, duration: 30, paused: false, playbackRate: 1,
+    const video = { videoHeight: 1440, currentTime: 10, duration: 30, paused: false, playbackRate: 1, readyState: 3, seeking: false,
       seekable: { length: 1, start: () => 0, end: () => 30 } }
     const hls = new Hls(LIVE_PLAYBACK_CONFIG)
-    stabilizeHighResolutionPlayback(hls, video)
+    applyLivePlaybackPolicy(hls, video)
     const videoRef = { current: video }, hlsRef = { current: hls }
     const hook = renderHook(() => useLiveDVR(videoRef, hlsRef))
     try {

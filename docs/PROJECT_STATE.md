@@ -1,6 +1,6 @@
 # PROJECT_STATE
 
-Updated: 2026-10-25
+Updated: 2026-10-28
 Status: active
 
 ## Objective
@@ -68,6 +68,8 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- Candidata12 compilada sin instalar: `src-tauri/target/candidates/1.5.4/BlinkStream_1.5.4_candidate12_seek_stability.exe`, SHA256 `ce48ad070827c2eb4f254af221802deb75d3ad03007be09201dbe780b7845432`. 842 frontend/1 omitido, 33 entrega; lint/build correctos. Repro HLS real fallaba antes con15seeks y pasa después con0; pruebas de atraso excesivo/seek pendiente/DVRmanual/Grid/diagnóstico pasan. Sin cambios nativos; UI candidata11 conservada. Falta reproducción real kokoop1080p60 con nuevo diagnóstico; sin tag/publicación/web, MSIX aún anterior.
+- 2026-10-28: usuario reporta congelación en kokoop 1080p AVC, fuera de Mod View. Diagnóstico30muestras/29.017s: frames1206/dropped246 constantes, FPS0, seeking=true continuo, seeks10→25/seeked3 constante, buffercrece46–70→46–98 y tasa1.1/cap6. Repro con motor HLS1.6.16 real y targetduration6: cap6 provoca15seeks/30s; corregido con margen máximo(segmento*2,targetadaptativo+segmento,capnominal), bloqueo de hard catch-up durante seek/buffering/pausa/DVR y perfil1080p a1x como1440p. Una función de política compartida entre hook DVR, metadata/LEVEL_UPDATED y Grid; no deshace rewind. Nuevas métricas numéricas targetDuration/targetLatency/liveSyncPosition, sin URLs/credenciales. Preparar candidata12; aún falta comprobar recuperación real en el canal del usuario.
 - Candidata11 responsiva compilada sin instalar: `src-tauri/target/candidates/1.5.4/BlinkStream_1.5.4_candidate11_responsive.exe`, SHA256 `0348936f994b0a08e0aace00bdfe101ac5621444eeabab2117d281a06f0b1de6`. 832 frontend/1 omitido, 67 Rust y33 entrega; lint/Clippy/fmt/build correctos. Edge local: controles reales sin overflow y ajustes desplazables en320/480/768/960; modalClips conserva ancho de ventana, red externa bloqueada. Containment soloen capa de controles, diálogos Clips/VOD identificados para ocultar hostoficial al abrirlos. Sin instalación/tag/publicación/web; MSIX todavía anterior. Falta validar zoom/reflow de widgets Twitch autenticados y aceptaciónvisual real.
 - Usuario rechaza candidata 10: ajustes del player recortados y columnas oficiales demasiado estrechas. Corregidos menú limitado a alto del player (antes75vh), scroll/cierre sticky, barras compactadas por container queries y doble toggle por propagación; compacto híbrido ahora tiene handler. Vídeo ancho25–45%, inicial35%; webview oficial escala nativa Auto (objetivo1440CSSpx, 65–100%) o manual70/80/90/100 sin navegar ni scripts. Pruebas Edge local de componentes reales con extracción vacía a320/480/768/960: menú dentro del player, última opción accesible y botones de barra sin desbordar. No es validación del reflow Twitch autenticado. Preparar candidata11; no publicar.
 - Candidata 10 lateral compilada sin instalar: `src-tauri/target/candidates/1.5.4/BlinkStream_1.5.4_candidate10_side_layout.exe`, SHA256 `ef8d0a2bb9f572eb325e555cbadcf73797caa6475f624c4f54ac0b4c79307701`. Incluye acceso a Mod View sin depender de rol local. 30 regresiones de vistas/traducciones y 33 entrega correctas; lint/build/geométrica Edge correctos. No cambios Rust desde candidata 7. Pendiente validar distribución responsive de Twitch real; MSIX anterior, sin tag/publicación/web.
