@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
-import { LIVE_PLAYBACK_CONFIG, createLiveStartAlignment } from '../utils/livePlayback'
+import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
 import { measureInvoke } from '../utils/perf'
-import { TauriPlaylistLoader, HLS_WORKER_CONFIG } from '../utils/tauriHls'
+import { LIVE_HLS_TRANSPORT, HLS_WORKER_CONFIG } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
 import { safeOpenUrl } from '../utils/tauriEnv'
@@ -251,7 +251,6 @@ export default function VideoPlayer({
     seekRelative,
     seekToPercent,
     updateDVRMetrics: updatePlaybackPolicy,
-    isFollowingLive,
   } = useLiveDVR(videoRef, hlsRef)
 
   const {
@@ -412,7 +411,7 @@ export default function VideoPlayer({
 
     const hls = new Hls({
       ...HLS_WORKER_CONFIG,
-      loader: TauriPlaylistLoader,
+      ...LIVE_HLS_TRANSPORT,
       ...LIVE_PLAYBACK_CONFIG,
       backBufferLength: 15,
       maxBufferLength: 12,
@@ -468,11 +467,6 @@ export default function VideoPlayer({
       }
     }
     video.addEventListener('error', handleVideoError)
-
-    const startAlignment = createLiveStartAlignment(video, isFollowingLive)
-    hls.on(Hls.Events.FRAG_BUFFERED, startAlignment.tryAlign)
-    video.addEventListener('playing', startAlignment.tryAlign)
-    video.addEventListener('pause', startAlignment.cancel)
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
       const playPromise = video.play()
@@ -610,8 +604,9 @@ export default function VideoPlayer({
           const probe = playbackProbe.sample()
           const bufferAhead = `${(probe?.bufferAhead || 0).toFixed(1)}s`
 
-          const latVal = typeof hlsInst.latency === 'number' && !isNaN(hlsInst.latency) && hlsInst.latency >= 0
-            ? `${hlsInst.latency.toFixed(1)}s`
+          const latency = probe?.sourceLatency ?? probe?.latency
+          const latVal = typeof latency === 'number' && latency >= 0
+            ? `${latency.toFixed(1)}s`
             : 'En vivo'
 
           setStats({
@@ -636,15 +631,11 @@ export default function VideoPlayer({
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
 
       policyEvents.forEach(event => video.removeEventListener(event, updatePlaybackPolicy))
-      startAlignment.cancel()
-      hls.off(Hls.Events.FRAG_BUFFERED, startAlignment.tryAlign)
-      video.removeEventListener('playing', startAlignment.tryAlign)
-      video.removeEventListener('pause', startAlignment.cancel)
       hls.off(Hls.Events.LEVEL_UPDATED, updatePlaybackPolicy)
       video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }
-  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy, isFollowingLive])
+  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy])
 
   useEffect(() => { const v = videoRef.current; if (v) v.volume = muted ? 0 : volume / 100 }, [volume, muted, streamUrl])
 

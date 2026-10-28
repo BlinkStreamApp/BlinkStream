@@ -42,7 +42,7 @@ describe('bounded playback diagnostics', () => {
     expect(report.samples.at(-1)).toMatchObject({ codec: 'hvc1.1.6.L150.90', lastError: 'bufferStalledError', events: { waiting: 1 } })
     expect(probe.export()).not.toMatch(/secret|https:|token|Authorization/)
     probe.stop()
-    expect(hls.off).toHaveBeenCalledTimes(2)
+    expect(hls.off).toHaveBeenCalledTimes(3)
     expect(probe.sample()).toBeNull()
   })
 
@@ -53,6 +53,20 @@ describe('bounded playback diagnostics', () => {
     hls.liveSyncPosition = 64
     expect(probe.sample()).toMatchObject({ targetDuration: 6, targetLatency: 6.5, liveSyncPosition: 64 })
     expect(probe.export()).not.toMatch(/secret|https:|token/)
+    probe.stop()
+  })
+  it('keeps raw HLS latency separate from the source timestamp measurement', () => {
+    const { video, hls, handlers, probe } = fixture()
+    hls.playingDate = new Date(Date.now() - 4200)
+    hls.latency = 8.1
+    hls.config = { progressive: true }
+    handlers.get(Hls.Events.LEVEL_LOADED)(null, { networkDetails: { blinkstreamPlaylist: { prefetchCount: 2, url: 'https://secret.invalid' } } })
+    expect(probe.sample()).toMatchObject({ latency: 8.1, sourceLatency: expect.closeTo(4.2, 1), prefetchCount: 2, playlistLoads: 1, progressive: true })
+    hls.playingDate = new Date(Date.now() + 60000)
+    expect(probe.sample().sourceLatency).toBeNull()
+    hls.playingDate = new Date('invalid')
+    expect(probe.sample().sourceLatency).toBeNull()
+    expect(probe.export()).not.toMatch(/https:|secret/)
     probe.stop()
   })
 })

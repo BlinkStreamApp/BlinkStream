@@ -1,6 +1,6 @@
 import Hls from 'hls.js'
 
-export function createPlaybackProbe(video, hls, clock = () => performance.now()) {
+export function createPlaybackProbe(video, hls, clock = () => performance.now(), wallClock = () => Date.now()) {
   const events = { waiting: 0, stalled: 0, seeking: 0, seeked: 0, ratechange: 0 }
   const listeners = Object.keys(events).map(name => {
     const handler = () => { events[name] += 1 }
@@ -11,6 +11,8 @@ export function createPlaybackProbe(video, hls, clock = () => performance.now())
   let lastError = null
   let previous = null
   let stopped = false
+  let prefetchCount = 0
+  let playlistLoads = 0
   const samples = []
   const onCodecs = (_event, tracks) => {
     const value = tracks.video?.codec || tracks.video?.levelCodec || tracks.audiovideo?.codec
@@ -19,8 +21,14 @@ export function createPlaybackProbe(video, hls, clock = () => performance.now())
   const onError = (_event, data) => {
     lastError = typeof data.details === 'string' && /^[a-zA-Z0-9_]{1,80}$/.test(data.details) ? data.details : 'unknown'
   }
+  const onPlaylist = (_event, data) => {
+    playlistLoads++
+    const count = data.networkDetails?.blinkstreamPlaylist?.prefetchCount
+    prefetchCount = Number.isInteger(count) && count >= 0 && count <= 2 ? count : 0
+  }
   hls.on(Hls.Events.BUFFER_CODECS, onCodecs)
   hls.on(Hls.Events.ERROR, onError)
+  hls.on(Hls.Events.LEVEL_LOADED, onPlaylist)
   return {
     sample() {
       if (stopped) return null
@@ -32,6 +40,8 @@ export function createPlaybackProbe(video, hls, clock = () => performance.now())
       const validDelta = seconds > 0 && total !== null && dropped !== null && previous?.total !== null && previous?.dropped !== null && total >= previous.total && dropped >= previous.dropped
       const ranges = Array.from({ length: Math.min(video.buffered.length, 8) }, (_, index) => [video.buffered.start(index), video.buffered.end(index)])
       const currentRange = ranges.find(([start, end]) => start <= video.currentTime && end >= video.currentTime)
+      const playingDate = hls.playingDate?.getTime()
+      const sourceLatency = Number.isFinite(playingDate) ? (wallClock() - playingDate) / 1000 : null
       const sample = {
         elapsedMs: Math.round(now), codec, width: video.videoWidth, height: video.videoHeight,
         playbackRate: video.playbackRate, paused: video.paused, seeking: video.seeking, readyState: video.readyState,
@@ -46,6 +56,8 @@ export function createPlaybackProbe(video, hls, clock = () => performance.now())
         targetDuration: Number.isFinite(hls.latestLevelDetails?.targetduration) ? hls.latestLevelDetails.targetduration : null,
         targetLatency: Number.isFinite(hls.targetLatency) ? hls.targetLatency : null,
         latency: Number.isFinite(hls.latency) ? hls.latency : null,
+        sourceLatency: sourceLatency !== null && sourceLatency >= 0 && sourceLatency <= 3600 ? sourceLatency : null,
+        prefetchCount, playlistLoads, progressive: Boolean(hls.config?.progressive),
         liveSyncPosition: Number.isFinite(hls.liveSyncPosition) ? hls.liveSyncPosition : null,
         lastError, events: { ...events },
       }
@@ -60,6 +72,7 @@ export function createPlaybackProbe(video, hls, clock = () => performance.now())
       listeners.forEach(([name, handler]) => video.removeEventListener(name, handler))
       hls.off(Hls.Events.BUFFER_CODECS, onCodecs)
       hls.off(Hls.Events.ERROR, onError)
+      hls.off(Hls.Events.LEVEL_LOADED, onPlaylist)
     },
   }
 }

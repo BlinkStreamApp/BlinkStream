@@ -51,22 +51,3 @@ export function getBufferedLivePosition(video, { currentRangeOnly = false } = {}
   }
   return null
 }
-
-export function createLiveStartAlignment(video, isFollowingLive, clock = () => performance.now()) {
-  const deadline = clock() + 15000
-  let finished = false
-  return {
-    tryAlign() {
-      if (finished || clock() > deadline) return false
-      if (!isFollowingLive()) { finished = true; return false }
-      if (video.paused || video.seeking || video.readyState < 3) return false
-      if (video.getVideoPlaybackQuality?.().totalVideoFrames === 0) return false
-      const position = getBufferedLivePosition(video, { currentRangeOnly: true })
-      if (position === null || position - video.currentTime < 1.5) return false
-      finished = true
-      video.currentTime = position
-      return true
-    },
-    cancel() { finished = true },
-  }
-}
