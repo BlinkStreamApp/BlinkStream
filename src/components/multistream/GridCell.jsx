@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
 import { LIVE_PLAYBACK_CONFIG, applyLivePlaybackPolicy } from '../../utils/livePlayback'
 import { measureInvoke } from '../../utils/perf'
-import { LIVE_HLS_TRANSPORT, HLS_WORKER_CONFIG } from '../../utils/tauriHls'
+import { LIVE_HLS_TRANSPORT, HLS_WORKER_CONFIG, attachLivePlaylistBootstrap } from '../../utils/tauriHls'
 import { useT, t as translate } from '../../utils/i18n'
 import { useStereoPanner } from '../../hooks/useStereoPanner'
 import PhosphorIcon from '../icons/PhosphorIcon'
@@ -86,6 +86,7 @@ export default function GridCell({
     const video = videoRef.current
     if (!video || !streamUrl) return
     let hls = null
+    let disposeBootstrap = () => {}
     const updatePolicy = () => applyLivePlaybackPolicy(hls, video)
     const policyEvents = ['loadedmetadata', 'resize', 'seeking', 'seeked', 'canplay', 'playing', 'pause']
     let disposed = false
@@ -109,6 +110,7 @@ export default function GridCell({
         }
       })
       hlsRef.current = hls
+      disposeBootstrap = attachLivePlaylistBootstrap(hls, video)
       hls.on(Hls.Events.LEVEL_UPDATED, updatePolicy)
       policyEvents.forEach(event => video.addEventListener(event, updatePolicy))
       updatePolicy()
@@ -119,6 +121,7 @@ export default function GridCell({
     }
     return () => {
       disposed = true
+      disposeBootstrap()
       policyEvents.forEach(event => video.removeEventListener(event, updatePolicy))
       hls?.off(Hls.Events.LEVEL_UPDATED, updatePolicy)
       hls?.destroy()

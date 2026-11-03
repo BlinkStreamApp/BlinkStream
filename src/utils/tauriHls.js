@@ -131,3 +131,53 @@ export class TauriPlaylistLoader extends Hls.DefaultConfig.loader {
 
 // A playlist-only native loader leaves hls.js free to select its streaming FetchLoader.
 export const LIVE_HLS_TRANSPORT = Object.freeze({ pLoader: TauriPlaylistLoader, progressive: true })
+
+export function attachLivePlaylistBootstrap(hls, video, isFollowingLive = () => true) {
+  let firstPlaylist = true
+  let disposed = false
+  let timer = null
+  const cancel = () => { clearTimeout(timer); timer = null }
+  const onLoaded = (_event, data) => {
+    cancel()
+    if (!firstPlaylist || disposed) return
+    firstPlaylist = false
+    const metadata = data.networkDetails?.blinkstreamPlaylist
+    const duration = metadata?.segmentDuration
+    const details = data.details
+    if (!details?.live || !Number.isInteger(metadata?.prefetchCount) || metadata.prefetchCount < 1 || metadata.prefetchCount > 2
+      || !Number.isFinite(duration) || duration < 0.25 || duration > 30
+      || !Number.isFinite(details.targetduration) || duration >= details.targetduration
+      || !Number.isFinite(details.totalduration) || details.totalduration < details.targetduration * 4
+      || !data.levelInfo?.uri || !Number.isInteger(data.level) || data.level < 0) return
+    // The first reload otherwise waits the nominal target duration while no forward buffer exists.
+    // Request only the next playlist; never restart segment loading or seek the media element.
+    timer = setTimeout(() => {
+      timer = null
+      if (disposed || !hls.started || video.paused || video.seeking || !isFollowingLive()) return
+      // LevelDetails carries the scheduled time across reloads. Rebase it to this actual
+      // request so the next regular reload does not inherit the original late deadline.
+      details.requestScheduled = performance.now()
+      hls.trigger(Hls.Events.LEVEL_LOADING, {
+        url: data.levelInfo.uri, level: data.level, levelInfo: data.levelInfo,
+        id: data.id ?? 0, pathwayId: data.levelInfo.attrs?.['PATHWAY-ID'], deliveryDirectives: null,
+      })
+    }, duration * 1000)
+  }
+  const onError = (_event, data) => { if (data.fatal) cancel() }
+  const dispose = () => {
+    if (disposed) return
+    disposed = true
+    cancel()
+    hls.off(Hls.Events.LEVEL_LOADED, onLoaded)
+    hls.off(Hls.Events.LEVEL_LOADING, cancel)
+    hls.off(Hls.Events.ERROR, onError)
+    hls.off(Hls.Events.DESTROYING, dispose)
+    video.removeEventListener('pause', cancel)
+  }
+  hls.on(Hls.Events.LEVEL_LOADED, onLoaded)
+  hls.on(Hls.Events.LEVEL_LOADING, cancel)
+  hls.on(Hls.Events.ERROR, onError)
+  hls.on(Hls.Events.DESTROYING, dispose)
+  video.addEventListener('pause', cancel)
+  return dispose
+}

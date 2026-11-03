@@ -49,3 +49,38 @@ is eliminated or infer universal latency from this sample.
 Real user WebView2, authenticated playback, HEVC, ads/discontinuity transitions,
 long playback and multistream still need acceptance. Do not publish 1.5.4 until
 accepted and release gates pass. Earlier stable candidates remain available.
+
+## Startup reload refinement — 2026-11-03
+
+The first playlist can schedule its next request about eight seconds later,
+despite two-second segments. Before forward buffer exists, the HLS 1.6.16 reload
+controller uses the nominal target duration. Its scheduled timestamp is then
+carried across playlist updates; an early request alone does not fix the next
+deadline. Seeking closer to live does not address this scheduling defect.
+
+For the first eligible live playlist only, request a refresh after the observed
+segment duration. Use the existing LEVEL_LOADING contract and rebase the public
+LevelDetails.requestScheduled timestamp to this actual request time. The normal
+controller then continues at the measured cadence. No vendor function is patched;
+the target duration, media position, speed and buffer limits remain unchanged.
+The adapter is specific to the currently tested HLS scheduling contract and must
+be revalidated on an engine update.
+
+Apply only to native-loader prefetch playlists with a sufficiently long window
+and a nominal target larger than the measured duration. Cancel on a normal
+playlist request, pause, fatal network failure, manual DVR, stopped loading or
+disposal. Allow the normal startup seek to finish; it must not cancel the refresh
+as if it were a manual rewind. Main playback and Grid share the same adapter.
+
+The 60-second public Kokoop comparison maintained 1x and worker processing:
+baseline exhausted its buffer once and added four dropped frames; the candidate
+had no waits, zero dropped frames and at least 2.93s of buffer. It remained about
+1.87s ahead of baseline after startup. The actual VideoPlayer in isolated WebView2
+156 also maintained approximately 60 FPS and zero new drops/waits in its measured
+minute. These are public anonymous local tests, not authenticated HEVC or broad
+platform acceptance.
+
+The PC clock was independently measured about 2.867s ahead of time.windows.com
+using a read-only NTP check. The displayed source delay includes that offset:
+approximately 6.35s displayed versus approximately 3.48s after clock correction.
+No OS clock setting was changed and no fixed offset was added to app metrics.

@@ -1,8 +1,10 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-10-17. Microsoft Store 1.5.1 publicada según confirma el usuario. GitHub 1.5.0 y 1.5.1 publicadas tras CI firmado multiplataforma, NSIS smoke y verificación independiente de artefactos públicos; 1.5.2 latest/updater tras CI `39060821359` y verificación de los 15 archivos públicos/cuatro firmas. Fuente 1.5.1 incluye el hotfix de iconos MSIX, variantes claro/oscuro/DPI y PRI verificado. El usuario gestiona Partner Center. Ver `guides/MSIX_STORE.md` y `guides/UPDATER_VERIFICATION.md`.
+Actualizado: 2026-11-03. GitHub latest verificado: v1.5.3 (publicado el2026-10-22). Fuente1.5.4 en candidatas, sin tag ni publicación; última Store confirmada por el usuario:1.5.2, no implica verificación actual de Partner Center.
 
-GitHub 1.5.2 publicada: búsqueda del chat nativo individual/unificado y traducciones aceptadas por el usuario; extractor ZIP opcional no utilizado retirado. Candidato y tag superaron CI firmado, smoke y verificación independiente. Store permanece en 1.5.1; MSIX 1.5.2.0 entregado por separado al mantenedor. Única web comercial: https://apxstudio.es/; conservar la confirmación de login independiente en Pages del repositorio auth.
+**Bloque activo:** cerrar reproducción/latencia y moderación de1.5.4 antes de ampliar funciones. Candidata16 incorpora refresco inicial de prefetch, con ~1.87s de mejora medida frente a15 y sin pausa inicial en la prueba pública. Windows mantiene Chat Ligero integrado y chat oficial en ventana. Falta aceptación en la sesión real, validación de ModView combinado y artefactos finales.
+
+**Siguiente mejora funcional:** ocultación y restauración de canales, sin cambiar follows y con preferencias aisladas por cuenta. Después: refinamientos de colecciones; 1.6 conserva su orden de VOD/bookmarks y workspaces. Detalle del estado y límites en PROJECT_STATE.md.
 
 ## Objetivo y reglas
 
@@ -17,7 +19,7 @@ Desde el 2026-10-22, el usuario autoriza el despliegue completo de cada nuevo PA
 | Orden | Hito / bloque | Dependencias | Criterio de cierre | Estado |
 | --- | --- | --- | --- | --- |
 | 0 | 1.4.4 categorías/UI/chat unificado | Componentes existentes, Helix/IRC | Publicación y CI firmados; aceptación específica registrada | Publicada; checks independientes de envío/audio pendientes |
-| 1 | Fiabilidad/latencia y validaciones Twitch, incluidas desde 1.5.0 | HLS, campañas/cuentas autorizadas | Grid, pausa/DVR y estabilidad; separar crédito/reclamo/inventario | Publicada; principal: 2.5 s aceptados; pruebas reales ampliadas pendientes; etiqueta 1.4.5 sustituida |
+| 1 | Fiabilidad/latencia y validaciones Twitch, incluidas desde 1.5.0 | HLS, campañas/cuentas autorizadas | Grid, pausa/DVR y estabilidad; separar crédito/reclamo/inventario | Reabierta en1.5.4: candidata16 mejora ~1.87s el arranque medido; pendiente aceptación GUI, HEVC/Grid y ModView combinado |
 | 2 | 1.5.x organización y chat | Cache por cuenta, favoritos y feed acotado | Búsqueda de sesión, ocultación de canales y refinamientos de colecciones sin fuga al salir ni recursos cruzados | Colecciones/categorías publicadas; búsqueda publicada en GitHub 1.5.2; pendientes ocultación de canales y refinamientos de colecciones |
 | 3 | 1.6.0 continuidad/workspaces | Identidad VOD y persistencia existentes | Reinicio/restauración, medios ausentes, cleanup y audio principal correctos | Planificada |
 | 4 | 1.6.x consumo/medios | Bloque 3, FFmpeg y disco acotado | DVR/audio existentes validados → ahorro/avisos → recorte/replay → biblioteca → temporizador; respetar grabación | Planificada |

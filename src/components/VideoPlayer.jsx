@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
 import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
 import { measureInvoke } from '../utils/perf'
-import { LIVE_HLS_TRANSPORT, HLS_WORKER_CONFIG } from '../utils/tauriHls'
+import { LIVE_HLS_TRANSPORT, HLS_WORKER_CONFIG, attachLivePlaylistBootstrap } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
 import { safeOpenUrl } from '../utils/tauriEnv'
@@ -251,6 +251,7 @@ export default function VideoPlayer({
     seekRelative,
     seekToPercent,
     updateDVRMetrics: updatePlaybackPolicy,
+    isFollowingLive,
   } = useLiveDVR(videoRef, hlsRef)
 
   const {
@@ -432,6 +433,7 @@ export default function VideoPlayer({
       debug: false,
     })
     hlsRef.current = hls
+    const disposeBootstrap = attachLivePlaylistBootstrap(hls, video, isFollowingLive)
     const playbackProbe = createPlaybackProbe(video, hls)
     playbackProbeRef.current = playbackProbe
     hls.loadSource(streamUrl)
@@ -627,6 +629,7 @@ export default function VideoPlayer({
       cancelled = true
       clearTimeout(statsTimer)
       playbackProbe.stop()
+      disposeBootstrap()
       if (playbackProbeRef.current === playbackProbe) playbackProbeRef.current = null
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
 
@@ -635,7 +638,7 @@ export default function VideoPlayer({
       video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }
-  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy])
+  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy, isFollowingLive])
 
   useEffect(() => { const v = videoRef.current; if (v) v.volume = muted ? 0 : volume / 100 }, [volume, muted, streamUrl])
 
