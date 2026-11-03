@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import ToggleSwitch from '../ToggleSwitch'
 import PhosphorIcon from '../icons/PhosphorIcon'
+import DiskSpaceIndicator from '../recording/DiskSpaceIndicator'
 
 const LS_REC_PATH = 'blinkstream_rec_path'
 const LS_REC_FORMAT = 'blinkstream_rec_format'
@@ -95,6 +96,7 @@ export function SettingsRecordingTab() {
         {statusMsg && (
           <p className="text-[11px] text-twitch mt-1.5 font-medium animate-fade-in">{statusMsg}</p>
         )}
+        <DiskSpaceIndicator directory={recPath} />
       </div>
 
       <div className="border-t border-bg-tertiary/50 pt-4">

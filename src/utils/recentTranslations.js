@@ -1,6 +1,11 @@
 // Keep each new UI message complete across the eight supported interface languages.
 export const featureLanguages = ['es', 'en', 'fr', 'de', 'pt', 'ja', 'ko', 'ru']
 const rows = {
+  'rec.disk.selectFolder': 'Selecciona una carpeta para consultar su espacio disponible.|Select a folder to check its available space.|Sélectionnez un dossier pour consulter son espace disponible.|Wähle einen Ordner, um den verfügbaren Speicherplatz zu prüfen.|Selecione uma pasta para consultar o espaço disponível.|フォルダーを選択して空き容量を確認してください。|폴더를 선택하여 사용 가능한 공간을 확인하세요.|Выберите папку, чтобы проверить свободное место.',
+  'rec.disk.checking': 'Consultando espacio disponible…|Checking available space…|Vérification de l’espace disponible…|Verfügbarer Speicherplatz wird geprüft…|Consultando espaço disponível…|空き容量を確認中…|사용 가능한 공간 확인 중…|Проверка свободного места…',
+  'rec.disk.available': '{free} GiB disponibles de {total} GiB|{free} GiB available of {total} GiB|{free} Gio disponibles sur {total} Gio|{free} GiB von {total} GiB verfügbar|{free} GiB disponíveis de {total} GiB|{total} GiB 中 {free} GiB の空き容量|전체 {total} GiB 중 {free} GiB 사용 가능|Свободно {free} ГиБ из {total} ГиБ',
+  'rec.disk.unknown': 'Espacio en disco desconocido|Disk space unavailable|Espace disque indisponible|Speicherplatz nicht verfügbar|Espaço em disco indisponível|ディスク容量を取得できません|디스크 공간을 확인할 수 없습니다|Данные о свободном месте недоступны',
+  'rec.disk.refresh': 'Actualizar|Refresh|Actualiser|Aktualisieren|Atualizar|更新|새로 고침|Обновить',
   'mod.official.scale': 'Escala de Twitch|Twitch scale|Échelle Twitch|Twitch-Skalierung|Escala da Twitch|Twitchの表示倍率|Twitch 배율|Масштаб Twitch',
   'mod.official.autoScale': 'Automática|Automatic|Automatique|Automatisch|Automática|自動|자동|Автоматически',
   'mod.hybrid.show': 'Mostrar vídeo BlinkStream|Show BlinkStream video|Afficher la vidéo BlinkStream|BlinkStream-Video anzeigen|Mostrar vídeo BlinkStream|BlinkStreamの映像を表示|BlinkStream 영상 표시|Показать видео BlinkStream',

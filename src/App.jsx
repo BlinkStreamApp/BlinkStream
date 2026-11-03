@@ -3,7 +3,6 @@ import ChannelSearch from './components/ChannelSearch'
 import StreamInfo from './components/StreamInfo'
 import ConfirmDialog from './components/ConfirmDialog'
 import PhosphorIcon from './components/icons/PhosphorIcon'
-import DiskSpaceIndicator from './components/recording/DiskSpaceIndicator'
 
 import { RecordingProvider } from './components/recording/RecordingContext'
 import { BlinkStreamLogo } from './components/BlinkStreamLogo'
@@ -732,11 +731,6 @@ function MainApp() {
           <DebugPanel />
         </Suspense>
       )}
-
-      {}
-      <DiskSpaceIndicator />
-
-      {}
       {modToast && (
         <div
           role="status"

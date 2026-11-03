@@ -153,13 +153,45 @@ fn find_streamlink(app: &AppHandle) -> Result<PathBuf, String> {
 /// `libc` (ya presente) en vez de anadir `nix` para minimizar la
 /// superficie de supply-chain.
 fn get_disk_space() -> Option<(f64, f64)> {
-    // Para el MVP usamos el directorio HOME como referencia. En G2 lo
-    // cambiaremos al dir de grabaciones configurado.
+    // Legacy global polling uses the home volume; settings query the selected directory.
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .ok()?;
     let path = std::path::Path::new(&home);
+    get_disk_space_for(path)
+}
 
+fn recording_disk_directory(directory: &str) -> Result<PathBuf, String> {
+    let path = std::path::Path::new(directory);
+    if directory.len() > 4096 || directory.contains('\0') || !path.is_absolute() {
+        return Err("Invalid recording directory".into());
+    }
+    #[cfg(windows)]
+    if !matches!(
+        path.components().next(),
+        Some(std::path::Component::Prefix(prefix))
+            if matches!(prefix.kind(), std::path::Prefix::Disk(_) | std::path::Prefix::VerbatimDisk(_))
+    ) {
+        return Err("Only local recording directories are supported".into());
+    }
+    let path = path
+        .canonicalize()
+        .map_err(|_| "Recording directory unavailable")?;
+    #[cfg(windows)]
+    if !matches!(
+        path.components().next(),
+        Some(std::path::Component::Prefix(prefix))
+            if matches!(prefix.kind(), std::path::Prefix::Disk(_) | std::path::Prefix::VerbatimDisk(_))
+    ) {
+        return Err("Only local recording directories are supported".into());
+    }
+    if !path.is_dir() {
+        return Err("Recording directory unavailable".into());
+    }
+    Ok(path)
+}
+
+fn get_disk_space_for(path: &std::path::Path) -> Option<(f64, f64)> {
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
@@ -364,16 +396,30 @@ pub fn recorder_set_global_enabled(app: AppHandle, state: String) -> Result<(), 
 
 /// Devuelve el estado global actual + count de grabaciones activas
 /// + espacio libre y total en disco (en GB, o null si no se pudo calcular).
+/// Con directory consulta el destino seleccionado; sin él conserva el volumen del perfil.
 ///
 /// WT-20260628-27 / FIX 1: ahora `get_disk_space` devuelve `(free, total)`
 /// en vez de solo `free`, asi la UI puede mostrar capacidad total del
 /// volumen ademas del espacio libre. En Unix, antes siempre devolvia
 /// `null`; ahora devuelve los valores reales via `libc::statvfs`.
 #[tauri::command]
-pub fn recorder_get_global_state() -> Result<serde_json::Value, String> {
+pub async fn recorder_get_global_state(
+    directory: Option<String>,
+) -> Result<serde_json::Value, String> {
     let state = get_global_state_from_memory();
     let active_count = active_recordings_count();
-    let (disk_free_gb, disk_total_gb) = match get_disk_space() {
+    let space = tauri::async_runtime::spawn_blocking(move || -> Result<_, String> {
+        Ok(match directory {
+            Some(directory) => {
+                let path = recording_disk_directory(&directory)?;
+                get_disk_space_for(&path)
+            }
+            None => get_disk_space(),
+        })
+    })
+    .await
+    .map_err(|_| "Disk space query failed")??;
+    let (disk_free_gb, disk_total_gb) = match space {
         Some((f, t)) => (Some(f), Some(t)),
         None => (None, None),
     };
@@ -721,6 +767,55 @@ mod tests {
             assert!(f >= 0.0, "free_gb debe ser >= 0, recibio {f}");
             assert!(t >= 0.0, "total_gb debe ser >= 0, recibio {t}");
             assert!(f <= t, "free_gb ({f}) no puede superar total_gb ({t})");
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_recording_directory_returns_actual_volume_capacity() {
+        let directory = make_temp_dir("disk_query");
+        let expected = get_disk_space_for(&directory).expect("temporary directory volume");
+        let result = recorder_get_global_state(Some(directory.to_string_lossy().into_owned()))
+            .await
+            .expect("selected directory metadata");
+        let free = result["diskFreeGb"].as_f64().expect("free space");
+        let total = result["diskTotalGb"].as_f64().expect("capacity");
+        assert!(free >= 0.0 && free <= total);
+        assert_eq!(total, expected.1);
+        assert!(result["state"].is_string());
+    }
+
+    #[test]
+    fn disk_query_rejects_relative_and_missing_directories() {
+        for value in ["", "relative", "../parent", "bad\0directory"] {
+            assert!(recording_disk_directory(value).is_err());
+        }
+        let missing = make_temp_dir("disk_missing").join("missing");
+        assert!(recording_disk_directory(&missing.to_string_lossy()).is_err());
+    }
+
+    #[tokio::test]
+    async fn disk_query_preserves_legacy_polling_without_directory() {
+        let result = recorder_get_global_state(None)
+            .await
+            .expect("legacy global state");
+        assert!(result["state"].is_string());
+        assert!(result["activeCount"].is_number());
+        assert_eq!(
+            result["diskTotalGb"].as_f64(),
+            get_disk_space().map(|(_, total)| total)
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn disk_query_rejects_network_and_device_paths_before_access() {
+        for value in [
+            r"\\host\share",
+            r"\\?\UNC\host\share",
+            r"\\.\PhysicalDrive0",
+            r"C:relative",
+        ] {
+            assert!(recording_disk_directory(value).is_err());
         }
     }
 }
