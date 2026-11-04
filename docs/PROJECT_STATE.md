@@ -1,6 +1,6 @@
 # PROJECT_STATE
 
-Updated: 2026-11-03
+Updated: 2026-11-04
 Status: active
 
 ## Objective
@@ -72,6 +72,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- Plan solicitado de la iniciativa StreamNook: `docs/STREAMNOOK_IMPLEMENTATION_PLAN.md` (R0–R8). Primero contrato de canje y cierre1.5.4; después viabilidad Twitch y centro de recompensas. Planificación únicamente, sin funciones nuevas implementadas ni versiones reservadas. EXECUTION_PLAN/ROADMAP alineados.
 - Candidata17 compilada sin instalar: src-tauri/target/candidates/1.5.4/BlinkStream_1.5.4_candidate17_recording_disk.exe; SHA256 97bba4619d942f36981a6f2252e94cdc2583aa22595a66633c32306c9ec80e6d. Retirada barra global ficticia de100GB. Capacidad real del destino solo en ajustes de grabación; consulta local fuera del hilo UI, sin nuevas dependencias, comandos ni permisos. Ignora respuestas obsoletas y muestra estado desconocido ante error. 906 frontend/1 omitido,71 Rust,33 entrega; lint/fmt/Clippy y build desktop correctos. Falta comprobación visual del usuario; conserva latencia16, sin publicación/MSIX final.
 - Usuario acepta candidata16 para la muestra actual deKokoop: «Perfecto», captura1080p ~3.3s,59.9FPS yΔ0. No equivale a aceptación de ModView combinado, HEVC o Store/MSIX.
 - Candidata16 conservada: src-tauri/target/candidates/1.5.4/BlinkStream_1.5.4_candidate16_startup_latency.exe; SHA256 f6f6dd12b93744c62346c76d4e8e00a7f78c6a82cb7e3335d36331d91851cb9e. 896 frontend/1 omitido,33 entrega,lint/build correctos. Regresión con HLS real: primera recarga8000→2010ms y siguientes a2000ms. Aceptación GUI limitada a la muestra anterior; sin tag/publicación/web/MSIX final.
@@ -88,7 +89,7 @@ NOW:
 NEXT:
 - Prueba GUI voluntaria desde 1.4.1 y de conservación de settings/sesión, sin instalar automáticamente en el PC del usuario. Linux updater integrado requiere AppImage; `.deb` se actualiza manualmente/mediante paquetes.
 - Validar canje EventSub real, Auto-Claim independiente y pausa/aislamiento del reporte nativo.
-- App 1.5.x: ocultación de canales y refinamientos de colecciones; colecciones/categorías/búsqueda ya publicadas. Luego 1.6 VOD/bookmarks, workspaces y audio principal antes de ahorro/replay/biblioteca. Próximos PATCH incluyen despliegue completo y web SSH tras validar.
+- Nuevo bloque R1–R4: contrato de canje → viabilidad de crédito/puntos → centro Drops → acciones que se demuestren. Ocultar canales/colecciones detrás del primer centro; R5 Chat Ligero independiente como entrega separada. Una investigación Twitch inconclusa no bloquea mejoras locales. Luego 1.6 conserva VOD/bookmarks antes de workspaces/audio y ahorro/replay/biblioteca; R7 personalización y R8 OBS por incrementos. Próximos PATCH incluyen despliegue completo y web SSH tras validar.
 - Despliegues backend asociados a cada PATCH: validar cambios y rollback antes de aplicar; operaciones destructivas, costes nuevos o cambios ajenos al parche requieren autorización específica.
 
 LATER:
@@ -142,6 +143,7 @@ LATER:
 
 ## Recent Changes
 
+- Investigación StreamNook 8.8.21 fijada a bc86adc: `docs/reviews/STREAMNOOK_REVIEW_2026-11-04.md`. Referencias para centro Drops y chat independiente; transporte privado no validado. Hallazgo pendiente: `redeemCustomReward` usa POST Helix no documentado para canje del espectador; separarlo de la restricción real de gestión de recompensas externas. Solo documentación, sin cambiar app ni prioridades aprobadas.
 - 1.5.3: OAuth privado/single-use, identidad inmutable, continuidad legacy probada y logout remoto; backend live y release pública verificados. TLS/Vite/Vitest parcheados y auditoría CI completa. Web pública actualizada a 1.5.3 por SSH; última Store confirmada 1.5.2.
 - 1.5.2: búsqueda nativa de sesión individual/unificada, filtros por texto/usuario/enlaces/origen, borrados de moderación y aislamiento entre cuentas/canales. Catálogo y cambio de idioma en ocho idiomas aceptados; sin persistir historial adicional.
 - Retirada feature ZIP opcional del updater para excluir tres avisos nuevos de extracción, sin suprimir auditorías, cambiar confianza ni formatos publicados. CI candidato/tag y firmas públicas correctos; tag recreado con autorización específica, 1.5.2 latest.

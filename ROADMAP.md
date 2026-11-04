@@ -7,6 +7,21 @@ Welcome to the official **BlinkStream Roadmap**. Built upon high-performance des
 We use ordered version numbers: consecutive PATCH releases for tested compatible
 fixes and incremental improvements; larger MINOR milestones are agreed separately.
 
+## Implementation initiative — 2026-11-04
+
+The requested StreamNook-inspired work is scoped in
+[the implementation plan](docs/STREAMNOOK_IMPLEMENTATION_PLAN.md): close 1.5.4,
+correct the viewer redemption contract, validate actual Drops/points capabilities,
+then deliver a rewards center and supported points actions. Standalone lightweight
+chat, Grid audio focus/workspaces, command palette, private chat preferences and an
+OBS overlay follow as separate increments. Private Twitch transports require real
+validation and retain an official fallback; source inspection is not delivery proof.
+
+Hidden channels and collection refinements remain planned after the first rewards
+center; an inconclusive Twitch investigation does not block them. VOD/bookmarks
+still precede Grid/workspace expansion in 1.6. This plan reserves no patch numbers
+or dates and does not change the published version.
+
 ## Execution status — 2026-10-25 / v1.5.4 release candidate
 
 1.5.4 normalizes fresh/legacy Mod View settings, requests H.264/HEVC/AV1 consistently
@@ -70,7 +85,7 @@ The current execution order and acceptance criteria are in [docs/EXECUTION_PLAN.
 Validation: 623 frontend tests pass, one skipped; 56 Rust Windows tests and 19 release/signature/documentation tests pass locally. Lint/legacy/fmt/Clippy, optimized GLib tests, signed four-target builds and NSIS smoke pass CI. See [updater verification](docs/guides/UPDATER_VERIFICATION.md).
 
 Now: 1.5.1 published on Store and GitHub; GitHub download/update artifacts verified.
-Next: 1.5.x session chat search, hidden channels and collection refinements, then 1.6 VOD/workspaces/media. Outstanding real-session latency and Twitch checks remain tracked separately.
+Next (updated 2026-11-04): rewards contracts/validation and the rewards center, then hidden channels, collection refinements and standalone lightweight chat; 1.6 retains VOD/workspaces/media. Session chat search is already published. Outstanding real-session latency and Twitch checks remain tracked separately.
 Then: 1.7 moderation, 1.8 integrations and 1.9 consolidation.
 2.0 centers on a complete interface redesign; AI, additional platforms and plugins remain conditional.
 

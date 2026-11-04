@@ -1,10 +1,10 @@
 # Plan de ejecución de BlinkStream
 
-Actualizado: 2026-11-03. GitHub latest verificado: v1.5.3 (publicado el2026-10-22). Fuente1.5.4 en candidatas, sin tag ni publicación; última Store confirmada por el usuario:1.5.2, no implica verificación actual de Partner Center.
+Actualizado: 2026-11-04. Última verificación de GitHub latest: v1.5.3 (publicado el2026-10-22). Fuente1.5.4 en candidatas, sin tag ni publicación; última Store confirmada por el usuario:1.5.2, no implica verificación actual de Partner Center.
 
-**Bloque activo:** cerrar reproducción/latencia y moderación de1.5.4 antes de ampliar funciones. Candidata16 incorpora refresco inicial de prefetch, con ~1.87s de mejora medida frente a15 y sin pausa inicial en la prueba pública. Windows mantiene Chat Ligero integrado y chat oficial en ventana. Falta aceptación en la sesión real, validación de ModView combinado y artefactos finales.
+**Bloque activo:** cerrar reproducción/latencia y moderación de1.5.4 antes de ampliar funciones. Usuario acepta la muestra de candidata16 (~3.3s,59.9FPS,Δ0); candidata17 retira la barra de disco y espera revisión visual. Windows mantiene Chat Ligero integrado y chat oficial en ventana. HEVC/Grid, ModView combinado y artefactos finales conservan validación separada. Corregir también el contrato del canje del espectador identificado en la revisión StreamNook.
 
-**Siguiente mejora funcional:** ocultación y restauración de canales, sin cambiar follows y con preferencias aisladas por cuenta. Después: refinamientos de colecciones; 1.6 conserva su orden de VOD/bookmarks y workspaces. Detalle del estado y límites en PROJECT_STATE.md.
+**Siguiente bloque solicitado (2026-11-04):** viabilidad real de Drops/puntos → centro de recompensas → puntos/canjes según capacidades demostradas → Chat Ligero independiente. Plan de tareas, dependencias, pruebas y alternativas: [STREAMNOOK_IMPLEMENTATION_PLAN.md](STREAMNOOK_IMPLEMENTATION_PLAN.md). Ocultación de canales y refinamientos de colecciones se desplazan detrás del primer centro de Drops; una investigación Twitch inconclusa no los bloquea. 1.6 conserva VOD/bookmarks antes de ampliar Grid/workspaces.
 
 ## Objetivo y reglas
 
@@ -20,6 +20,7 @@ Desde el 2026-10-22, el usuario autoriza el despliegue completo de cada nuevo PA
 | --- | --- | --- | --- | --- |
 | 0 | 1.4.4 categorías/UI/chat unificado | Componentes existentes, Helix/IRC | Publicación y CI firmados; aceptación específica registrada | Publicada; checks independientes de envío/audio pendientes |
 | 1 | Fiabilidad/latencia y validaciones Twitch, incluidas desde 1.5.0 | HLS, campañas/cuentas autorizadas | Grid, pausa/DVR y estabilidad; separar crédito/reclamo/inventario | Reabierta en1.5.4: candidata16 mejora ~1.87s el arranque medido; pendiente aceptación GUI, HEVC/Grid y ModView combinado |
+| 1A | Recompensas R1–R4 | Contrato correcto, inventario y capacidades Twitch verificadas | Crédito remoto, UI coherente y acciones confirmadas; fallback oficial donde proceda | Plan solicitado; todavía sin implementar |
 | 2 | 1.5.x organización y chat | Cache por cuenta, favoritos y feed acotado | Búsqueda de sesión, ocultación de canales y refinamientos de colecciones sin fuga al salir ni recursos cruzados | Colecciones/categorías publicadas; búsqueda publicada en GitHub 1.5.2; pendientes ocultación de canales y refinamientos de colecciones |
 | 3 | 1.6.0 continuidad/workspaces | Identidad VOD y persistencia existentes | Reinicio/restauración, medios ausentes, cleanup y audio principal correctos | Planificada |
 | 4 | 1.6.x consumo/medios | Bloque 3, FFmpeg y disco acotado | DVR/audio existentes validados → ahorro/avisos → recorte/replay → biblioteca → temporizador; respetar grabación | Planificada |
@@ -55,7 +56,7 @@ Desde el 2026-10-22, el usuario autoriza el despliegue completo de cada nuevo PA
 El detalle funcional y las reasignaciones de la antigua 1.5/1.6 están en [ROADMAP.md](../ROADMAP.md); no mantener listas paralelas divergentes.
 
 1. Mantener las regresiones de texto/usuario/enlaces/origen, borrados de moderación, cambio de cuenta y ventanas estrechas. Cada PATCH validado incluye su despliegue completo, MSIX preparado y web actualizada por SSH; distinguir generación, envío y aprobación de Microsoft Store.
-2. Colecciones y categorías: base publicada; mejorar orden/filtros/teclado e incorporar ocultación de canales mediante incrementos PATCH separados.
+2. Ejecutar R1–R4 del plan de recompensas; iniciar R5 de chat independiente como entrega separada. Colecciones/categorías conservan su base publicada; ocultación de canales y refinamientos siguen pendientes detrás del primer centro de Drops, sin depender del éxito de un transporte privado.
 3. Mantener pruebas reales de grid, pausa/DVR, estabilidad y Twitch como validación transversal. La mejora de latencia ya se distribuye desde 1.5.0; no crear una entrega 1.4.5 posterior.
 4. Dimensionar VOD/workspaces antes de abrir el bloque de medios; no activar todo 1.6 simultáneamente.
 
