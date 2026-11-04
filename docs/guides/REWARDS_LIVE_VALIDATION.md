@@ -41,7 +41,7 @@ Prueba preparada para candidata23: el usuario indica un Drop al100% pendiente. D
 
 ## Resultado
 
-Captura del usuario2026-11-04 con candidata23: `Catálogo: failed integrity check` mientras el inventario sincronizado muestra Battle Support Chest x1 a60/60 y reclamado. Confirma rechazo autenticado del catálogo y lectura del inventario; no atribuye ese reclamo al transporte nuevo sin respuesta del usuario. La comprobación anónima de campos no validaba esta operación autenticada. Candidata24 añade pausa por cuenta tras integridad y catálogo oficial integrado, con inventario independiente para reclamar.
+Captura del usuario2026-11-04 con candidata23: `Catálogo: failed integrity check` mientras el inventario sincronizado muestra Battle Support Chest x1 a60/60 y reclamado. Confirma rechazo autenticado del catálogo y lectura del inventario; el usuario confirma posteriormente que ese cofre ya estaba obtenido, por lo que no valida el reclamo nuevo. La comprobación anónima de campos no validaba esta operación autenticada. Candidata24 añade pausa por cuenta tras integridad y catálogo oficial integrado, con inventario independiente para reclamar.
 
 Clasificar cada capacidad como **confirmada en la muestra**, **no confirmada**, **solo oficial** o **pendiente de escenario disponible**. Registrar evidencia y limitaciones; no extrapolar una cuenta/campaña a todas las plataformas.
 
