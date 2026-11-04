@@ -35,6 +35,7 @@ keeps its own interface. All new search controls support the eight interface lan
 |---------|-------------|
 | 🌍 **Global Localization** | Core interface supports 8 languages (ES, EN, FR, DE, PT, JA, KO, RU); new experimental screens may still contain Spanish copy |
 | 💬 **Twitch Popout Chat & Channel Points** | Official Twitch chat embeds in the individual chat panel, with a separate native window available manually. It provides channel points, viewer reward redemption and emotes. The BlinkStream rewards catalog links to official chat; creator management uses the permissions Twitch grants to the app. |
+| **Twitch GIFs in lightweight chat** | Native Twitch GIF messages render alongside text and emotes, with bounded lazy-loaded images, descriptive fallback and retry. GIF metadata comes from the documented IRC tags; sending GIFs is not part of this feature. |
 | 🛡️ **Pro Mod View Workspace** | Dedicated multi-dock command center (`Ctrl+M`) with live mod logs, AutoMod queue, unban appeals, active viewers, predictions, and channel point redemptions |
 | ⚡ **Low Latency (LL-HLS)** | Live-edge synchronization, dynamic catchup and one-click live resync; latency depends on stream/network conditions |
 | 💬 **Rich IRC Chat & Badges** | Real-time chat with 7TV/BTTV/FFZ emotes, optimistic badge rendering (Sub, Mod, VIP, Founder, Turbo), and custom colors |

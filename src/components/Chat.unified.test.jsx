@@ -56,6 +56,35 @@ describe('unified native Chat', () => {
     expect(within(log).getByTitle('Canal: alpha')).toBeInTheDocument()
   })
 
+  it('renders Twitch GIFs in the source channel, preserves text/emotes and respects moderation deletion', async () => {
+    render(<Chat {...props} />)
+    const socket = await start()
+    const url = 'https://media4.giphy.com/media/joSNxeswxuc74Juo8X/giphy.gif?cid=x&ct=g'
+    act(() => socket.receive(`@id=gif1;display-name=alice;emotes=25:14-18;gifs=6-12|happy|${url} :alice!a@a PRIVMSG #beta :Hello [Happy] Kappa!\r\n`))
+    const gif = await screen.findByRole('img', { name: '[Happy]' })
+    expect(gif).toHaveAttribute('src', url)
+    expect(screen.getByAltText('Kappa')).toBeInTheDocument()
+    expect(screen.getByRole('log')).toHaveTextContent('Hello')
+    expect(screen.getByTitle('Canal: beta')).toBeInTheDocument()
+    act(() => socket.receive('@target-msg-id=gif1 :tmi.twitch.tv CLEARMSG #beta :Hello [Happy] Kappa!\r\n'))
+    await waitFor(() => expect(screen.queryByRole('img', { name: '[Happy]' })).not.toBeInTheDocument())
+  })
+
+  it('keeps malformed GIF metadata as text without auto-loading another host', async () => {
+    render(<Chat {...props} channels={undefined} />)
+    const socket = await start()
+    act(() => socket.receive('@id=badgif;gifs=0-6|bad|https://127.0.0.1/private :alice!a@a PRIVMSG #alpha :[Happy]\r\n'))
+    await screen.findByText('[Happy]')
+    expect(screen.queryByRole('img', { name: '[Happy]' })).not.toBeInTheDocument()
+  })
+
+  it('decodes IRC escapes once and preserves a semicolon in the supplied GIF URL', async () => {
+    render(<Chat {...props} channels={undefined} />)
+    const socket = await start()
+    act(() => socket.receive('@id=escapedgif;gifs=0-2|happy|https://media.giphy.com/test.gif?value=a\\:b&ct=g :alice!a@a PRIVMSG #alpha :[a]\r\n'))
+    expect(await screen.findByRole('img', { name: '[a]' })).toHaveAttribute('src', 'https://media.giphy.com/test.gif?value=a;b&ct=g')
+  })
+
   it('changes the send destination without reconnecting or mixing viewer badges', async () => {
     const { rerender } = render(<Chat {...props} />)
     const socket = await start()

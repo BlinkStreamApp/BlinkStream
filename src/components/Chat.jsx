@@ -14,6 +14,8 @@ import { openTwitchChatPopoutWindow } from '../utils/twitchPopout'
 import { normalizeChatChannels, parseIrcEnvelope } from '../utils/chatChannels'
 import ChannelLabel from './chat/ChannelLabel'
 import ChatSearchPanel from './chat/ChatSearchPanel'
+import TwitchChatGif from './chat/TwitchChatGif'
+import { parseChatGifs } from '../utils/chatGifs'
 import { CHAT_URL_REGEX as URL_REGEX, EMPTY_CHAT_SEARCH, createChatSearchMatcher } from '../utils/chatSearch'
 
 async function gqlGetUserIdByLogin(channel) {
@@ -61,7 +63,7 @@ function parseMessageTags(tags) {
     const k = pair.slice(0, idx)
     let v = pair.slice(idx + 1)
     if (k && v) {
-      v = v.replace(/\\s/g, ' ').replace(/\\:/g, ':').replace(/\\;/g, ';').replace(/\\\\/g, '\\').replace(/\\r/g, '').replace(/\\n/g, ' ')
+      v = v.replace(/\\([s:\\rn])/g, (_match, character) => ({ s: ' ', ':': ';', '\\': '\\', r: '', n: ' ' })[character])
     }
     obj[k] = v || ''
   })
@@ -123,15 +125,17 @@ function buildEmoteTrie(emotes) {
   return root
 }
 
-function matchEmotesInText(text, twitchEmotesStr, trie) {
+function matchEmotesInText(text, twitchEmotesStr, trie, gifs = []) {
   const emoteMap = {}
+  const gifMap = new Map(gifs.map(gif => [gif.start, gif]))
   if (twitchEmotesStr) {
     twitchEmotesStr.split('/').forEach(pair => {
       const [id, positions] = pair.split(':')
       if (id && positions) {
         positions.split(',').forEach(range => {
           const [start, end] = range.split('-')
-          emoteMap[Number(start)] = { id, start: Number(start), end: Number(end) + 1 }
+          const span = { id, start: Number(start), end: Number(end) + 1 }
+          if (!gifs.some(gif => span.start < gif.end && span.end > gif.start)) emoteMap[span.start] = span
         })
       }
     })
@@ -148,6 +152,12 @@ function matchEmotesInText(text, twitchEmotesStr, trie) {
   const parts = []
   let i = 0
   while (i < text.length) {
+    if (gifMap.has(i)) {
+      const gif = gifMap.get(i)
+      parts.push({ type: 'gif', ...gif })
+      i = gif.end
+      continue
+    }
     if (emoteMap[i]) {
       const em = emoteMap[i]
       parts.push({ type: 'twitch-emote', id: em.id, text: text.slice(em.start, em.end) })
@@ -161,7 +171,7 @@ function matchEmotesInText(text, twitchEmotesStr, trie) {
     const lowerText = text.slice(i).toLowerCase()
     for (let j = 0; j < lowerText.length && node[lowerText[j]]; j++) {
       node = node[lowerText[j]]
-      if (node.$ && j + 1 > bestLen && hasWordBoundaries(i, i + j + 1)) {
+      if (node.$ && j + 1 > bestLen && hasWordBoundaries(i, i + j + 1) && !gifs.some(gif => i < gif.end && i + j + 1 > gif.start)) {
         bestMatch = node.$
         bestLen = j + 1
       }
@@ -175,7 +185,7 @@ function matchEmotesInText(text, twitchEmotesStr, trie) {
     let textStart = i
     i++
     while (i < text.length) {
-      if (emoteMap[i]) break
+      if (emoteMap[i] || gifMap.has(i)) break
       let found = false
       const ch = text[i].toLowerCase()
       if (trie[ch] && hasWordBoundaries(i, i + 1)) {
@@ -399,7 +409,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
             {msg.message && <span className="text-text-muted/50 font-bold ml-0.5 mr-1.5 inline select-none">:</span>}
             {msg.message && (
               <span className="inline font-normal tracking-wide">
-                {renderMessage(msg.message, msg.emotes, msg.channel)}
+                {renderMessage(msg.message, msg.emotes, msg.channel, msg.gifs)}
               </span>
             )}
             {msg.timestamp && (
@@ -444,7 +454,7 @@ const ChatMessage = memo(({ msg, badgeUrls, chatFontSize, setUserCard, renderMes
       </span>
       <span className="text-text-muted/50 font-bold ml-0.5 mr-1.5 inline select-none">:</span>
       <span className="inline font-normal tracking-wide">
-        {renderMessage(msg.message, msg.emotes, msg.channel)}
+        {renderMessage(msg.message, msg.emotes, msg.channel, msg.gifs)}
         {msg.spamCount > 1 && (
           <span className="inline-flex items-center gap-1 ml-2 px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-twitch/20 border border-twitch/60 text-fuchsia-300 shadow-sm shadow-twitch/30 tabular-nums animate-pulse align-middle">
             x{msg.spamCount}
@@ -740,12 +750,13 @@ export default function Chat({
   }, [])
 
   const channelTries = useMemo(() => Object.fromEntries(Object.entries(channelAssets).map(([name, assets]) => [name, buildEmoteTrie(assets.emotes || {})])), [channelAssets])
-  const renderMessage = useCallback((text, twitchEmotes, sourceChannel) => {
+  const renderMessage = useCallback((text, twitchEmotes, sourceChannel, gifs = []) => {
     if (!text) return text
-    const parts = matchEmotesInText(text, twitchEmotes, channelTries[sourceChannel] || {})
+    const parts = matchEmotesInText(text, twitchEmotes, channelTries[sourceChannel] || {}, gifs)
     const isOnlyEmotes = parts.every(p => p.type !== 'text' || p.text.trim() === '') && parts.filter(p => p.type !== 'text').length >= 1 && parts.filter(p => p.type !== 'text').length <= 5
     return parts.map((part, idx) => {
       if (part.type === 'text') return renderTextWithLinks(part.text, idx, t)
+      if (part.type === 'gif') return <TwitchChatGif key={`${idx}:${part.url}`} url={part.url} text={part.text} />
       const hideOnError = (e) => { e.target.style.display = 'none' }
       const emoteClass = isOnlyEmotes
         ? "inline-block w-9 h-9 sm:w-10 sm:h-10 align-middle mx-1 my-0.5 hover:scale-125 transition-transform duration-150 drop-shadow-md cursor-pointer select-none"
@@ -1117,7 +1128,7 @@ export default function Chat({
           }
 
           if (msg.message && !isOverlay && !isGridMode) {
-            const parts = matchEmotesInText(msg.message, msg.emotes, trieRef.current)
+            const parts = matchEmotesInText(msg.message, msg.emotes, trieRef.current, msg.gifs)
             for (const p of parts) {
               if (p.type === 'twitch-emote') {
                 window.dispatchEvent(new CustomEvent('blinkstream:emote', { detail: { url: `https://static-cdn.jtvnw.net/emoticons/v2/${p.id}/default/dark/2.0`, name: p.text } }))
@@ -1145,6 +1156,7 @@ export default function Chat({
                 last.message &&
                 msg.message &&
                 last.channel === msg.channel &&
+                !last.gifs?.length && !msg.gifs?.length &&
                 last.message.trim().toLowerCase() === msg.message.trim().toLowerCase() &&
                 !last.isNotice && !last.eventType && !last.isReward &&
                 !msg.isNotice && !msg.eventType && !msg.isReward
@@ -1373,6 +1385,7 @@ export default function Chat({
               color: parsed['color'] || '#b19cd9',
               message: userMsg || '',
               emotes: parsed['emotes'] || '',
+              gifs: parseChatGifs(userMsg || '', parsed.gifs),
               badges: badgeList,
               isNotice: true,
               isReward: eventType === 'reward',
@@ -1438,6 +1451,7 @@ export default function Chat({
             color: parsed['color'] || null,
             message,
             emotes: parsed['emotes'] || '',
+            gifs: parseChatGifs(message, parsed.gifs),
             badges: badgeList,
             isReward,
             eventType,
