@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useT } from '../../utils/i18n'
 import DropsCampaignBrowser from './DropsCampaignBrowser'
 import PhosphorIcon from '../icons/PhosphorIcon'
@@ -6,14 +6,24 @@ import { useTwitchDrops } from '../../hooks/useTwitchDrops'
 import { isTauri, safeOpenUrl } from '../../utils/tauriEnv'
 import { useEmbeddedDropsInventory } from '../../hooks/useEmbeddedDropsInventory'
 import { isDomElementVisible } from '../../utils/keyboard'
+import { isDropsIntegrityError } from '../../utils/drops'
 
 export default function DropsModal({ token, channel, onClose, nativeWatchEnabled = false, nativeWatchStatus, onToggleNativeWatch }) {
   const t = useT()
   const dialogRef = useRef(null)
   const closeButtonRef = useRef(null)
-  const { isOpen: officialOpen, open: prepareOfficialInventory, close: closeOfficialInventory,
-    reload: reloadOfficialInventory, error: officialError, containerRef: officialContainerRef } = useEmbeddedDropsInventory()
+  const { isOpen: inventoryOpen, open: openInventoryHost, close: closeOfficialInventory,
+    reload: reloadInventory, error: inventoryError, containerRef: inventoryRef } = useEmbeddedDropsInventory()
+  const { isOpen: catalogOpen, open: openCatalogHost, close: closeOfficialCatalog,
+    reload: reloadCatalog, error: catalogError, containerRef: catalogRef } = useEmbeddedDropsInventory('campaigns')
+  const officialOpen = inventoryOpen || catalogOpen
+  const officialError = inventoryOpen ? inventoryError : catalogError
+  const officialContainerRef = inventoryOpen ? inventoryRef : catalogRef
+  const reloadOfficialInventory = inventoryOpen ? reloadInventory : reloadCatalog
+  const closeOfficial = () => inventoryOpen ? closeOfficialInventory() : closeOfficialCatalog()
+  const prepareOfficialInventory = useCallback(() => { closeOfficialCatalog(); return openInventoryHost() }, [closeOfficialCatalog, openInventoryHost])
   const openOfficialInventory = () => { prepareOfficialInventory().catch(() => {}) }
+  const openOfficialCatalog = () => { closeOfficialInventory(); openCatalogHost().catch(() => {}) }
   const {
     campaigns,
     loading,
@@ -138,19 +148,20 @@ export default function DropsModal({ token, channel, onClose, nativeWatchEnabled
 
         {isTauri() && (
           <div className="flex gap-2 px-5 py-2 border-b border-white/10 shrink-0">
-            <button type="button" aria-pressed={!officialOpen} onClick={closeOfficialInventory}
+            <button type="button" aria-pressed={!officialOpen} onClick={closeOfficial}
               className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer transition-colors ${!officialOpen ? 'bg-purple-500/15 text-purple-300' : 'bg-white/5 text-white hover:bg-white/10'}`}>Progreso</button>
-            <button type="button" aria-pressed={officialOpen} onClick={openOfficialInventory}
-              className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer transition-colors ${officialOpen ? 'bg-purple-500/15 text-purple-300' : 'bg-white/5 text-white hover:bg-white/10'}`}>Inventario oficial</button>
+            <button type="button" aria-pressed={inventoryOpen} onClick={openOfficialInventory}
+              className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer transition-colors ${inventoryOpen ? 'bg-purple-500/15 text-purple-300' : 'bg-white/5 text-white hover:bg-white/10'}`}>Inventario oficial</button>
+            <button type="button" aria-pressed={catalogOpen && !inventoryOpen} onClick={openOfficialCatalog} className="px-3 py-1.5 text-xs rounded-lg cursor-pointer bg-white/5 text-purple-200">{t('drops.catalog.official')}</button>
           </div>
         )}
         {officialOpen && (
           <div className="flex-1 min-h-0 flex flex-col p-3 gap-2">
             <p className="text-xs text-purple-200 shrink-0">Twitch oficial integrado. Si pide vincular la cuenta del juego, completa ese requisito antes de reclamar.</p>
-            <button type="button" onClick={reloadOfficialInventory} className="text-xs text-purple-300 self-start cursor-pointer shrink-0">Volver al inventario de Twitch</button>
+            <button type="button" onClick={reloadOfficialInventory} className="text-xs text-purple-300 self-start cursor-pointer shrink-0">{inventoryOpen ? 'Volver al inventario de Twitch' : t('drops.catalog.return')}</button>
             {(officialError || claimError) && <p role="alert" className="text-xs text-amber-300 shrink-0">{officialError || claimError}</p>}
-            {officialError && <button type="button" onClick={closeOfficialInventory} className="text-xs text-white cursor-pointer">Volver al progreso para reintentar</button>}
-            <div ref={officialContainerRef} aria-label="Inventario oficial de Twitch integrado"
+            {officialError && <button type="button" onClick={closeOfficial} className="text-xs text-white cursor-pointer">Volver al progreso para reintentar</button>}
+            <div ref={officialContainerRef} aria-label={inventoryOpen ? 'Inventario oficial de Twitch integrado' : t('drops.catalog.official')}
               className="flex-1 min-h-0 rounded-lg bg-black/30" />
           </div>
         )}
@@ -203,6 +214,10 @@ export default function DropsModal({ token, channel, onClose, nativeWatchEnabled
           ) : claimError && (
             <p role="alert" className="text-xs text-amber-300">No se pudo reclamar el Drop: {claimError}</p>
           )}
+          {typeof syncError === 'string' && syncError.includes('Catálogo:') && isDropsIntegrityError(syncError) && <div role="status" className="rounded-xl border border-amber-500/30 p-3 space-y-2 text-xs text-amber-200">
+            <p>{t('drops.catalog.blocked')}</p>
+            <button type="button" onClick={() => isTauri() ? openOfficialCatalog() : safeOpenUrl('https://www.twitch.tv/drops/campaigns', true)} className="rounded-lg bg-white/10 px-3 py-2 cursor-pointer">{t('drops.catalog.open')}</button>
+          </div>}
           {syncError && campaigns.length > 0 && (
             <p role="status" className="text-xs text-amber-300">Sincronización parcial: {syncError}</p>
           )}

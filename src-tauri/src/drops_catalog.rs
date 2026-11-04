@@ -7,7 +7,15 @@ pub(crate) const QUERY: &str = "query DropsCatalog { currentUser { dropCampaigns
 struct CachedCatalog {
     account: String,
     fetched: Instant,
-    campaigns: Value,
+    result: Result<Value, String>,
+}
+
+impl CachedCatalog {
+    fn for_account(&self, account: &str) -> Option<Result<Value, String>> {
+        (self.account == account
+            && (self.result.is_err() || self.fetched.elapsed() < Duration::from_secs(60)))
+        .then(|| self.result.clone())
+    }
 }
 
 static CACHE: OnceLock<Mutex<Option<CachedCatalog>>> = OnceLock::new();
@@ -24,10 +32,11 @@ pub(crate) async fn fetch(account: &str, token: &str) -> Result<Value, String> {
             .get_or_init(|| Mutex::new(None))
             .lock()
             .map_err(|_| "No se pudo leer la caché de campañas".to_string())?;
-        if let Some(cached) = cache.as_ref().filter(|cached| {
-            cached.account == account && cached.fetched.elapsed() < Duration::from_secs(60)
-        }) {
-            return Ok(cached.campaigns.clone());
+        if let Some(result) = cache
+            .as_ref()
+            .and_then(|cached| cached.for_account(account))
+        {
+            return result;
         }
     }
     let response = tokio::time::timeout(
@@ -36,7 +45,12 @@ pub(crate) async fn fetch(account: &str, token: &str) -> Result<Value, String> {
     )
     .await
     .map_err(|_| "La consulta del catálogo de Drops agotó el tiempo de espera".to_string())??;
-    let campaigns = parse_catalog_response(&response)?;
+    let result = parse_catalog_response(&response);
+    if let Err(error) = &result {
+        if !error.to_lowercase().contains("integrity") {
+            return result;
+        }
+    }
     let mut cache = CACHE
         .get_or_init(|| Mutex::new(None))
         .lock()
@@ -44,9 +58,9 @@ pub(crate) async fn fetch(account: &str, token: &str) -> Result<Value, String> {
     *cache = Some(CachedCatalog {
         account: account.to_string(),
         fetched: Instant::now(),
-        campaigns: campaigns.clone(),
+        result: result.clone(),
     });
-    Ok(campaigns)
+    result
 }
 
 fn parse_catalog_response(response: &Value) -> Result<Value, String> {
@@ -72,6 +86,24 @@ fn parse_catalog_response(response: &Value) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn integrity_rejection_stays_paused_for_its_account_after_normal_cache_expiry() {
+        let fetched = Instant::now() - Duration::from_secs(120);
+        let blocked = CachedCatalog {
+            account: "alice".to_string(),
+            fetched,
+            result: Err("failed integrity check".to_string()),
+        };
+        assert!(blocked.for_account("alice").unwrap().is_err());
+        assert!(blocked.for_account("bob").is_none());
+        let ready = CachedCatalog {
+            account: "alice".to_string(),
+            fetched,
+            result: Ok(serde_json::json!([])),
+        };
+        assert!(ready.for_account("alice").is_none());
+    }
 
     #[test]
     fn catalog_is_read_only_and_does_not_request_or_fabricate_personal_progress() {

@@ -30,6 +30,12 @@ indicator, configurable player controls, indexed settings search, grouped commun
 and compact audio/points controls. Native web-session Drops claims are implemented
 with inventory confirmation (ADR-019); live claim acceptance remains pending.
 
+Candidate23 authenticated catalog feedback: Twitch rejected the request with
+`failed integrity check`. Candidate24 pauses that catalog transport per account and
+provides the embedded official campaign page while retaining synced inventory.
+Native gallery acceptance remains blocked by its data source; anonymous schema
+validation is not authenticated service validation.
+
 Hidden channels and collection refinements remain planned after the first rewards
 center; an inconclusive Twitch investigation does not block them. VOD/bookmarks
 still precede Grid/workspace expansion in 1.6. This plan reserves no patch numbers

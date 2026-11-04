@@ -18,6 +18,17 @@ function host() {
 }
 
 describe('embedded Drops inventory lifecycle', () => {
+  it('mounts and reloads only the explicit official campaign page', async () => {
+    const { result, unmount } = renderHook(() => useEmbeddedDropsInventory('campaigns'))
+    result.current.containerRef.current = { getBoundingClientRect: () => ({ left: 0, top: 100, width: 640, height: 300 }) }
+    let opened
+    await act(async () => { opened = result.current.open() })
+    const session = await opened
+    expect(invoke).toHaveBeenCalledWith('mount_embedded_twitch_drops', { session, page: 'campaigns', x: 0, y: 100, width: 640, height: 300 })
+    await act(async () => { await result.current.reload() })
+    expect(invoke).toHaveBeenCalledWith('reset_embedded_twitch_drops', { session, page: 'campaigns' })
+    unmount()
+  })
   it('mounts one child in the measured rectangle and reuses its ready session', async () => {
     const { result, unmount } = host()
     let first

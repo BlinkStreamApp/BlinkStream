@@ -2,6 +2,17 @@ use tauri::{AppHandle, Manager, Webview};
 
 static HOST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+fn page_url(page: Option<&str>) -> Result<tauri::Url, String> {
+    let path = match page {
+        None | Some("inventory") => "inventory",
+        Some("campaigns") => "campaigns",
+        _ => return Err("Página de Drops no permitida".to_string()),
+    };
+    format!("https://www.twitch.tv/drops/{path}")
+        .parse()
+        .map_err(|_| "URL de Drops inválida".to_string())
+}
+
 pub(crate) fn host_label(session: &str) -> Result<String, String> {
     if session.len() != 32 || !session.bytes().all(|c| c.is_ascii_hexdigit()) {
         return Err("Sesión de inventario inválida".to_string());
@@ -74,8 +85,10 @@ pub async fn mount_embedded_twitch_drops(
     y: f64,
     width: f64,
     height: f64,
+    page: Option<String>,
 ) -> Result<(), String> {
     require_ui(&webview)?;
+    let url = page_url(page.as_deref())?;
     let label = host_label(&session)?;
     check_bounds(&app, x, y, width, height)?;
     let _guard = HOST_LOCK.lock().await;
@@ -90,9 +103,6 @@ pub async fn mount_embedded_twitch_drops(
             .show()
             .map_err(|_| "No se pudo mostrar el inventario".to_string());
     }
-    let url = "https://www.twitch.tv/drops/inventory"
-        .parse()
-        .map_err(|_| "URL de inventario inválida")?;
     let navigation_app = app.clone();
     let navigation_label = label.clone();
     let builder = tauri::WebviewBuilder::new(&label, tauri::WebviewUrl::External(url))
@@ -158,6 +168,7 @@ pub async fn reset_embedded_twitch_drops(
     app: AppHandle,
     webview: Webview,
     session: String,
+    page: Option<String>,
 ) -> Result<(), String> {
     require_ui(&webview)?;
     let label = host_label(&session)?;
@@ -165,12 +176,8 @@ pub async fn reset_embedded_twitch_drops(
     let view = app
         .get_webview(&label)
         .ok_or("El inventario integrado se ha cerrado")?;
-    view.navigate(
-        "https://www.twitch.tv/drops/inventory"
-            .parse()
-            .map_err(|_| "URL de inventario inválida")?,
-    )
-    .map_err(|_| "No se pudo volver al inventario".to_string())
+    view.navigate(page_url(page.as_deref())?)
+        .map_err(|_| "No se pudo volver al inventario".to_string())
 }
 
 #[tauri::command]
@@ -192,6 +199,17 @@ pub async fn unmount_embedded_twitch_drops(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_inventory_and_campaign_pages_can_be_requested() {
+        assert_eq!(page_url(None).unwrap().path(), "/drops/inventory");
+        assert_eq!(
+            page_url(Some("campaigns")).unwrap().path(),
+            "/drops/campaigns"
+        );
+        for page in ["https://example.com", "../", "inventory?token=x"] {
+            assert!(page_url(Some(page)).is_err());
+        }
+    }
     #[test]
     fn labels_are_session_scoped_and_reject_arbitrary_webviews() {
         assert!(host_label("embedded_twitch_chat").is_err());

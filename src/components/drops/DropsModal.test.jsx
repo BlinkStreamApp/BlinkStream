@@ -5,6 +5,18 @@ import * as useTwitchDropsModule from '../../hooks/useTwitchDrops'
 import * as embeddedInventory from '../../hooks/useEmbeddedDropsInventory'
 
 describe('DropsModal', () => {
+  it('offers the official catalog without hiding synchronized inventory when integrity blocks discovery', () => {
+    vi.spyOn(useTwitchDropsModule, 'useTwitchDrops').mockReturnValue({
+      campaigns: [{ id: 'c', name: 'Campaign', drops: [{ id: 'd', benefitName: 'Reward', requiredMinutes: 60, currentMinutes: 60, hasProgress: true, isClaimed: true, percent: 100 }] }],
+      syncError: 'Catálogo: failed integrity check', autoClaim: false, claimingIds: new Set(), claimableCount: 0,
+      claimDrop: vi.fn(), toggleAutoClaim: vi.fn(), refreshDrops: vi.fn(),
+    })
+    render(<DropsModal token="token" onClose={() => {}} />)
+    expect(screen.getByText(/reintentos automáticos están detenidos/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abrir catálogo oficial' })).toBeInTheDocument()
+    expect(screen.getByText('Reclamado')).toBeInTheDocument()
+    expect(screen.getByText(/failed integrity check/)).toBeInTheDocument()
+  })
   beforeEach(() => {
     vi.restoreAllMocks()
   })

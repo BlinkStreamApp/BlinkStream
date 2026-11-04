@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../utils/tauriEnv'
 import { isDomElementVisible } from '../utils/keyboard'
 
-export function useEmbeddedDropsInventory() {
+export function useEmbeddedDropsInventory(page = 'inventory') {
   const [isOpen, setIsOpen] = useState(false)
   const [error, setError] = useState(null)
   const containerRef = useRef(null)
@@ -30,10 +30,10 @@ export function useEmbeddedDropsInventory() {
   const reload = useCallback(async () => {
     if (!requestRef.current) return
     try {
-      await invoke('reset_embedded_twitch_drops', { session: requestRef.current.session })
+      await invoke('reset_embedded_twitch_drops', { session: requestRef.current.session, ...(page === 'campaigns' ? { page } : {}) })
       setError(null)
     } catch (err) { setError(err instanceof Error ? err.message : String(err)) }
-  }, [])
+  }, [page])
 
   useEffect(() => {
     if (!isOpen || !requestRef.current) return undefined
@@ -56,7 +56,7 @@ export function useEmbeddedDropsInventory() {
     const timeout = setTimeout(() => fail(new Error('El inventario integrado no respondió a tiempo')), 10000)
     mounting = (async () => {
       try {
-        await invoke('mount_embedded_twitch_drops', bounds())
+        await invoke('mount_embedded_twitch_drops', { ...bounds(), ...(page === 'campaigns' ? { page } : {}) })
         if (disposed) return
         mounted = true
         // Modal/resize changes while mounting cannot be applied until the child exists.
@@ -93,7 +93,7 @@ export function useEmbeddedDropsInventory() {
       // Wait for the outstanding mount; its session cannot close a newer panel.
       void mounting.finally(() => invoke('unmount_embedded_twitch_drops', { session: request.session }).catch(() => {}))
     }
-  }, [isOpen])
+  }, [isOpen, page])
 
   useEffect(() => () => {
     requestRef.current?.reject(new Error('El panel de Drops se ha cerrado'))
