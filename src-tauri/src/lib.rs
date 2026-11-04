@@ -8,6 +8,7 @@ use tauri::Manager;
 use tauri::Webview;
 use wait_timeout::ChildExt;
 
+mod drops_catalog;
 mod drops_watch;
 mod embedded_drops;
 mod embedded_modview;
@@ -2160,6 +2161,7 @@ async fn sync_drops_inventory_from_webview(
 ) -> Result<(), String> {
     let generation = DROPS_SYNC_GENERATION.load(std::sync::atomic::Ordering::SeqCst);
     let Some(token) = twitch_webview_auth_token(&webview).await? else {
+        drops_catalog::clear();
         return companion::publish_drops_inventory(
             &app,
             serde_json::json!({
@@ -2205,10 +2207,39 @@ async fn sync_drops_inventory_from_webview(
             "/data/currentUser/inventory/dropCampaignsInProgress",
         )?
     };
+    let (catalog_campaigns, catalog_error) = if auth_required {
+        drops_catalog::clear();
+        (serde_json::json!([]), None)
+    } else if let Some(account) = current_user
+        .and_then(|user| user.get("id"))
+        .and_then(serde_json::Value::as_str)
+    {
+        match drops_catalog::fetch(account, &token).await {
+            Ok(catalog) => (catalog, None),
+            Err(error) => (serde_json::json!([]), Some(error)),
+        }
+    } else {
+        (
+            serde_json::json!([]),
+            Some("Twitch no confirmó la cuenta del catálogo".to_string()),
+        )
+    };
     let (channel_campaigns, channel_error) = match channel_result {
         Ok(campaigns) => (campaigns, None),
         Err(error) => (serde_json::json!([]), Some(error)),
     };
+    let sync_error = match (channel_error, catalog_error) {
+        (Some(channel), Some(catalog)) => Some(format!("{channel}; Catálogo: {catalog}")),
+        (Some(error), None) => Some(error),
+        (None, Some(error)) => Some(format!("Catálogo: {error}")),
+        (None, None) => None,
+    }
+    .map(|mut error| {
+        while error.len() > 300 {
+            error.pop();
+        }
+        error
+    });
     if DROPS_SYNC_GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation {
         return Ok(());
     }
@@ -2227,10 +2258,11 @@ async fn sync_drops_inventory_from_webview(
         serde_json::json!({
             "campaigns": campaigns,
             "channelCampaigns": channel_campaigns,
+            "catalogCampaigns": catalog_campaigns,
             "channel": channel,
             "authRequired": auth_required,
-            "status": if auth_required { "auth-required" } else if channel_error.is_some() { "partial" } else { "ready" },
-            "error": channel_error,
+            "status": if auth_required { "auth-required" } else if sync_error.is_some() { "partial" } else { "ready" },
+            "error": sync_error,
             "updatedAt": drops_now_ms()
         }),
     )

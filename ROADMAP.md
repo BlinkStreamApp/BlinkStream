@@ -20,8 +20,10 @@ validation and retain an official fallback; source inspection is not delivery pr
 Candidate progress (2026-11-04): the user confirmed 3→27 watched minutes matching
 Twitch's official inventory for one campaign. The first Drops center now groups
 synced campaigns by game, adds search/state filters and a visual campaign target.
-Unknown requirements stay unknown; global catalog, verified expiry/linking metadata
-and broader authenticated claim/session acceptance remain pending.
+Candidate22 adds native active-campaign catalog queries and available cards with
+art, rewards, requirements and supplied end dates. Unknown requirements stay
+unknown; authenticated catalog acceptance, linking and broader claim/session
+verification remain pending.
 
 Hidden channels and collection refinements remain planned after the first rewards
 center; an inconclusive Twitch investigation does not block them. VOD/bookmarks

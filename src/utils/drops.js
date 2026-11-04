@@ -61,6 +61,10 @@ export function parseCampaign(c, isCurrentChannel = false) {
     gameName: c.game?.name || '',
     boxArtUrl: c.game?.boxArtURL || '',
     isCurrentChannel,
+    imageUrl: typeof c.imageURL === 'string' ? c.imageURL : '',
+    status: typeof c.status === 'string' ? c.status : '',
+    startAt: typeof c.startAt === 'string' ? c.startAt : '',
+    endAt: typeof c.endAt === 'string' ? c.endAt : '',
     drops,
   }
 }
@@ -75,6 +79,13 @@ export function getDropState(drop) {
   return drop.currentMinutes > 0 ? 'progress' : 'available'
 }
 
+export function isDropCampaignAvailable(campaign, now = Date.now()) {
+  if (campaign.status && campaign.status !== 'ACTIVE') return false
+  const start = Date.parse(campaign.startAt)
+  const end = Date.parse(campaign.endAt)
+  return (!Number.isFinite(start) || start <= now) && (!Number.isFinite(end) || end > now)
+}
+
 export function filterDropCampaigns(campaigns, query = '', filter = 'all') {
   const normalize = value => String(value || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
   const needle = normalize(query.trim().slice(0, 200))
@@ -82,30 +93,39 @@ export function filterDropCampaigns(campaigns, query = '', filter = 'all') {
     const matchesCampaign = normalize(`${campaign.name} ${campaign.gameName}`).includes(needle)
     const drops = (campaign.drops || []).filter(drop => {
       const state = getDropState(drop)
-      const matchesState = filter === 'all' || state === filter || (filter === 'progress' && state === 'awaiting')
+      const matchesState = filter === 'all' || (filter === 'available'
+        ? isDropCampaignAvailable(campaign) && state !== 'claimed'
+        : state === filter || (filter === 'progress' && state === 'awaiting'))
       return matchesState && (matchesCampaign || normalize(`${drop.name} ${drop.benefitName}`).includes(needle))
     })
-    return { ...campaign, drops }
-  }).filter(campaign => campaign.drops.length > 0)
+    const showEmptyCampaign = !(campaign.drops || []).length && matchesCampaign &&
+      campaign.status === 'ACTIVE' && isDropCampaignAvailable(campaign) && (filter === 'all' || filter === 'available')
+    return drops.length || showEmptyCampaign ? { ...campaign, drops } : null
+  }).filter(Boolean)
 }
 
 export function parseDropsInventory(inventory) {
   const rawCampaigns = Array.isArray(inventory?.campaigns) ? inventory.campaigns : []
   const campaignMap = new Map()
-
-  for (const campaign of Array.isArray(inventory?.channelCampaigns) ? inventory.channelCampaigns : []) {
-    if (campaign?.id) campaignMap.set(campaign.id, parseCampaign(campaign, true))
-  }
-
-  for (const campaign of rawCampaigns) {
+  const sources = [
+    [Array.isArray(inventory?.catalogCampaigns) ? inventory.catalogCampaigns : [], false],
+    [Array.isArray(inventory?.channelCampaigns) ? inventory.channelCampaigns : [], true],
+    [rawCampaigns, false],
+  ]
+  for (const [campaigns, currentChannel] of sources) for (const campaign of campaigns) {
     if (campaign?.id) {
       const available = campaignMap.get(campaign.id)
-      const parsed = parseCampaign(campaign, Boolean(available))
+      const parsed = parseCampaign(campaign, currentChannel || Boolean(available?.isCurrentChannel))
       const drops = new Map((available?.drops || []).map(drop => [drop.id, drop]))
       for (const drop of parsed.drops) {
-        if (drop.hasProgress || !drops.get(drop.id)?.hasProgress) drops.set(drop.id, drop)
+        if (drop.hasProgress || drop.isClaimed || (!drops.get(drop.id)?.hasProgress && !drops.get(drop.id)?.isClaimed)) drops.set(drop.id, drop)
       }
-      campaignMap.set(campaign.id, { ...parsed, drops: [...drops.values()] })
+      campaignMap.set(campaign.id, {
+        ...parsed,
+        ...Object.fromEntries(['name', 'gameName', 'boxArtUrl', 'imageUrl', 'status', 'startAt', 'endAt']
+          .map(key => [key, parsed[key] || available?.[key] || ''])),
+        drops: [...drops.values()],
+      })
     }
   }
 

@@ -89,6 +89,8 @@ Aceptación: progreso remoto verificable en más de una sesión/campaña elegibl
 
 Primera entrega implementada el2026-11-04: agrupación por juego/campaña, búsqueda y filtros disponible/en curso/reclamable/obtenido, objetivo visual, última sincronización y ocho idiomas. Solo inventario sincronizado/campañas del canal; no incluye fechas, vinculación ni caducidad sin datos verificados. Progreso remoto3→27 y coincidencia oficial confirmados por el usuario para una campaña (R2 parcial). Reclamo real y aceptación de esta interfaz nueva siguen pendientes; catálogo global y ampliaciones no se consideran terminados.
 
+Ampliación candidata22: consulta nativa propia `currentUser.dropCampaigns`, solo lectura, con la sesión web existente y caché en memoria de60s por cuenta. Tarjetas de campañas activas sin progreso, arte/recompensas/requisitos y fin recibido; combina progreso personal por IDs sin marcar todo el catálogo como canal actual. «Disponibles» incluye campañas activas sin reclamar aunque estén empezadas. Twitch aceptó anónimamente los campos de la consulta (200, currentUser null); datos autenticados pendientes de prueba del usuario. Errores de catálogo conservan el inventario y se muestran como sincronización parcial; no hay cliente Android ajeno, permisos nuevos ni cambios en reproducción.
+
 Áreas: ampliar `src/components/drops/DropsModal.jsx`, `useTwitchDrops.js`, `src/utils/drops.js` y el inventario oficial existente. Separar catálogo, normalización y presentación solo donde el código actual lo necesite; buscar implementaciones equivalentes antes de crear módulos.
 
 Entrega mínima:

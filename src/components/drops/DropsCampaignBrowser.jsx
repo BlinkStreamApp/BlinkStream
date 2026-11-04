@@ -37,9 +37,13 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
       {target && <p className="text-xs text-purple-200">{t('drops.center.target').replace('{name}', target.name)}</p>}
     </div>
     {filtered.length === 0 && <p role="status" className="py-8 text-center text-sm text-text-muted">{t('drops.center.noMatches')}</p>}
-    {[...groups.entries()].map(([game, items]) => <section key={game} className="space-y-3">
+    <div className={filter === 'available' ? 'grid grid-cols-1 md:grid-cols-2 gap-4 items-start' : 'space-y-4'}>
+    {[...groups.entries()].map(([game, items]) => <section key={game} className="space-y-3 min-w-0">
       <h4 className="text-sm font-bold text-text-primary">{items[0].gameName || t('drops.center.unknownGame')}</h4>
       {items.map(campaign => <article key={campaign.id} className={`rounded-2xl border p-4 space-y-3 ${campaign.id === targetId ? 'border-purple-500/50 bg-purple-500/5' : 'border-white/10 bg-bg-tertiary/40'}`}>
+        {filter === 'available' && (campaign.imageUrl || campaign.boxArtUrl) && <img
+          src={(campaign.imageUrl || campaign.boxArtUrl).replace('{width}', '480').replace('{height}', '640')}
+          alt="" loading="lazy" onError={event => { event.currentTarget.hidden = true }} className="w-full h-28 rounded-xl object-cover" />}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             {campaign.boxArtUrl && <img src={campaign.boxArtUrl.replace('{width}', '60').replace('{height}', '80')} alt="" loading="lazy" className="w-8 h-10 rounded-lg object-cover shrink-0" />}
@@ -53,7 +57,10 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
             {t(campaign.id === targetId ? 'drops.center.unpin' : 'drops.center.pin')}
           </button>
         </div>
+        {campaign.endAt && Number.isFinite(Date.parse(campaign.endAt)) && <p className="text-xs text-text-secondary">{t('drops.center.ends').replace('{date}', new Intl.DateTimeFormat(getLanguage(), { dateStyle: 'medium' }).format(new Date(campaign.endAt)))}</p>}
+        {filter === 'available' && <p className="text-[11px] text-text-secondary">{t('drops.center.eligible')}</p>}
         <div className="space-y-2">
+          {campaign.drops.length === 0 && <p className="text-xs text-text-secondary">{t('drops.center.noRewardDetails')}</p>}
           {campaign.drops.map(drop => {
             const state = getDropState(drop)
             const confirmed = drop.hasProgress !== false && Number.isFinite(drop.currentMinutes) && Number.isFinite(drop.requiredMinutes) && drop.requiredMinutes > 0
@@ -65,7 +72,7 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
                   <h6 className="text-xs font-bold text-white break-words">{drop.benefitName}</h6>
                   <p className="text-[11px] text-text-muted">{confirmed
                     ? `${drop.currentMinutes} / ${drop.requiredMinutes} min (${percent}%)`
-                    : drop.requiredMinutes > 0 ? t('drops.center.unconfirmed').replace('{minutes}', drop.requiredMinutes) : t('drops.center.unknownRequirement')}</p>
+                    : state === 'claimed' ? t('drops.state.claimed') : drop.requiredMinutes > 0 ? t('drops.center.unconfirmed').replace('{minutes}', drop.requiredMinutes) : t('drops.center.unknownRequirement')}</p>
                   {confirmed && <div role="progressbar" aria-label={drop.benefitName} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}
                     className="h-2 rounded-full bg-white/10 overflow-hidden"><div className={`h-full ${state === 'claimed' ? 'bg-emerald-500' : 'bg-purple-500'}`} style={{ width: `${percent}%` }} /></div>}
                 </div>
@@ -82,5 +89,6 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
         </div>
       </article>)}
     </section>)}
+    </div>
   </section>
 }

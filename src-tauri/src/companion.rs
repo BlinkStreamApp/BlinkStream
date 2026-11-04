@@ -543,6 +543,7 @@ pub(crate) fn publish_drops_inventory(
 }
 
 pub fn reset_twitch_drops_inventory(app: &AppHandle) -> Result<(), String> {
+    crate::drops_catalog::clear();
     let started_at = unix_timestamp_millis();
     store_drops_inventory(
         app,

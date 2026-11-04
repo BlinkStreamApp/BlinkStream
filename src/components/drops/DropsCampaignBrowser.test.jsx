@@ -11,6 +11,19 @@ const props = () => ({ campaigns, claimingIds: new Set(), claimDrop: vi.fn(), op
 afterEach(() => { cleanup(); setLanguage('es') })
 
 describe('Drops campaign browser', () => {
+  it('renders available campaign art and reward cards even when no watch minutes exist', () => {
+    render(<DropsCampaignBrowser {...props()} campaigns={[{ id: 'new', name: 'New Campaign', gameName: 'Other Game', status: 'ACTIVE', imageUrl: 'https://static-cdn.jtvnw.net/campaign.jpg', endAt: '2099-01-01T00:00:00Z', drops: [
+      { id: 'chest', benefitName: 'New Chest', benefitImage: 'https://static-cdn.jtvnw.net/chest.png', requiredMinutes: 60, currentMinutes: 0, hasProgress: false },
+    ] }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Disponibles' }))
+    expect(screen.getByRole('heading', { name: 'New Campaign' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'New Chest' })).toBeInTheDocument()
+    expect(document.querySelector('img[src="https://static-cdn.jtvnw.net/campaign.jpg"]')).toBeInTheDocument()
+    expect(document.querySelector('img[src="https://static-cdn.jtvnw.net/chest.png"]')).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(screen.queryByText('En este canal')).not.toBeInTheDocument()
+    expect(screen.getByText(/Finaliza:/)).toBeInTheDocument()
+  })
   it('switches all eight languages without losing search or pinned target', () => {
     render(<DropsCampaignBrowser {...props()} lastUpdatedAt={1730000000000} />)
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'battle' } })

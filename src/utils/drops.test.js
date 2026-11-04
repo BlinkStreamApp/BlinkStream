@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fetchUserDropsInventory, claimDropReward, parseDropsInventory, parseCampaign, getDropState, filterDropCampaigns } from './drops'
+import { fetchUserDropsInventory, claimDropReward, parseDropsInventory, parseCampaign, getDropState, filterDropCampaigns, isDropCampaignAvailable } from './drops'
 import { invoke } from '@tauri-apps/api/core'
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -7,6 +7,44 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 describe('drops utility', () => {
+  it('shows active catalog campaigns without requiring inventory progress or the current channel', () => {
+    const state = parseDropsInventory({ catalogCampaigns: [{ id: 'global', name: 'Other Game', status: 'ACTIVE',
+      imageURL: 'https://static-cdn.jtvnw.net/campaign.jpg', game: { name: 'Other Game' },
+      timeBasedDrops: [{ id: 'gift', name: 'Gift', requiredMinutesWatched: 60,
+        benefitEdges: [{ benefit: { name: 'Chest', imageAssetURL: 'https://static-cdn.jtvnw.net/chest.png' } }] }] }], campaigns: [] })
+    const campaign = filterDropCampaigns(state.campaigns, '', 'available')[0]
+    expect(campaign).toMatchObject({ isCurrentChannel: false, imageUrl: 'https://static-cdn.jtvnw.net/campaign.jpg' })
+    expect(campaign.drops[0]).toMatchObject({ hasProgress: false, isReadyToClaim: false, benefitName: 'Chest' })
+    const claimed = parseDropsInventory({ catalogCampaigns: [{ id: 'claimed', status: 'ACTIVE', timeBasedDrops: [
+      { id: 'earned', requiredMinutesWatched: 60, self: { isClaimed: true } },
+    ] }] })
+    expect(filterDropCampaigns(claimed.campaigns, '', 'available')).toEqual([])
+    expect(filterDropCampaigns(claimed.campaigns, '', 'claimed')[0].drops[0].isClaimed).toBe(true)
+  })
+
+  it('merges catalog art and dates with personal progress without marking every campaign as current', () => {
+    const timeBasedDrops = [{ id: 'gift', name: 'Gift', requiredMinutesWatched: 60 }]
+    const state = parseDropsInventory({
+      catalogCampaigns: [{ id: 'c', status: 'ACTIVE', imageURL: 'https://art.jpg', endAt: '2099-01-01T00:00:00Z', timeBasedDrops }],
+      campaigns: [{ id: 'c', timeBasedDrops: [{ ...timeBasedDrops[0], self: { currentMinutesWatched: 27 } }] }],
+    })
+    expect(state.campaigns).toHaveLength(1)
+    expect(state.campaigns[0]).toMatchObject({ isCurrentChannel: false, imageUrl: 'https://art.jpg', status: 'ACTIVE', endAt: '2099-01-01T00:00:00Z' })
+    expect(filterDropCampaigns(state.campaigns, '', 'available')[0].drops[0].currentMinutes).toBe(27)
+    expect(filterDropCampaigns(state.campaigns, '', 'progress')[0].drops[0].currentMinutes).toBe(27)
+  })
+
+  it('excludes expired, future and claimed rewards from available cards', () => {
+    const now = Date.parse('2026-11-04T12:00:00Z')
+    expect(isDropCampaignAvailable({ status: 'EXPIRED' }, now)).toBe(false)
+    expect(isDropCampaignAvailable({ status: 'UPCOMING' }, now)).toBe(false)
+    expect(isDropCampaignAvailable({ status: 'ACTIVE', endAt: '2026-11-04T12:00:00Z' }, now)).toBe(false)
+    expect(isDropCampaignAvailable({ status: 'ACTIVE', startAt: '2026-11-05T12:00:00Z' }, now)).toBe(false)
+    expect(isDropCampaignAvailable({ status: 'ACTIVE' }, now)).toBe(true)
+    expect(filterDropCampaigns([{ id: 'c', status: 'ACTIVE', drops: [{ id: 'd', isClaimed: true }] }], '', 'available')).toEqual([])
+    expect(filterDropCampaigns([{ id: 'c', name: 'Active', status: 'ACTIVE', drops: [] }], '', 'available')).toHaveLength(1)
+    expect(filterDropCampaigns([{ id: 'c', name: 'Active', status: 'ACTIVE', drops: [] }], 'absent', 'available')).toEqual([])
+  })
   it('does not invent requirements or confirmed progress for incomplete Twitch data', () => {
     const campaign = parseCampaign({ id: 'c', timeBasedDrops: [
       { id: 'missing', self: { currentMinutesWatched: 80, dropInstanceID: 'instance' } },

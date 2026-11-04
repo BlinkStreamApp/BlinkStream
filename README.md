@@ -236,6 +236,7 @@ blinkstream/
 │   │   ├── recorder.rs      # FFmpeg recording and disk operations
 │   │   ├── companion.rs     # Wi-Fi remote server
 │   │   ├── embedded_drops.rs # Official inventory webview lifecycle
+│   │   ├── drops_catalog.rs # Read-only active campaign catalog; native session/cache
 │   │   └── drops_watch.rs   # Experimental measured-playback reporting
 │   ├── capabilities/       # Native permission boundaries
 │   ├── vendor/glib/        # Reviewed GTK3 security backport for Linux
