@@ -42,7 +42,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 
 ## Current Decisions
 
-- DEC-018 → ADR-018: Windows conserva Chat Ligero integrado; Popout abre la ventana oficial existente. Preferencia incrustada previa ignorada solo en Windows nativo, sin borrarla. Usuario confirma fluidez al cerrar subvista oficial y también con ventana oficial separada. No modificar HLS/audio/GPU por este fallo.
+- DEC-018 → ADR-018 revertida por petición explícita del2026-11-04: el usuario considera posiblemente errónea la comparación anterior y solicita recuperar chat oficial incrustado. Se respeta su preferencia guardada también en Windows; ventana flotante solo manual. No atribuir los tirones al chat como causa confirmada ni cambiar HLS/audio/GPU por esta reversión; reproducción conjunta pendiente de nueva comprobación.
 
 - DEC-017 → ADR-017: directo usa `pLoader` nativo solo para listas y FetchLoader progresivo para segmentos; adapta hasta dos prefetch Twitch sobre CDN ya presente. Retirado el salto automático inicial. Diagnóstico conserva borde HLS y diferencia reloj/fecha del vídeo por separado; no cambia seguridad nativa ni CSP.
 
@@ -72,6 +72,7 @@ de updater con la clave configurada y solo publica desde un tag validado.
 ## Current Work
 
 NOW:
+- Candidata19 compilada sin instalar: `src-tauri/target/candidates/1.5.4/BlinkStream_1.5.4_candidate19_inline_chat.exe`, SHA256 8be0bd66523647f4fc256d0e8406945325d1fd9a2d13b58bc0a766946a6f3af6. Petición del usuario: recuperado chat oficial incrustado en Windows y preferencia previa, popout manual independiente. Retirada política forzada de candidata15; sin cambios HLS/audio/GPU. 927 frontend/1 omitido,33 entrega,lint/build correctos; nueva aceptación de reproducción conjunta pendiente. Incluye R1 de18.
 - Candidata18 R1 compilada sin instalar: `src-tauri/target/candidates/1.5.4/BlinkStream_1.5.4_candidate18_rewards.exe`, SHA256 21619c1ae9d6f8c46e804fee5940df415cac98718bb635eb267162cce0b43f06. 932 frontend/1 omitido,33 entrega,lint/build desktop correctos; UI real a420×700 comprobada. Apertura nativa probada por contrato, interacción autenticada pendiente. Conserva fuente de playback17; sin tag/publicación/web/MSIX final.
 - Iniciativa StreamNook R0–R8: plan/revisión guardados en eaa95f9. R1 implementado: canje de espectador por acceso oficial explícito, sin POST Helix ni falso historial; consulta de catálogo aislada por cuenta y respuestas obsoletas descartadas. Protocolo R2 en `docs/guides/REWARDS_LIVE_VALIDATION.md`; acreditación real y canjes autenticados pendientes. Sin transporte privado nuevo ni cambios cloud.
 - Usuario acepta candidata17 el2026-11-04: vídeo fluido y barra inferior eliminada. No certifica por sí solo HEVC/Grid ni ModView combinado prolongado. R0 conserva esos escenarios pendientes.

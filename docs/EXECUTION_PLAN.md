@@ -2,7 +2,7 @@
 
 Actualizado: 2026-11-04. Última verificación de GitHub latest: v1.5.3 (publicado el2026-10-22). Fuente1.5.4 en candidatas, sin tag ni publicación; última Store confirmada por el usuario:1.5.2, no implica verificación actual de Partner Center.
 
-**Bloque activo:** cerrar reproducción/latencia y moderación de1.5.4 antes de ampliar funciones. Usuario acepta la muestra de candidata16 (~3.3s,59.9FPS,Δ0); candidata17 retira la barra de disco y espera revisión visual. Windows mantiene Chat Ligero integrado y chat oficial en ventana. HEVC/Grid, ModView combinado y artefactos finales conservan validación separada. Corregir también el contrato del canje del espectador identificado en la revisión StreamNook.
+**Bloque activo:** cerrar reproducción/latencia y moderación de1.5.4 antes de ampliar funciones. Usuario acepta candidata17: vídeo fluido y barra retirada. R1 está implementado en candidata18. Por petición del2026-11-04 se recupera chat oficial incrustado también en Windows y se conserva popout manual; el usuario considera posiblemente errónea la comparación anterior. HEVC/Grid, ModView combinado y artefactos finales conservan validación separada.
 
 **Siguiente bloque solicitado (2026-11-04):** viabilidad real de Drops/puntos → centro de recompensas → puntos/canjes según capacidades demostradas → Chat Ligero independiente. Plan de tareas, dependencias, pruebas y alternativas: [STREAMNOOK_IMPLEMENTATION_PLAN.md](STREAMNOOK_IMPLEMENTATION_PLAN.md). Ocultación de canales y refinamientos de colecciones se desplazan detrás del primer centro de Drops; una investigación Twitch inconclusa no los bloquea. 1.6 conserva VOD/bookmarks antes de ampliar Grid/workspaces.
 

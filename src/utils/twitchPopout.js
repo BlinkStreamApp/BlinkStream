@@ -14,13 +14,6 @@ export async function openOfficialRewardsChat(channel) {
   window.open(`https://www.twitch.tv/popout/${login}/chat?popout=`, '_blank', 'noopener,noreferrer') // ALLOWED-REGRESSION: popup window
 }
 
-export function requiresOfficialChatWindow() {
-  if (!isTauri() || typeof navigator === 'undefined') return false
-  const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent
-  // The inline child view causes sustained video frame loss on Windows; a separate window does not.
-  return /windows|win32|win64/i.test(platform)
-}
-
 export async function openTwitchChatPopoutWindow(channelName, alwaysOnTop = false, authToken = null, username = null) {
   if (!channelName) return
   const cleanChannel = channelName.trim().toLowerCase()

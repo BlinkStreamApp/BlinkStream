@@ -1,7 +1,16 @@
 # ADR-018: Separate official chat window on Windows
 
-Status: Accepted for candidate testing
+Status: Reversed by user request on 2026-11-04; historical decision below
 Date: 2026-10-28
+
+## Revision — 2026-11-04
+
+The user reports that the earlier comparison may have been mistaken and explicitly
+requests restoring inline official chat. Remove the Windows-only forced-window
+policy, honor the existing saved inline preference and retain the separate window
+as a manual option. The earlier observation no longer establishes inline chat as
+the cause of frame loss. Recheck playback in the real session without changing
+HLS, audio or GPU configuration. The original candidate decision follows for traceability.
 
 ## Context
 

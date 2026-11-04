@@ -43,7 +43,7 @@ flowchart LR
 ## R0 — Cerrar la base de reproducción
 
 - Confirmar candidata17: barra inferior ausente y capacidad real en Ajustes → Grabación.
-- Registrar una línea base en el mismo equipo: 1080p H.264, 1440p HEVC cuando exista canal elegible, Chat Ligero, ventana oficial separada y Mod View combinado.
+- Registrar una línea base en el mismo equipo: 1080p H.264, 1440p HEVC cuando exista canal elegible, Chat Ligero, chat oficial incrustado, ventana oficial manual y Mod View combinado. El usuario retiró como concluyente la comparación anterior sobre el chat el2026-11-04; repetirla con la preferencia restaurada.
 - Medir arranque, latencia respecto al borde HLS, métrica por fecha del vídeo por separado, FPS, fotogramas perdidos, pausas, CPU/RAM/GPU. Registrar runtime, canal, calidad y duración para repetir comparaciones.
 - Realizar sesiones de al menos 20 minutos y cambios de canal/pausa/DVR/salida. Si un escenario falla, corregirlo antes de atribuirle nuevas funciones.
 - Generar artefactos finales y MSIX desde la fuente aceptada; no reutilizar el MSIX antiguo de candidata3. Firma/CI/updater y comprobación por plataforma según el gate habitual.
@@ -117,14 +117,14 @@ Aceptación: al menos un cofre confirmado y canjes simple/con texto con saldo an
 
 ## R5 — Chat Ligero independiente
 
-Áreas: `src/components/Chat.jsx`, hooks IRC/EventSub existentes, búsqueda de chat, ventanas Tauri y configuración de cuentas. Mantener la política Windows de chat oficial separado.
+Áreas: `src/components/Chat.jsx`, hooks IRC/EventSub existentes, búsqueda de chat, ventanas Tauri y configuración de cuentas. Chat oficial incrustado recuperado por petición del2026-11-04; ventana oficial manual disponible, sin forzar una presentación según el OS.
 
 - Primera entrega: ventana de Chat Ligero sin player, un canal y luego pestañas. El chat sigue al cerrar el player de origen, pero cerrar la última ventana libera sus recursos.
 - Segunda entrega: divisiones de 2–4 columnas, cambio de tamaño, foco e identificación inequívoca del destino antes de enviar. Canales offline admitidos si IRC lo permite.
 - Tercera entrega: preferencias de layout y sincronización entre ventanas; historial limitado a la sesión, sin crear un archivo permanente de conversaciones.
 - Inspeccionar quién es dueño de cada conexión; reutilizar el lifecycle existente y, si hace falta compartir, adoptar suscripciones con consumidores explícitos. No montar una conexión extra inadvertida por cada panel.
 
-Aceptación: dos canales y dos ventanas, envío al destino correcto, cierre/reapertura, reconexión, logout y borrados de moderación. Medir vídeo con chat rápido y ambas ventanas; no reaparecen las pérdidas observadas con subvista oficial incrustada.
+Aceptación: dos canales y dos ventanas, envío al destino correcto, cierre/reapertura, reconexión, logout y borrados de moderación. Medir vídeo con chat rápido en presentaciones incrustada y separada; contrastar con el mismo canal/calidad sin asumir la causa de las pérdidas anteriores.
 
 ## R6 — Grid y workspaces
 
