@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { getModerators, getVips, getChatters } from '../../utils/twitch'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { ModDataNotice } from './ModDataNotice'
+import CommunityGroups from '../chat/CommunityGroups'
+import { useT } from '../../utils/i18n'
 
-export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], onInspectUser }) {
-  const [tab, setTab] = useState('chatters') // 'chatters' | 'mods' | 'vips'
+export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], onInspectUser, initialTab = 'chatters' }) {
+  const t = useT()
+  const [tab, setTab] = useState(initialTab)
   const [mods, setMods] = useState([])
   const [vips, setVips] = useState([])
   const [chatters, setChatters] = useState([])
@@ -128,13 +131,14 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
       {/* Subtabs */}
       <div className="shrink-0 flex items-center justify-between p-2 border-b border-white/10 bg-white/[0.02]">
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          <button type="button" onClick={() => setTab('groups')} aria-pressed={tab === 'groups'} className="px-2 py-1 rounded-lg text-xs font-bold text-purple-200 border border-white/10 cursor-pointer">{t('community.title')}</button>
           <button
             onClick={() => setTab('chatters')}
             className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               tab === 'chatters' ? 'bg-twitch/20 text-twitch-glow border border-twitch/40' : 'text-white/60 hover:text-white'
             }`}
           >
-            Espectadores ({mergedChatters.length})
+            {t('community.chatters')} ({mergedChatters.length})
           </button>
           <button
             onClick={() => setTab('mods')}
@@ -142,7 +146,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
               tab === 'mods' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'text-white/60 hover:text-white'
             }`}
           >
-            Mods ({allMods.length})
+            {t('community.moderators')} ({allMods.length})
           </button>
           <button
             onClick={() => setTab('vips')}
@@ -150,7 +154,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
               tab === 'vips' ? 'bg-pink-500/20 text-pink-300 border border-pink-500/30' : 'text-white/60 hover:text-white'
             }`}
           >
-            VIPs ({allVips.length})
+            {t('community.vips')} ({allVips.length})
           </button>
         </div>
 
@@ -158,7 +162,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
           onClick={loadData}
           disabled={loading}
           className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
-          title="Recargar lista"
+          title={t('community.refresh')}
         >
           <PhosphorIcon name="ArrowsClockwise" size={14} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -169,7 +173,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
       <div className="p-2 border-b border-white/5">
         <input
           type="text"
-          placeholder={`Buscar en ${tab === 'chatters' ? 'espectadores' : tab === 'mods' ? 'moderadores' : 'VIPs'}...`}
+          placeholder={t('community.search')} aria-label={t('community.search')} maxLength={100}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-twitch"
@@ -178,14 +182,17 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
 
       {/* List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {loading ? (
+        {tab === 'groups' ? <>
+          {Object.entries(errors).map(([source, error]) => <ModDataNotice key={source} error={error} />)}
+          <CommunityGroups viewers={mergedChatters} moderators={allMods} vips={allVips} broadcasterId={broadcasterId} search={search} onInspectUser={onInspectUser} />
+        </> : loading ? (
           <div className="flex items-center justify-center p-6 text-text-muted text-xs">
             <div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin mr-2" />
-            <span>Cargando lista...</span>
+            <span>{t('community.loading')}</span>
           </div>
         ) : filteredList.length === 0 && !errors[tab] ? (
           <p className="text-center p-4 text-xs text-text-muted/60 italic">
-            No se encontraron {tab === 'chatters' ? 'espectadores' : tab === 'mods' ? 'moderadores' : 'VIPs'}.
+            {t('community.empty')}
           </p>
         ) : (
           filteredList.map(item => {
@@ -244,7 +251,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
                 </div>
 
                 <span className="text-[10px] text-white/30 group-hover:text-white/80 transition-colors shrink-0 ml-2">
-                  Inspeccionar ➔
+                  {t('community.inspect')} ➔
                 </span>
               </div>
             )

@@ -14,6 +14,7 @@ import { openTwitchChatPopoutWindow } from '../utils/twitchPopout'
 import { normalizeChatChannels, parseIrcEnvelope } from '../utils/chatChannels'
 import ChannelLabel from './chat/ChannelLabel'
 import ChatSearchPanel from './chat/ChatSearchPanel'
+import { ActiveModsPanel } from './modview/ActiveModsPanel'
 import TwitchChatGif from './chat/TwitchChatGif'
 import { parseChatGifs } from '../utils/chatGifs'
 import { CHAT_URL_REGEX as URL_REGEX, EMPTY_CHAT_SEARCH, createChatSearchMatcher } from '../utils/chatSearch'
@@ -498,6 +499,7 @@ export default function Chat({
   const subscribedChannels = useMemo(() => channelsKey ? channelsKey.split(',') : [], [channelsKey])
   const [joinedChannels, setJoinedChannels] = useState([])
   const [messages, setMessages] = useState([])
+  const [showCommunity, setShowCommunity] = useState(false)
 
   useEffect(() => {
     onMessagesUpdate?.(messages)
@@ -1801,6 +1803,7 @@ export default function Chat({
 
         {/* Right: Action Buttons toolbar */}
         <div className="flex items-center gap-1 shrink-0">
+          {!isUnified && <button type="button" aria-label={t('community.title')} title={t('community.title')} aria-expanded={showCommunity} onClick={() => setShowCommunity(value => !value)} className="rounded-lg p-1.5 text-text-muted hover:bg-white/10 cursor-pointer"><PhosphorIcon name="Users" size={15} /></button>}
           <button ref={searchButtonRef} type="button" aria-label={t('chat.search.title', 'Buscar en el chat')} title={t('chat.search.title', 'Buscar en el chat')} aria-expanded={search.open} onClick={() => search.open ? closeSearch() : updateSearch({ open: true })} className={`rounded-lg p-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-twitch ${search.open ? 'bg-twitch/20 text-twitch-light' : 'text-text-muted hover:bg-white/10 hover:text-text-primary'}`}>
             <PhosphorIcon name="MagnifyingGlass" size={15} weight="bold" />
           </button>
@@ -1979,6 +1982,7 @@ export default function Chat({
         </button>
       </div>
 
+      {showCommunity && !isUnified && <div className="h-80 min-h-0 shrink-0 overflow-auto border-b border-white/10"><ActiveModsPanel key={`${channel}:${userId || auth.userId || ''}`} broadcasterId={broadcasterId} userId={userId || auth.userId} recentMessages={messages} initialTab="groups" onInspectUser={onSelectUserForInspection || (user => setUserCard({ username: user.username, userId: user.userId, displayName: user.displayName }))} /></div>}
       {search.open && <ChatSearchPanel search={search} channels={subscribedChannels} count={chatHidden ? 0 : visibleMessages.length} onChange={updateSearch} onClose={closeSearch} />}
 
       {authing && authCode && (

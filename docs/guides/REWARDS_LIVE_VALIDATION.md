@@ -28,6 +28,8 @@ Plan: [R0–R8](../STREAMNOOK_IMPLEMENTATION_PLAN.md). Una candidata puede super
 
 ## Casos
 
+Prueba preparada para candidata23: el usuario indica un Drop al100% pendiente. Desde Centro de Drops → Listos para reclamar, iniciar una sola reclamación y comprobar `Reclamado` y su estado en el inventario oficial. Registrar error textual si lo hay; mantener Auto-Claim pausado ante incertidumbre. No sustituir esta prueba por un canje de puntos o una compra.
+
 1. **Control oficial:** reproducir al menos 15 minutos y registrar progreso remoto antes/después. Si no avanza, revisar campaña/vinculación antes de atribuir el problema a BlinkStream.
 2. **Reproducción BlinkStream:** misma campaña/cuenta/canal, intervalo independiente comparable. Registrar progreso del servidor, no un contador local. Repetir en otra sesión/campaña cuando esté disponible.
 3. **Pausa/buffering:** comprobar que el reporte experimental no acredita por simple selección de canal. Registrar su parada y recuperación; la pausa del reporte no elimina progreso ya recibido por Twitch.

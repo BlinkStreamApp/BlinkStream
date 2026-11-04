@@ -16,6 +16,7 @@ describe('Drops campaign browser', () => {
       { id: 'chest', benefitName: 'New Chest', benefitImage: 'https://static-cdn.jtvnw.net/chest.png', requiredMinutes: 60, currentMinutes: 0, hasProgress: false },
     ] }]} />)
     fireEvent.click(screen.getByRole('button', { name: 'Disponibles' }))
+    fireEvent.click(screen.getByRole('button', { name: /Other Game/ }))
     expect(screen.getByRole('heading', { name: 'New Campaign' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'New Chest' })).toBeInTheDocument()
     expect(document.querySelector('img[src="https://static-cdn.jtvnw.net/campaign.jpg"]')).toBeInTheDocument()

@@ -13,6 +13,15 @@ vi.mock('../../utils/twitchPopout', () => ({ openOfficialRewardsChat: vi.fn() })
 afterEach(() => { cleanup(); localStorage.clear() })
 const props = { open: true, onClose: vi.fn(), channel: 'kokoop', broadcasterId: '123', userId: 'alice', userToken: 't' }
 
+it('searches rewards and switches to compact presentation without redeeming', () => {
+  render(<CPPanel {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Vista compacta' }))
+  expect(screen.getByRole('button', { name: 'Vista compacta' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar recompensa' }), { target: { value: 'absent' } })
+  expect(screen.queryByRole('button', { name: /Hydrate/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
 it('catalog selection opens the official handoff and disappears on account change', () => {
   const { rerender } = render(<CPPanel {...props} />)
   fireEvent.click(screen.getByRole('button', { name: /Hydrate/ }))

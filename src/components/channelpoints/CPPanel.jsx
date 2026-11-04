@@ -25,6 +25,8 @@ function CoinsIcon() {
 
 export default function CPPanel({ open, onClose, channel, broadcasterId, userId, userToken, isBroadcaster }) {
   const t = useT()
+  const [compact, setCompact] = useState(false)
+  const [rewardSearch, setRewardSearch] = useState('')
 
   const viewer = useChannelPoints({
     broadcasterId: isBroadcaster ? null : broadcasterId, 
@@ -98,6 +100,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
     }
     return viewer.rewards
   }, [isBroadcaster, tab, viewer.rewards, manage.rewards])
+  const filteredRewards = rewardsList.filter(reward => `${reward.title || ''} ${reward.prompt || ''}`.toLowerCase().includes(rewardSearch.trim().toLowerCase()))
 
   if (!broadcasterId) return null
 
@@ -115,8 +118,9 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
       <aside
         className={`fixed top-0 right-0 h-full z-[99999] bg-bg-secondary border-l border-bg-tertiary/40 shadow-2xl flex flex-col
           transition-transform duration-240 ${open ? 'translate-x-0' : 'translate-x-full'}`}
-        style={{ width: PANEL_WIDTH, transitionDuration: '240ms' }}
+        style={{ width: `min(${PANEL_WIDTH}px, calc(100vw - 24px))`, height: compact ? 'min(70vh, 640px)' : '100%', top: compact ? 'auto' : 0, bottom: compact ? 12 : 0, right: compact ? 12 : 0, borderRadius: compact ? 16 : 0, transitionDuration: '240ms' }}
         aria-hidden={!open}
+        inert={!open}
       >
         {}
         <div className="flex items-center justify-between px-4 py-3 border-b border-bg-tertiary/40 shrink-0">
@@ -131,6 +135,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
               )}
             </div>
           </div>
+          <button type="button" aria-pressed={compact} onClick={() => setCompact(value => !value)} className="text-xs text-purple-200 cursor-pointer">{t('cp.compact')}</button>
           <button
             onClick={onClose}
             className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer"
@@ -214,6 +219,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
         <div className="flex-1 overflow-y-auto p-4">
           {tab === 'rewards' && (
             <div className="space-y-3">
+              <label className="block text-xs text-text-secondary space-y-1"><span>{t('cp.search')}</span><input type="search" maxLength={100} value={rewardSearch} onChange={event => setRewardSearch(event.target.value)} className="w-full rounded-lg border border-white/10 bg-bg-tertiary px-3 py-2 text-text-primary" /></label>
               {viewer.error && (
                 <div className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 font-mono break-all">
                   <div className="font-bold mb-1">Error:</div>
@@ -225,12 +231,12 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
                 <div className="flex items-center justify-center py-8">
                   <div className="w-6 h-6 border-2 border-twitch border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : rewardsList.length === 0 ? (
+              ) : filteredRewards.length === 0 ? (
                 <div className="text-center py-8 text-text-muted text-[12px]">
                   {t('cp.empty.rewards')}
                 </div>
               ) : (
-                rewardsList.map((r) => (
+                filteredRewards.map((r) => (
                   <RewardCard
                     key={r.id}
                     reward={r}

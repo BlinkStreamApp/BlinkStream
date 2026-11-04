@@ -13,6 +13,13 @@ vi.mock('./settings/SettingsRecordingTab', () => ({ SettingsRecordingTab: () => 
 vi.mock('./settings/SettingsAdvancedTab', () => ({ SettingsAdvancedTab: () => <button>Avanzado de prueba</button> }))
 
 describe('Settings keyboard and state', () => {
+  it('searches controls across sections and opens the matching section', () => {
+    render(<Settings onClose={vi.fn()} />)
+    fireEvent.change(screen.getByRole('searchbox', { name: 'settings.search' }), { target: { value: 'controls.pip' } })
+    fireEvent.click(screen.getByRole('button', { name: 'controls.tab' }))
+    expect(screen.getByRole('tabpanel', { name: 'controls.tab' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'controls.pip' })).toBeInTheDocument()
+  })
   it('names the dialog, focuses close and wraps Tab without focusing the background', () => {
     const onClose = vi.fn()
     render(<><button>Fondo</button><Settings onClose={onClose} /></>)
@@ -36,6 +43,8 @@ describe('Settings keyboard and state', () => {
     expect(general).toHaveAttribute('aria-selected', 'true')
     general.focus()
     fireEvent.keyDown(general, { key: 'ArrowRight' })
+    expect(screen.getByRole('tab', { name: 'controls.tab' })).toHaveFocus()
+    fireEvent.keyDown(document.activeElement, { key: 'ArrowRight' })
     expect(screen.getByRole('tab', { name: 'Personalización & Temas' })).toHaveFocus()
     expect(screen.getByRole('tabpanel', { name: 'Personalización & Temas' })).toBeInTheDocument()
     fireEvent.keyDown(document.activeElement, { key: 'End' })

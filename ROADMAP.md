@@ -25,6 +25,11 @@ art, rewards, requirements and supplied end dates. Unknown requirements stay
 unknown; authenticated catalog acceptance, linking and broader claim/session
 verification remain pending.
 
+Candidate23 adds a game-cover gallery with campaign details, scoped progress
+indicator, configurable player controls, indexed settings search, grouped community
+and compact audio/points controls. Native web-session Drops claims are implemented
+with inventory confirmation (ADR-019); live claim acceptance remains pending.
+
 Hidden channels and collection refinements remain planned after the first rewards
 center; an inconclusive Twitch investigation does not block them. VOD/bookmarks
 still precede Grid/workspace expansion in 1.6. This plan reserves no patch numbers

@@ -86,6 +86,16 @@ export function isDropCampaignAvailable(campaign, now = Date.now()) {
   return (!Number.isFinite(start) || start <= now) && (!Number.isFinite(end) || end > now)
 }
 
+export function getDropsProgress(campaigns, currentChannelOnly = false) {
+  for (const campaign of campaigns) {
+    if (currentChannelOnly && !campaign.isCurrentChannel) continue
+    const drop = campaign.drops?.find(item => item.hasProgress && !item.isClaimed &&
+      Number.isFinite(item.requiredMinutes) && item.requiredMinutes > 0 && item.currentMinutes > 0)
+    if (drop) return { campaign, drop, remaining: Math.max(0, drop.requiredMinutes - drop.currentMinutes) }
+  }
+  return null
+}
+
 export function filterDropCampaigns(campaigns, query = '', filter = 'all') {
   const normalize = value => String(value || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
   const needle = normalize(query.trim().slice(0, 200))

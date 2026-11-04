@@ -29,10 +29,10 @@ describe('moderation data is not confused with unavailable data', () => {
     render(<ActiveModsPanel broadcasterId="1" userId="2" />)
     expect(await screen.findByText('alice')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText('Mods (0)'))
+    fireEvent.click(screen.getByRole('button', { name: 'Moderadores (0)' }))
     expect(screen.getByRole('alert')).toHaveTextContent('HTTP 401')
     expect(screen.queryByText('No se encontraron moderadores.')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText('VIPs (0)'))
+    fireEvent.click(screen.getByRole('button', { name: 'VIP (0)' }))
     expect(screen.getByRole('alert')).toHaveTextContent('HTTP 403')
   })
   it('keeps other data usable when one request rejects', async () => {
@@ -41,7 +41,7 @@ describe('moderation data is not confused with unavailable data', () => {
     getChatters.mockResolvedValue({ success: true, value: [{ user_login: 'bob' }] })
     render(<ActiveModsPanel broadcasterId="1" userId="2" />)
     expect(await screen.findByText('bob')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('Mods (0)'))
+    fireEvent.click(screen.getByRole('button', { name: 'Moderadores (0)' }))
     expect(screen.getByRole('alert')).toHaveTextContent('No se han podido cargar')
   })
   it('reports authorization failures instead of claiming there are no predictions', async () => {

@@ -71,7 +71,7 @@ export default function DropsModal({ token, channel, onClose, nativeWatchEnabled
       aria-labelledby="drops-modal-title"
     >
       <div
-        className={`bg-bg-secondary border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden ${officialOpen ? 'h-[85vh]' : ''}`}
+        className={`bg-bg-secondary border border-white/10 rounded-2xl shadow-2xl w-full max-w-[1500px] max-h-[85vh] flex flex-col overflow-hidden ${officialOpen ? 'h-[85vh]' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

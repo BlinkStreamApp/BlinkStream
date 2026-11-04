@@ -237,6 +237,7 @@ blinkstream/
 │   │   ├── companion.rs     # Wi-Fi remote server
 │   │   ├── embedded_drops.rs # Official inventory webview lifecycle
 │   │   ├── drops_catalog.rs # Read-only active campaign catalog; native session/cache
+│   │   ├── drops_claim.rs   # Web-session claim attempt with inventory confirmation
 │   │   └── drops_watch.rs   # Experimental measured-playback reporting
 │   ├── capabilities/       # Native permission boundaries
 │   ├── vendor/glib/        # Reviewed GTK3 security backport for Linux

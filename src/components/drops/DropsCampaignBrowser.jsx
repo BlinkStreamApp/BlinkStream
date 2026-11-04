@@ -1,6 +1,6 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { getLanguage, useT } from '../../utils/i18n'
-import { filterDropCampaigns, getDropState } from '../../utils/drops'
+import { filterDropCampaigns, getDropState, getDropsProgress } from '../../utils/drops'
 
 const filters = ['all', 'available', 'progress', 'claimable', 'claimed']
 
@@ -10,6 +10,10 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const [targetId, setTargetId] = useState(null)
+  const [selectedGame, setSelectedGame] = useState(null)
+  const backRef = useRef(null)
+  const gameRefs = useRef(new Map())
+  useEffect(() => { if (selectedGame) backRef.current?.focus() }, [selectedGame])
   const filtered = useMemo(() => filterDropCampaigns(campaigns, query, filter), [campaigns, query, filter])
   const target = campaigns.find(campaign => campaign.id === targetId)
   const groups = new Map()
@@ -19,6 +23,7 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(campaign)
   }
+  const activeGame = groups.has(selectedGame) ? selectedGame : null
   const syncedAt = Number.isFinite(lastUpdatedAt) && lastUpdatedAt > 0 && !Number.isNaN(new Date(lastUpdatedAt).getTime())
     ? new Intl.DateTimeFormat(getLanguage(), { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(lastUpdatedAt) : null
   return <section className="space-y-4" aria-label={t('drops.center.title')}>
@@ -37,8 +42,23 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
       {target && <p className="text-xs text-purple-200">{t('drops.center.target').replace('{name}', target.name)}</p>}
     </div>
     {filtered.length === 0 && <p role="status" className="py-8 text-center text-sm text-text-muted">{t('drops.center.noMatches')}</p>}
-    <div className={filter === 'available' ? 'grid grid-cols-1 md:grid-cols-2 gap-4 items-start' : 'space-y-4'}>
-    {[...groups.entries()].map(([game, items]) => <section key={game} className="space-y-3 min-w-0">
+    {filter === 'available' && !activeGame ? <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-7 gap-3">
+      {[...groups.entries()].map(([game, items]) => {
+        const progress = getDropsProgress(items)
+        const cover = items[0].boxArtUrl || items[0].imageUrl
+        return <button key={game} ref={element => { if (element) gameRefs.current.set(game, element); else gameRefs.current.delete(game) }} type="button" onClick={() => setSelectedGame(game)} className="flex flex-col justify-start min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] text-left hover:border-purple-400 focus-visible:outline-2 focus-visible:outline-purple-400 cursor-pointer">
+          {cover ? <img src={cover.replace('{width}', '285').replace('{height}', '380')} alt="" loading="lazy" className="w-full aspect-[3/4] object-cover" /> : <div className="aspect-[3/4] bg-purple-500/10 flex items-center justify-center text-3xl" aria-hidden="true">🎁</div>}
+          <div className="p-3 space-y-2">
+            <h4 className="text-sm font-bold text-white break-words">{items[0].gameName || t('drops.center.unknownGame')}</h4>
+            <p className="text-xs text-text-secondary">{t('drops.gallery.counts').replace('{campaigns}', items.length).replace('{drops}', items.reduce((total, campaign) => total + campaign.drops.length, 0))}</p>
+            {progress && <div className="space-y-1 text-xs text-purple-200"><p className="truncate">{progress.drop.benefitName}</p><div className="h-1.5 rounded bg-white/10 overflow-hidden"><div className="h-full bg-purple-400" style={{ width: `${Math.max(0, Math.min(100, progress.drop.percent || 0))}%` }} /></div><span>{progress.drop.percent}% · {t('drops.center.remaining').replace('{minutes}', progress.remaining)}</span></div>}
+          </div>
+        </button>
+      })}
+    </div> : <>
+    {filter === 'available' && activeGame && <button ref={backRef} type="button" onClick={() => { setSelectedGame(null); requestAnimationFrame(() => gameRefs.current.get(activeGame)?.focus()) }} className="text-sm text-purple-200 cursor-pointer">← {t('drops.gallery.back')}</button>}
+    <div className="space-y-4">
+    {[...groups.entries()].filter(([game]) => filter !== 'available' || !activeGame || game === activeGame).map(([game, items]) => <section key={game} className="space-y-3 min-w-0">
       <h4 className="text-sm font-bold text-text-primary">{items[0].gameName || t('drops.center.unknownGame')}</h4>
       {items.map(campaign => <article key={campaign.id} className={`rounded-2xl border p-4 space-y-3 ${campaign.id === targetId ? 'border-purple-500/50 bg-purple-500/5' : 'border-white/10 bg-bg-tertiary/40'}`}>
         {filter === 'available' && (campaign.imageUrl || campaign.boxArtUrl) && <img
@@ -90,5 +110,6 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
       </article>)}
     </section>)}
     </div>
+    </>}
   </section>
 }

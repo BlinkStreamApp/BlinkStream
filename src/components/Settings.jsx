@@ -13,10 +13,12 @@ import HslThemeStudio from './settings/HslThemeStudio'
 import PhosphorIcon from './icons/PhosphorIcon'
 import { useDialogFocus } from '../hooks/useDialogFocus'
 import { readVolume, setItem } from '../utils/storage'
+import SettingsPlayerTab from './settings/SettingsPlayerTab'
 
 function CloseIcon() { return <PhosphorIcon name="X" size={18} weight="bold" /> }
 
 const TABS = [
+  { id: 'player', label: 'Player' },
   { id: 'general', label: 'General' },
   { id: 'hsl', label: 'Personalización' },
   { id: 'account', label: 'Cuenta' },
@@ -87,6 +89,7 @@ export default function Settings({ onClose }) {
   useDialogFocus(dialogRef, closeButtonRef, onClose)
   const currentTabs = [
     { id: 'general', label: t('tab.general', 'General'), icon: 'Gear' },
+    { id: 'player', label: t('controls.tab'), icon: 'Play' },
     { id: 'hsl', label: t('hsl.tab', 'Personalización & Temas'), icon: 'Palette' },
     { id: 'account', label: t('tab.account', 'Cuenta'), icon: 'User' },
     { id: 'moderation', label: t('tab.moderation', 'Moderación'), icon: 'ShieldCheck' },
@@ -107,6 +110,16 @@ export default function Settings({ onClose }) {
   const [chatOnRight, setChatOnRight] = useState(() => localStorage.getItem('blinkstream_chat_side') !== 'left')
   const [compactMode, setCompactMode] = useState(() => localStorage.getItem('blinkstream_compact') === 'true')
   const [lang, setLang] = useState(getLanguage)
+  const [search, setSearch] = useState('')
+  const searchTerms = {
+    player: ['controls.title', ...['clips', 'vods', 'drops', 'record', 'snapshot', 'audio', 'theatre', 'browser', 'pip'].map(id => `controls.${id}`)],
+    general: ['set.streamQuality', 'set.defaultVolume', 'set.autoTheatre', 'set.chatRight', 'set.compactMode', 'set.language'],
+    hsl: ['hsl.tab', 'set.appearanceTitle'], account: ['tab.account'], moderation: ['tab.moderation'],
+    recording: ['tab.recording'], advanced: ['tab.advanced'],
+  }
+  const normalizeSearch = value => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase()
+  const normalizedSearch = normalizeSearch(search.trim())
+  const matchingTabs = currentTabs.filter(tab => normalizeSearch(`${tab.label} ${(searchTerms[tab.id] || []).map(key => t(key)).join(' ')}`).includes(normalizedSearch))
 
   useEffect(() => {
     try { localStorage.setItem(LS_TAB_KEY, activeTab) } catch {  }
@@ -142,9 +155,15 @@ export default function Settings({ onClose }) {
           </button>
         </div>
 
+        <div className="px-5 py-3 border-b border-white/10 space-y-2">
+          <label htmlFor={`${prefix}-search`} className="text-xs text-text-secondary">{t('settings.search')}</label>
+          <input id={`${prefix}-search`} type="search" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} className="w-full px-3 py-2 rounded-lg border border-white/10 bg-bg-tertiary text-text-primary" />
+          {normalizedSearch && <div className="flex flex-wrap gap-2" role="status">{matchingTabs.length ? matchingTabs.map(tab => <button type="button" key={tab.id} onClick={() => { setActiveTab(tab.id); setSearch('') }} className="px-3 py-2 rounded-lg bg-purple-500/20 text-purple-200 cursor-pointer">{tab.label}</button>) : t('settings.noMatches')}</div>}
+        </div>
         <Tabs tabs={currentTabs} active={activeTab} onChange={setActiveTab} prefix={prefix} label={t('settings')} />
 
         <div role="tabpanel" id={`${prefix}-panel`} aria-labelledby={`${prefix}-tab-${activeTab}`} tabIndex={0} className="flex-1 overflow-y-auto px-5 py-4">
+          {activeTab === 'player' && <SettingsPlayerTab />}
           {activeTab === 'general' && (
             <div className="space-y-5">
               <div>
