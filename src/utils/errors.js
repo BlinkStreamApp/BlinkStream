@@ -14,6 +14,7 @@ export const ErrorCode = {
   CHANNEL_POINTS_UPDATE_FAILED: 'CHANNEL_POINTS_UPDATE_FAILED',
   CHANNEL_POINTS_DELETE_FAILED: 'CHANNEL_POINTS_DELETE_FAILED',
   CHANNEL_POINTS_REDEEM_FAILED: 'CHANNEL_POINTS_REDEEM_FAILED',
+  CHANNEL_POINTS_OFFICIAL_REQUIRED: 'CHANNEL_POINTS_OFFICIAL_REQUIRED',
   CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED: 'CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED',
   CHANNEL_POINTS_REDEMPTION_NOT_MANAGEABLE: 'CHANNEL_POINTS_REDEMPTION_NOT_MANAGEABLE',
   CHANNEL_POINTS_REDEMPTION_FORBIDDEN: 'CHANNEL_POINTS_REDEMPTION_FORBIDDEN',
@@ -39,6 +40,7 @@ export class AppError extends Error {
 }
 
 import { isTauri } from './tauriEnv'
+import { t } from './i18n'
 
 function fmtContext(context) {
   if (!context || typeof context !== 'object') return ''
@@ -96,7 +98,9 @@ export function formatUserMessage(err) {
     case ErrorCode.CHANNEL_POINTS_DELETE_FAILED:
       return 'No se pudo eliminar la recompensa. Intentalo de nuevo.'
     case ErrorCode.CHANNEL_POINTS_REDEEM_FAILED:
-      return 'No se pudo canjear esta recompensa. Por políticas de Twitch, las recompensas del streamer solo pueden canjearse en su web oficial.'
+      return t('cp.official.redeemFailed')
+    case ErrorCode.CHANNEL_POINTS_OFFICIAL_REQUIRED:
+      return t('cp.official.explanation')
     case ErrorCode.CHANNEL_POINTS_REDEMPTION_FULFILL_FAILED:
       return 'No se pudo aprobar/rechazar la redencion. Intentalo de nuevo.'
     case ErrorCode.CHANNEL_POINTS_APP_TOKEN_FAILED:

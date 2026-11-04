@@ -1,6 +1,6 @@
 # Plan de implementación: recompensas y experiencia de escritorio
 
-Actualizado: 2026-11-04. Estado: plan solicitado; implementación pendiente.
+Actualizado: 2026-11-04. Estado: R1 implementado localmente y en candidata; aceptación autenticada pendiente. R0: el usuario acepta fluidez y retirada de barra en candidata17, con escenarios adicionales aún abiertos. R2: protocolo preparado; prueba de crédito remoto pendiente.
 
 Base: [revisión de StreamNook](reviews/STREAMNOOK_REVIEW_2026-11-04.md), fuente BlinkStream c8ca7ca y candidata 1.5.4/17. Este documento concreta la iniciativa; [EXECUTION_PLAN](EXECUTION_PLAN.md) conserva el orden general del producto y [PROJECT_STATE](PROJECT_STATE.md) registra lo realmente entregado.
 
@@ -15,7 +15,7 @@ Responsables: Codex implementa, revisa y ejecuta pruebas; el usuario acepta las 
 | ID | Entrega | Dependencia | Tamaño relativo | Cierre |
 |---|---|---|---|---|
 | R0 | Consolidar 1.5.4 y registrar baseline | Candidata17 | Pequeño, validación pendiente | Reproducción, Mod View y corrección de barra aceptadas; gates de entrega |
-| R1 | Corregir contrato del canje y separar roles | Inspección de rutas existentes | Pequeño | Sin POST Helix incorrecto; alternativa oficial útil; estados y errores coherentes |
+| R1 | Corregir contrato del canje y separar roles — implementado en candidata | Inspección de rutas existentes | Pequeño | Sin POST Helix incorrecto; alternativa oficial útil; falta aceptación autenticada |
 | R2 | Prueba de viabilidad de Drops y puntos | R0; cuenta/campaña elegibles | Medio, incertidumbre alta | Evidencia de crédito remoto y matriz de capacidades, o resultado negativo documentado |
 | R3 | Centro de Drops y campañas | R1; fuentes de inventario verificadas en R2 | Medio | Descubrimiento disponible, progreso y objetos obtenidos coherentes |
 | R4 | Saldo, cofres y canjes del espectador | R1 y viabilidad específica R2 | Grande, condicionado | Operaciones confirmadas y sin doble gasto; fallback oficial donde corresponda |
@@ -187,3 +187,5 @@ Aceptación: Browser Source real de OBS, reconexión, eventos deduplicados, text
 4. R3: construir el modelo y prototipo visual sobre fuentes verificadas; validar con el usuario antes de ampliar catálogo y automatización.
 
 Al terminar cada fase, actualizar este estado con evidencia y pendientes; no marcar «implementado» como «validado en Twitch».
+
+Evidencia R1: prueba de interfaz a420×700 del componente real; ruta nativa existente, sin tokens en el acceso; catálogo sin consultas de historial del creador y con caché por cuenta limpia al salir. Tests detallados y artefacto final en PROJECT_STATE. Protocolo para la parte real: [validación de recompensas](guides/REWARDS_LIVE_VALIDATION.md).

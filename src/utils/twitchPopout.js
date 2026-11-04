@@ -1,5 +1,18 @@
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from './tauriEnv'
+import { sanitizeChannelForGraphQL } from './twitch'
+
+export async function openOfficialRewardsChat(channel) {
+  const login = sanitizeChannelForGraphQL(channel)
+  if (!login) throw new Error('Invalid Twitch channel')
+  if (isTauri()) {
+    await invoke('open_twitch_popout_window', {
+      channel: login, alwaysOnTop: false, authToken: null, username: null,
+    })
+    return
+  }
+  window.open(`https://www.twitch.tv/popout/${login}/chat?popout=`, '_blank', 'noopener,noreferrer') // ALLOWED-REGRESSION: popup window
+}
 
 export function requiresOfficialChatWindow() {
   if (!isTauri() || typeof navigator === 'undefined') return false

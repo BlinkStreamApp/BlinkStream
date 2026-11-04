@@ -2,70 +2,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import RedeemModal from './RedeemModal'
 import RewardForm from './RewardForm'
 import PendingRedemptions from './PendingRedemptions'
-
-function makeReward(overrides = {}) {
-  return {
-    id: 'r1',
-    title: 'Hydrate',
-    cost: 50,
-    prompt: 'Bebe agua',
-    is_user_input_required: false,
-    is_enabled: true,
-    background_color: '#9146ff',
-    ...overrides,
-  }
-}
-
-function renderRedeemModal(rewardOverrides = {}, extraProps = {}) {
-  const onRedeem = vi.fn()
-  const onClose = vi.fn()
-  const reward = makeReward(rewardOverrides)
-  render(
-    <RedeemModal
-      reward={reward}
-      userBalance={null}
-      submitting={false}
-      error={null}
-      success={null}
-      onRedeem={onRedeem}
-      onClose={onClose}
-      {...extraProps}
-    />
-  )
-  return { onRedeem, onClose, reward }
-}
-
-describe('FIX 2: RedeemModal — reward.is_enabled', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('si reward.is_enabled=false muestra banner y deshabilita submit', () => {
-    renderRedeemModal({ is_enabled: false })
-
-    expect(
-      screen.getByText(/esta recompensa ya no est[áa] disponible|no disponible|disabled/i)
-    ).toBeInTheDocument()
-
-    const submitBtn = screen.getByRole('button', { name: /canjear|submit|✓/i })
-    expect(submitBtn).toBeDisabled()
-  })
-
-  it('si reward.is_enabled=true (o undefined) el submit esta habilitado', () => {
-    renderRedeemModal({ is_enabled: true })
-    const submitBtn = screen.getByRole('button', { name: /canjear|submit/i })
-    expect(submitBtn).not.toBeDisabled()
-  })
-
-  it('reward sin is_enabled explicito (undefined) se trata como activo', () => {
-    renderRedeemModal({ is_enabled: undefined })
-    const submitBtn = screen.getByRole('button', { name: /canjear|submit/i })
-    expect(submitBtn).not.toBeDisabled()
-  })
-})
 
 describe('FIX 3: RewardForm — cost >= 0', () => {
   beforeEach(() => {

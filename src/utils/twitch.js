@@ -903,65 +903,9 @@ export async function updateRedemptionStatus(broadcasterId, rewardId, redemption
   return _cpResult(true, results)
 }
 
-export async function redeemCustomReward(broadcasterId, rewardId, userInput, userToken) {
-  if (!broadcasterId || !rewardId || !userToken) {
-    return _cpResult(false, undefined, 'Faltan campos requeridos (broadcasterId, rewardId, userToken)', ErrorCode.CHANNEL_POINTS_REDEEM_FAILED)
-  }
-  const params = new URLSearchParams()
-  params.set('broadcaster_id', broadcasterId)
-  params.set('reward_id', rewardId)
-  if (userInput) params.set('user_input', userInput)
-
-  try {
-    const res = await measureFetch(
-      `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: {
-          'Client-ID': getHelixClientId(),
-          'Authorization': `Bearer ${userToken}`,
-        },
-        signal: safeTimeout(CP_TIMEOUT_MS),
-      },
-    )
-    if (!res.ok) {
-      let bodyMsg = ''
-      try {
-        const body = await res.json()
-        bodyMsg = body?.message || ''
-      } catch {  }
-
-      let code = ErrorCode.CHANNEL_POINTS_REDEEM_FAILED
-      let customMsg = null
-
-      const lower = bodyMsg.toLowerCase()
-      if (lower.includes('created by the broadcaster') || lower.includes('another app') || lower.includes('not created by your app')) {
-        customMsg = 'Por políticas de seguridad y privacidad de la API de Twitch, las recompensas creadas por el streamer solo se pueden canjear en la web o aplicación oficial de Twitch.'
-      } else if (lower.includes('insufficient') || (lower.includes('points') && lower.includes('enough'))) {
-        code = ErrorCode.CHANNEL_POINTS_INSUFFICIENT_BALANCE
-      } else if (lower.includes('cooldown') || lower.includes('paused') || lower.includes('limit') || lower.includes('stock')) {
-        customMsg = 'Esta recompensa está temporalmente en enfriamiento o ha alcanzado su límite de canjes por stream.'
-      } else if (res.status === 400) {
-
-        customMsg = `Por políticas de la API de Twitch, el canje de esta recompensa está reservado a su web oficial${bodyMsg ? ` (${bodyMsg})` : ''}.`
-      }
-
-      const err = new AppError(code, `Twitch HTTP ${res.status}: ${bodyMsg}`, { action: 'redeem' })
-      logError(err, { context: 'channel-points', action: 'redeem', bodyMsg })
-      return _cpResult(false, undefined, customMsg || formatUserMessage(err), code)
-    }
-    const data = await res.json()
-    return _cpResult(true, data?.data?.[0] || null)
-  } catch (e) {
-
-    const wrapped = new AppError(
-      ErrorCode.CHANNEL_POINTS_REDEEM_FAILED,
-      e?.message || 'Error al canjear la recompensa',
-      { action: 'redeem', originalErrName: e?.name, originalErrMsg: e?.message },
-    )
-    logError(wrapped, { context: 'channel-points', action: 'redeem' })
-    return _cpResult(false, undefined, formatUserMessage(wrapped), ErrorCode.CHANNEL_POINTS_REDEEM_FAILED)
-  }
+export async function redeemCustomReward() {
+  // Helix has no viewer redemption POST. Keep legacy callers from issuing one.
+  return _cpResult(false, undefined, formatUserMessage({ code: ErrorCode.CHANNEL_POINTS_OFFICIAL_REQUIRED }), ErrorCode.CHANNEL_POINTS_OFFICIAL_REQUIRED)
 }
 
 export async function getChannelRole(broadcasterId, userId, signal, channel) {

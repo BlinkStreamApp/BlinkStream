@@ -6,7 +6,7 @@ import { useChannelPoints } from '../../hooks/useChannelPoints'
 import { useManageRewards } from '../../hooks/useManageRewards'
 import RewardCard from './RewardCard'
 import RedeemModal from './RedeemModal'
-import MyRedemptions from './MyRedemptions'
+import { OfficialRewardsAccess } from './RedeemModal'
 import ManageRewards from './ManageRewards'
 import RewardForm from './RewardForm'
 import PendingRedemptions from './PendingRedemptions'
@@ -46,7 +46,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
   }, [isBroadcaster, tab])
 
   const [selectedReward, setSelectedReward] = useState(null)
-  const [redeemStatus, setRedeemStatus] = useState({ submitting: false, error: null, success: false })
+  const rewardScope = JSON.stringify([userId, channel])
   const [showRewardForm, setShowRewardForm] = useState(false)
   const [editingReward, setEditingReward] = useState(null)
 
@@ -72,22 +72,6 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
-
-  const handleRedeem = async (rewardId, userInput) => {
-    setRedeemStatus({ submitting: true, error: null, success: false })
-    const res = await viewer.redeem(rewardId, userInput)
-    if (res.ok) {
-      setRedeemStatus({ submitting: false, error: null, success: true })
-    } else {
-      setRedeemStatus({ submitting: false, error: res.error, success: false })
-    }
-    return res
-  }
-
-  const handleCloseRedeem = () => {
-    setSelectedReward(null)
-    setRedeemStatus({ submitting: false, error: null, success: false })
-  }
 
   const handleNewReward = () => {
     setEditingReward(null)
@@ -179,7 +163,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
               ) : (
                 <span
                   className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-twitch/20 text-twitch border border-twitch/30"
-                  title="Por política de Twitch, tu saldo no se expone a apps de terceros por API pública."
+                  title={t('cp.balance.disclaimer_private')}
                 >
                   {t('cp.balance.private')}
                 </span>
@@ -251,7 +235,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
                     key={r.id}
                     reward={r}
                     userBalance={viewer.balance}
-                    onClick={() => setSelectedReward(r)}
+                    onClick={() => setSelectedReward({ reward: r, scope: rewardScope })}
                   />
                 ))
               )}
@@ -259,12 +243,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
           )}
 
           {tab === 'mine' && (
-            <MyRedemptions
-              redemptions={viewer.myRedemptions}
-              loading={viewer.loading}
-              error={viewer.error}
-              onRefresh={viewer.refresh}
-            />
+            <OfficialRewardsAccess key={rewardScope} channel={channel} history />
           )}
 
           {tab === 'manage' && isBroadcaster && (
@@ -310,15 +289,12 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
       </aside>
 
       {}
-      {selectedReward && (
+      {open && selectedReward?.scope === rewardScope && (
         <RedeemModal
-          reward={selectedReward}
-          userBalance={viewer.balance}
-          submitting={redeemStatus.submitting}
-          error={redeemStatus.error}
-          success={redeemStatus.success}
-          onRedeem={handleRedeem}
-          onClose={handleCloseRedeem}
+          key={JSON.stringify([rewardScope, selectedReward.reward.id])}
+          reward={selectedReward.reward}
+          channel={channel}
+          onClose={() => setSelectedReward(null)}
         />
       )}
 
@@ -326,7 +302,7 @@ export default function CPPanel({ open, onClose, channel, broadcasterId, userId,
         <RewardForm
           initial={editingReward}
           saving={manage.loading}
-          onSave={async (data) => {
+          onSave={async data => {
             const res = await handleSaveReward(data)
             if (res.ok) setShowRewardForm(false)
             return res

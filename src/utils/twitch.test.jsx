@@ -9,8 +9,19 @@ import {
   validateToken,
   getDirectStreamUrl,
   secureRandomInt,
+  redeemCustomReward,
 } from './twitch'
 import { mockResponse } from '../test/__mocks__/response'
+
+it('viewer redemption never posts to Helix or reports a successful claim', async () => {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch')
+  try {
+    const result = await redeemCustomReward('123', 'reward', 'text', 'test-token')
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('CHANNEL_POINTS_OFFICIAL_REQUIRED')
+    expect(fetchSpy).not.toHaveBeenCalled()
+  } finally { fetchSpy.mockRestore() }
+})
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(async () => null), 

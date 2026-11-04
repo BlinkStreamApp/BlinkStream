@@ -1,0 +1,46 @@
+# Validación real de recompensas — R0/R2
+
+Estado: protocolo preparado el 2026-11-04; no acredita pruebas Twitch completadas.
+Plan: [R0–R8](../STREAMNOOK_IMPLEMENTATION_PLAN.md). Una candidata puede superar tests sin que Twitch haya acreditado minutos o entregado una recompensa.
+
+## Preparación
+
+- Registrar candidata/commit, sistema, WebView2, calidad y códec. No incluir tokens, cookies ni URLs firmadas.
+- Elegir canal en directo y campaña activa que el inventario oficial confirme como elegible; comprobar fechas y vinculación del juego.
+- Misma cuenta en BlinkStream y Twitch oficial. No pedir al usuario que copie credenciales ni leer mensajes para esta prueba.
+- Realizar los intervalos de Twitch oficial y BlinkStream por separado. Cerrar otra reproducción de esa cuenta que pueda contaminar la atribución.
+- Registrar por separado latencia HLS y retraso por fecha del vídeo; verificar si el reloj sesga la segunda métrica, sin modificarlo automáticamente.
+
+## Registro de cada sesión
+
+| Campo | Dato observado |
+|---|---|
+| Fecha/hora y zona | Pendiente |
+| Candidata/commit y runtime | Pendiente |
+| Canal/campaña y requisito | Pendiente |
+| Vinculación y elegibilidad confirmadas | Pendiente |
+| Medio: oficial/BlinkStream; chat/Mod View utilizados | Pendiente |
+| Calidad/códec y tiempo observado | Pendiente |
+| Minutos remotos iniciales → intermedios → finales | Pendiente |
+| Estado de reproducción/FPS/pérdidas/búfer | Pendiente |
+| Estado de reporte y errores no sensibles | Pendiente |
+| Estado del Drop después de reclamar | Pendiente |
+
+## Casos
+
+1. **Control oficial:** reproducir al menos 15 minutos y registrar progreso remoto antes/después. Si no avanza, revisar campaña/vinculación antes de atribuir el problema a BlinkStream.
+2. **Reproducción BlinkStream:** misma campaña/cuenta/canal, intervalo independiente comparable. Registrar progreso del servidor, no un contador local. Repetir en otra sesión/campaña cuando esté disponible.
+3. **Pausa/buffering:** comprobar que el reporte experimental no acredita por simple selección de canal. Registrar su parada y recuperación; la pausa del reporte no elimina progreso ya recibido por Twitch.
+4. **Cambio/cierre/minimización/logout:** comprobar la política existente y descartar respuestas tardías de la cuenta/canal anterior; sin procesos huérfanos.
+5. **Reclamo:** utilizar una recompensa que Twitch marque realmente como reclamable. Observar el resultado en el inventario oficial y su sincronización; abrir una ventana no significa reclamar.
+6. **Saldo/cofre:** documentar si cada lectura está disponible; si se reclama un cofre, comprobar resultado y saldo remoto. Un HTTP 200/204 o un valor por defecto no confirma puntos obtenidos.
+7. **Canje de espectador:** en R1 solo verificar apertura oficial, canal correcto, errores recuperables y ausencia de POST Helix. Un canje real posterior requiere elegir con el usuario una recompensa de prueba y autorizar ese gasto concreto.
+8. **Gestión del creador/moderador:** probar por separado recompensa gestionable/externa; no confundir autorización para leer eventos con capacidad para aprobar/rechazar.
+
+## Resultado
+
+Clasificar cada capacidad como **confirmada en la muestra**, **no confirmada**, **solo oficial** o **pendiente de escenario disponible**. Registrar evidencia y limitaciones; no extrapolar una cuenta/campaña a todas las plataformas.
+
+R0: el usuario acepta candidata17 (2026-11-04): reproducción fluida y barra inferior eliminada. Esto no sustituye validación específica de HEVC/Grid/Mod View combinado prolongado.
+
+R1: tests y candidata de acceso oficial se documentan en PROJECT_STATE. La interacción autenticada del usuario sigue siendo una comprobación distinta.
