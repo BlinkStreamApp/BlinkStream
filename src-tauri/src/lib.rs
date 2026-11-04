@@ -9,6 +9,7 @@ use tauri::Webview;
 use wait_timeout::ChildExt;
 
 mod drops_catalog;
+mod drops_claim;
 mod drops_watch;
 mod embedded_drops;
 mod embedded_modview;
@@ -2055,7 +2056,7 @@ async fn open_twitch_drops_window(
     Ok(())
 }
 
-const TWITCH_DROPS_INVENTORY_QUERY: &str = "query DropsInventory { currentUser { id inventory { dropCampaignsInProgress { id name status game { id name boxArtURL } timeBasedDrops { id name requiredMinutesWatched benefitEdges { benefit { id name imageAssetURL } } self { currentMinutesWatched isClaimed dropInstanceID } } } } } }";
+const TWITCH_DROPS_INVENTORY_QUERY: &str = "query DropsInventory { currentUser { id login inventory { dropCampaignsInProgress { id name status game { id name boxArtURL } timeBasedDrops { id name requiredMinutesWatched benefitEdges { benefit { id name imageAssetURL } } self { currentMinutesWatched isClaimed dropInstanceID } } } } } }";
 const TWITCH_CHANNEL_DROPS_QUERY: &str = "query ChannelDrops($id: ID!) { channel(id: $id) { viewerDropCampaigns { id name game { name boxArtURL } timeBasedDrops { id name requiredMinutesWatched benefitEdges { benefit { name imageAssetURL } } } } } }";
 
 fn drops_response_array(
@@ -2259,6 +2260,7 @@ async fn sync_drops_inventory_from_webview(
             "campaigns": campaigns,
             "channelCampaigns": channel_campaigns,
             "catalogCampaigns": catalog_campaigns,
+            "accountLogin": current_user.and_then(|user| user.get("login")).and_then(serde_json::Value::as_str),
             "channel": channel,
             "authRequired": auth_required,
             "status": if auth_required { "auth-required" } else if sync_error.is_some() { "partial" } else { "ready" },
@@ -2352,6 +2354,7 @@ fn official_drop_claim_target(
                 {
                     return Some(serde_json::json!({
                         "id": instance,
+                        "instanceId": instance,
                         "dropId": drop.get("id")?,
                         "names": [drop.get("name")?, drop.pointer("/benefitEdges/0/benefit/name").unwrap_or(&serde_json::Value::Null)],
                         "images": [drop.pointer("/benefitEdges/0/benefit/imageAssetURL").unwrap_or(&serde_json::Value::Null)]
@@ -2423,6 +2426,19 @@ async fn claim_drop_on_official_page(
     )
     .await?;
     if official_drop_claim_confirmed(&inventory, &drop_id)? {
+        return Ok(true);
+    }
+    let official = app
+        .get_webview(inventory_label)
+        .ok_or("Abre el inventario oficial antes de reclamar")?;
+    if twitch_webview_auth_token(&official).await?.as_deref() != Some(&token) {
+        return Err("La ventana oficial usa una sesión distinta; actualiza el panel".to_string());
+    }
+    let instance = target
+        .get("instanceId")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("El Drop no tiene instancia verificable")?;
+    if drops_claim::try_web_claim(&token, instance, &drop_id).await? {
         return Ok(true);
     }
     target["deadline"] = serde_json::json!(drops_now_ms() + 30000);
@@ -2991,6 +3007,9 @@ mod tests {
             "voucher"
         );
         assert!(official_drop_claim_target(&cache, "unknown").is_none());
+        let mut target = official_drop_claim_target(&cache, "instance").unwrap();
+        target["id"] = serde_json::json!("instance:job-timestamp");
+        assert_eq!(target["instanceId"], "instance");
         assert!(!TWITCH_OFFICIAL_CLAIM_SCRIPT.contains("document.cookie"));
         assert!(!TWITCH_OFFICIAL_CLAIM_SCRIPT.contains("fetch("));
         assert!(!TWITCH_OFFICIAL_CLAIM_SCRIPT.contains("__TAURI"));
