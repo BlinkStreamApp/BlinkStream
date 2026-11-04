@@ -34,10 +34,11 @@ function withTimeout(promise, timeoutMs, message) {
 
 export function parseCampaign(c, isCurrentChannel = false) {
   const drops = (c.timeBasedDrops || []).map(d => {
-    const required = d.requiredMinutesWatched || 60
-    const current = d.self?.currentMinutesWatched || 0
-    const percent = Math.min(100, Math.floor((current / required) * 100))
-    const isReadyToClaim = percent >= 100 && !d.self?.isClaimed && Boolean(d.self?.dropInstanceID)
+    const required = Number.isFinite(d.requiredMinutesWatched) && d.requiredMinutesWatched > 0 ? d.requiredMinutesWatched : null
+    const hasProgress = Number.isFinite(d.self?.currentMinutesWatched) && d.self.currentMinutesWatched >= 0
+    const current = hasProgress ? d.self.currentMinutesWatched : 0
+    const percent = required && hasProgress ? Math.min(100, Math.floor((current / required) * 100)) : 0
+    const isReadyToClaim = hasProgress && required !== null && current >= required && !d.self?.isClaimed && Boolean(d.self?.dropInstanceID)
 
     return {
       id: d.id,
@@ -45,7 +46,7 @@ export function parseCampaign(c, isCurrentChannel = false) {
       requiredMinutes: required,
       currentMinutes: current,
       percent,
-      hasProgress: Boolean(d.self),
+      hasProgress,
       isClaimed: Boolean(d.self?.isClaimed),
       isReadyToClaim,
       dropInstanceId: d.self?.dropInstanceID || null,
@@ -62,6 +63,30 @@ export function parseCampaign(c, isCurrentChannel = false) {
     isCurrentChannel,
     drops,
   }
+}
+
+export function getDropState(drop) {
+  if (drop.isClaimed) return 'claimed'
+  const timed = Number.isFinite(drop.requiredMinutes) && drop.requiredMinutes > 0
+  if (!timed) return 'unknown'
+  if (drop.hasProgress === false || !Number.isFinite(drop.currentMinutes) || drop.currentMinutes < 0) return 'available'
+  if (drop.isReadyToClaim && drop.dropInstanceId && drop.currentMinutes >= drop.requiredMinutes) return 'claimable'
+  if (drop.currentMinutes >= drop.requiredMinutes) return 'awaiting'
+  return drop.currentMinutes > 0 ? 'progress' : 'available'
+}
+
+export function filterDropCampaigns(campaigns, query = '', filter = 'all') {
+  const normalize = value => String(value || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  const needle = normalize(query.trim().slice(0, 200))
+  return campaigns.map(campaign => {
+    const matchesCampaign = normalize(`${campaign.name} ${campaign.gameName}`).includes(needle)
+    const drops = (campaign.drops || []).filter(drop => {
+      const state = getDropState(drop)
+      const matchesState = filter === 'all' || state === filter || (filter === 'progress' && state === 'awaiting')
+      return matchesState && (matchesCampaign || normalize(`${drop.name} ${drop.benefitName}`).includes(needle))
+    })
+    return { ...campaign, drops }
+  }).filter(campaign => campaign.drops.length > 0)
 }
 
 export function parseDropsInventory(inventory) {

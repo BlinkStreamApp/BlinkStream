@@ -17,6 +17,12 @@ chat, Grid audio focus/workspaces, command palette, private chat preferences and
 OBS overlay follow as separate increments. Private Twitch transports require real
 validation and retain an official fallback; source inspection is not delivery proof.
 
+Candidate progress (2026-11-04): the user confirmed 3→27 watched minutes matching
+Twitch's official inventory for one campaign. The first Drops center now groups
+synced campaigns by game, adds search/state filters and a visual campaign target.
+Unknown requirements stay unknown; global catalog, verified expiry/linking metadata
+and broader authenticated claim/session acceptance remain pending.
+
 Hidden channels and collection refinements remain planned after the first rewards
 center; an inconclusive Twitch investigation does not block them. VOD/bookmarks
 still precede Grid/workspace expansion in 1.6. This plan reserves no patch numbers

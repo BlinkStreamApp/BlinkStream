@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fetchUserDropsInventory, claimDropReward, parseDropsInventory } from './drops'
+import { fetchUserDropsInventory, claimDropReward, parseDropsInventory, parseCampaign, getDropState, filterDropCampaigns } from './drops'
 import { invoke } from '@tauri-apps/api/core'
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -7,6 +7,41 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 describe('drops utility', () => {
+  it('does not invent requirements or confirmed progress for incomplete Twitch data', () => {
+    const campaign = parseCampaign({ id: 'c', timeBasedDrops: [
+      { id: 'missing', self: { currentMinutesWatched: 80, dropInstanceID: 'instance' } },
+      { id: 'zero', requiredMinutesWatched: 0, self: { currentMinutesWatched: 0 } },
+      { id: 'invalid', requiredMinutesWatched: 60, self: { currentMinutesWatched: -1 } },
+      { id: 'no-progress', requiredMinutesWatched: 60, self: {} },
+    ] })
+    expect(campaign.drops.map(drop => drop.requiredMinutes)).toEqual([null, null, 60, 60])
+    expect(campaign.drops.map(drop => getDropState(drop))).toEqual(['unknown', 'unknown', 'available', 'available'])
+    expect(campaign.drops.every(drop => !drop.isReadyToClaim)).toBe(true)
+    expect(campaign.drops[3].hasProgress).toBe(false)
+  })
+
+  it('requires both confirmed completion and an issued instance before showing a claim', () => {
+    const drop = { requiredMinutes: 60, currentMinutes: 27, hasProgress: true, isReadyToClaim: true, dropInstanceId: 'real' }
+    expect(getDropState(drop)).toBe('progress')
+    expect(getDropState({ ...drop, currentMinutes: 60, dropInstanceId: null })).toBe('awaiting')
+    expect(getDropState({ ...drop, currentMinutes: 60 })).toBe('claimable')
+    expect(getDropState({ ...drop, isClaimed: true })).toBe('claimed')
+    expect(getDropState({ ...drop, currentMinutes: NaN })).toBe('available')
+  })
+
+  it('searches game, campaign and benefit names without accents and combines state filters', () => {
+    const campaigns = [{ id: 'c', name: 'Élite', gameName: 'AION 2', drops: [
+      { id: 'a', benefitName: 'Cofré', requiredMinutes: 60, currentMinutes: 27 },
+      { id: 'b', benefitName: 'Skin', requiredMinutes: 60, currentMinutes: 60 },
+      { id: 'c', benefitName: 'Gift', requiredMinutes: null },
+    ] }]
+    expect(filterDropCampaigns(campaigns, 'cofre')[0].drops.map(drop => drop.id)).toEqual(['a'])
+    expect(filterDropCampaigns(campaigns, 'elite', 'progress')[0].drops.map(drop => drop.id)).toEqual(['a', 'b'])
+    expect(filterDropCampaigns(campaigns, 'aion')[0].drops).toHaveLength(3)
+    expect(filterDropCampaigns(campaigns, '', 'claimable')).toEqual([])
+    expect(filterDropCampaigns(campaigns, 'absent')).toEqual([])
+    expect(campaigns[0].drops).toHaveLength(3)
+  })
   beforeEach(() => {
     vi.restoreAllMocks()
     invoke.mockReset()

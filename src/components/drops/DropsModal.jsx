@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { useT } from '../../utils/i18n'
+import DropsCampaignBrowser from './DropsCampaignBrowser'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { useTwitchDrops } from '../../hooks/useTwitchDrops'
 import { isTauri, safeOpenUrl } from '../../utils/tauriEnv'
@@ -6,6 +8,7 @@ import { useEmbeddedDropsInventory } from '../../hooks/useEmbeddedDropsInventory
 import { isDomElementVisible } from '../../utils/keyboard'
 
 export default function DropsModal({ token, channel, onClose, nativeWatchEnabled = false, nativeWatchStatus, onToggleNativeWatch }) {
+  const t = useT()
   const dialogRef = useRef(null)
   const closeButtonRef = useRef(null)
   const { isOpen: officialOpen, open: prepareOfficialInventory, close: closeOfficialInventory,
@@ -22,6 +25,7 @@ export default function DropsModal({ token, channel, onClose, nativeWatchEnabled
     refreshDrops,
     authRequired,
     syncStatus,
+    lastUpdatedAt,
     syncError,
     claimError,
     claimBlocked,
@@ -67,7 +71,7 @@ export default function DropsModal({ token, channel, onClose, nativeWatchEnabled
       aria-labelledby="drops-modal-title"
     >
       <div
-        className={`bg-bg-secondary border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden ${officialOpen ? 'h-[85vh]' : ''}`}
+        className={`bg-bg-secondary border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden ${officialOpen ? 'h-[85vh]' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -79,7 +83,7 @@ export default function DropsModal({ token, channel, onClose, nativeWatchEnabled
             <div>
               <div className="flex items-center gap-2">
                 <h3 id="drops-modal-title" className="text-base font-bold text-white">
-                  Twitch Drops & Recompensas
+                  {t('drops.center.title')}
                 </h3>
                 {claimableCount > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold animate-pulse">
@@ -88,7 +92,7 @@ export default function DropsModal({ token, channel, onClose, nativeWatchEnabled
                 )}
               </div>
               <p className="text-xs text-text-muted">
-                Rastrea tu progreso y reclama automáticamente tus Drops
+                {t('drops.center.subtitle')}
               </p>
             </div>
           </div>
@@ -275,128 +279,8 @@ export default function DropsModal({ token, channel, onClose, nativeWatchEnabled
               </div>
             </div>
           ) : (
-            campaigns.map((campaign) => (
-              <div
-                key={campaign.id}
-                className="bg-bg-tertiary/40 border border-white/5 rounded-2xl p-4 space-y-3"
-              >
-                {/* Campaign Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {campaign.boxArtUrl ? (
-                      <img
-                        src={campaign.boxArtUrl.replace('{width}', '60').replace('{height}', '80')}
-                        alt={campaign.gameName}
-                        className="w-8 h-10 object-cover rounded-lg border border-white/10 shadow-sm"
-                      />
-                    ) : (
-                      <div className="w-8 h-10 bg-white/10 rounded-lg flex items-center justify-center text-[10px] font-bold text-text-muted">
-                        🎮
-                      </div>
-                    )}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-white">{campaign.name}</h4>
-                        {campaign.isCurrentChannel && (
-                          <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold">
-                            En este canal
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-text-muted font-medium">{campaign.gameName}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Drops list */}
-                <div className="space-y-2.5 pt-1">
-                  {campaign.drops.map((drop) => {
-                    const isClaimingThis = claimingIds.has(drop.dropInstanceId)
-
-                    return (
-                      <div
-                        key={drop.id}
-                        className="bg-black/30 border border-white/5 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {drop.benefitImage ? (
-                            <img
-                              src={drop.benefitImage}
-                              alt={drop.benefitName}
-                              className="w-10 h-10 rounded-lg object-cover border border-white/10 bg-black/40 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
-                              <PhosphorIcon name="Gift" size={18} weight="bold" />
-                            </div>
-                          )}
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="font-bold text-white truncate max-w-[200px]">
-                                {drop.benefitName}
-                              </span>
-                              <span className="font-mono text-[11px] text-text-muted font-medium">
-                                {drop.hasProgress === false
-                                  ? `Disponible · ${drop.requiredMinutes} min · Progreso aún no confirmado`
-                                  : `${drop.currentMinutes} / ${drop.requiredMinutes} min (${drop.percent}%)`}
-                              </span>
-                            </div>
-
-                            {/* Progress bar */}
-                            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full transition-all duration-500 ${
-                                  drop.isClaimed
-                                    ? 'bg-emerald-500'
-                                    : drop.isReadyToClaim
-                                    ? 'bg-purple-500 animate-pulse'
-                                    : 'bg-gradient-to-r from-purple-500 to-indigo-500'
-                                }`}
-                                style={{ width: `${drop.percent}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action status / button */}
-                        <div className="shrink-0 flex items-center justify-end">
-                          {drop.isClaimed ? (
-                            <span className="px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1">
-                              <PhosphorIcon name="Check" size={14} weight="bold" />
-                              <span>Reclamado</span>
-                            </span>
-                          ) : drop.isReadyToClaim ? (
-                            <button
-                              type="button"
-                              onClick={() => claimBlocked ? openOfficialInventory() : claimDrop(drop.dropInstanceId, drop.benefitName)}
-                              disabled={claimingIds.size > 0}
-                              className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                            >
-                              {isClaimingThis ? (
-                                <>
-                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  <span>Reclamando...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <PhosphorIcon name="Gift" size={14} weight="fill" />
-                                  <span>{claimBlocked ? 'Reclamar en Twitch' : '¡Reclamar Drop!'}</span>
-                                </>
-                              )}
-                            </button>
-                          ) : (
-                            <span className="text-[11px] font-medium text-text-muted px-2 py-1 rounded bg-white/5 border border-white/5">
-                              {drop.requiredMinutes - drop.currentMinutes} min restantes
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))
+            <DropsCampaignBrowser key={channel || ''} campaigns={campaigns} lastUpdatedAt={lastUpdatedAt}
+              claimingIds={claimingIds} claimBlocked={claimBlocked} claimDrop={claimDrop} openOfficialInventory={openOfficialInventory} />
           )}
         </div>
       </div>

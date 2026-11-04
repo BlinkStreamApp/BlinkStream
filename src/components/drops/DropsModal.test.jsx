@@ -159,10 +159,12 @@ describe('DropsModal', () => {
     const first = screen.getByRole('button', { name: 'Auto-Claim: ON' })
     try {
       expect(close).toHaveFocus()
-      fireEvent.keyDown(close, { key: 'Tab' })
+      const last = screen.getByRole('button', { name: 'Fijar campaña' })
+      last.focus()
+      fireEvent.keyDown(last, { key: 'Tab' })
       expect(first).toHaveFocus()
       fireEvent.keyDown(first, { key: 'Tab', shiftKey: true })
-      expect(close).toHaveFocus()
+      expect(last).toHaveFocus()
       unmount()
       expect(opener).toHaveFocus()
     } finally { unmount(); opener.remove() }

@@ -87,6 +87,8 @@ Aceptación: progreso remoto verificable en más de una sesión/campaña elegibl
 
 ## R3 — Centro de Drops propio
 
+Primera entrega implementada el2026-11-04: agrupación por juego/campaña, búsqueda y filtros disponible/en curso/reclamable/obtenido, objetivo visual, última sincronización y ocho idiomas. Solo inventario sincronizado/campañas del canal; no incluye fechas, vinculación ni caducidad sin datos verificados. Progreso remoto3→27 y coincidencia oficial confirmados por el usuario para una campaña (R2 parcial). Reclamo real y aceptación de esta interfaz nueva siguen pendientes; catálogo global y ampliaciones no se consideran terminados.
+
 Áreas: ampliar `src/components/drops/DropsModal.jsx`, `useTwitchDrops.js`, `src/utils/drops.js` y el inventario oficial existente. Separar catálogo, normalización y presentación solo donde el código actual lo necesite; buscar implementaciones equivalentes antes de crear módulos.
 
 Entrega mínima:

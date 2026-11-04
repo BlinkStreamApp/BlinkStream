@@ -44,3 +44,7 @@ Clasificar cada capacidad como **confirmada en la muestra**, **no confirmada**, 
 R0: el usuario acepta candidata17 (2026-11-04): reproducción fluida y barra inferior eliminada. Esto no sustituye validación específica de HEVC/Grid/Mod View combinado prolongado.
 
 R1: tests y candidata de acceso oficial se documentan en PROJECT_STATE. La interacción autenticada del usuario sigue siendo una comprobación distinta.
+
+R2, muestra del2026-11-04: el usuario confirma que «Battle Support Chest x1» pasó de3 a27 minutos y que el inventario oficial de Twitch también muestra27 (45% de60). Crédito remoto confirmado para esa cuenta/campaña/sesión. No acredita por sí solo reclamo manual/automático, pausa/logout ni otras campañas o plataformas; esos casos siguen pendientes.
+
+R3, primera entrega: centro propio limitado al inventario sincronizado y campañas del canal, búsqueda, filtros y campaña fijada solo para seguimiento visual. Requisitos ausentes permanecen desconocidos; completar minutos sin instancia emitida no habilita reclamar. Fechas, vinculación y catálogo global quedan pendientes de una fuente verificada. Comprobar la candidata nueva con el mismo inventario; las pruebas de interfaz con datos de ejemplo no son validación autenticada.
