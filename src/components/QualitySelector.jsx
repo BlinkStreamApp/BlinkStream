@@ -1,17 +1,8 @@
-const FALLBACK_QUALITIES = [
-  { value: 'audio_only', label: 'Solo audio 🎧' },
-  { value: '160p30', label: '160p30 (Mínimo)' },
-  { value: '360p30', label: '360p30' },
-  { value: '480p30', label: '480p30' },
-  { value: '720p60', label: '720p60 (HD)' },
-  { value: '936p60', label: '936p60 (Pro Bitrate 🚀)' },
-  { value: '963p60', label: '963p60 (Pro Bitrate 🚀)' },
-  { value: '1080p60', label: '1080p60 (Full HD ⚡)' },
-  { value: '1440p60', label: '1440p60 (2K 💎)' },
-]
+import { useT } from '../utils/i18n'
 
 function qualityLabel(value) {
   const map = {
+    best: 'Automática (mejor disponible)',
     audio: 'Solo audio 🎧',
     audio_only: 'Solo audio 🎧',
     '160p': '160p (Mínimo)',
@@ -37,16 +28,14 @@ function qualityLabel(value) {
 }
 
 export default function QualitySelector({ current, onChange, qualities = [], isSettings = false }) {
-  const rawItems = (qualities && qualities.length > 0 ? qualities : FALLBACK_QUALITIES.map(q => q.value))
-    .filter(q => q && q.toLowerCase() !== 'best')
-
-  const items = Array.from(new Set([...rawItems]))
-  const effective = items.includes(current) ? current : (items[items.length - 1] || '1080p60')
+  const t = useT()
+  const items = Array.from(new Set(['best', ...(qualities || [])]))
+  const unavailable = current && !items.includes(current)
 
   return (
     <div className="relative w-full">
       <select
-        value={effective}
+        value={current || 'best'}
         onChange={(e) => onChange(e.target.value)}
         className={`w-full text-white font-mono font-bold border border-white/15 hover:border-twitch/50 focus:border-twitch focus:ring-1 focus:ring-twitch transition-all appearance-none cursor-pointer shadow-inner ${
           isSettings
@@ -55,9 +44,10 @@ export default function QualitySelector({ current, onChange, qualities = [], isS
         }`}
         title="Seleccionar calidad de transmisión"
       >
+        {unavailable && <option value={current} disabled>{qualityLabel(current)} — {t('player.qualityUnavailable')}</option>}
         {items.map(q => (
           <option key={q} value={q} className="bg-[#10121a] text-white font-mono py-1">
-            {qualityLabel(q)}
+            {q === 'best' ? t('player.qualityBest') : qualityLabel(q)}
           </option>
         ))}
       </select>

@@ -954,10 +954,10 @@ fn streamlink_playback_args(channel: &str, quality: Option<&str>) -> Vec<String>
     let mut args = vec![format!("twitch.tv/{channel}")];
     if let Some(quality) = quality {
         args.push(quality.to_string());
+        args.push("--stream-url".to_string());
     }
     args.extend(
         [
-            "--stream-url",
             "--twitch-low-latency",
             "--hls-live-edge",
             "1",
@@ -1020,6 +1020,19 @@ fn parse_streamlink_qualities(stdout: &str, stderr: &str) -> Vec<String> {
     qualities
 }
 
+// One Streamlink name only: never a selector expression or CLI option.
+fn validate_playback_quality(quality: &str) -> Result<(), String> {
+    if quality.is_empty()
+        || quality.len() > 80
+        || !quality
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err("Calidad de reproducción inválida".to_string());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn get_stream_url(
     app: AppHandle,
@@ -1027,6 +1040,8 @@ async fn get_stream_url(
     quality: String,
 ) -> Result<String, String> {
     validate_channel(&channel)?;
+
+    validate_playback_quality(&quality)?;
 
     let args = streamlink_playback_args(&channel, Some(&quality));
 
@@ -1171,36 +1186,21 @@ async fn fetch_segment(url: String) -> Result<Vec<u8>, String> {
     media_security::read_limited(response, 32 * 1024 * 1024).await
 }
 
-const DEFAULT_QUALITIES: &[&str] = &[
-    "audio_only",
-    "160p",
-    "360p",
-    "480p",
-    "720p",
-    "720p60",
-    "936p60",
-    "963p60",
-    "1080p60",
-    "1440p60",
-];
-
 #[tauri::command]
-async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String> {
-    let defaults: Vec<String> = DEFAULT_QUALITIES.iter().map(|&s| s.to_string()).collect();
-    if validate_channel(&channel).is_err() {
-        return defaults;
-    }
-    let result = tokio::task::spawn_blocking(move || {
+async fn get_available_qualities(app: AppHandle, channel: String) -> Result<Vec<String>, String> {
+    validate_channel(&channel)?;
+    tokio::task::spawn_blocking(move || {
         let args = streamlink_playback_args(&channel, None);
         let refs: Vec<&str> = args.iter().map(String::as_str).collect();
         let (stdout, stderr) = run_streamlink_with_timeout(&app, &refs, 15)?;
-        Ok::<_, String>(parse_streamlink_qualities(&stdout, &stderr))
+        let qualities = parse_streamlink_qualities(&stdout, &stderr);
+        if qualities.is_empty() {
+            return Err("No se pudo consultar el catálogo de calidades".to_string());
+        }
+        Ok(qualities)
     })
-    .await;
-    match result {
-        Ok(Ok(qualities)) if !qualities.is_empty() => qualities,
-        _ => defaults,
-    }
+    .await
+    .map_err(|_| "No se pudo consultar el catálogo de calidades".to_string())?
 }
 
 #[tauri::command]
@@ -2692,8 +2692,32 @@ mod tests {
             if let Some(quality) = quality {
                 assert_eq!(args[1], quality);
             } else {
-                assert_eq!(args[1], "--stream-url");
+                assert!(!args.iter().any(|arg| arg == "--stream-url"));
             }
+        }
+    }
+
+    #[test]
+    fn playback_quality_is_one_name_for_video_audio_and_multistream() {
+        for name in [
+            "best",
+            "worst",
+            "audio",
+            "audio_only",
+            "1440p60",
+            "1920p60_portrait",
+        ] {
+            assert!(validate_playback_quality(name).is_ok());
+        }
+        for name in [
+            "",
+            "--help",
+            "best,worst",
+            "1080p60 --config secret",
+            "best/720p",
+            "best\n",
+        ] {
+            assert!(validate_playback_quality(name).is_err());
         }
     }
 

@@ -39,8 +39,9 @@ function ClipIcon() { return <PhosphorIcon name="PlayCircle" size={19} weight="r
 function VodIcon() { return <PhosphorIcon name="FilmStrip" size={19} weight="regular" /> }
 function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="regular" /> }
 
-const FALLBACK_QUALITIES = ['audio_only', '160p', '360p', '480p', '720p', '720p60', '936p60', '963p60', '1080p60', '1440p60']
-
+function canUseAutomaticQuality(quality) {
+  return quality !== 'best' && quality !== 'audio_only' && quality !== 'audio'
+}
 
 export function PlayerSettingsPanel({
   onClose,
@@ -60,7 +61,10 @@ export function PlayerSettingsPanel({
   quality,
   onQualityChange,
   availableQualities,
+  playbackStatus,
+  onOpenTwitch,
 }) {
+  const t = useT()
   const compactValue = compact || false
   const toggleOnce = action => event => { event.stopPropagation(); action?.() }
 
@@ -77,7 +81,7 @@ export function PlayerSettingsPanel({
       </div>
 
       {}
-      {availableQualities && availableQualities.length > 0 && (
+      {(
         <div className="flex items-center justify-between py-1 px-2 rounded-lg bg-twitch/15 border border-twitch/30 gap-2 mb-1 shadow-sm">
           <div className="flex items-center gap-1.5 text-twitch-light shrink-0">
             <PhosphorIcon name="MonitorPlay" size={15} weight="duotone" />
@@ -88,6 +92,17 @@ export function PlayerSettingsPanel({
           </div>
         </div>
       )}
+
+      <div className="text-[11px] text-white/70" role="status">
+        {playbackStatus}
+        {availableQualities?.length === 0 && <div>{t('player.qualityCatalogFailed')}</div>}
+        {onOpenTwitch && (
+          <>
+            <div>{t('player.qualityOfficial')}</div>
+            <button onClick={onOpenTwitch} className="text-twitch-light underline cursor-pointer">{t('player.qualityOpenTwitch')}</button>
+          </>
+        )}
+      </div>
 
       <div className="player-settings-toggles space-y-0.5 text-[11px]">
         {}
@@ -220,7 +235,17 @@ export default function VideoPlayer({
   const fallbackTimersRef = useRef(null)
   const [playing, setPlaying] = useState(true)
   const [muted, setMuted] = useState(false)
-  const [streamUrl, setStreamUrl] = useState('')
+  const [streamSource, setStreamSource] = useState(null)
+  const streamUrl = streamSource?.channel === channel && streamSource?.preference === quality ? streamSource.url : ''
+  const requestIdRef = useRef(0)
+  const catalogIdRef = useRef(0)
+  const identityRef = useRef({ channel, quality })
+  useLayoutEffect(() => {
+    identityRef.current = { channel, quality }
+    const requests = requestIdRef
+    return () => { identityRef.current = null; requests.current++ }
+  }, [channel, quality])
+  const [effectiveVideo, setEffectiveVideo] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showControls, setShowControls] = useState(true)
@@ -229,7 +254,8 @@ export default function VideoPlayer({
   const [hlsDebug, setHlsDebug] = useState('Iniciando...')
   // hlsDebug_unused workaround to make eslint happy since the overlay is currently removed
   useEffect(() => { if (hlsDebug) {} }, [hlsDebug])
-  const [availableQualities, setAvailableQualities] = useState(null)
+  const [qualityCatalog, setQualityCatalog] = useState(null)
+  const availableQualities = qualityCatalog?.channel === channel ? qualityCatalog.items : null
   const [showClips, setShowClips] = useState(false)
   const [showDrops, setShowDrops] = useState(false)
   const playerControls = usePlayerControls()
@@ -260,7 +286,8 @@ export default function VideoPlayer({
   const [completedSegments, setCompletedSegments] = useState(false)
   const playbackProbeRef = useRef(null)
   const [copyDiagnosticsState, setCopyDiagnosticsState] = useState('')
-  const [audioOnly, setAudioOnly] = useState(false)
+  const audioOnly = quality === 'audio_only' || quality === 'audio'
+  const preferredQuality = audioOnly ? 'audio_only' : quality || 'best'
   const prevQualityRef = useRef('best')
   const audioOnlyRef = useRef(false)
   useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
@@ -288,7 +315,6 @@ export default function VideoPlayer({
   const [showTheatreToast, setShowTheatreToast] = useState(false)
   const [showOverlayChat, setShowOverlayChat] = useState(() => getItem(STORAGE_KEYS.OVERLAY_CHAT, 'false') === 'true')
   const [showEmoteEffects, setShowEmoteEffects] = useState(() => getItem(STORAGE_KEYS.EMOTE_EFFECTS, 'true') === 'true')
-  const abortControllerRef = useRef(null)
   const containerRef = useRef(null)
   const [streamStartTime] = useState(Date.now)
 
@@ -313,70 +339,66 @@ export default function VideoPlayer({
   }, [streamUrl, channel, recording, startRecording])
 
   const fetchStream = useCallback(async (ch, q) => {
-    if (!ch) return
-    if (isFetchingRef.current) return
+    if (!ch || identityRef.current?.channel !== ch || identityRef.current?.quality !== quality) return
+    const id = ++requestIdRef.current
+    const isCurrent = () => requestIdRef.current === id
+    let resolvedQuality = q === 'audio' ? 'audio_only' : q || preferredQuality
     isFetchingRef.current = true
-    console.log(`[VideoPlayer] fetchStream llamado: channel=${ch}, quality=${q || quality || 'best'}`)
-    setLoading(true); setError(''); setStreamUrl('')
-    isFetchingRef.current = true
+    setLoading(true); setError(''); setStreamSource(null); setEffectiveVideo(null)
+    setUsingFallback(false)
     networkRetriesRef.current = 0
-    const targetQuality = q || quality || 'best'
-
-    if (targetQuality === 'audio_only') {
+    try {
+      let url
+      let fallback = resolvedQuality !== preferredQuality
       try {
-        const url = await measureInvoke('get_stream_url', { channel: ch, quality: 'audio_only' })
-        setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
-      } catch (e) { console.warn('Audio-only failed:', e) }
-      setError('No se pudo obtener stream de solo audio')
-      setHlsDebug('Fallo audio-only')
-      setLoading(false); isFetchingRef.current = false; return
+        url = await measureInvoke('get_stream_url', { channel: ch, quality: resolvedQuality })
+      } catch (error) {
+        if (!isCurrent()) return
+        if (!canUseAutomaticQuality(resolvedQuality)) throw error
+        resolvedQuality = 'best'
+        url = await measureInvoke('get_stream_url', { channel: ch, quality: resolvedQuality })
+        fallback = true
+      }
+      if (!isCurrent()) return
+      setStreamSource({ url, channel: ch, preference: quality, resolvedQuality })
+      setUsingFallback(fallback)
+    } catch (error) {
+      if (isCurrent()) {
+        // Retain offline classification without copying native output/URLs into React.
+        const offline = /no playable streams found|offline|no streams found|is not live/i.test(String(error))
+        setError(offline ? 'offline' : ['VIDEO_CODEC_UNSUPPORTED', 'VIDEO_SOURCE_UNAVAILABLE'].includes(error) ? error : `No se pudo cargar ${ch}`)
+      }
+    } finally {
+      if (isCurrent()) { setLoading(false); isFetchingRef.current = false }
     }
-
-    try {
-      const url = await measureInvoke('get_stream_url', { channel: ch, quality: targetQuality })
-      console.log(`[VideoPlayer] streamUrl obtenida para ${ch}: ${url?.substring(0, 80)}...`)
-      setStreamUrl(url); setUsingFallback(false); setLoading(false); isFetchingRef.current = false; return
-    } catch (e) { console.warn('[VideoPlayer] get_stream_url failed:', e) }
-
-    try {
-      const url = await measureInvoke('get_stream_url', { channel: ch, quality: 'best' })
-      setStreamUrl(url); setUsingFallback(true); setLoading(false); isFetchingRef.current = false; return
-    } catch (e) {
-      const msg = typeof e === 'string' ? e : e?.message || e?.toString() || 'Error desconocido'
-      setError(`No se pudo cargar ${ch}: ${msg}`)
-      setHlsDebug(`Fallo get_stream_url: ${msg}`)
-    }
-    setLoading(false); isFetchingRef.current = false
-  }, [quality])
+  }, [quality, preferredQuality])
 
   const fetchQualities = useCallback(async (ch) => {
     if (!ch) return
+    const id = ++catalogIdRef.current
+    setQualityCatalog(null)
     try {
       const quals = await measureInvoke('get_available_qualities', { channel: ch })
-      if (Array.isArray(quals) && quals.length > 0) {
-        setAvailableQualities(quals.filter(q => q.toLowerCase() !== 'best'))
-        return
-      }
-    } catch (e) { console.warn('Error fetching qualities:', e) }
-
-    setAvailableQualities(FALLBACK_QUALITIES)
-
+      if (id === catalogIdRef.current) setQualityCatalog({ channel: ch, items: Array.isArray(quals) ? quals : [] })
+    } catch {
+      if (id === catalogIdRef.current) setQualityCatalog({ channel: ch, items: [] })
+    }
   }, [])
 
   const handleQualityChange = useCallback((newQuality) => {
     onQualityChange(newQuality)
-    fetchStream(channel, newQuality)
-  }, [onQualityChange, fetchStream, channel])
+  }, [onQualityChange])
 
   useEffect(() => {
-    if (abortControllerRef.current) {
-      try { abortControllerRef.current.abort() } catch {  }
-    }
-    const abortCtrl = new AbortController()
-    abortControllerRef.current = abortCtrl
-
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    Promise.all([fetchStream(channel), fetchQualities(channel)])
+    fetchQualities(channel)
+    const catalogs = catalogIdRef
+    return () => { catalogs.current++ }
+  }, [channel, fetchQualities])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStream(channel)
     let cancelled = false
     let timer
     const reconnect = () => {
@@ -388,10 +410,10 @@ export default function VideoPlayer({
       }, 25 * 60 * 1000)
     }
     reconnect()
-    return () => { cancelled = true; try { abortCtrl.abort() } catch {} clearTimeout(timer) }
+    return () => { cancelled = true; clearTimeout(timer) }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channel, fetchStream, fetchQualities])
+  }, [channel, fetchStream])
 
   useEffect(() => {
     return () => {
@@ -407,7 +429,7 @@ export default function VideoPlayer({
   useEffect(() => {
     const video = videoRef.current
     if (!video || !streamUrl) return
-    console.log(`[VideoPlayer] Inicializando HLS con streamUrl: ${streamUrl?.substring(0, 80)}...`)
+    const resolvedQuality = streamSource.resolvedQuality
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
 
     if (!Hls.isSupported()) {
@@ -454,6 +476,23 @@ export default function VideoPlayer({
     hls.on(Hls.Events.LEVEL_UPDATED, updatePlaybackPolicy)
     updatePlaybackPolicy()
 
+    let recovering = false
+    const recoverWithAutomaticQuality = () => {
+      if (recovering) return true
+      if (!canUseAutomaticQuality(resolvedQuality)) return false
+      recovering = true
+      fetchStream(channel, 'best')
+      return true
+    }
+    let networkRetryTimer
+    const scheduleStreamRefresh = delay => {
+      if (networkRetryTimer || isFetchingRef.current) return
+      networkRetryTimer = setTimeout(() => {
+        networkRetryTimer = undefined
+        if (hlsRef.current === hls && !isFetchingRef.current) fetchStream(channel, resolvedQuality)
+      }, delay)
+    }
+
     const handleVideoError = () => {
       if (!video.error) return
       const errCode = video.error.code
@@ -468,11 +507,8 @@ export default function VideoPlayer({
         setError('VIDEO_CODEC_UNSUPPORTED')
         setHlsDebug('Native MEDIA_ERR_SRC_NOT_SUPPORTED')
       } else if (errCode === 3) {
-        if (quality !== 'best') {
-          console.warn(`[VideoPlayer] decode error at ${quality}, falling back to best`)
-          onQualityChange('best')
-          fetchStream(channel, 'best')
-        } else {
+        if (!recoverWithAutomaticQuality()) {
+          hls.stopLoad()
           setError(`Fallo de decodificación de vídeo (Hardware/Codec). Intenta actualizar tus drivers o instalar el Media Feature Pack si usas Windows N.`)
           setHlsDebug('Native MEDIA_ERR_DECODE ignorado/mostrado')
         }
@@ -503,18 +539,21 @@ export default function VideoPlayer({
         console.log(`[HLS] ${data.levels.length} levels: ${levelsInfo}`)
       }
 
+      clearTimeout(fallbackTimersRef.current)
       const fallbackTimer = setTimeout(() => {
         if (video.readyState < 2) {
           const currentLevelIdx = hls.currentLevel
           console.warn(`[HLS] current level (${currentLevelIdx}) not playing after 5s, trying fallback`)
-          if (hls.levels && hls.levels.length > 1 && currentLevelIdx >= 0 && currentLevelIdx < hls.levels.length - 1) {
+          if (!audioOnly && hls.levels && hls.levels.length > 1 && currentLevelIdx >= 0 && currentLevelIdx < hls.levels.length - 1) {
+            setUsingFallback(true)
             hls.currentLevel = currentLevelIdx + 1
-          } else {
-            onQualityChange('best')
-            fetchStream(channel, 'best')
+          } else if (!recoverWithAutomaticQuality()) {
+            hls.stopLoad()
+            setError('VIDEO_START_TIMEOUT')
           }
-        } else if (video.videoWidth === 0 && data.levels.length > 1) {
+        } else if (!audioOnly && video.videoWidth === 0 && data.levels.length > 1) {
           console.warn(`[VideoPlayer] videoWidth=0 with levels available, downgrading to lowest`)
+          setUsingFallback(true)
           hls.currentLevel = data.levels.length - 1
         }
       }, 5000)
@@ -543,17 +582,13 @@ export default function VideoPlayer({
           if (data.details === 'manifestLoadError' || data.response?.code === 403 || data.response?.code === 404) {
             console.warn('[HLS] Error 403/404 o fallo de manifiesto. Deteniendo bucle y reintentando stream desde Streamlink...')
             hls.destroy()
-            if (!isFetchingRef.current) {
-              setTimeout(() => { fetchStream(channel, quality) }, 2500)
-            }
+            scheduleStreamRefresh(2500)
           } else {
             networkRetriesRef.current += 1
             if (networkRetriesRef.current > 5) {
               console.warn('[HLS] Demasiados errores de red. Reiniciando stream...')
               hls.destroy()
-              if (!isFetchingRef.current) {
-                setTimeout(() => { fetchStream(channel, quality) }, 2000)
-              }
+              scheduleStreamRefresh(2000)
             } else {
               hls.startLoad()
             }
@@ -608,7 +643,7 @@ export default function VideoPlayer({
           const h = v.videoHeight || level?.height || 0
           const fpsVal = Number(level?.attrs?.FRAME_RATE || level?.attrs?.['FRAME-RATE'] || level?.frameRate || 0)
           const fpsStr = fpsVal > 0 ? `@${Math.round(fpsVal)}fps` : ''
-          const resolutionStr = (w && h) ? `${w}x${h}${fpsStr}` : (quality && quality !== 'best' ? `${quality}` : '—')
+          const resolutionStr = (w && h) ? `${w}x${h}${fpsStr}` : '—'
 
           const pbQuality = typeof v.getVideoPlaybackQuality === 'function' ? v.getVideoPlaybackQuality() : null
           const droppedVal = pbQuality ? pbQuality.droppedVideoFrames : (hlsInst.stats?.droppedFrames || 0)
@@ -638,6 +673,7 @@ export default function VideoPlayer({
     return () => {
       cancelled = true
       clearTimeout(statsTimer)
+      clearTimeout(networkRetryTimer)
       playbackProbe.stop()
       disposeBootstrap()
       disposeBufferedStart()
@@ -649,7 +685,7 @@ export default function VideoPlayer({
       video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }
-  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy, isFollowingLive, completedSegments, readAudioDiagnostics])
+  }, [streamUrl, streamSource, channel, fetchStream, quality, audioOnly, updatePlaybackPolicy, isFollowingLive, completedSegments, readAudioDiagnostics])
 
   useEffect(() => {
     const probe = playbackProbeRef.current
@@ -665,13 +701,9 @@ export default function VideoPlayer({
   const toggleAudioOnly = () => {
     if (audioOnly) {
       onQualityChange(prevQualityRef.current)
-      fetchStream(channel, prevQualityRef.current)
-      setAudioOnly(false)
     } else {
       prevQualityRef.current = quality
       onQualityChange('audio_only')
-      fetchStream(channel, 'audio_only')
-      setAudioOnly(true)
     }
   }
 
@@ -790,7 +822,11 @@ export default function VideoPlayer({
     };
   }, [togglePlay, toggleMute, captureSnapshot]);
 
-  const errInfo = error ? formatPlayerError(error, channel, t) : null
+  const errInfo = error ? formatPlayerError(
+    error === 'VIDEO_START_TIMEOUT' ? t('player.qualityStartFailed', 'No se pudo iniciar la reproducción.') : error,
+    channel,
+    t,
+  ) : null
   const handleRetry = useCallback(() => { fetchStream(channel) }, [channel, fetchStream])
   useEffect(() => {
     const handleKey = (e) => {
@@ -828,7 +864,13 @@ export default function VideoPlayer({
         </div>
       )}
 
-      <video ref={videoRef} className={`relative z-10 w-full h-full object-contain bg-black ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
+      <video onLoadedMetadata={event => {
+        const video = event.currentTarget
+        if (streamUrl && video.videoWidth && video.videoHeight) setEffectiveVideo({ url: streamUrl, label: `${video.videoWidth}×${video.videoHeight}` })
+      }} onResize={event => {
+        const video = event.currentTarget
+        if (streamUrl && video.videoWidth && video.videoHeight) setEffectiveVideo({ url: streamUrl, label: `${video.videoWidth}×${video.videoHeight}` })
+      }} ref={videoRef} className={`relative z-10 w-full h-full object-contain bg-black ${audioOnly ? 'hidden' : ''}`} autoPlay playsInline aria-label={channel ? `Reproduciendo ${channel}` : 'Reproductor de video'} />
       {audioOnly && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 select-none">
           <div className="w-16 h-16 rounded-2xl bg-twitch/20 flex items-center justify-center mb-3 animate-pulse-glow">
@@ -1071,7 +1113,11 @@ export default function VideoPlayer({
       {showSettingsPanel && (
         <PlayerSettingsPanel
           onClose={() => setShowSettingsPanel(false)}
-          quality={quality}
+          playbackStatus={`${audioOnly ? 'Solo audio' : (effectiveVideo?.url === streamUrl ? effectiveVideo.label : t('player.qualityPending'))}${usingFallback && streamUrl ? ` · ${t('player.qualityFallback')}` : ''}`}
+          onOpenTwitch={availableQualities && (availableQualities.length === 0 || usingFallback || (preferredQuality !== 'best' && !availableQualities.includes(preferredQuality)))
+            ? () => safeOpenUrl(`https://www.twitch.tv/${channel}`, true)
+            : undefined}
+          quality={preferredQuality}
           onQualityChange={handleQualityChange}
           availableQualities={availableQualities}
           compact={compact}
