@@ -1,11 +1,13 @@
+import { getUserIdByLogin } from '../../utils/twitch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import ModView from './ModView'
+import { t } from '../../utils/i18n'
 
-vi.mock('../../hooks/useModeration', () => ({ useModeration: () => ({ auditLog: [], remainingActions: 20 }) }))
+vi.mock('../../hooks/useModeration', () => ({ useModeration: () => ({ auditLog: feeds.localAudit || [], remainingActions: 20 }) }))
 vi.mock('../../hooks/useChannelRole', () => ({ useChannelRole: () => ({ isBroadcaster: false, isModerator: true }) }))
 vi.mock('../../hooks/useManageRewards', () => ({ useManageRewards: () => ({ pendingRedemptions: [], fulfilledRedemptions: [] }) }))
-vi.mock('../VideoPlayer', () => ({ default: ({ channel, volume, quality }) => <div data-testid="modview-player" data-channel={channel} data-volume={volume} data-quality={quality} /> }))
+vi.mock('../VideoPlayer', () => ({ default: props => <div data-testid="modview-player" data-channel={props.channel} data-volume={props.volume} data-quality={props.quality} data-user={props.twitchUsername} data-owner={props.broadcasterId} data-compact={String(props.compact)} /> }))
 vi.mock('../Chat', () => ({ default: ({ isModerator, broadcasterId }) => <div data-testid="modview-chat" data-moderator={isModerator} data-broadcaster={broadcasterId} /> }))
 
 const props = {
@@ -61,4 +63,111 @@ describe('ModView mounting and saved-layout recovery', () => {
     expect(Array.isArray(persisted.enabledTabs)).toBe(true)
     expect(persisted.enabledTabs.length).toBeGreaterThan(0)
   })
+})
+
+it('passes the same account and compact presentation to the native monitor', async () => {
+  localStorage.setItem('bs.modview.surface', 'blinkstream')
+  render(<ModView {...props} />)
+  const monitor = await screen.findByTestId('modview-player')
+  expect(monitor).toHaveAttribute('data-user', 'viewer')
+  expect(monitor).toHaveAttribute('data-owner', '123')
+  expect(monitor).toHaveAttribute('data-compact', 'true')
+})
+
+it('preserves the native video DOM across tool navigation and resizing', async () => {
+  localStorage.setItem('bs.modview.surface', 'blinkstream')
+  render(<ModView {...props} />)
+  const monitor = await screen.findByTestId('modview-player')
+  fireEvent.click(screen.getByRole('button', { name: 'Cola de AutoMod', exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: 'Acciones del moderador', exact: true }))
+  fireEvent.change(screen.getByRole('slider', { name: 'Ancho de herramientas' }), { target: { value: '1.4' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Comunidad', exact: true }))
+  expect(screen.getByTestId('modview-player')).toBe(monitor)
+  expect(JSON.parse(localStorage.getItem('bs.modview.config.v4')).workWeight).toBe(1.4)
+})
+
+it('resets the native workspace when account or channel changes', async () => {
+  localStorage.setItem('bs.modview.surface', 'blinkstream')
+  const view = render(<ModView {...props} />)
+  const first = await screen.findByTestId('modview-chat')
+  view.rerender(<ModView {...props} userId="another" />)
+  expect(await screen.findByTestId('modview-chat')).not.toBe(first)
+  const second = screen.getByTestId('modview-chat')
+  view.rerender(<ModView {...props} userId="another" channel="otherchannel" />)
+  expect(await screen.findByTestId('modview-chat')).not.toBe(second)
+})
+
+vi.mock('../../utils/twitch', async importOriginal => ({ ...await importOriginal(), getUserIdByLogin: vi.fn(async () => null) }))
+it('native fallback associates IDs with their channel and cancels late A/B lookups', async () => {
+  localStorage.setItem('bs.modview.surface', 'blinkstream')
+  const requests = []
+  getUserIdByLogin.mockImplementation(channel => new Promise(resolve => requests.push({ channel, resolve })))
+  const view = render(<ModView {...props} broadcasterId={null} />)
+  expect(await screen.findByTestId('modview-player')).not.toHaveAttribute('data-owner')
+  const firstA = requests.at(-1)
+  view.rerender(<ModView {...props} broadcasterId={null} channel="bravo" />)
+  const firstB = requests.at(-1)
+  await act(async () => firstA.resolve('101'))
+  expect(screen.getByTestId('modview-player')).not.toHaveAttribute('data-owner')
+  await act(async () => firstB.resolve('202'))
+  expect(screen.getByTestId('modview-player')).toHaveAttribute('data-owner', '202')
+  view.rerender(<ModView {...props} broadcasterId={null} />)
+  const secondA = requests.at(-1)
+  expect(screen.getByTestId('modview-player')).not.toHaveAttribute('data-owner')
+  view.rerender(<ModView {...props} broadcasterId="202" channel="bravo" />)
+  await act(async () => secondA.resolve('101'))
+  expect(screen.getByTestId('modview-player')).toHaveAttribute('data-owner', '202')
+  expect(screen.getByRole('button', { name: 'BlinkStream', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('slider', { name: 'Ancho de herramientas' })).toBeInTheDocument()
+})
+
+const feeds = vi.hoisted(() => ({ public: { state: 'connected', possibleGap: false, redemptions: [], predictions: [], polls: [] }, live: { status: 'connected', topics: {}, scopes: [], held: [], suspicious: [], audit: [], activity: [], activityPossibleGap: false } }))
+vi.mock('../../hooks/useChannelActivity', () => ({ useChannelActivity: () => feeds.public }))
+vi.mock('../../hooks/useModerationSession', () => ({ useModerationSession: () => ({ state: feeds.live, removeHeld: vi.fn() }) }))
+beforeEach(() => { feeds.public.possibleGap = false; feeds.live.activityPossibleGap = false })
+it.each(['public', 'live'])('integrates %s continuity warning in native Activity without remounting video', async source => {
+  localStorage.setItem('bs.modview.surface', 'blinkstream')
+  const view = render(<ModView {...props} />)
+  const player = await screen.findByTestId('modview-player')
+  fireEvent.click(screen.getByRole('button', { name: t('mod.native.activity'), exact: true }))
+  expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  if (source === 'public') feeds.public.possibleGap = true
+  else feeds.live.activityPossibleGap = true
+  view.rerender(<ModView {...props} />)
+  expect(screen.getByRole('status')).toHaveTextContent(t('channel.activity.possibleGap'))
+  fireEvent.click(screen.getByRole('button', { name: t('mod.native.predictions'), exact: true }))
+  if (source === 'public') expect(screen.getByRole('status')).toHaveTextContent(t('channel.activity.possibleGap'))
+  else expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  expect(screen.getByTestId('modview-player')).toBe(player)
+})
+
+
+it('feeds Activity only confirmed workspace EventSub moderation and ignores unknown topics without remounting video', async () => {
+  localStorage.setItem('bs.modview.surface', 'blinkstream')
+  feeds.localAudit = [{ id: 'local-audit', source: 'local', success: true, action: 'ban', targetName: 'local-only', timestamp: 1 }]
+  feeds.live.audit = [
+    { id: 'confirmed', source: 'eventsub', success: true, action: 'ban', moderator: 'actor', targetName: 'real-target', target: '99', timestamp: 2 },
+    { id: 'failed', source: 'eventsub', success: false, action: 'ban', targetName: 'failed-target', timestamp: 3 },
+  ]
+  feeds.live.activity = [
+    { id: 'unknown', type: 'channel.unknown', timestamp: 2, event: { user_name: 'unknown-user' } },
+    { id: 'follow', type: 'channel.follow', timestamp: 1, event: { user_name: 'follow-user', user_login: 'follow_login', user_id: '55' } },
+  ]
+  try {
+    render(<ModView {...props} />)
+    const player = await screen.findByTestId('modview-player')
+    fireEvent.click(screen.getByRole('button', { name: t('mod.native.activity'), exact: true }))
+    expect(screen.getByRole('button', { name: 'Filas disponibles (2)' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: t('activity.moderation'), exact: true }))
+    expect(screen.getByText('actor · ban · real-target')).toBeInTheDocument()
+    expect(screen.queryByText(/local-only|failed-target|unknown-user/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('modview-player')).toBe(player)
+    fireEvent.click(screen.getByRole('button', { name: t('mod.native.audit'), exact: true }))
+    expect(screen.getByText(/local-only/)).toBeInTheDocument()
+    expect(screen.getByTestId('modview-player')).toBe(player)
+  } finally {
+    feeds.localAudit = []
+    feeds.live.audit = []
+    feeds.live.activity = []
+  }
 })

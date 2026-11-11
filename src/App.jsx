@@ -3,6 +3,7 @@ import ChannelSearch from './components/ChannelSearch'
 import StreamInfo from './components/StreamInfo'
 import ConfirmDialog from './components/ConfirmDialog'
 import PhosphorIcon from './components/icons/PhosphorIcon'
+import BrandIcon from './components/icons/BrandIcon'
 
 import { RecordingProvider } from './components/recording/RecordingContext'
 import { BlinkStreamLogo } from './components/BlinkStreamLogo'
@@ -33,6 +34,7 @@ const DebugPanel = import.meta.env.DEV
 import { useAuth } from './hooks/useAuth'
 import { useChannelRole } from './hooks/useChannelRole'
 import { useFavoriteChannels } from './hooks/useFavoriteChannels'
+import { useChatVisibility } from './hooks/useChatVisibility'
 import { useLiveAlerts } from './hooks/useLiveAlerts'
 import { Toast } from './hooks/useLiveAlerts.Toast'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -44,6 +46,7 @@ import { isTauri } from './utils/tauriEnv'
 import { useT } from './utils/i18n'
 
 import { ModerationProvider } from './components/moderation/ModerationContext'
+import WhisperInboxButton from './components/chat/WhisperInboxButton'
 
 function PlayerFallback() {
   return (
@@ -91,7 +94,7 @@ function TitleBar() {
 }
 function ChatIcon() { return <PhosphorIcon name="ChatCircle" size={20} weight="regular" /> }
 function ChatOffIcon() { return <PhosphorIcon name="ChatCircleSlash" size={20} weight="regular" /> }
-function SettingsIcon() { return <PhosphorIcon name="Gear" size={20} weight="regular" /> }
+function SettingsIcon() { return <BrandIcon name="settings" size={22} /> }
 
 const CHAT_BREAKPOINT = 600
 const MAX_RECENT = 8
@@ -132,8 +135,7 @@ function MainApp() {
   const [recentChannels, setRecentChannels] = useState(loadRecent)
   const [volume, setVolume] = useState(loadVolume)
   const [theatreMode, setTheatreMode] = useState(loadTheatre)
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
-  const [showChat, setShowChat] = useState(window.innerWidth >= CHAT_BREAKPOINT)
+  const [showChat, setShowChat] = useChatVisibility(CHAT_BREAKPOINT)
   const [compact, setCompact] = useState(() => localStorage.getItem('blinkstream_compact') === 'true')
   const [chatOnRight, setChatOnRight] = useState(() => {
     try { return localStorage.getItem('blinkstream_chat_side') !== 'left' }
@@ -163,10 +165,10 @@ function MainApp() {
 
     setTimeout(() => { setModToast(curr => (curr === toast ? null : curr)) }, 3000)
   }, [])
-  const [broadcasterId, setBroadcasterId] = useState(null)
-  const [viewerUserId, setViewerUserId] = useState(() => {
-    try { return localStorage.getItem('bs.twitch.viewer_userid') || null } catch { return null }
-  })
+  const [broadcaster, setBroadcaster] = useState(null)
+  const broadcasterId = broadcaster?.channel === channel ? broadcaster.id : null
+  const [resolvedViewer, setResolvedViewer] = useState(null)
+
 
   const finishOnboarding = () => {
     localStorage.setItem('blinkstream_onboarded', '1')
@@ -210,6 +212,9 @@ function MainApp() {
   }, [theatreMode])
 
   const { isLoggedIn, user, avatar, authing, loading: authLoading, login, logout, getTwitchToken, loginWithToken } = useAuth()
+  const viewerUserId = isLoggedIn
+    ? user?.userId || (resolvedViewer?.owner === user ? resolvedViewer.id : null)
+    : null
   const username = user?.username || user?.identities?.[0]?.identity_data?.login || null
   const { favorites, pinnedFavorites, followsError, toggleFavorite } = useFavoriteChannels({
     username, token: getTwitchToken(), loading: authLoading,
@@ -267,18 +272,6 @@ function MainApp() {
 
   const { alerts, dismissAlert, liveFavorites } = useLiveAlerts(favorites)
 
-  useEffect(() => {
-    const onResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
-  useEffect(() => {
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (windowWidth < CHAT_BREAKPOINT) setShowChat(false)
-  }, [windowWidth])
-
   useEffect(() => { saveTo('blinkstream_recent', recentChannels) }, [recentChannels])
   useEffect(() => { localStorage.setItem('blinkstream_quality', quality) }, [quality])
   useEffect(() => { localStorage.setItem('blinkstream_volume', String(volume)) }, [volume])
@@ -299,22 +292,15 @@ function MainApp() {
 
     if (!channel) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBroadcasterId(null); return
+      setBroadcaster(null); return
     }
 
-    setBroadcasterId(null) 
+    setBroadcaster(null)
     getUserIdByLogin(channel).then(id => {
-      if (!cancelled) setBroadcasterId(id)
+      if (!cancelled) setBroadcaster({ channel, id })
     })
     return () => { cancelled = true }
   }, [channel])
-
-  useEffect(() => {
-    if (!isLoggedIn || (user?.userId && user.userId !== viewerUserId)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setViewerUserId(isLoggedIn ? user.userId : null)
-    }
-  }, [isLoggedIn, user?.userId, viewerUserId])
 
   useEffect(() => {
     if (!isLoggedIn || viewerUserId) return
@@ -328,13 +314,13 @@ function MainApp() {
       .then(data => {
         const id = data?.data?.[0]?.id
         if (!cancelled && id) {
-          setViewerUserId(id)
+          setResolvedViewer({ owner: user, id })
           try { localStorage.setItem('bs.twitch.viewer_userid', id) } catch {  }
         }
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [isLoggedIn, viewerUserId, getTwitchToken])
+  }, [isLoggedIn, viewerUserId, getTwitchToken, user])
 
   const selectChannel = useCallback((name) => {
     setViewMode('normal')
@@ -467,7 +453,7 @@ function MainApp() {
                 : 'bg-bg-tertiary/80 text-text-secondary border-white/10 hover:text-text-primary hover:border-white/20'
             }`}
           >
-            <PhosphorIcon name="SquaresFour" size={17} weight={viewMode === 'multistream' ? 'fill' : 'duotone'} />
+            <BrandIcon name="grid" size={22} />
             <span className="hidden md:inline">{t('nav.multistream', 'Grid Multi-Stream')}</span>
           </button>
 
@@ -476,7 +462,7 @@ function MainApp() {
             title="Mando a Distancia Wi-Fi para Móvil y Tablet (Fase 4)"
             className="flex items-center gap-2 px-3 py-1.5 ml-2 rounded-xl border bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 hover:from-cyan-500/25 hover:to-fuchsia-500/25 text-cyan-300 border-cyan-500/40 hover:border-cyan-400 shadow-sm hover:shadow-cyan-500/20 hover:scale-[1.02] transition-all cursor-pointer text-[12px] font-extrabold shrink-0"
           >
-            <PhosphorIcon name="DeviceMobile" size={18} weight="fill" className="text-cyan-400 animate-bounce-short" />
+            <BrandIcon name="remote" size={22} />
             <span className="hidden sm:inline">{t('nav.wifiRemote', 'Mando Wi-Fi')}</span>
           </button>
 
@@ -525,6 +511,7 @@ function MainApp() {
           {}
           {isLoggedIn ? (
             <div className="relative z-[9998] flex items-center gap-2 pl-3 ml-2 border-l border-bg-tertiary/50">
+              <WhisperInboxButton account={String(viewerUserId || '')} />
               <button
                 onClick={() => setShowUserMenu(p => !p)}
                 className="w-8 h-8 rounded-full bg-gradient-to-br from-twitch to-purple-600 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-twitch/50 hover:scale-105 transition-all shrink-0 overflow-hidden border-2 border-white/10 shadow-lg shadow-twitch/20"
@@ -653,8 +640,8 @@ function MainApp() {
             )}
           </div>
 
-          {showChat && channel && (
-            <div className={`w-96 min-w-[320px] max-w-[440px] ${chatOnRight ? 'border-l' : 'border-r'} border-bg-tertiary/30 transition-all duration-300`}>
+          {channel && (
+            <div hidden={!showChat} inert={!showChat ? true : undefined} aria-hidden={!showChat ? true : undefined} className={`w-96 min-w-[320px] max-w-[440px] ${chatOnRight ? 'border-l' : 'border-r'} border-bg-tertiary/30 transition-all duration-300`}>
               <Suspense fallback={<ChatFallback />}>
                 <Chat
                   channel={channel}

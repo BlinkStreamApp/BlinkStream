@@ -3,9 +3,12 @@ import { getModerators, getVips, getChatters } from '../../utils/twitch'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { ModDataNotice } from './ModDataNotice'
 import CommunityGroups from '../chat/CommunityGroups'
+import CommunityUserRow from '../chat/CommunityUserRow'
 import { useT } from '../../utils/i18n'
+import { invoke } from '@tauri-apps/api/core'
+import { isTauri } from '../../utils/tauriEnv'
 
-export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], onInspectUser, initialTab = 'chatters' }) {
+export function ActiveModsPanel({ broadcasterId, channelLogin, userId, recentMessages = [], onInspectUser, initialTab = 'groups' }) {
   const t = useT()
   const [tab, setTab] = useState(initialTab)
   const [mods, setMods] = useState([])
@@ -24,7 +27,9 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
     try {
       const results = await Promise.allSettled([
         getModerators(broadcasterId),
-        getVips(broadcasterId),
+        /^[1-9][0-9]{0,31}$/.test(userId) && /^[1-9][0-9]{0,31}$/.test(broadcasterId) && String(userId) !== String(broadcasterId)
+          ? Promise.resolve({ success: false, error: { context: { reason: 'broadcaster_only' } } })
+          : getVips(broadcasterId),
         getChatters(broadcasterId, userId),
       ])
       if (request !== requestRef.current) return
@@ -36,11 +41,21 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
           setList(result.value.value || [])
         } else failures[key] = result.status === 'rejected' ? result.reason || {} : result.value.error || {}
       })
-      setErrors(failures)
+      if (Object.keys(failures).length && channelLogin && isTauri()) {
+        try {
+          const roster = await invoke('get_public_chat_roster', { channel: channelLogin })
+          if (request !== requestRef.current) return
+          if (!Array.isArray(roster?.users)) throw new Error('response')
+          if (failures.chatters) { setChatters(roster.users); delete failures.chatters }
+          if (failures.mods) { setMods(roster.users.filter(user => user.isMod)); delete failures.mods }
+          if (failures.vips) { setVips(roster.users.filter(user => user.isVip)) }
+        } catch { /* Preserve the original access errors when the public list is unavailable. */ }
+      }
+      if (request === requestRef.current) setErrors(failures)
     } finally {
       if (request === requestRef.current) setLoading(false)
     }
-  }, [broadcasterId, userId])
+  }, [broadcasterId, channelLogin, userId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -58,10 +73,11 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
           userId: c.user_id || c.id || '',
           user_login: c.user_login || c.user_name,
           user_name: c.user_name || c.user_login,
-          isMod: false,
-          isBroadcaster: false,
-          isVip: false,
+          isMod: Boolean(c.isMod),
+          isBroadcaster: Boolean(c.isBroadcaster),
+          isVip: Boolean(c.isVip),
           isSub: false,
+          color: c.color,
         })
       }
     }
@@ -82,10 +98,13 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
 
         map.set(uname, {
           ...existing,
+          userId: existing.userId || m.user_id || m.userId || '',
+          user_name: m.displayName || m.user_name || existing.user_name,
           isBroadcaster: existing.isBroadcaster || isBroadcaster,
           isMod: existing.isMod || isMod,
           isVip: existing.isVip || isVip,
           isSub: existing.isSub || isSub,
+          color: m.color || existing.color,
         })
       }
     }
@@ -120,6 +139,13 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
     return Array.from(map.values())
   }, [vips, mergedChatters])
 
+  const vipError = errors.vips
+  const vipOwnerOnly = vipError?.context?.reason === 'broadcaster_only'
+  // A 401 alone also covers expired tokens and client mismatches.
+  const vipMissingScope = (vipError?.context?.status ?? vipError?.status) === 401
+    && /missing.*scope|scope.*required/i.test(vipError?.context?.twitchMsg || '')
+  const vipNotice = vipOwnerOnly ? 'community.vipOwnerOnly' : vipMissingScope ? 'community.vipReadScope' : null
+
   const currentList = tab === 'chatters' ? mergedChatters : tab === 'mods' ? allMods : allVips
   const filteredList = currentList.filter(item => {
     const name = item.user_name || item.user_login || item.name || ''
@@ -127,41 +153,21 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
   })
 
   return (
-    <div className="h-full flex flex-col font-sans">
+    <div className="h-full min-h-0 min-w-0 flex flex-col font-sans">
       {/* Subtabs */}
       <div className="shrink-0 flex items-center justify-between p-2 border-b border-white/10 bg-white/[0.02]">
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-          <button type="button" onClick={() => setTab('groups')} aria-pressed={tab === 'groups'} className="px-2 py-1 rounded-lg text-xs font-bold text-purple-200 border border-white/10 cursor-pointer">{t('community.title')}</button>
-          <button
-            onClick={() => setTab('chatters')}
-            className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
-              tab === 'chatters' ? 'bg-twitch/20 text-twitch-glow border border-twitch/40' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            {t('community.chatters')} ({mergedChatters.length})
-          </button>
-          <button
-            onClick={() => setTab('mods')}
-            className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
-              tab === 'mods' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            {t('community.moderators')} ({allMods.length})
-          </button>
-          <button
-            onClick={() => setTab('vips')}
-            className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
-              tab === 'vips' ? 'bg-pink-500/20 text-pink-300 border border-pink-500/30' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            {t('community.vips')} ({allVips.length})
-          </button>
-        </div>
+        <select value={tab} onChange={event => setTab(event.target.value)} aria-label={t('community.filter')} className="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-bg-secondary px-3 text-xs font-medium text-text-primary">
+          <option value="groups">{t('community.title')}</option>
+          <option value="chatters">{t('community.chatters')} ({mergedChatters.length})</option>
+          <option value="mods">{t('community.moderators')} ({allMods.length})</option>
+          <option value="vips">{t('community.vips')}{errors.vips ? '' : ` (${allVips.length})`}</option>
+        </select>
 
         <button
           onClick={loadData}
           disabled={loading}
-          className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
+          type="button" aria-label={t('community.refresh')}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-text-muted hover:bg-white/10 cursor-pointer shrink-0 ml-2"
           title={t('community.refresh')}
         >
           <PhosphorIcon name="ArrowsClockwise" size={14} className={loading ? 'animate-spin' : ''} />
@@ -169,21 +175,27 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
       </div>
 
       {/* Search filter */}
-      <ModDataNotice error={errors[tab]} />
       <div className="p-2 border-b border-white/5">
         <input
-          type="text"
+          type="search"
           placeholder={t('community.search')} aria-label={t('community.search')} maxLength={100}
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-twitch"
+          className="h-9 w-full min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-twitch"
         />
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+        {(tab === 'groups' || tab === 'vips') && vipError ? <div role="note" className="px-3 py-2 text-xs text-amber-300">
+          {vipNotice ? <p>{t(vipNotice)}</p> : null}
+          <p>{t('community.vipPartial')}</p>
+        </div> : null}
+        {(tab === 'groups' ? Object.keys(errors).length > 0 : Boolean(errors[tab])) && <details className="rounded-lg border border-amber-400/15 bg-amber-400/5 text-xs text-amber-200">
+          <summary className="cursor-pointer px-3 py-2 leading-relaxed">{t('community.partial')}</summary>
+          <div className="border-t border-amber-400/10">{(tab === 'groups' ? Object.entries(errors) : [[tab, errors[tab]]]).map(([source, error]) => <div key={source}><p className="px-3 pt-2 font-medium">{t(`community.${source === 'mods' ? 'moderators' : source === 'chatters' ? 'chatters' : 'vips'}`)}</p>{source === 'vips' && vipNotice ? null : <ModDataNotice error={error} />}</div>)}</div>
+        </details>}
         {tab === 'groups' ? <>
-          {Object.entries(errors).map(([source, error]) => <ModDataNotice key={source} error={error} />)}
           <CommunityGroups viewers={mergedChatters} moderators={allMods} vips={allVips} broadcasterId={broadcasterId} search={search} onInspectUser={onInspectUser} />
         </> : loading ? (
           <div className="flex items-center justify-center p-6 text-text-muted text-xs">
@@ -195,67 +207,7 @@ export function ActiveModsPanel({ broadcasterId, userId, recentMessages = [], on
             {t('community.empty')}
           </p>
         ) : (
-          filteredList.map(item => {
-            const username = item.user_login || item.name || item.user_name || ''
-            const displayName = item.user_name || item.name || username
-            const userId = item.user_id || item.id
-
-            const isMod = tab === 'mods' || item.isMod
-            const isVip = tab === 'vips' || item.isVip
-            const isBroadcaster = item.isBroadcaster
-
-            return (
-              <div
-                key={userId || username}
-                onClick={() => onInspectUser?.({
-                  username,
-                  displayName,
-                  userId,
-                  isMod,
-                  isVip,
-                  isSub: item.isSub,
-                  isBroadcaster,
-                })}
-                className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.07] border border-white/5 cursor-pointer transition-all group"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-twitch/50 to-purple-900 flex items-center justify-center font-bold text-white text-xs shrink-0">
-                    {username.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-xs font-semibold text-white truncate group-hover:text-twitch-glow">{displayName}</p>
-                      {isBroadcaster && (
-                        <span className="px-1.5 py-0.2 rounded bg-red-500/20 text-red-300 text-[9px] font-extrabold border border-red-500/30">
-                          STREAMER
-                        </span>
-                      )}
-                      {isMod && !isBroadcaster && (
-                        <span className="px-1.5 py-0.2 rounded bg-green-500/20 text-green-300 text-[9px] font-extrabold border border-green-500/30 flex items-center gap-0.5">
-                          ⚔️ MOD
-                        </span>
-                      )}
-                      {isVip && (
-                        <span className="px-1.5 py-0.2 rounded bg-pink-500/20 text-pink-300 text-[9px] font-extrabold border border-pink-500/30 flex items-center gap-0.5">
-                          💎 VIP
-                        </span>
-                      )}
-                      {item.isSub && (
-                        <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[9px] font-extrabold border border-purple-500/30">
-                          ⭐ SUB
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-text-muted/60 truncate">@{username}</p>
-                  </div>
-                </div>
-
-                <span className="text-[10px] text-white/30 group-hover:text-white/80 transition-colors shrink-0 ml-2">
-                  {t('community.inspect')} ➔
-                </span>
-              </div>
-            )
-          })
+          filteredList.map(item => <CommunityUserRow key={item.user_login || item.user_id || item.id} user={{ ...item, isMod: tab === 'mods' || item.isMod, isVip: tab === 'vips' || item.isVip }} onInspectUser={onInspectUser} />)
         )}
       </div>
     </div>

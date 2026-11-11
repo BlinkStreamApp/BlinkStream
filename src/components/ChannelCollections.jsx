@@ -4,6 +4,7 @@ import { changeCollections, collectionsKey, normalizeCollections, COLLECTION_COL
 import { prepareCollectionCover } from '../utils/collectionCover'
 import { useT } from '../utils/i18n'
 import PhosphorIcon from './icons/PhosphorIcon'
+import BrandIcon from './icons/BrandIcon'
 
 const coverColors = {
   violet: 'from-violet-600/70 to-purple-950', pink: 'from-fuchsia-600/70 to-pink-950',
@@ -61,7 +62,7 @@ function CollectionEditor({ owner, favorites, onSelect, liveStatus, logos }) {
   return <section aria-label={t('collections.label')} className="my-6 rounded-2xl border border-twitch/20 bg-bg-secondary/60 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-text-primary">{t('collections.title')} <span className="ml-2 rounded-full bg-twitch/15 px-2 py-0.5 text-sm text-twitch-light">{items.length}</span></h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-text-primary"><BrandIcon name="collections" size={26} />{t('collections.title')} <span className="ml-2 rounded-full bg-twitch/15 px-2 py-0.5 text-sm text-twitch-light">{items.length}</span></h2>
           <p className="mt-1 text-sm text-text-muted">{t('collections.hint')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -118,7 +119,7 @@ function CollectionEditor({ owner, favorites, onSelect, liveStatus, logos }) {
             <p className="mb-2 text-[13px] font-semibold text-text-primary">{t('collections.cover')}</p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" disabled={uploading} className={`${button} inline-flex min-h-9 items-center justify-center gap-2 border-twitch/35 bg-twitch/15 text-twitch-light hover:bg-twitch/25`} onClick={() => coverInputRef.current?.click()}>
-                <span aria-hidden="true" className="inline-flex"><PhosphorIcon name={uploading ? 'SpinnerGap' : 'FolderOpen'} size={16} /></span>
+                <span aria-hidden="true" className="inline-flex">{uploading ? <PhosphorIcon name="SpinnerGap" size={16} /> : <BrandIcon name="collections" size={20} />}</span>
                 {uploading ? t('collections.preparing') : selected.cover ? t('collections.changeImage') : t('collections.upload')}
               </button>
               {selected.cover && <button type="button" className={`${button} min-h-9`} onClick={() => { uploadRequestRef.current++; setUploading(false); apply({ type: 'appearance', id: selected.id, cover: '' }) }}>{t('collections.removeCover')}</button>}

@@ -8,13 +8,20 @@ use tauri::Manager;
 use tauri::Webview;
 use wait_timeout::ChildExt;
 
+mod community;
 mod drops_catalog;
 mod drops_claim;
+mod drops_connection;
+mod drops_probe;
 mod drops_watch;
 mod embedded_drops;
 mod embedded_modview;
 mod media_security;
+mod mod_tools;
+mod modview_clip;
 mod recorder;
+mod viewer_rewards;
+mod whispers;
 pub use recorder::{start_recording, stop_recording};
 pub mod companion;
 
@@ -963,23 +970,6 @@ fn streamlink_playback_args(channel: &str, quality: Option<&str>) -> Vec<String>
     args
 }
 
-fn streamlink_authenticated_args(args: &[String], token: Option<&str>) -> Vec<String> {
-    let mut authenticated = args.to_vec();
-    if let Some(token) = token.filter(|token| !token.is_empty()) {
-        authenticated.extend([
-            "--twitch-api-header".to_string(),
-            format!("Authorization=OAuth {token}"),
-        ]);
-    }
-    authenticated
-}
-
-fn playback_identities_match(app_id: Option<&str>, web_id: Option<&str>) -> bool {
-    app_id.is_some_and(|id| {
-        !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_digit()) && web_id == Some(id)
-    })
-}
-
 async fn playback_user_id(client: &reqwest::Client, token: &str) -> Option<String> {
     let response = client
         .get("https://id.twitch.tv/oauth2/validate")
@@ -992,37 +982,6 @@ async fn playback_user_id(client: &reqwest::Client, token: &str) -> Option<Strin
     }
     let identity: serde_json::Value = response.json().await.ok()?;
     identity.get("user_id")?.as_str().map(str::to_string)
-}
-
-async fn resolve_streamlink_user_token(app: &AppHandle) -> Option<String> {
-    let app_token = get_secret("twitch_token".to_string())
-        .await
-        .ok()
-        .filter(|token| !token.is_empty())?;
-    let Some(webview) = app.get_webview("main") else {
-        return Some(app_token);
-    };
-    let Some(web_token) = twitch_webview_auth_token(&webview).await.ok().flatten() else {
-        return Some(app_token);
-    };
-    if app_token == web_token {
-        return Some(app_token);
-    }
-    if let Ok(client) = reqwest::Client::builder()
-        .use_native_tls()
-        .timeout(Duration::from_secs(6))
-        .build()
-    {
-        let (app_id, web_id) = tokio::join!(
-            playback_user_id(&client, &app_token),
-            playback_user_id(&client, &web_token),
-        );
-        // A shared WebView profile must never borrow another account's session.
-        if playback_identities_match(app_id.as_deref(), web_id.as_deref()) {
-            return Some(web_token);
-        }
-    }
-    Some(app_token)
 }
 
 fn parse_streamlink_qualities(stdout: &str, stderr: &str) -> Vec<String> {
@@ -1071,46 +1030,10 @@ async fn get_stream_url(
 
     let args = streamlink_playback_args(&channel, Some(&quality));
 
-    let mut resolved_token = resolve_streamlink_user_token(&app).await;
-
-    if resolved_token.is_none() {
-        match get_app_token().await {
-            Ok(v) => {
-                if let Some(t) = v.get("token").and_then(|x| x.as_str()) {
-                    if !t.is_empty() {
-                        resolved_token = Some(t.to_string());
-                        log::info!("get_stream_url: usando app token (no user token en keychain)");
-                    }
-                }
-            }
-            Err(e) => {
-                log::warn!("get_stream_url: get_app_token fallo: {e}");
-            }
-        }
-    }
-
-    let auth_args = streamlink_authenticated_args(&args, resolved_token.as_deref());
-    let mut res_sl = if resolved_token.is_some() {
-        let arg_refs_auth: Vec<&str> = auth_args.iter().map(String::as_str).collect();
-        run_streamlink(&app, &arg_refs_auth)
-    } else {
-        Err("No hay token disponible".to_string())
-    };
-
-    let should_try_clean = match &res_sl {
-        Err(_) => true,
-        Ok((stdout, _)) => stdout.trim().starts_with("error:") || stdout.trim().is_empty(),
-    };
-
-    if should_try_clean {
-        if auth_args.len() > args.len() {
-            log::info!("get_stream_url: Fallo con token (posiblemente expirado). Reintentando de forma anónima...");
-        } else {
-            log::info!("get_stream_url: Acceso anónimo (no hay token)...");
-        }
-        let arg_refs_clean: Vec<&str> = args.iter().map(String::as_str).collect();
-        res_sl = run_streamlink(&app, &arg_refs_clean);
-    }
+    // Streamlink 8.6.2 has no supported in-memory credential input.
+    // Keep playback anonymous rather than exposing OAuth in process arguments.
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let res_sl = run_streamlink(&app, &arg_refs);
 
     let (stdout, stderr) = res_sl?;
     let url = stdout.trim().to_string();
@@ -1267,19 +1190,11 @@ async fn get_available_qualities(app: AppHandle, channel: String) -> Vec<String>
     if validate_channel(&channel).is_err() {
         return defaults;
     }
-    let token = resolve_streamlink_user_token(&app).await;
     let result = tokio::task::spawn_blocking(move || {
         let args = streamlink_playback_args(&channel, None);
-        let authenticated = streamlink_authenticated_args(&args, token.as_deref());
-        let refs: Vec<&str> = authenticated.iter().map(String::as_str).collect();
-        let (stdout, stderr) = run_streamlink_with_timeout(&app, &refs, 15)?;
-        let qualities = parse_streamlink_qualities(&stdout, &stderr);
-        if !qualities.is_empty() || token.is_none() {
-            return Ok::<_, String>(qualities);
-        }
         let refs: Vec<&str> = args.iter().map(String::as_str).collect();
         let (stdout, stderr) = run_streamlink_with_timeout(&app, &refs, 15)?;
-        Ok(parse_streamlink_qualities(&stdout, &stderr))
+        Ok::<_, String>(parse_streamlink_qualities(&stdout, &stderr))
     })
     .await;
     match result {
@@ -1559,11 +1474,16 @@ async fn get_secret(key: String) -> Result<String, String> {
 #[tauri::command]
 async fn delete_secret(key: String) -> Result<(), String> {
     validate_secret_key(&key)?;
+    let drops_cleanup = if key == "twitch_token" {
+        drops_probe::clear_account()
+    } else {
+        Ok(())
+    };
     let entry = Entry::new("blinkstream", &key)
         .map_err(|e| format!("Error creando entrada keychain: {e}"))?;
     match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
+        Ok(()) => drops_cleanup,
+        Err(keyring::Error::NoEntry) => drops_cleanup,
         Err(e) => Err(format!("Error eliminando del keychain: {e}")),
     }
 }
@@ -2434,13 +2354,6 @@ async fn claim_drop_on_official_page(
     if twitch_webview_auth_token(&official).await?.as_deref() != Some(&token) {
         return Err("La ventana oficial usa una sesión distinta; actualiza el panel".to_string());
     }
-    let instance = target
-        .get("instanceId")
-        .and_then(serde_json::Value::as_str)
-        .ok_or("El Drop no tiene instancia verificable")?;
-    if drops_claim::try_web_claim(&token, instance, &drop_id).await? {
-        return Ok(true);
-    }
     target["deadline"] = serde_json::json!(drops_now_ms() + 30000);
     let script =
         format!("window.__blinkstreamDropClaimRequest = {target};\n{TWITCH_OFFICIAL_CLAIM_SCRIPT}");
@@ -2690,14 +2603,29 @@ pub fn run() {
             drops_watch::sample_native_drops_watch,
             stop_drops_watcher,
             fetch_twitch_gql,
+            mod_tools::read_moderation_tool,
+            whispers::send_native_whisper,
+            drops_probe::read_connected_channel_rewards,
+            drops_probe::redeem_connected_channel_reward,
+            community::get_public_chat_roster,
             mount_embedded_twitch_chat,
             embedded_drops::mount_embedded_twitch_drops,
+            drops_probe::experimental_drops_status,
+            drops_probe::remember_drops_connection,
+            drops_probe::read_connected_channel_points,
+            drops_probe::mount_experimental_drops_auth,
+            drops_probe::update_experimental_drops_bounds,
+            drops_probe::disconnect_experimental_drops,
+            drops_probe::experimental_drops_probe,
+            drops_probe::claim_experimental_drop,
             embedded_drops::update_embedded_twitch_drops_bounds,
             embedded_drops::unmount_embedded_twitch_drops,
             embedded_drops::reset_embedded_twitch_drops,
             embedded_modview::mount_official_modview,
             embedded_modview::update_official_modview_bounds,
             embedded_modview::unmount_official_modview,
+            embedded_modview::set_official_modview_detached,
+            embedded_modview::get_official_modview_video_bounds,
             update_embedded_twitch_chat_bounds,
             set_embedded_twitch_chat_visible,
             unmount_embedded_twitch_chat,
@@ -2752,33 +2680,6 @@ pub fn run() {
 mod tests {
 
     use super::*;
-
-    #[test]
-    fn playback_web_session_requires_the_same_validated_twitch_identity() {
-        assert!(playback_identities_match(Some("123"), Some("123")));
-        for (app_id, web_id) in [
-            (None, Some("123")),
-            (Some("123"), None),
-            (Some("123"), Some("456")),
-            (Some(""), Some("")),
-            (Some("name"), Some("name")),
-        ] {
-            assert!(!playback_identities_match(app_id, web_id));
-        }
-    }
-
-    #[test]
-    fn streamlink_uses_its_documented_oauth_header_without_mutating_clean_args() {
-        let args = streamlink_playback_args("testchannel", Some("best"));
-        let authenticated = streamlink_authenticated_args(&args, Some("unit-test"));
-        assert_eq!(
-            authenticated.last().map(String::as_str),
-            Some("Authorization=OAuth unit-test")
-        );
-        assert!(!args.iter().any(|arg| arg.contains("Authorization=")));
-        assert_eq!(streamlink_authenticated_args(&args, None), args);
-        assert_eq!(streamlink_authenticated_args(&args, Some("")), args);
-    }
 
     #[test]
     fn playback_and_discovery_request_enhanced_broadcast_codecs() {

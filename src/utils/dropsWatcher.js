@@ -9,7 +9,7 @@ function enqueueWatchSample(channel, sample) {
   return request
 }
 
-export function watchNativeDropsPlayback(video, channel, onStatus) {
+export function watchNativeDropsPlayback(video, channel, onStatus = () => {}) {
   const cleanChannel = String(channel || '').trim().toLowerCase()
   if (!video || !isTauri() || !/^[a-z0-9_]{3,25}$/.test(cleanChannel)) return () => {}
   let disposed = false
@@ -66,24 +66,5 @@ export function watchNativeDropsPlayback(video, channel, onStatus) {
     enqueueWatchSample(cleanChannel, { ...sample(), enabled: false, active: false }).catch(error => {
       console.warn('[DropsWatch] No se pudo cerrar la sesión nativa:', String(error?.message || error))
     })
-  }
-}
-
-export async function startDropsWatcher(channel) {
-  if (!channel || !isTauri()) return
-  try {
-    const clean = String(channel).trim().toLowerCase()
-    await invoke('start_drops_watcher', { channel: clean })
-  } catch (err) {
-    console.warn('[DropsWatcher] start_drops_watcher failed:', err)
-  }
-}
-
-export async function stopDropsWatcher() {
-  if (!isTauri()) return
-  try {
-    await invoke('stop_drops_watcher')
-  } catch (err) {
-    console.warn('[DropsWatcher] stop_drops_watcher failed:', err)
   }
 }

@@ -37,6 +37,29 @@ export const DEFAULT_ICON_STYLE = ICON_STYLES[0]
 const STORAGE_KEY = 'blinkstream_custom_hsl'
 const FONT_STORAGE_KEY = 'blinkstream_custom_font'
 const ICON_STORAGE_KEY = 'blinkstream_icon_style'
+const BRAND_ICON_STORAGE_KEY = 'blinkstream_brand_icon_theme'
+export const BRAND_ICON_THEMES = [
+  { id: 'classic', name: 'Twitch Clásico', color: '#9146ff', filter: 'none' },
+  { id: 'neon', name: 'Cyberpunk Neon', color: '#ef20f5', filter: 'hue-rotate(40deg) saturate(2)' },
+  { id: 'emerald', name: 'Matrix Emerald', color: '#55df00', filter: 'hue-rotate(-140deg) saturate(2)' },
+  { id: 'prestige', name: 'Midnight Prestige', color: '#ffe600', filter: 'hue-rotate(150deg) saturate(2)' },
+  { id: 'ice', name: 'Nord Ice', color: '#00bcff', filter: 'hue-rotate(-70deg) saturate(2)' },
+  { id: 'crimson', name: 'Obsidian Crimson', color: '#ff2020', filter: 'hue-rotate(100deg) saturate(2)' },
+]
+function storedBrandIconTheme() {
+  try {
+    const value = localStorage.getItem(BRAND_ICON_STORAGE_KEY)
+    if (BRAND_ICON_THEMES.some(theme => theme.id === value)) return value
+  } catch { /* Storage may be unavailable in a restricted webview. */ }
+  return 'classic'
+}
+let currentBrandIconTheme = storedBrandIconTheme()
+export function getBrandIconTheme() { return currentBrandIconTheme }
+export function saveAndApplyBrandIconTheme(value) {
+  currentBrandIconTheme = BRAND_ICON_THEMES.some(theme => theme.id === value) ? value : 'classic'
+  try { localStorage.setItem(BRAND_ICON_STORAGE_KEY, currentBrandIconTheme) } catch { /* Keep the selection for this session. */ }
+  for (const cb of iconSubscribers) cb()
+}
 
 let currentIconWeight = DEFAULT_ICON_STYLE.weight
 const iconSubscribers = new Set()

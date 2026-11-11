@@ -330,6 +330,7 @@ export function useAuth() {
         userId: userInfo.userId || null,
         identities: [{ provider: 'twitch', identity_data: { login: username } }],
       })
+      window.dispatchEvent(new CustomEvent('blinkstream_auth_updated', { detail: { token: cleanToken, username } }))
       setAuthing(false)
       setError(null)
     } catch (err) {

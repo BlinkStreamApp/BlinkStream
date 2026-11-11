@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-connected-channel-rewards"
+description = "Enables the read_connected_channel_rewards command without any pre-configured scope."
+commands.allow = ["read_connected_channel_rewards"]
+
+[[permission]]
+identifier = "deny-read-connected-channel-rewards"
+description = "Denies the read_connected_channel_rewards command without any pre-configured scope."
+commands.deny = ["read_connected_channel_rewards"]

@@ -1,4 +1,4 @@
-const TABS = ['audit', 'users', 'activity', 'automod', 'predictions', 'rewards']
+const TABS = ['audit', 'users', 'activity', 'automod', 'predictions', 'rewards', 'unban', 'suspicious', 'terms', 'protection', 'chatTools']
 const PRESETS = ['standard', 'chat_left', 'no_player']
 
 export function normalizeModViewConfig(value) {
@@ -13,7 +13,9 @@ export function normalizeModViewConfig(value) {
     preset,
     showPlayer: typeof saved.showPlayer === 'boolean' ? saved.showPlayer : true,
     showInspector: typeof saved.showInspector === 'boolean' ? saved.showInspector : true,
+    showCommunity: typeof saved.showCommunity === 'boolean' ? saved.showCommunity : true,
     enabledTabs,
     activeTab: enabledTabs.includes(saved.activeTab) ? saved.activeTab : enabledTabs[0],
+    workWeight: Number.isFinite(saved.workWeight) ? Math.min(1.8, Math.max(0.7, saved.workWeight)) : 1,
   }
 }

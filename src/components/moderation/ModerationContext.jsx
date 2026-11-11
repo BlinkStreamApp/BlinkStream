@@ -1,10 +1,12 @@
 
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { ActionModal } from './ActionModal'
 import { useModeration } from '../../hooks/useModeration'
 import { ModerationContext } from './moderationContextValue'
-import { safeOpenUrl } from '../../utils/tauriEnv'
+import { openNativeWhisper } from '../../utils/whispers'
+import NativeWhispers from '../chat/NativeWhispers'
+import { clearChannelActivity } from '../../utils/channelActivity'
 
 export function ModerationProvider({
   children,
@@ -14,6 +16,7 @@ export function ModerationProvider({
   onToast,
 }) {
   const [actionModal, setActionModal] = useState(null)
+  useEffect(() => () => clearChannelActivity(String(userId || '')), [userId])
   const mod = useModeration({ broadcasterId, userId })
 
   const openAction = useCallback((action, target) => {
@@ -54,13 +57,7 @@ export function ModerationProvider({
         return false
       }
       case 'whisper': {
-
-        if (target.user_login) {
-          const url = `https://www.twitch.tv/popout/${target.user_login}/chat?whisper=${encodeURIComponent(target.user_login)}`
-          try { safeOpenUrl(url, false) } catch {  }
-          return true
-        }
-        return false
+        return openNativeWhisper(target)
       }
       case 'delete': {
         if (!target.message_id) {
@@ -141,6 +138,7 @@ export function ModerationProvider({
   return (
     <ModerationContext.Provider value={value}>
       {children}
+      <NativeWhispers key={userId || 'signed-out'} account={userId ? String(userId) : ''} />
       {actionModal && (
         <ActionModal
           open={actionModal.open}

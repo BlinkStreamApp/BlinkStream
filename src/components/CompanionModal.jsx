@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import QRCodeSvg from './QRCodeSvg';
 import { useT } from '../utils/i18n';
 import PhosphorIcon from './icons/PhosphorIcon';
+import BrandIcon from './icons/BrandIcon';
 
 const CompanionModal = ({ onClose }) => {
   const t = useT();
@@ -92,8 +93,8 @@ const CompanionModal = ({ onClose }) => {
 
         {}
         <div className="flex items-center gap-3 mb-4 pr-6">
-          <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-cyan-500 to-fuchsia-500 text-white shadow-lg shadow-cyan-500/30 shrink-0">
-            <PhosphorIcon name="DeviceMobile" size={26} weight="fill" />
+          <div className="p-2.5 rounded-2xl bg-purple-500/10 border border-purple-400/20 shrink-0">
+            <BrandIcon name="remote" size={30} />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">

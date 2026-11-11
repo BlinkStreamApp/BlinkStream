@@ -1,4 +1,5 @@
 import PhosphorIcon from '../icons/PhosphorIcon'
+import { useEffect, useRef } from 'react'
 
 const DOCK_TABS = [
   { id: 'audit', title: 'Mod Log', icon: 'ClockCounterClockwise', desc: 'Registro de auditoría de moderación en vivo con limpieza local.' },
@@ -7,6 +8,11 @@ const DOCK_TABS = [
   { id: 'automod', title: 'Cola de AutoMod & Bans', icon: 'ShieldCheck', desc: 'Revisión de mensajes retenidos por AutoMod y apelaciones de desbaneo.' },
   { id: 'predictions', title: 'Predicciones & Encuestas', icon: 'Coins', desc: 'Monitor en vivo de apuestas, votos y control de predicciones.' },
   { id: 'rewards', title: 'Recompensas de Puntos', icon: 'Gift', desc: 'Cola de canjes de puntos de canal pendientes de cumplir.' },
+  { id: 'unban', title: 'Desbaneos', icon: 'Heart', desc: 'Revisar y resolver solicitudes de desbaneo.' },
+  { id: 'suspicious', title: 'Sospechosos', icon: 'WarningCircle', desc: 'Eventos de seguimiento y restricción.' },
+  { id: 'terms', title: 'Términos bloqueados', icon: 'TextAa', desc: 'Consultar y gestionar términos del canal.' },
+  { id: 'protection', title: 'Protección', icon: 'SlidersHorizontal', desc: 'Consultar y ajustar el nivel de AutoMod.' },
+  { id: 'chatTools', title: 'Anuncios y mensajes fijados', icon: 'Broadcast', desc: 'Herramientas del chat con permisos de moderación.' },
 ]
 
 const LAYOUT_PRESETS = [
@@ -22,6 +28,23 @@ export function ModViewLayoutDrawer({
   onChangeConfig,
   onResetDefaults,
 }) {
+  const dialog = useRef(null)
+  useEffect(() => {
+    if (!isOpen) return
+    const previous = document.activeElement
+    const root = dialog.current
+    const focusable = () => [...root.querySelectorAll('button:not(:disabled),input,select,[tabindex="0"]')].filter(el => !el.hidden)
+    focusable()[0]?.focus()
+    const onKey = event => {
+      if (event.key === 'Escape') { event.preventDefault(); onClose?.(); return }
+      if (event.key !== 'Tab') return
+      const elements = focusable(), first = elements[0], last = elements.at(-1)
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
+    root.addEventListener('keydown', onKey)
+    return () => { root.removeEventListener('keydown', onKey); if (previous?.isConnected) previous.focus() }
+  }, [isOpen, onClose])
   if (!isOpen) return null
 
   const { showPlayer = true, showInspector = true, preset = 'standard', enabledTabs = [] } = config
@@ -45,6 +68,10 @@ export function ModViewLayoutDrawer({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in font-sans">
       <div
+        ref={dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Personalizar Vista de Moderación"
         className="w-full max-w-xl max-h-[90vh] bg-[#111119] border border-white/15 rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
         onClick={e => e.stopPropagation()}
       >

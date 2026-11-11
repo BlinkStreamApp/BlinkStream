@@ -131,6 +131,47 @@ export class TauriPlaylistLoader extends Hls.DefaultConfig.loader {
 
 // A playlist-only native loader leaves hls.js free to select its streaming FetchLoader.
 export const LIVE_HLS_TRANSPORT = Object.freeze({ pLoader: TauriPlaylistLoader, progressive: true })
+export const COMPLETED_HLS_TRANSPORT = Object.freeze({ pLoader: TauriPlaylistLoader, progressive: false })
+class PublishedPlaylistLoader extends TauriPlaylistLoader {
+  constructor(config) { super(config); this.prefetchEnabled = false }
+}
+export const PUBLISHED_LIVE_HLS_TRANSPORT = Object.freeze({ pLoader: PublishedPlaylistLoader, progressive: false })
+
+export function attachLiveTransportRecovery(hls, video, onRecovery, isFollowingLive = () => true, clock = () => performance.now()) {
+  if (!hls.config.progressive) return () => {}
+  let disposed = false, prefetchActive = false, firstErrorAt = null
+  const reset = () => { firstErrorAt = null }
+  const onLoaded = (_event, data) => {
+    const count = data.networkDetails?.blinkstreamPlaylist?.prefetchCount
+    prefetchActive = data.details?.live === true && Number.isInteger(count) && count > 0 && count <= 2
+    if (!prefetchActive) reset()
+  }
+  const onError = (_event, data) => {
+    if (disposed || data.details !== 'levelParsingError') return
+    if (!prefetchActive || video.paused || !isFollowingLive()) { reset(); return }
+    const reason = data.reason || data.error?.message
+    const sequenceMismatch = typeof reason === 'string' && /^(media sequence mismatch \d+:|discontinuity sequence mismatch \()/.test(reason)
+    if (data.fatal && !sequenceMismatch) return
+    const now = clock()
+    if (!sequenceMismatch && (firstErrorAt === null || now - firstErrorAt > 10000)) { firstErrorAt = now; return }
+    // A sequence conflict invalidates speculative delivery even if HLS escalates it.
+    dispose()
+    onRecovery()
+  }
+  const dispose = () => {
+    if (disposed) return
+    disposed = true
+    hls.off(Hls.Events.LEVEL_LOADED, onLoaded)
+    hls.off(Hls.Events.ERROR, onError)
+    hls.off(Hls.Events.DESTROYING, dispose)
+    video.removeEventListener('pause', reset)
+  }
+  hls.on(Hls.Events.LEVEL_LOADED, onLoaded)
+  hls.on(Hls.Events.ERROR, onError)
+  hls.on(Hls.Events.DESTROYING, dispose)
+  video.addEventListener('pause', reset)
+  return dispose
+}
 
 export function attachLivePlaylistBootstrap(hls, video, isFollowingLive = () => true) {
   let firstPlaylist = true
@@ -144,7 +185,9 @@ export function attachLivePlaylistBootstrap(hls, video, isFollowingLive = () => 
     const metadata = data.networkDetails?.blinkstreamPlaylist
     const duration = metadata?.segmentDuration
     const details = data.details
-    if (!details?.live || !Number.isInteger(metadata?.prefetchCount) || metadata.prefetchCount < 1 || metadata.prefetchCount > 2
+    const count = metadata?.prefetchCount
+    const supportedCount = Number.isInteger(count) && count >= 0 && count <= 2 && (count > 0 || hls.config?.progressive === false || hls.config?.pLoader === PublishedPlaylistLoader)
+    if (!details?.live || !supportedCount
       || !Number.isFinite(duration) || duration < 0.25 || duration > 30
       || !Number.isFinite(details.targetduration) || duration >= details.targetduration
       || !Number.isFinite(details.totalduration) || details.totalduration < details.targetduration * 4

@@ -1,7 +1,9 @@
 
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { createElement, useLayoutEffect, useRef } from 'react'
+import { ModActionFeed } from '../components/modview/ModActionFeed'
+import { render, screen, fireEvent, renderHook, act, waitFor } from '@testing-library/react'
 
 const banUserMock = vi.fn()
 const unbanUserMock = vi.fn()
@@ -229,7 +231,7 @@ describe('useModeration — audit log persistencia', () => {
     const { result } = renderHook(() => useModeration({ broadcasterId: 'C1', userId: 'mod1' }))
     await act(async () => { await result.current.ban('u1', 'alice') })
     await act(async () => { await result.current.ban('u2', 'bob') })
-    const stored = JSON.parse(localStorage.getItem('bs.modAudit.C1'))
+    const stored = JSON.parse(localStorage.getItem('bs.modAudit.v2.mod1.C1'))
     expect(stored).toHaveLength(2)
     expect(stored[0].targetName).toBe('alice')
     expect(stored[1].targetName).toBe('bob')
@@ -240,7 +242,7 @@ describe('useModeration — audit log persistencia', () => {
     const seed = [
       { id: '1', timestamp: 1000, action: 'ban', target: 'u1', targetName: 'old', success: true },
     ]
-    localStorage.setItem('bs.modAudit.C2', JSON.stringify(seed))
+    localStorage.setItem('bs.modAudit.v2.mod1.C2', JSON.stringify(seed))
     const { result } = renderHook(() => useModeration({ broadcasterId: 'C2', userId: 'mod1' }))
     await waitFor(() => expect(result.current.auditLog).toHaveLength(1))
     expect(result.current.auditLog[0].targetName).toBe('old')
@@ -252,7 +254,7 @@ describe('useModeration — audit log persistencia', () => {
     expect(result.current.auditLog).toHaveLength(1)
     act(() => result.current.clearAuditLog())
     expect(result.current.auditLog).toHaveLength(0)
-    expect(localStorage.getItem('bs.modAudit.C3')).toBeNull()
+    expect(localStorage.getItem('bs.modAudit.v2.mod1.C3')).toBeNull()
   })
 
   it('audit log circular: max 100 entradas', async () => {
@@ -325,4 +327,188 @@ describe('parseDuration + formatRemaining helpers', () => {
     expect(formatRemaining(-5)).toBe('00:00:00')
     expect(formatRemaining(NaN)).toBe('00:00:00')
   })
+})
+
+
+describe('useModeration — aislamiento de auditoría', () => {
+  const key = (account, channel) => `bs.modAudit.v2.${account}.${channel}`
+  const row = name => ({ id: name, timestamp: 1, action: 'ban', targetName: name })
+  beforeEach(() => {
+    localStorage.clear()
+    clearRateLimitState()
+    banUserMock.mockReset().mockResolvedValue({ success: true })
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each([
+    [{ broadcasterId: 'B', userId: 'one' }, 'one', 'B'],
+    [{ broadcasterId: 'A', userId: 'two' }, 'two', 'A'],
+    [{ broadcasterId: 'A', userId: null }, null, 'A'],
+  ])('oculta filas desde el primer render y conserva la respuesta en origen: %j', async (next, account, channel) => {
+    localStorage.setItem(key('one', 'A'), JSON.stringify([row('original')]))
+    if (account) localStorage.setItem(key(account, channel), JSON.stringify([row('other')]))
+    let resolve
+    banUserMock.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+    const renders = []
+    const { result, rerender } = renderHook(props => {
+      const mod = useModeration(props)
+      renders.push(mod.auditLog.map(r => r.targetName))
+      return mod
+    }, { initialProps: { broadcasterId: 'A', userId: 'one' } })
+    let pending
+    act(() => { pending = result.current.ban('u', 'late') })
+    renders.length = 0
+    rerender(next)
+    expect(renders[0]).toEqual([])
+    await act(async () => { resolve({ success: true }); await pending })
+    expect(result.current.auditLog.map(r => r.targetName)).toEqual(account ? ['other'] : [])
+    expect(JSON.parse(localStorage.getItem(key('one', 'A'))).map(r => r.targetName)).toEqual(['original', 'late'])
+    rerender({ broadcasterId: 'A', userId: 'one' })
+    expect(result.current.auditLog.map(r => r.targetName)).toEqual(['original', 'late'])
+  })
+
+  it('A→B→A antes de completar conserva solo las filas de A', async () => {
+    let resolve
+    banUserMock.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+    const { result, rerender } = renderHook(props => useModeration(props), { initialProps: { broadcasterId: 'A', userId: 'one' } })
+    let pending
+    act(() => { pending = result.current.ban('u', 'late') })
+    rerender({ broadcasterId: 'B', userId: 'one' })
+    await act(async () => { await result.current.ban('v', 'other') })
+    rerender({ broadcasterId: 'A', userId: 'one' })
+    await act(async () => { resolve({ success: true }); await pending })
+    expect(result.current.auditLog.map(r => r.targetName)).toEqual(['late'])
+  })
+
+  it('no importa ni borra legacy; clear y reload pertenecen a la cuenta actual', async () => {
+    const legacy = ' [ {"timestamp":1,"action":"ban"} ] '
+    localStorage.setItem('bs.modAudit.A', legacy)
+    const { result, rerender } = renderHook(props => useModeration(props), { initialProps: { broadcasterId: 'A', userId: 'one' } })
+    expect(result.current.auditLog).toEqual([])
+    await act(async () => { await result.current.ban('u', 'one') })
+    rerender({ broadcasterId: 'A', userId: 'two' })
+    act(() => result.current.clearAuditLog())
+    expect(JSON.parse(localStorage.getItem(key('one', 'A')))).toHaveLength(1)
+    localStorage.setItem(key('two', 'A'), JSON.stringify([row('two')]))
+    act(() => result.current.reloadAuditLog())
+    expect(result.current.auditLog[0].targetName).toBe('two')
+    act(() => result.current.clearAuditLog())
+    expect(result.current.auditLog).toEqual([])
+    expect(localStorage.getItem('bs.modAudit.A')).toBe(legacy)
+  })
+
+  it('dos escritores no pisan snapshots y clear se propaga', async () => {
+    const a = renderHook(() => useModeration({ broadcasterId: 'A', userId: 'one' }))
+    const b = renderHook(() => useModeration({ broadcasterId: 'A', userId: 'one' }))
+    await act(async () => { await a.result.current.ban('u', 'first'); await b.result.current.ban('v', 'second') })
+    expect(a.result.current.auditLog.map(r => r.targetName)).toEqual(['first', 'second'])
+    expect(b.result.current.auditLog).toEqual(a.result.current.auditLog)
+    act(() => b.result.current.clearAuditLog())
+    expect(a.result.current.auditLog).toEqual([])
+  })
+
+  it('almacenamiento bloqueado mantiene UX en memoria mientras está montado', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw Error('blocked') })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw Error('blocked') })
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw Error('blocked') })
+    const { result } = renderHook(() => useModeration({ broadcasterId: 'A', userId: 'one' }))
+    await act(async () => { await result.current.ban('u', 'first'); await result.current.ban('v', 'second') })
+    act(() => result.current.reloadAuditLog())
+    expect(result.current.auditLog).toHaveLength(2)
+    act(() => result.current.clearAuditLog())
+    expect(result.current.auditLog).toEqual([])
+  })
+})
+
+
+it('consumidor real: ningún commit muestra filas ajenas y el botón conserva nombre y acción accesibles', async () => {
+  localStorage.clear()
+  clearRateLimitState()
+  banUserMock.mockResolvedValue({ success: true })
+  const commits = []
+  const inspect = vi.fn()
+  let current
+  function Consumer(props) {
+    current = useModeration(props)
+    const root = useRef(null)
+    useLayoutEffect(() => { commits.push(root.current.textContent) })
+    return createElement('div', { ref: root }, createElement(ModActionFeed, { auditLog: current.auditLog, onInspectUser: inspect }))
+  }
+  const { rerender } = render(createElement(Consumer, { broadcasterId: 'A', userId: 'one' }))
+  await act(async () => { await current.ban('u', 'original') })
+  fireEvent.click(screen.getByRole('button', { name: '@original' }))
+  expect(inspect).toHaveBeenCalledWith({ username: 'original', userId: 'u' })
+  for (const props of [
+    { broadcasterId: 'B', userId: 'one' },
+    { broadcasterId: 'A', userId: 'two' },
+    { broadcasterId: 'A', userId: null },
+  ]) {
+    commits.length = 0
+    rerender(createElement(Consumer, props))
+    expect(commits.length).toBeGreaterThan(0)
+    expect(commits.every(text => !text.includes('@original'))).toBe(true)
+    expect(screen.queryByRole('button', { name: '@original' })).toBeNull()
+    rerender(createElement(Consumer, { broadcasterId: 'A', userId: 'one' }))
+  }
+})
+
+it('lectura sana y escritura bloqueada conserva acciones repetidas, clear/reload y recuperación', async () => {
+  localStorage.clear()
+  clearRateLimitState()
+  banUserMock.mockResolvedValue({ success: true })
+  const key = 'bs.modAudit.v2.one.A'
+  localStorage.setItem(key, JSON.stringify([{ id: 'old', timestamp: 1, action: 'ban', targetName: 'old' }]))
+  const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw Error('quota') })
+  const remove = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw Error('blocked') })
+  const a = renderHook(() => useModeration({ broadcasterId: 'A', userId: 'one' }))
+  const b = renderHook(() => useModeration({ broadcasterId: 'A', userId: 'one' }))
+  await act(async () => { await a.result.current.ban('u', 'first'); await b.result.current.ban('v', 'second') })
+  act(() => a.result.current.reloadAuditLog())
+  expect(a.result.current.auditLog.map(r => r.targetName)).toEqual(['old', 'first', 'second'])
+  expect(b.result.current.auditLog).toEqual(a.result.current.auditLog)
+  write.mockRestore()
+  await act(async () => { await b.result.current.ban('w', 'recovered') })
+  expect(JSON.parse(localStorage.getItem(key)).map(r => r.targetName)).toEqual(['old', 'first', 'second', 'recovered'])
+  act(() => a.result.current.clearAuditLog())
+  act(() => b.result.current.reloadAuditLog())
+  expect(b.result.current.auditLog).toEqual([])
+  remove.mockRestore()
+  await act(async () => { await b.result.current.ban('x', 'after-clear') })
+  expect(JSON.parse(localStorage.getItem(key)).map(r => r.targetName)).toEqual(['after-clear'])
+  a.unmount()
+  b.unmount()
+  const remounted = renderHook(() => useModeration({ broadcasterId: 'A', userId: 'one' }))
+  expect(remounted.result.current.auditLog.map(r => r.targetName)).toEqual(['after-clear'])
+})
+
+it('los puntos en las identidades no comparten clave entre ámbitos', async () => {
+  localStorage.clear()
+  clearRateLimitState()
+  banUserMock.mockResolvedValue({ success: true })
+  const a = renderHook(() => useModeration({ broadcasterId: 'c', userId: 'a.b' }))
+  const b = renderHook(() => useModeration({ broadcasterId: 'b.c', userId: 'a' }))
+  await act(async () => { await a.result.current.ban('u', 'first'); await b.result.current.ban('v', 'second') })
+  expect(a.result.current.auditLog.map(r => r.targetName)).toEqual(['first'])
+  expect(b.result.current.auditLog.map(r => r.targetName)).toEqual(['second'])
+  expect(JSON.parse(localStorage.getItem('bs.modAudit.v2.a%2Eb.c'))[0].targetName).toBe('first')
+  expect(JSON.parse(localStorage.getItem('bs.modAudit.v2.a.b%2Ec'))[0].targetName).toBe('second')
+})
+
+it('sin mutación pendiente combina disco fresco y libera el fallback al desmontar', async () => {
+  localStorage.clear()
+  clearRateLimitState()
+  banUserMock.mockResolvedValue({ success: true })
+  const key = 'bs.modAudit.v2.one.A'
+  const mounted = renderHook(() => useModeration({ broadcasterId: 'A', userId: 'one' }))
+  await act(async () => { await mounted.result.current.ban('u', 'first') })
+  const rows = JSON.parse(localStorage.getItem(key))
+  localStorage.setItem(key, JSON.stringify([...rows, { id: 'external', timestamp: 1, action: 'ban', targetName: 'external' }]))
+  await act(async () => { await mounted.result.current.ban('v', 'second') })
+  expect(mounted.result.current.auditLog.map(r => r.targetName)).toEqual(['first', 'external', 'second'])
+  const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw Error('quota') })
+  await act(async () => { await mounted.result.current.ban('w', 'memory-only') })
+  mounted.unmount()
+  write.mockRestore()
+  const remounted = renderHook(() => useModeration({ broadcasterId: 'A', userId: 'one' }))
+  expect(remounted.result.current.auditLog.map(r => r.targetName)).toEqual(['first', 'external', 'second'])
 })

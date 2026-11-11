@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Hls from 'hls.js'
 import { invoke } from '@tauri-apps/api/core'
-import { LIVE_HLS_TRANSPORT, prepareLivePlaylist, TauriPlaylistLoader } from './tauriHls'
+import { LIVE_HLS_TRANSPORT, PUBLISHED_LIVE_HLS_TRANSPORT, COMPLETED_HLS_TRANSPORT, prepareLivePlaylist, TauriPlaylistLoader } from './tauriHls'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 const base = 'https://video.example.ttvnw.net/live/index.m3u8?private=redacted'
@@ -9,10 +9,44 @@ const playlist = '#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXT-X-MEDIA-SEQUENCE:12\n#E
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('Twitch progressive playlist transport', () => {
+  it('loads complete published segments without progressive chunks or speculative sequence numbers', async () => {
+    const hls = new Hls(PUBLISHED_LIVE_HLS_TRANSPORT)
+    const loader = new hls.config.pLoader(hls.config)
+    try {
+      expect(hls.config.progressive).toBe(false)
+      expect(hls.config.loader).toBe(Hls.DefaultConfig.loader)
+      invoke.mockResolvedValue(playlist)
+      const onSuccess = vi.fn()
+      loader.load({ type: 'level', url: base }, { timeout: 500 }, { onSuccess, onError: vi.fn(), onTimeout: vi.fn() })
+      await vi.waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
+      const result = onSuccess.mock.calls[0]
+      expect(result[3].blinkstreamPlaylist.prefetchCount).toBe(0)
+      expect(result[0].data.match(/#EXTINF:/g)).toHaveLength(2)
+      expect(result[0].data).toContain('#EXT-X-MEDIA-SEQUENCE:12')
+      expect(result[0].data).toContain('#EXT-X-TWITCH-PREFETCH:14.ts')
+    } finally { loader.destroy(); hls.destroy() }
+  })
   it('leaves segment fetching to the built-in streaming loader', () => {
     const hls = new Hls(LIVE_HLS_TRANSPORT)
     try { expect(hls.config.progressive).toBe(true); expect(hls.config.loader).not.toBe(TauriPlaylistLoader); expect(hls.config.pLoader).toBe(TauriPlaylistLoader) }
     finally { hls.destroy() }
+  })
+  it('keeps the native playlist boundary but disables progressive and speculative fragments in the comparison profile', async () => {
+    const hls = new Hls(COMPLETED_HLS_TRANSPORT)
+    const loader = new TauriPlaylistLoader(hls.config)
+    try {
+      expect(hls.config.progressive).toBe(false)
+      expect(hls.config.pLoader).toBe(TauriPlaylistLoader)
+      expect(hls.config.loader).not.toBe(TauriPlaylistLoader)
+      expect(hls.config.loader).toBe(Hls.DefaultConfig.loader)
+      invoke.mockResolvedValue(playlist)
+      const onSuccess = vi.fn()
+      loader.load({ type: 'level', url: base }, { timeout: 500 }, { onSuccess, onError: vi.fn(), onTimeout: vi.fn() })
+      await vi.waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
+      expect(onSuccess.mock.calls[0][3].blinkstreamPlaylist.prefetchCount).toBe(0)
+      expect(onSuccess.mock.calls[0][0].data).toContain('#EXT-X-TWITCH-PREFETCH:14.ts')
+      expect(onSuccess.mock.calls[0][0].data).not.toContain('#EXTINF:2.000000,')
+    } finally { loader.destroy(); hls.destroy() }
   })
   it('exposes two CDN prefetch segments with measured duration', () => {
     const result = prepareLivePlaylist(playlist, base, true)

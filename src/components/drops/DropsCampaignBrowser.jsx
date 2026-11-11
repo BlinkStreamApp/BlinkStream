@@ -4,11 +4,11 @@ import { filterDropCampaigns, getDropState, getDropsProgress } from '../../utils
 
 const filters = ['all', 'available', 'progress', 'claimable', 'claimed']
 
-export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimingIds, claimBlocked, claimDrop, openOfficialInventory }) {
+export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimingIds = new Set(), claimBlocked, claimDrop, openOfficialInventory, readOnly = false, initialFilter = 'all', claimDisabled = false }) {
   const t = useT()
   const searchId = useId()
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState(initialFilter)
   const [targetId, setTargetId] = useState(null)
   const [selectedGame, setSelectedGame] = useState(null)
   const backRef = useRef(null)
@@ -98,8 +98,8 @@ export default function DropsCampaignBrowser({ campaigns, lastUpdatedAt, claimin
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
-                {state === 'claimable' ? <button type="button" onClick={() => claimBlocked ? openOfficialInventory() : claimDrop(drop.dropInstanceId, drop.benefitName)}
-                  disabled={claimingIds.size > 0} className="rounded-lg bg-purple-600 px-3 py-1.5 font-bold text-white hover:bg-purple-500 disabled:opacity-40 cursor-pointer">
+                {state === 'claimable' && !readOnly ? <button type="button" onClick={() => claimBlocked ? openOfficialInventory() : claimDrop(drop.dropInstanceId, drop.benefitName)}
+                  disabled={claimDisabled || claimingIds.size > 0} className="rounded-lg bg-purple-600 px-3 py-1.5 font-bold text-white hover:bg-purple-500 disabled:opacity-40 cursor-pointer">
                   {t(claimingIds.has(drop.dropInstanceId) ? 'drops.center.claiming' : claimBlocked ? 'drops.center.claimOfficial' : 'drops.center.claim')}
                 </button> : <span className={state === 'claimed' ? 'text-emerald-400' : 'text-text-muted'}>{t(`drops.state.${state}`)}</span>}
                 {state === 'progress' && <span className="text-text-muted">{t('drops.center.remaining').replace('{minutes}', Math.max(0, drop.requiredMinutes - drop.currentMinutes))}</span>}

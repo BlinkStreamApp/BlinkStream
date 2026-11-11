@@ -85,7 +85,7 @@ export function SettingsModerationTab() {
 
       <div className="border-t border-bg-tertiary/50 pt-4">
         <p className="text-[11px] text-text-muted/50 leading-relaxed">
-          El audit log de acciones se guarda localmente por canal (clave <code>bs.modAudit.&lt;channelId&gt;</code>) y nunca abandona tu dispositivo.
+          El audit log de acciones se guarda localmente por cuenta y canal (clave <code>bs.modAudit.v2.&lt;accountId&gt;.&lt;channelId&gt;</code>) y nunca abandona tu dispositivo.
         </p>
       </div>
     </div>

@@ -12,7 +12,7 @@ import {
 import { useT } from '../../utils/i18n'
 import { ModDataNotice } from './ModDataNotice'
 
-export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, isLoggedIn = true, onLoginWithToken }) {
+export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, isLoggedIn = true, onLoginWithToken, canManage = true, publicActivity }) {
   const t = useT()
   const [subTab, setSubTab] = useState('predictions') // 'predictions' | 'polls'
   const [predictions, setPredictions] = useState([])
@@ -22,6 +22,9 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
   const [actionPending, setActionPending] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [readError, setReadError] = useState(null)
+  const usePublic = Boolean(publicActivity && !canManage)
+  const visiblePredictions = usePublic ? publicActivity.predictions : predictions
+  const visiblePolls = usePublic ? publicActivity.polls : polls
 
   // Form State for creating prediction
   const [predTitle, setPredTitle] = useState('')
@@ -35,7 +38,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
   const [pollDuration, setPollDuration] = useState(60)
 
   const loadData = useCallback(async () => {
-    if (!broadcasterId || !isLoggedIn) return
+    if (!broadcasterId || !isLoggedIn || usePublic) return
     setLoading(true)
     setStatusMessage('')
     setReadError(null)
@@ -61,7 +64,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
       setReadError(error || {})
     }
     setLoading(false)
-  }, [broadcasterId, subTab, isLoggedIn, token])
+  }, [broadcasterId, subTab, isLoggedIn, token, usePublic])
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -72,6 +75,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
 
   const handleCreatePrediction = async (e) => {
     e.preventDefault()
+    if (!canManage || actionPending) return
     if (!predTitle.trim() || !predOutcome1.trim() || !predOutcome2.trim()) return
     setActionPending(true)
     setStatusMessage('')
@@ -99,6 +103,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
   }
 
   const handleResolvePrediction = async (predictionId, status, winningOutcomeId) => {
+    if (!canManage || actionPending) return
     setActionPending(true)
     setStatusMessage('')
     const res = await resolvePrediction(broadcasterId, predictionId, status, winningOutcomeId, token)
@@ -112,6 +117,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
 
   const handleCreatePoll = async (e) => {
     e.preventDefault()
+    if (!canManage || actionPending) return
     const validChoices = pollChoices.map(c => c.trim()).filter(Boolean)
     if (!pollTitle.trim() || validChoices.length < 2) return
     setActionPending(true)
@@ -140,6 +146,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
   }
 
   const handleEndPoll = async (pollId) => {
+    if (!canManage || actionPending) return
     setActionPending(true)
     const res = await endPoll(broadcasterId, pollId, 'TERMINATED', token)
     if (res.success) {
@@ -180,6 +187,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowCreateModal(p => !p)}
+            disabled={!canManage}
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-twitch hover:bg-twitch-glow text-white text-xs font-semibold transition-all cursor-pointer shadow-sm shadow-twitch/30"
           >
             <PhosphorIcon name="Plus" size={13} weight="bold" />
@@ -187,7 +195,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
           </button>
           <button
             onClick={loadData}
-            disabled={loading}
+            disabled={loading || usePublic}
             className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             title={t('player.retry', 'Recargar')}
           >
@@ -196,7 +204,9 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
         </div>
       </div>
 
-      <ModDataNotice error={readError} />
+      <p role="status" aria-live="polite" className={usePublic && publicActivity.possibleGap ? 'native-mod-notice' : undefined}>{usePublic && publicActivity.possibleGap ? t('channel.activity.possibleGap') : ''}</p>
+      {!usePublic && <ModDataNotice error={readError} />}
+      {usePublic && <p className="native-mod-notice">{t(`channel.activity.${publicActivity.state}`)} · {t('channel.activity.sessionOnly')}</p>}
       {statusMessage && (
         <div className="px-3 py-2 bg-purple-950/40 border-b border-purple-500/20 text-[11px] text-purple-200 flex items-center justify-between gap-2 animate-fade-in">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -285,7 +295,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
                 </select>
                 <button
                   type="submit"
-                  disabled={actionPending}
+                  disabled={actionPending || !canManage}
                   className="px-3 py-1 bg-gradient-to-r from-twitch to-purple-600 hover:from-twitch-glow hover:to-purple-500 text-white rounded-lg text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
                 >
                   Iniciar Predicción
@@ -349,7 +359,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
                 </select>
                 <button
                   type="submit"
-                  disabled={actionPending}
+                  disabled={actionPending || !canManage}
                   className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
                 >
                   Iniciar Encuesta
@@ -386,15 +396,15 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
             <div className="w-5 h-5 border-2 border-twitch border-t-transparent rounded-full animate-spin mr-2" />
             <span>Cargando {subTab === 'predictions' ? 'predicciones' : 'encuestas'}...</span>
           </div>
-        ) : readError ? null : subTab === 'predictions' ? (
-          predictions.length === 0 ? (
+        ) : readError && !usePublic ? null : subTab === 'predictions' ? (
+          visiblePredictions.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-6 text-center text-text-muted select-none">
               <PhosphorIcon name="Coins" size={24} className="text-white/20 mb-2" />
-              <p className="text-xs font-semibold text-white/70">{t('mod.pred.empty', 'Sin predicciones recientes')}</p>
-              <p className="text-[10px] text-text-muted mt-0.5">Usa "+ Nueva" para iniciar una predicción para tu chat.</p>
+              <p className="text-xs font-semibold text-white/70">{usePublic ? t('channel.activity.waitingPrediction') : t('mod.pred.empty', 'Sin predicciones recientes')}</p>
+              {!usePublic && <p className="text-[10px] text-text-muted mt-0.5">Usa "+ Nueva" para iniciar una predicción para tu chat.</p>}
             </div>
           ) : (
-            predictions.map(pred => {
+            visiblePredictions.map(pred => {
               const isActive = pred.status === 'ACTIVE' || pred.status === 'LOCKED'
               const outcomes = pred.outcomes || []
               const totalPoints = outcomes.reduce((acc, o) => acc + (o.channel_points || 0), 0)
@@ -436,7 +446,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
                         <button
                           key={o.id}
                           onClick={() => handleResolvePrediction(pred.id, 'RESOLVED', o.id)}
-                          disabled={actionPending}
+                          disabled={actionPending || !canManage}
                           className="px-2 py-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 text-green-300 rounded-lg text-[10px] font-bold cursor-pointer transition-all disabled:opacity-50"
                         >
                           ✓ Ganó "{o.title}"
@@ -444,7 +454,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
                       ))}
                       <button
                         onClick={() => handleResolvePrediction(pred.id, 'CANCELED', null)}
-                        disabled={actionPending}
+                        disabled={actionPending || !canManage}
                         className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 rounded-lg text-[10px] font-semibold cursor-pointer transition-all disabled:opacity-50"
                       >
                         ✕ Cancelar
@@ -456,14 +466,14 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
             })
           )
         ) : (
-          polls.length === 0 ? (
+          visiblePolls.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-6 text-center text-text-muted select-none">
               <PhosphorIcon name="ChartBar" size={24} className="text-white/20 mb-2" />
-              <p className="text-xs font-semibold text-white/70">{t('mod.poll.empty', 'Sin encuestas recientes')}</p>
-              <p className="text-[10px] text-text-muted mt-0.5">Usa "+ Nueva" para lanzar una encuesta en el canal.</p>
+              <p className="text-xs font-semibold text-white/70">{usePublic ? t('channel.activity.waitingPoll') : t('mod.poll.empty', 'Sin encuestas recientes')}</p>
+              {!usePublic && <p className="text-[10px] text-text-muted mt-0.5">Usa "+ Nueva" para lanzar una encuesta en el canal.</p>}
             </div>
           ) : (
-            polls.map(poll => {
+            visiblePolls.map(poll => {
               const isActive = poll.status === 'ACTIVE'
               const choices = poll.choices || []
               const totalVotes = choices.reduce((acc, c) => acc + (c.votes || 0), 0)
@@ -505,7 +515,7 @@ export function PredictionsPollsPanel({ channel, broadcasterId, _userId, token, 
                     <div className="flex items-center justify-end pt-1">
                       <button
                         onClick={() => handleEndPoll(poll.id)}
-                        disabled={actionPending}
+                        disabled={actionPending || !canManage}
                         className="text-[10px] text-amber-400 hover:text-amber-300 hover:underline cursor-pointer"
                       >
                         ⏹️ Finalizar Encuesta

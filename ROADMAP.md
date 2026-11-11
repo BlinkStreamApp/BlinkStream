@@ -9,13 +9,13 @@ fixes and incremental improvements; larger MINOR milestones are agreed separatel
 
 ## Implementation initiative — 2026-11-04
 
-The requested StreamNook-inspired work is scoped in
-[the implementation plan](docs/STREAMNOOK_IMPLEMENTATION_PLAN.md): close 1.5.4,
-correct the viewer redemption contract, validate actual Drops/points capabilities,
-then deliver a rewards center and supported points actions. Standalone lightweight
-chat, Grid audio focus/workspaces, command palette, private chat preferences and an
-OBS overlay follow as separate increments. Private Twitch transports require real
-validation and retain an official fallback; source inspection is not delivery proof.
+Close 1.5.4 with redesigned Mod View, Community, native whispers, profiles,
+playback controls and verified chat improvements. On 2026-11-11 the user confirmed
+Activity search, filters and a real interruption notice in candidate 63. This
+acceptance is limited to the observed session. Official Drops catalog/inventory
+remain the fallback; native catalog, Auto-Claim and native redemption require the
+experimental compile-time flag and are excluded from Store. Public downloads and
+updater remain on verified 1.5.3 until 1.5.4 signatures and gates are confirmed.
 
 Candidate progress (2026-11-04): the user confirmed 3→27 watched minutes matching
 Twitch's official inventory for one campaign. The first Drops center now groups

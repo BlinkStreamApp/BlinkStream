@@ -3,6 +3,7 @@ import { fetchCategories, fetchCategoryStreams } from '../utils/categories'
 import { useCategoryFeed } from '../hooks/useCategoryFeed'
 import { useT, getLanguage } from '../utils/i18n'
 import PhosphorIcon from './icons/PhosphorIcon'
+import BrandIcon from './icons/BrandIcon'
 import { getJSON, setJSON } from '../utils/storage'
 import { categoryPreferencesKey, normalizeCategoryPreferences, changeCategoryPreferences, visibleCategories } from '../utils/categoryPreferences'
 
@@ -174,7 +175,7 @@ function CategoryExplorerContent({ onSelect, owner }) {
         </h3>
         <div className="flex flex-wrap items-center gap-2.5">
           <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-bg-tertiary/70 py-1.5 pl-3 pr-1.5 text-xs font-medium text-text-secondary">
-            <PhosphorIcon name="GlobeHemisphereWest" size={16} className="text-twitch-light" />{t('set.language', 'Idioma')}
+            <BrandIcon name="language" size={20} />{t('set.language', 'Idioma')}
             <select value={language} onChange={event => setLanguage(event.target.value)} className="max-w-[180px] rounded-lg bg-bg-tertiary px-2 py-1.5 text-[13px] font-semibold text-text-primary focus-visible:outline-2 focus-visible:outline-twitch">
               <option value="">{t('browse.allLanguages', 'Todos los idiomas')}</option>
               {languages.map(([code]) => <option key={code} value={code}>{languageName(code)}</option>)}

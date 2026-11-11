@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { getUserByLogin } from '../../utils/twitch'
 import { useT } from '../../utils/i18n'
+import { openNativeWhisper } from '../../utils/whispers'
 
 export function UserInspectorCard({
   targetUser,
@@ -20,6 +21,15 @@ export function UserInspectorCard({
   const [searchQuery, setSearchQuery] = useState('')
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const [profileResult, setProfileResult] = useState(null)
+  const login = targetUser?.username || targetUser?.user_login || ''
+  useEffect(() => {
+    if (!login) return
+    let cancelled = false
+    getUserByLogin(login).then(result => { if (!cancelled && result?.success && result.value) setProfileResult({ login, data: result.value }) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [login])
+  const profile = profileResult?.login === login ? profileResult.data : null
 
   const recentChatters = useMemo(() => {
     const map = new Map()
@@ -214,9 +224,9 @@ export function UserInspectorCard({
     <div className="h-full flex flex-col bg-[#111119]/95 border border-white/15 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-xl animate-fade-in">
       <div className="p-3 border-b border-white/10 bg-white/5 flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-twitch to-purple-800 flex items-center justify-center font-bold text-white text-sm shrink-0 border border-white/20 shadow-md">
-            {targetUser.avatar ? (
-              <img src={targetUser.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-twitch to-purple-800 flex items-center justify-center font-bold text-white text-lg shrink-0 border border-white/20 shadow-md">
+            {profile?.profile_image_url || targetUser.avatar ? (
+              <img src={profile?.profile_image_url || targetUser.avatar} alt={targetUser.displayName || login} className="w-full h-full rounded-full object-cover" />
             ) : (
               targetUser.username.charAt(0).toUpperCase()
             )}
@@ -251,6 +261,10 @@ export function UserInspectorCard({
       </div>
 
       <div className="p-3 border-b border-white/10 bg-black/20 space-y-2 shrink-0">
+        {profile?.description && <p className="text-xs text-text-secondary whitespace-pre-wrap break-words">{profile.description}</p>}
+        {profile?.created_at && <p className="text-xs text-text-muted">{t('profile.created')} {new Date(profile.created_at).toLocaleDateString()}</p>}
+        {profile?.broadcaster_type && <p className="text-xs text-twitch-glow">{profile.broadcaster_type === 'partner' ? 'Partner' : 'Affiliate'}</p>}
+        <button type="button" onClick={() => openNativeWhisper(targetUser)} className="flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-xs hover:bg-white/10 cursor-pointer"><PhosphorIcon name="ChatCircleDots" size={16} />{t('whisper.open')}</button>
         <div className="flex items-center justify-between">
           <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">{t('mod.inspector.quickSanctions', 'Sanciones Rápidas')}</span>
           <button

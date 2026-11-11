@@ -3,6 +3,25 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 const STORAGE_KEY = 'blinkstream_audio_night_mode'
 const elementAudioMap = new WeakMap()
 
+function retainAudioBundle(video) {
+  const bundle = video && elementAudioMap.get(video)
+  if (!bundle) return undefined
+  bundle.users++
+  return () => {
+    bundle.users--
+    // StrictMode can reacquire the element before deferred cleanup runs.
+    queueMicrotask(() => {
+      if (bundle.users || elementAudioMap.get(video) !== bundle) return
+      bundle.removeGesture?.()
+      bundle.source.disconnect()
+      bundle.compressor.disconnect()
+      bundle.gain.disconnect()
+      void bundle.ctx.close().catch(() => {})
+      elementAudioMap.delete(video)
+    })
+  }
+}
+
 export function useAudioCompressor(videoRef) {
   const [isNightMode, setIsNightMode] = useState(() => {
     try {
@@ -44,7 +63,7 @@ export function useAudioCompressor(videoRef) {
         compressor.connect(gain)
         gain.connect(ctx.destination)
 
-        bundle = { ctx, source, compressor, gain }
+        bundle = { ctx, source, compressor, gain, users: 0, removeGesture: null }
         elementAudioMap.set(video, bundle)
       }
 
@@ -54,6 +73,7 @@ export function useAudioCompressor(videoRef) {
 
       // Resume context if suspended
       if (bundle.ctx.state === 'suspended') {
+        bundle.removeGesture?.()
         const handleUserGesture = () => {
           bundle.ctx.resume().catch(() => {})
           window.removeEventListener('click', handleUserGesture)
@@ -61,6 +81,10 @@ export function useAudioCompressor(videoRef) {
         }
         window.addEventListener('click', handleUserGesture, { once: true })
         window.addEventListener('keydown', handleUserGesture, { once: true })
+        bundle.removeGesture = () => {
+          window.removeEventListener('click', handleUserGesture)
+          window.removeEventListener('keydown', handleUserGesture)
+        }
       }
     } catch (e) {
       console.warn('[useAudioCompressor] Failed to initialize Web Audio graph:', e)
@@ -100,13 +124,27 @@ export function useAudioCompressor(videoRef) {
     }
   }, [isNightMode, setupAudioNodes])
 
+  useEffect(() => retainAudioBundle(videoRef?.current), [videoRef])
+
   const toggleNightMode = useCallback(() => {
     setIsNightMode(prev => !prev)
+  }, [])
+
+  const readAudioDiagnostics = useCallback(() => {
+    const context = audioCtxRef.current
+    if (!context) return null
+    return {
+      state: context.state,
+      currentTime: context.currentTime,
+      baseLatency: context.baseLatency,
+      outputLatency: context.outputLatency,
+    }
   }, [])
 
   return {
     isNightMode,
     toggleNightMode,
     setNightMode: setIsNightMode,
+    readAudioDiagnostics,
   }
 }

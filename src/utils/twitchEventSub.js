@@ -9,7 +9,7 @@ const REDEMPTION_TYPES = [
 ]
 
 // Owns every socket, request and timer for one mounted consumer.
-export function startRewardEventSub({ broadcasterId, token, onRedemption, onStatus }) {
+export function startRewardEventSub({ broadcasterId, token, onRedemption, onStatus, moderation }) {
   let stopped = false
   let activeSocket = null
   let migrationSocket = null
@@ -104,7 +104,8 @@ export function startRewardEventSub({ broadcasterId, token, onRedemption, onStat
           return // Twitch transfers existing subscriptions during a handoff.
         }
         try {
-          const responses = await Promise.all(REDEMPTION_TYPES.map(subscriptionType => request(SUBSCRIPTION_URL, {
+          const topics = moderation ? moderation.topics : REDEMPTION_TYPES.map(type => ({ type, version: '1', condition: { broadcaster_user_id: String(broadcasterId) } }))
+          const responses = await Promise.all(topics.map(topic => request(SUBSCRIPTION_URL, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${authorization.token}`,
@@ -112,14 +113,19 @@ export function startRewardEventSub({ broadcasterId, token, onRedemption, onStat
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              type: subscriptionType,
-              version: '1',
-              condition: { broadcaster_user_id: String(broadcasterId) },
+              type: topic.type,
+              version: topic.version,
+              condition: topic.condition,
               transport: { method: 'websocket', session_id: session.id },
             }),
-          })))
+          }).catch(() => ({ ok: false, status: 0 }))))
           if (stopped || !connections.has(socket)) return
-          if (responses.some(response => response.status === 401 || response.status === 403)) {
+          if (moderation) {
+            moderation.onTopics?.(topics.map((topic, index) => ({ type: topic.type, status: responses[index].status })))
+            if (responses.some(response => response.ok)) { retryDelay = 1000; status('connected') }
+            else if (responses.some(response => response.status === 0 || response.status === 429 || response.status >= 500)) retry()
+            else unavailable('Sin permisos para los eventos de moderación.')
+          } else if (responses.some(response => response.status === 401 || response.status === 403)) {
             unavailable('Renueva la sesión del creador con permisos para recibir canjes.')
           } else if (responses.some(response => !response.ok)) {
             retry()
@@ -133,6 +139,17 @@ export function startRewardEventSub({ broadcasterId, token, onRedemption, onStat
         if (type !== 'notification') return
         const subscriptionType = message.payload?.subscription?.type
         const event = message.payload?.event
+        if (moderation) {
+          const id = message.metadata.message_id
+          const matchesOwner = subscriptionType === 'user.whisper.message'
+            ? String(event?.to_user_id) === String(moderation.userId)
+            : String(event?.broadcaster_user_id || event?.to_broadcaster_user_id) === String(broadcasterId)
+          if (!moderation.topics.some(t => t.type === subscriptionType) || !event || !matchesOwner || !id || seenMessages.has(id)) return
+          seenMessages.add(id)
+          if (seenMessages.size > 500) seenMessages.delete(seenMessages.values().next().value)
+          moderation.onEvent?.({ id, type: subscriptionType, event, timestamp: message.metadata.message_timestamp })
+          return
+        }
         if (!REDEMPTION_TYPES.includes(subscriptionType) || !event?.id ||
           String(event.broadcaster_user_id) !== String(broadcasterId)) return
         const messageId = message.metadata.message_id
@@ -156,6 +173,10 @@ export function startRewardEventSub({ broadcasterId, token, onRedemption, onStat
         } catch { retry(); return }
         connect(reconnectUrl, authorization, true)
       } else if (type === 'revocation') {
+        if (moderation) {
+          moderation.onTopics?.([{ type: message.payload?.subscription?.type, status: 403 }])
+          return
+        }
         unavailable('Twitch ha retirado el permiso para recibir canjes. Renueva la sesión del creador.')
       }
     }
@@ -187,6 +208,12 @@ export function startRewardEventSub({ broadcasterId, token, onRedemption, onStat
       const identity = response.data
       if (stopped) return
       if (!identity) { retry(); return }
+      if (moderation) {
+        if (String(identity.user_id) !== String(moderation.userId) || !identity.client_id) { unavailable('La cuenta de moderación no coincide.'); return }
+        moderation.onIdentity?.({ scopes: identity.scopes || [], userId: identity.user_id })
+        connect(SOCKET_URL, { token: cleanToken, clientId: identity.client_id })
+        return
+      }
       if (String(identity.user_id) !== String(broadcasterId)) {
         unavailable('Los avisos de canjes requieren la autorización del creador del canal. Puedes consultar el chat oficial.'); return
       }

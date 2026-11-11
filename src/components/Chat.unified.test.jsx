@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Chat from './Chat'
 import { banUser } from '../utils/twitch'
 import { openTwitchChatPopoutWindow } from '../utils/twitchPopout'
+import { recordConfirmedViewerRedemption, clearChannelActivity } from '../utils/channelActivity'
 
 vi.mock('../utils/twitch', () => ({ PUBLIC_CLIENT_ID: 'test-client', sanitizeChannelForGraphQL: value => value, getHeaders: vi.fn(async () => ({})), banUser: vi.fn(), unbanUser: vi.fn(), clearChatMessages: vi.fn(), updateChatSettings: vi.fn(), getUserIdByLogin: vi.fn() }))
 vi.mock('../utils/tauriEnv', () => ({ isTauri: () => false, safeOpenUrl: vi.fn() }))
@@ -41,7 +42,16 @@ describe('unified native Chat', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
     vi.mocked(banUser).mockClear()
   })
-  afterEach(() => { vi.unstubAllGlobals() })
+  afterEach(() => { clearChannelActivity('1'); vi.unstubAllGlobals() })
+
+  it('renders a confirmed native redemption even when Twitch sends no IRC message', async () => {
+    render(<Chat {...props} channels={undefined} broadcasterId="2" userId="1" />)
+    await start()
+    act(() => recordConfirmedViewerRedemption({ accountId: '1', account: 'alice', channelId: '2', channel: 'alpha' }, { id: 'reward', title: 'Hydration test', cost: 100 }, 'a'.repeat(32), 'Water please'))
+    expect(await screen.findByText(/Hydration test/)).toBeInTheDocument()
+    expect(screen.getByRole('log')).toHaveTextContent('Hydration test')
+    expect(FakeSocket.instances).toHaveLength(1)
+  })
 
   it('joins each room once, routes by origin and keeps arrival order', async () => {
     render(<Chat {...props} channels={['alpha', 'beta', 'alpha']} />)
@@ -325,5 +335,79 @@ describe('unified native Chat', () => {
     expect(within(screen.getByRole('log')).getByText('entry 509')).toBeInTheDocument()
     expect(screen.getByText('Resultados: 1')).toBeInTheDocument()
     expect(onMessagesUpdate).not.toHaveBeenCalled()
+  })
+  it.each(['USERSTATE', 'GLOBALUSERSTATE'])('keeps payload %s as ordinary chat without trusted role', async (word) => {
+    render(<Chat {...props} />)
+    const socket = await start()
+    act(() => socket.receive('@user-id=123 :tmi.twitch.tv GLOBALUSERSTATE\r\n'))
+    const detected = vi.fn()
+    window.addEventListener('bs:user-role-detected', detected)
+    try {
+      act(() => socket.receive(message('alpha', 'payload', 'hello ' + word + ' everyone').replace('badges= ', 'badges=moderator/1;mod=1 ')))
+      expect(await screen.findByText('hello ' + word + ' everyone')).toBeInTheDocument()
+      expect(detected).not.toHaveBeenCalled()
+    } finally { window.removeEventListener('bs:user-role-detected', detected) }
+  })
+
+  it('binds trusted USERSTATE to authenticated socket identity and drops stale socket frames', async () => {
+    const detected = vi.fn()
+    window.addEventListener('bs:user-role-detected', detected)
+    const { rerender } = render(<Chat {...props} />)
+    try {
+      const first = await start()
+      detected.mockClear()
+      const state = '@badges=moderator/1;mod=1 :tmi.twitch.tv USERSTATE #alpha\r\n'
+      act(() => first.receive(state))
+      expect(detected).not.toHaveBeenCalled()
+      act(() => first.receive('@user-id=123 :reader!r@r GLOBALUSERSTATE\r\n' + state))
+      expect(detected).not.toHaveBeenCalled()
+      act(() => first.receive('@user-id=123 :tmi.twitch.tv GLOBALUSERSTATE\r\n' + state))
+      expect(detected).toHaveBeenCalledTimes(1)
+      expect(detected.mock.calls[0][0].detail).toEqual(expect.objectContaining({ channel: 'alpha', userId: '123', role: 'mod' }))
+      expect(Object.keys(detected.mock.calls[0][0].detail).sort()).toEqual(['channel', 'isBroadcaster', 'isModerator', 'isVip', 'role', 'userId'])
+      rerender(<Chat {...props} twitchToken="other-token" twitchUsername="other-viewer" />)
+      await waitFor(() => expect(FakeSocket.instances).toHaveLength(2))
+      detected.mockClear()
+      const second = FakeSocket.instances[1]
+      act(() => { second.open(); first.receive(state); second.receive(state) })
+      expect(detected).not.toHaveBeenCalled()
+      act(() => second.receive('@user-id=456 :tmi.twitch.tv GLOBALUSERSTATE\r\n' + state))
+      expect(detected.mock.calls[0][0].detail.userId).toBe('456')
+      detected.mockClear()
+      rerender(<Chat {...props} twitchToken="" twitchUsername="" />)
+      await waitFor(() => expect(FakeSocket.instances).toHaveLength(3))
+      const guest = FakeSocket.instances[2]
+      act(() => { guest.open(); guest.receive('@user-id=789 :tmi.twitch.tv GLOBALUSERSTATE\r\n' + state) })
+      expect(detected).not.toHaveBeenCalled()
+    } finally { window.removeEventListener('bs:user-role-detected', detected) }
+  })
+  it('requires a fresh GLOBALUSERSTATE after a same-account reconnect', async () => {
+    render(<Chat {...props} />)
+    const first = await start()
+    expect(first.send).toHaveBeenCalledWith('PASS oauth:test-token')
+    expect(first.send).toHaveBeenCalledWith('NICK viewer')
+    const detected = vi.fn()
+    window.addEventListener('bs:user-role-detected', detected)
+    try {
+      const state = '@badges=moderator/1;mod=1 :tmi.twitch.tv USERSTATE #alpha\r\n'
+      act(() => first.receive('@user-id=123 :tmi.twitch.tv GLOBALUSERSTATE\r\n' + state))
+      expect(detected.mock.calls.at(-1)[0].detail.userId).toBe('123')
+      act(() => { first.readyState = 3; first.onclose() })
+      await waitFor(() => expect(FakeSocket.instances).toHaveLength(2), { timeout: 2000 })
+      const second = FakeSocket.instances[1]
+      detected.mockClear()
+      act(() => { second.open(); first.receive(state); second.receive(state) })
+      expect(detected).not.toHaveBeenCalled()
+      for (const id of ['', 'abc', '0', '123x']) {
+        act(() => second.receive('@user-id=' + id + ' :tmi.twitch.tv GLOBALUSERSTATE\r\n' + state))
+        expect(detected).not.toHaveBeenCalled()
+      }
+      act(() => second.receive('@user-id=123 :tmi.twitch.tv GLOBALUSERSTATE\r\n'))
+      act(() => second.receive(state.replace(':tmi.twitch.tv', ':reader!r@r') + state.replace('#alpha', '#outside')))
+      expect(detected).not.toHaveBeenCalled()
+      act(() => second.receive(state))
+      expect(detected).toHaveBeenCalledTimes(1)
+      expect(detected.mock.calls[0][0].detail).toMatchObject({ userId: '123', channel: 'alpha', role: 'mod' })
+    } finally { window.removeEventListener('bs:user-role-detected', detected) }
   })
 })

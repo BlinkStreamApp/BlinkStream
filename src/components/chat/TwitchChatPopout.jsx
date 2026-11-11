@@ -27,53 +27,67 @@ export function TwitchChatPopout({
     if (!isTauri() || !cleanChannel) return
 
     let isMounted = true
+    let nativeMounted = false
+    let syncQueue = Promise.resolve()
 
-    const syncBounds = async (forceMount = false) => {
-      if (!containerRef.current || !isMounted) return
-      const hasModal = isOverlayModalOpenRef.current || Boolean(document.querySelector('[role="dialog"], [data-modal="true"], .fixed.inset-0:not([data-ignore-modal="true"])'))
-      if (hasModal) {
-        await invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
-        return
-      }
-
-      const rect = containerRef.current.getBoundingClientRect()
-      if (rect.width <= 0 || rect.height <= 0) return
-
-      try {
-        if (forceMount) {
-          await invoke('mount_embedded_twitch_chat', {
-            channel: cleanChannel,
-            x: Math.round(rect.left),
-            y: Math.round(rect.top),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-            authToken: twitchToken || null,
-            username: twitchUsername || null,
-          })
-        } else {
-          await invoke('set_embedded_twitch_chat_visible', {
-            visible: true,
-            x: Math.round(rect.left),
-            y: Math.round(rect.top),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-          })
+    const syncBounds = () => {
+      syncQueue = syncQueue.then(async () => {
+        if (!containerRef.current || !isMounted) return
+        const hasModal = isOverlayModalOpenRef.current || Boolean(document.querySelector('[role="dialog"], [data-modal="true"], .fixed.inset-0:not([data-ignore-modal="true"])'))
+        if (hasModal) {
+          await invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
+          return
         }
-      } catch (err) {
-        console.warn('[TwitchChatPopout] Child webview error:', err)
-      }
+
+        const rect = containerRef.current.getBoundingClientRect()
+        if (rect.width <= 0 || rect.height <= 0) {
+          if (nativeMounted) await invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
+          return
+        }
+
+        try {
+          if (!nativeMounted) {
+            await invoke('mount_embedded_twitch_chat', {
+              channel: cleanChannel,
+              x: Math.round(rect.left),
+              y: Math.round(rect.top),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+              authToken: twitchToken || null,
+              username: twitchUsername || null,
+            })
+            nativeMounted = true
+          } else {
+            await invoke('set_embedded_twitch_chat_visible', {
+              visible: true,
+              x: Math.round(rect.left),
+              y: Math.round(rect.top),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+            })
+          }
+        } catch (err) {
+          console.warn('[TwitchChatPopout] Child webview error:', err)
+        }
+      })
+      return syncQueue
     }
 
-    const timer = setTimeout(() => syncBounds(true), 60)
+    const timer = setTimeout(() => syncBounds(), 60)
 
     let observer = null
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
-      observer = new ResizeObserver(() => syncBounds(false))
+      observer = new ResizeObserver(() => syncBounds())
       observer.observe(containerRef.current)
     }
 
-    const handleResize = () => syncBounds(false)
+    const handleResize = () => syncBounds()
     window.addEventListener('resize', handleResize)
+    const handleReturn = () => {
+      if (document.visibilityState !== 'hidden') void syncBounds()
+    }
+    window.addEventListener('focus', handleReturn)
+    document.addEventListener('visibilitychange', handleReturn)
 
     const handleModalEvent = (e) => {
       const open = Boolean(e?.detail?.isModalOpen ?? e?.detail?.open)
@@ -82,7 +96,7 @@ export function TwitchChatPopout({
         invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
       } else {
         setTimeout(() => {
-          if (isMounted) syncBounds(false)
+          if (isMounted) syncBounds()
         }, 50)
       }
     }
@@ -97,7 +111,7 @@ export function TwitchChatPopout({
             invoke('set_embedded_twitch_chat_visible', { visible: false }).catch(() => {})
           } else {
             setTimeout(() => {
-              if (isMounted) syncBounds(false)
+              if (isMounted) syncBounds()
             }, 50)
           }
         }
@@ -114,6 +128,8 @@ export function TwitchChatPopout({
       if (observer) observer.disconnect()
       domObserver.disconnect()
       window.removeEventListener('resize', handleResize)
+      window.removeEventListener('focus', handleReturn)
+      document.removeEventListener('visibilitychange', handleReturn)
       window.removeEventListener('bs:modal-state-change', handleModalEvent)
       if (isTauri()) {
         invoke('unmount_embedded_twitch_chat').catch(() => {})

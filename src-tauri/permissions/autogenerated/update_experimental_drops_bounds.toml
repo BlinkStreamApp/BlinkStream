@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-update-experimental-drops-bounds"
+description = "Enables the update_experimental_drops_bounds command without any pre-configured scope."
+commands.allow = ["update_experimental_drops_bounds"]
+
+[[permission]]
+identifier = "deny-update-experimental-drops-bounds"
+description = "Denies the update_experimental_drops_bounds command without any pre-configured scope."
+commands.deny = ["update_experimental_drops_bounds"]

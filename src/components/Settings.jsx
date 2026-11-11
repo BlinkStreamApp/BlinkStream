@@ -11,6 +11,8 @@ import { SettingsRecordingTab } from './settings/SettingsRecordingTab'
 import { SettingsAdvancedTab } from './settings/SettingsAdvancedTab'
 import HslThemeStudio from './settings/HslThemeStudio'
 import PhosphorIcon from './icons/PhosphorIcon'
+import BrandIcon from './icons/BrandIcon'
+import { BRAND_ICON_THEMES } from '../utils/hslTheme'
 import { useDialogFocus } from '../hooks/useDialogFocus'
 import { readVolume, setItem } from '../utils/storage'
 import SettingsPlayerTab from './settings/SettingsPlayerTab'
@@ -30,7 +32,7 @@ const LS_TAB_KEY = 'bs.settingsTab'
 
 function Tabs({ tabs, active, onChange, prefix, label }) {
   return (
-    <div role="tablist" aria-label={label} className="flex border-b border-white/[0.08] bg-bg-secondary/70 px-4 sm:px-6 shrink-0 overflow-x-auto scrollbar-thin gap-1.5">
+    <div role="tablist" aria-orientation="vertical" aria-label={label} className="flex w-16 sm:w-52 flex-col border-r border-white/10 bg-black/15 p-2 sm:p-3 shrink-0 overflow-y-auto scrollbar-thin gap-1.5">
       {tabs.map(tab => {
         const isActive = active === tab.id
         return (
@@ -43,29 +45,29 @@ function Tabs({ tabs, active, onChange, prefix, label }) {
             tabIndex={isActive ? 0 : -1}
             onKeyDown={event => {
               const index = tabs.findIndex(item => item.id === tab.id)
-              const next = { ArrowRight: (index + 1) % tabs.length, ArrowLeft: (index - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key]
+              const next = { ArrowDown: (index + 1) % tabs.length, ArrowUp: (index - 1 + tabs.length) % tabs.length, ArrowRight: (index + 1) % tabs.length, ArrowLeft: (index - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key]
               if (next === undefined) return
               event.preventDefault()
               onChange(tabs[next].id)
               event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next]?.focus()
             }}
             onClick={() => onChange(tab.id)}
-            className={`relative px-4 py-3 text-[13px] font-semibold cursor-pointer transition-all duration-200 flex items-center gap-2 whitespace-nowrap rounded-t-xl ${
+            className={`relative px-2 sm:px-3 py-3 text-[13px] font-semibold cursor-pointer transition-all duration-200 flex items-center gap-2 justify-center sm:justify-start rounded-xl ${
               isActive
                 ? 'text-white font-extrabold bg-white/[0.04]'
                 : 'text-text-secondary hover:text-text-primary hover:bg-white/[0.02]'
             }`}
           >
-            {tab.icon && (
+            {tab.brandIcon ? <BrandIcon name={tab.brandIcon} size={22} /> : tab.icon && (
               <PhosphorIcon
                 name={tab.icon}
                 size={16}
                 className={`transition-transform duration-200 ${isActive ? 'text-twitch scale-110 drop-shadow-[0_0_8px_var(--color-twitch)]' : 'opacity-70'}`}
               />
             )}
-            <span>{tab.label}</span>
+            <span className="hidden sm:block text-left">{tab.label}</span>
             {isActive && (
-              <span className="absolute left-3 right-3 bottom-0 h-0.5 bg-twitch shadow-[0_0_10px_var(--color-twitch)] rounded-full" />
+              <span className="absolute left-0 top-3 bottom-3 w-0.5 bg-twitch shadow-[0_0_10px_var(--color-twitch)] rounded-full" />
             )}
           </button>
         )
@@ -88,13 +90,13 @@ export default function Settings({ onClose }) {
   const closeButtonRef = useRef(null)
   useDialogFocus(dialogRef, closeButtonRef, onClose)
   const currentTabs = [
-    { id: 'general', label: t('tab.general', 'General'), icon: 'Gear' },
-    { id: 'player', label: t('controls.tab'), icon: 'Play' },
-    { id: 'hsl', label: t('hsl.tab', 'Personalización & Temas'), icon: 'Palette' },
-    { id: 'account', label: t('tab.account', 'Cuenta'), icon: 'User' },
-    { id: 'moderation', label: t('tab.moderation', 'Moderación'), icon: 'ShieldCheck' },
-    { id: 'recording', label: t('tab.recording', 'Grabación'), icon: 'VideoCamera' },
-    { id: 'advanced', label: t('tab.advanced', 'Avanzado'), icon: 'Sliders' },
+    { id: 'general', brandIcon: 'settings', label: t('tab.general', 'General'), icon: 'Gear' },
+    { id: 'player', brandIcon: 'vods', label: t('controls.tab'), icon: 'Play' },
+    { id: 'hsl', brandIcon: 'palette', label: t('settings.appearance', 'Personalización'), icon: 'Palette' },
+    { id: 'account', brandIcon: 'account', label: t('tab.account', 'Cuenta'), icon: 'User' },
+    { id: 'moderation', brandIcon: 'shield', label: t('tab.moderation', 'Moderación'), icon: 'ShieldCheck' },
+    { id: 'recording', brandIcon: 'clips', label: t('tab.recording', 'Grabación'), icon: 'VideoCamera' },
+    { id: 'advanced', brandIcon: 'sliders', label: t('tab.advanced', 'Avanzado'), icon: 'Sliders' },
   ]
   const [activeTab, setActiveTab] = useState(() => {
     try {
@@ -119,7 +121,7 @@ export default function Settings({ onClose }) {
   }
   const normalizeSearch = value => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase()
   const normalizedSearch = normalizeSearch(search.trim())
-  const matchingTabs = currentTabs.filter(tab => normalizeSearch(`${tab.label} ${(searchTerms[tab.id] || []).map(key => t(key)).join(' ')}`).includes(normalizedSearch))
+  const matchingTabs = currentTabs.filter(tab => normalizeSearch(`${tab.label} ${tab.id === 'hsl' ? BRAND_ICON_THEMES.map(theme => theme.name).join(' ') + ' ' + t('icons.theme.title') : ''} ${(searchTerms[tab.id] || []).map(key => t(key)).join(' ')}`).includes(normalizedSearch))
 
   useEffect(() => {
     try { localStorage.setItem(LS_TAB_KEY, activeTab) } catch {  }
@@ -144,7 +146,7 @@ export default function Settings({ onClose }) {
       className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/65 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${prefix}-title`} tabIndex={-1} className="bg-bg-secondary/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.85)] w-full max-w-[880px] max-h-[88vh] flex flex-col overflow-hidden shrink-0" onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${prefix}-title`} tabIndex={-1} className="bg-bg-secondary/95 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.85)] w-full max-w-[1120px] h-[88vh] max-h-[920px] flex flex-col overflow-hidden shrink-0" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] shrink-0">
           <div className="flex items-center gap-2">
             <BlinkStreamLogo size={28} />
@@ -160,9 +162,10 @@ export default function Settings({ onClose }) {
           <input id={`${prefix}-search`} type="search" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} className="w-full px-3 py-2 rounded-lg border border-white/10 bg-bg-tertiary text-text-primary" />
           {normalizedSearch && <div className="flex flex-wrap gap-2" role="status">{matchingTabs.length ? matchingTabs.map(tab => <button type="button" key={tab.id} onClick={() => { setActiveTab(tab.id); setSearch('') }} className="px-3 py-2 rounded-lg bg-purple-500/20 text-purple-200 cursor-pointer">{tab.label}</button>) : t('settings.noMatches')}</div>}
         </div>
+        <div className="flex flex-1 min-h-0">
         <Tabs tabs={currentTabs} active={activeTab} onChange={setActiveTab} prefix={prefix} label={t('settings')} />
 
-        <div role="tabpanel" id={`${prefix}-panel`} aria-labelledby={`${prefix}-tab-${activeTab}`} tabIndex={0} className="flex-1 overflow-y-auto px-5 py-4">
+        <div role="tabpanel" id={`${prefix}-panel`} aria-labelledby={`${prefix}-tab-${activeTab}`} tabIndex={0} className="flex-1 min-w-0 overflow-y-auto px-3 sm:px-6 py-5">
           {activeTab === 'player' && <SettingsPlayerTab />}
           {activeTab === 'general' && (
             <div className="space-y-5">
@@ -267,6 +270,7 @@ export default function Settings({ onClose }) {
           {activeTab === 'recording' && <SettingsRecordingTab />}
 
           {activeTab === 'advanced' && <SettingsAdvancedTab />}
+        </div>
         </div>
       </div>
     </div>

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-remember-drops-connection"
+description = "Enables the remember_drops_connection command without any pre-configured scope."
+commands.allow = ["remember_drops_connection"]
+
+[[permission]]
+identifier = "deny-remember-drops-connection"
+description = "Denies the remember_drops_connection command without any pre-configured scope."
+commands.deny = ["remember_drops_connection"]

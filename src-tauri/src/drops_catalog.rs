@@ -63,7 +63,7 @@ pub(crate) async fn fetch(account: &str, token: &str) -> Result<Value, String> {
     result
 }
 
-fn parse_catalog_response(response: &Value) -> Result<Value, String> {
+pub(crate) fn parse_catalog_response(response: &Value) -> Result<Value, String> {
     let campaigns = super::drops_response_array(response, "/data/currentUser/dropCampaigns")?;
     let active: Vec<Value> = campaigns
         .as_array()

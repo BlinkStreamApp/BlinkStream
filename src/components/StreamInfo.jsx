@@ -5,6 +5,8 @@ import { PUBLIC_CLIENT_ID, getHeaders, sanitizeChannelForGraphQL } from '../util
 import { validateProps, isString, isBoolean } from '../utils/validateProps'
 import timerIcon from '../assets/timer.png'
 import LiveBadge from './LiveBadge'
+import BrandIcon from './icons/BrandIcon'
+import { useT } from '../utils/i18n'
 
 function exactViewers(n) {
   if (n == null) return null
@@ -33,6 +35,7 @@ function buildGqlQuery(channel) {
 }
 
 export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
+  const t = useT()
 
   validateProps(
     { channel, isFavorite, onToggleFavorite },
@@ -208,15 +211,13 @@ export default function StreamInfo({ channel, isFavorite, onToggleFavorite }) {
       </div>
 
       {onToggleFavorite && (
-        <button onClick={onToggleFavorite}
+        <button type="button" onClick={onToggleFavorite} aria-pressed={isFavorite} aria-label={t('browse.pinTip')} title={t('browse.pinTip')}
           className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors btn-press shrink-0 ${
             isFavorite
-              ? 'border-yellow-400/30 bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20'
-              : 'border-bg-tertiary bg-bg-tertiary/30 text-text-muted/40 hover:text-yellow-400 hover:border-yellow-400/30'
+              ? 'border-purple-400/50 bg-purple-500/20 hover:bg-purple-500/30'
+              : 'border-bg-tertiary bg-bg-tertiary/30 hover:bg-purple-500/10 hover:border-purple-400/30'
           }`}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-          </svg>
+          <BrandIcon name="favorite" size={21} />
         </button>
       )}
     </div>

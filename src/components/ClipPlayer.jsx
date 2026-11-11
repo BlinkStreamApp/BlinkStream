@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../utils/tauriEnv'
 import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL } from '../utils/twitch'
 import PhosphorIcon from './icons/PhosphorIcon'
+import BrandIcon from './icons/BrandIcon'
 import TimeRangeSnipper from './clips/TimeRangeSnipper'
 
 async function fetchClipUrl(slug) {
@@ -141,7 +142,7 @@ export default function ClipPlayer({ channel, onClose }) {
     <div role="dialog" aria-modal="true" aria-label="Clips" className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 animate-fade-in" onClick={onClose}>
       <div className="bg-bg-secondary border border-bg-tertiary/50 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-bg-tertiary/30 shrink-0">
-          <h2 className="text-white text-sm font-bold">Clips de {channel}</h2>
+          <h2 className="flex items-center gap-2 text-white text-sm font-bold"><BrandIcon name="clips" size={26} />Clips de {channel}</h2>
           <button onClick={onClose} className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-hover cursor-pointer transition-colors"><PhosphorIcon name="X" size={18} weight="bold" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { OfficialModView } from './OfficialModView'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }))
 vi.mock('../../utils/tauriEnv', () => ({ isTauri: () => true, safeOpenUrl: vi.fn() }))
 vi.mock('../VideoPlayer', () => ({ default: props => <div data-testid="hybrid-player" data-channel={props.channel} data-quality={props.quality} data-volume={props.volume}>
   <button onClick={() => props.onQualityChange('720p')}>Test quality</button>
@@ -19,6 +21,111 @@ beforeEach(() => {
 })
 
 describe('Official moderation host', () => {
+  it('fits only the real video slot and restores the complete tools page without restarting video', async () => {
+    invoke.mockImplementation(command => Promise.resolve(command === 'mount_official_modview' ? true : command === 'get_official_modview_video_bounds' ? { x: 0.1, y: 0.12, width: 0.35, height: 0.32 } : undefined))
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      return this.dataset.testid === 'hybrid-video-panel'
+        ? { left: 90, top: 140, right: 370, bottom: 300, width: 280, height: 160 }
+        : { left: 10, top: 80, right: 810, bottom: 580, width: 800, height: 500 }
+    })
+    render(<OfficialModView channel="testchannel" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    const player = await screen.findByTestId('hybrid-player')
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Distribución' }), { target: { value: 'corner' } })
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('update_official_modview_bounds', expect.objectContaining({ corner: { x: 80, y: 60, width: 280, height: 160 } })))
+    expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ position: 'absolute', left: '10%', top: '12%' })
+    expect(screen.getByTestId('hybrid-player')).toBe(player)
+    expect(invoke.mock.calls.filter(([command]) => command === 'mount_official_modview')).toHaveLength(1)
+    expect(localStorage.getItem('bs.modview.hybrid.layout')).toBe('corner')
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar vídeo BlinkStream' }))
+    await waitFor(() => expect(invoke).toHaveBeenLastCalledWith('update_official_modview_bounds', expect.objectContaining({ corner: null })))
+    expect(screen.queryByTestId('hybrid-player')).not.toBeInTheDocument()
+    expect(invoke.mock.calls.filter(([command]) => command === 'mount_official_modview')).toHaveLength(1)
+  })
+
+  it('does not offer native corner clipping on an unsupported platform', async () => {
+    render(<OfficialModView channel="testchannel" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    await screen.findByTestId('hybrid-player')
+    expect(screen.queryByRole('combobox', { name: 'Distribución' })).not.toBeInTheDocument()
+  })
+
+  it('leaves official tools complete when their video panel is missing instead of masking headers', async () => {
+    invoke.mockImplementation(command => Promise.resolve(command === 'mount_official_modview' ? true : null))
+    render(<OfficialModView channel="testchannel" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    const player = await screen.findByTestId('hybrid-player')
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Distribución' }), { target: { value: 'corner' } })
+    expect(await screen.findByRole('status')).toHaveTextContent('Restaura y muestra el panel Stream')
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('get_official_modview_video_bounds', expect.anything()))
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Distribución' })).toHaveValue('columns'))
+    expect(screen.getByTestId('hybrid-video-panel')).not.toHaveStyle({ visibility: 'hidden' })
+    expect(screen.getByTestId('hybrid-player')).toBe(player)
+    expect(localStorage.getItem('bs.modview.hybrid.layout')).toBe('columns')
+    expect(invoke.mock.calls.filter(([command, args]) => command === 'update_official_modview_bounds' && args.corner)).toHaveLength(0)
+  })
+
+  it('restores columns and reports a rejected native corner without recreating the player', async () => {
+    invoke.mockImplementation((command, args) => command === 'update_official_modview_bounds' && args.corner
+      ? Promise.reject(new Error('native clipping failed')) : Promise.resolve(command === 'mount_official_modview' ? true : command === 'get_official_modview_video_bounds' ? { x: 0.1, y: 0.12, width: 0.35, height: 0.32 } : undefined))
+    render(<OfficialModView channel="testchannel" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    const player = await screen.findByTestId('hybrid-player')
+    const layout = await screen.findByRole('combobox', { name: 'Distribución' })
+    fireEvent.change(layout, { target: { value: 'corner' } })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Se ha restaurado la distribución lateral')
+    expect(layout).toHaveValue('columns')
+    expect(screen.getByTestId('hybrid-player')).toBe(player)
+    expect(localStorage.getItem('bs.modview.hybrid.layout')).toBe('columns')
+  })
+  it('keeps the native video while requesting a separate or embedded tools page', async () => {
+    render(<OfficialModView channel="testchannel" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Desacoplar Twitch' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    const player = await screen.findByTestId('hybrid-player')
+    const session = invoke.mock.calls.find(([command]) => command === 'mount_official_modview')[1].session
+    fireEvent.click(screen.getByRole('button', { name: 'Desacoplar Twitch' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Acoplar Twitch' })).toBeEnabled())
+    expect(invoke).toHaveBeenCalledWith('set_official_modview_detached', { session, detached: true })
+    expect(screen.getByTestId('hybrid-player')).toBe(player)
+    expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ width: '100%', height: '100%' })
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Acoplar Twitch' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Desacoplar Twitch' })).toBeEnabled())
+    expect(invoke).toHaveBeenCalledWith('set_official_modview_detached', { session, detached: false })
+    expect(screen.getByTestId('hybrid-player')).toBe(player)
+    expect(invoke.mock.calls.filter(([command]) => command === 'mount_official_modview')).toHaveLength(1)
+    expect(invoke.mock.calls.filter(([command]) => command === 'unmount_official_modview')).toHaveLength(0)
+    expect(screen.getByRole('separator')).toBeInTheDocument()
+  })
+
+  it('docks only its own native close event and removes a late listener after unmount', async () => {
+    const unlisten = vi.fn()
+    listen.mockResolvedValue(unlisten)
+    const view = render(<OfficialModView channel="testchannel" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Desacoplar Twitch' })).toBeEnabled())
+    const session = invoke.mock.calls.find(([command]) => command === 'mount_official_modview')[1].session
+    const handler = listen.mock.calls.find(([event]) => event === 'bs:official-modview-dock')[1]
+    invoke.mockClear()
+    await act(async () => handler({ payload: 'other-session' }))
+    expect(invoke).not.toHaveBeenCalledWith('set_official_modview_detached', expect.anything())
+    await act(async () => handler({ payload: session }))
+    expect(invoke).toHaveBeenCalledWith('set_official_modview_detached', { session, detached: false })
+    view.unmount()
+    await waitFor(() => expect(unlisten).toHaveBeenCalledOnce())
+  })
+
+  it('keeps the player and embedded mode if moving tools fails', async () => {
+    render(<OfficialModView channel="testchannel" />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Desacoplar Twitch' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+    const player = await screen.findByTestId('hybrid-player')
+    invoke.mockImplementation(command => command === 'set_official_modview_detached' ? Promise.reject(new Error('move failed')) : Promise.resolve())
+    fireEvent.click(screen.getByRole('button', { name: 'Desacoplar Twitch' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo mover Twitch')
+    expect(screen.getByTestId('hybrid-player')).toBe(player)
+    expect(screen.getByRole('button', { name: 'Desacoplar Twitch' })).toBeEnabled()
+  })
   it('adds and removes the BlinkStream player without remounting the official page', async () => {
     const onQualityChange = vi.fn()
     const onVolumeChange = vi.fn()
@@ -35,7 +142,7 @@ describe('Official moderation host', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test volume' }))
     expect(onQualityChange).toHaveBeenCalledWith('720p')
     expect(onVolumeChange).toHaveBeenCalledWith(25)
-    fireEvent.change(screen.getByRole('slider', { name: 'Ancho del vídeo' }), { target: { value: '45' } })
+    fireEvent.change(screen.getByRole('slider', { name: 'Tamaño del vídeo' }), { target: { value: '45' } })
     expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ width: '45%' })
     expect(localStorage.getItem('bs.modview.hybrid.width')).toBe('45')
     HTMLElement.prototype.getBoundingClientRect.mockReturnValue({ left: 350, top: 80, right: 810, bottom: 580, width: 460, height: 500 })
@@ -147,4 +254,22 @@ describe('Official moderation host', () => {
     expect(invoke).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Abrir en navegador' })).not.toBeInTheDocument()
   })
+})
+
+
+it('docks on four edges and resizes with keyboard without remounting page or player', async () => {
+  render(<OfficialModView channel="testchannel" />)
+  fireEvent.click(screen.getByRole('button', { name: 'Mostrar vídeo BlinkStream' }))
+  const player = await screen.findByTestId('hybrid-player')
+  const host = screen.getByTestId('official-modview-host')
+  const positions = screen.getByRole('combobox', { name: 'Posición del vídeo' })
+  for (const [side, direction] of [['right', 'row-reverse'], ['top', 'column'], ['bottom', 'column-reverse'], ['left', 'row']]) {
+    fireEvent.change(positions, { target: { value: side } })
+    expect(screen.getByTestId('mod-workspace')).toHaveStyle({ flexDirection: direction })
+    expect(screen.getByTestId('hybrid-player')).toBe(player)
+    expect(screen.getByTestId('official-modview-host')).toBe(host)
+  }
+  fireEvent.keyDown(screen.getByRole('separator'), { key: 'ArrowRight' })
+  expect(screen.getByTestId('hybrid-video-panel')).toHaveStyle({ width: '37%' })
+  expect(invoke.mock.calls.filter(([cmd]) => cmd === 'mount_official_modview')).toHaveLength(1)
 })

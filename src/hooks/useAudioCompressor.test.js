@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useAudioCompressor } from './useAudioCompressor'
@@ -36,6 +37,8 @@ class MockAudioContext {
   createDynamicsCompressor = vi.fn(() => new MockDynamicsCompressorNode())
   createGain = vi.fn(() => new MockGainNode())
   resume = vi.fn().mockResolvedValue(undefined)
+  close = vi.fn().mockResolvedValue(undefined)
+  constructor() { MockAudioContext.latest = this }
 }
 
 describe('useAudioCompressor', () => {
@@ -52,6 +55,40 @@ describe('useAudioCompressor', () => {
   afterEach(() => {
     window.AudioContext = origAudioContext
     vi.restoreAllMocks()
+  })
+
+  it('releases its media source and context when the player is unmounted', async () => {
+    const hook = renderHook(() => useAudioCompressor({ current: mockVideo }))
+    const context = MockAudioContext.latest
+    const source = context.createMediaElementSource.mock.results[0].value
+    hook.unmount()
+    await act(async () => { await Promise.resolve() })
+    expect(source.disconnect).toHaveBeenCalledOnce()
+    expect(context.close).toHaveBeenCalledOnce()
+  })
+
+  it('reads the existing audio clock without creating or resuming another context', () => {
+    const { result } = renderHook(() => useAudioCompressor({ current: mockVideo }))
+    const context = MockAudioContext.latest
+    context.state = 'suspended'
+    context.currentTime = 12
+    expect(result.current.readAudioDiagnostics()).toMatchObject({ state: 'suspended', currentTime: 12 })
+    context.currentTime = 13
+    expect(result.current.readAudioDiagnostics().currentTime).toBe(13)
+    expect(context.createMediaElementSource).toHaveBeenCalledOnce()
+    expect(context.resume).not.toHaveBeenCalled()
+  })
+
+  it('keeps the context alive through StrictMode effect replay and releases it at real unmount', async () => {
+    const videoRef = { current: mockVideo }
+    const hook = renderHook(() => useAudioCompressor(videoRef), { wrapper: StrictMode })
+    const context = MockAudioContext.latest
+    await act(async () => { await Promise.resolve() })
+    expect(context.close).not.toHaveBeenCalled()
+    expect(context.createMediaElementSource).toHaveBeenCalledOnce()
+    hook.unmount()
+    await act(async () => { await Promise.resolve() })
+    expect(context.close).toHaveBeenCalledOnce()
   })
 
   it('initializes with default false when localStorage is empty', () => {

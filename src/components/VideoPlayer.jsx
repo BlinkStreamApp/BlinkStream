@@ -3,11 +3,11 @@ import { useDropsProgress } from '../hooks/useDropsProgress'
 import PlayerQuickAudio from './PlayerQuickAudio'
 
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
-import { LIVE_PLAYBACK_CONFIG } from '../utils/livePlayback'
+import { LIVE_PLAYBACK_CONFIG, attachBufferedLiveStart } from '../utils/livePlayback'
 import { measureInvoke } from '../utils/perf'
-import { LIVE_HLS_TRANSPORT, HLS_WORKER_CONFIG, attachLivePlaylistBootstrap } from '../utils/tauriHls'
+import { PUBLISHED_LIVE_HLS_TRANSPORT, COMPLETED_HLS_TRANSPORT, HLS_WORKER_CONFIG, attachLivePlaylistBootstrap } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
 import { safeOpenUrl } from '../utils/tauriEnv'
@@ -24,7 +24,7 @@ import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { useAudioCompressor } from '../hooks/useAudioCompressor'
 import { useLiveDVR } from '../hooks/useLiveDVR'
 import DropsModal from './drops/DropsModal'
-import { startDropsWatcher, stopDropsWatcher, watchNativeDropsPlayback } from '../utils/dropsWatcher'
+import { watchNativeDropsPlayback } from '../utils/dropsWatcher'
 import { getPlayerShortcut } from '../utils/keyboard'
 import { formatPlayerError } from '../utils/playerErrors'
 import { createPlaybackProbe } from '../utils/playbackDiagnostics'
@@ -65,7 +65,7 @@ export function PlayerSettingsPanel({
   const toggleOnce = action => event => { event.stopPropagation(); action?.() }
 
   return (
-    <div className="player-settings-panel pointer-events-auto absolute bottom-14 right-3 z-50 w-64 overflow-y-auto custom-scrollbar bg-[#0f1016]/95 backdrop-blur-2xl border border-white/15 rounded-xl p-3 text-text-primary shadow-[0_10px_35px_rgba(0,0,0,0.95)] animate-fade-in space-y-2 text-xs select-none" style={{ maxHeight: 'calc(100% - 4.25rem)', maxWidth: 'calc(100% - 1.5rem)' }}>
+    <div className="player-settings-panel player-popover pointer-events-auto custom-scrollbar bg-[#0f1016]/95 backdrop-blur-2xl border border-white/15 rounded-xl p-3 text-text-primary shadow-[0_10px_35px_rgba(0,0,0,0.95)] animate-fade-in space-y-2 text-xs select-none">
       <div className="sticky top-0 z-10 bg-[#0f1016] flex items-center justify-between pb-2 border-b border-white/[0.08]">
         <div className="flex items-center gap-1.5">
           <PhosphorIcon name="SlidersHorizontal" size={15} weight="duotone" className="text-twitch" />
@@ -214,6 +214,8 @@ export default function VideoPlayer({
   const isFetchingRef = useRef(false)
   const networkRetriesRef = useRef(0)
   const controlsTimeoutRef = useRef(null)
+  const controlsLayerRef = useRef(null)
+  const controlsRef = useRef(null)
   const volumeRef = useRef(volume)
   const fallbackTimersRef = useRef(null)
   const [playing, setPlaying] = useState(true)
@@ -222,6 +224,7 @@ export default function VideoPlayer({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showControls, setShowControls] = useState(true)
+  const [showMoreControls, setShowMoreControls] = useState(false)
   const [usingFallback, setUsingFallback] = useState(false)
   const [hlsDebug, setHlsDebug] = useState('Iniciando...')
   // hlsDebug_unused workaround to make eslint happy since the overlay is currently removed
@@ -232,13 +235,29 @@ export default function VideoPlayer({
   const playerControls = usePlayerControls()
   const dropsProgress = useDropsProgress(channel, isLoggedIn ? (twitchUsername || viewerLogin || '') : '')
   const [showQuickAudio, setShowQuickAudio] = useState(false)
-  const [nativeDropsEnabled, setNativeDropsEnabled] = useState(
+  const [nativeDropsEnabled] = useState(
     () => getItem(STORAGE_KEYS.DROPS_NATIVE_WATCH, 'false') === 'true',
   )
-  const [nativeDropsStatus, setNativeDropsStatus] = useState(null)
+
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
+  useLayoutEffect(() => {
+    if (!showQuickAudio && !showSettingsPanel) return
+    const layer = controlsLayerRef.current, controls = controlsRef.current
+    if (!layer || !controls) return
+    const update = () => {
+      const clearance = `${Math.ceil(layer.clientHeight - controls.offsetTop + 8)}px`
+      if (layer.style.getPropertyValue('--player-menu-bottom') !== clearance) layer.style.setProperty('--player-menu-bottom', clearance)
+    }
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    observer?.observe(layer)
+    observer?.observe(controls)
+    window.addEventListener('resize', update)
+    return () => { observer?.disconnect(); window.removeEventListener('resize', update); layer.style.removeProperty('--player-menu-bottom') }
+  }, [showQuickAudio, showSettingsPanel, loading, error, compact])
   const [isPiP, setIsPiP] = useState(false)
   const [showStats, setShowStats] = useState(false)
+  const [completedSegments, setCompletedSegments] = useState(false)
   const playbackProbeRef = useRef(null)
   const [copyDiagnosticsState, setCopyDiagnosticsState] = useState('')
   const [audioOnly, setAudioOnly] = useState(false)
@@ -246,7 +265,7 @@ export default function VideoPlayer({
   const audioOnlyRef = useRef(false)
   useEffect(() => { audioOnlyRef.current = audioOnly }, [audioOnly])
   const [stats, setStats] = useState({ bitrate: 'Calculando...', resolution: 'Calculando...', dropped: 0, buffer: '0.0s' })
-  const { isNightMode, toggleNightMode } = useAudioCompressor(videoRef)
+  const { isNightMode, toggleNightMode, readAudioDiagnostics } = useAudioCompressor(videoRef)
   const {
     delayFromLive,
     isAtLiveEdge,
@@ -277,7 +296,7 @@ export default function VideoPlayer({
 
   useEffect(() => {
     if (!nativeDropsEnabled || !channel || !streamUrl || audioOnly) return
-    return watchNativeDropsPlayback(videoRef.current, channel, setNativeDropsStatus)
+    return watchNativeDropsPlayback(videoRef.current, channel)
   }, [nativeDropsEnabled, channel, streamUrl, audioOnly])
 
   const jumpToLive = useCallback(() => {
@@ -292,22 +311,6 @@ export default function VideoPlayer({
       return () => clearTimeout(timer)
     }
   }, [streamUrl, channel, recording, startRecording])
-
-  useEffect(() => {
-    let started = false
-    const timer = setTimeout(() => {
-      if (!channel) return
-      started = true
-      startDropsWatcher(channel).catch(() => {})
-    }, 50)
-
-    return () => {
-      clearTimeout(timer)
-      if (started) {
-        stopDropsWatcher().catch(() => {})
-      }
-    }
-  }, [channel])
 
   const fetchStream = useCallback(async (ch, q) => {
     if (!ch) return
@@ -418,7 +421,7 @@ export default function VideoPlayer({
 
     const hls = new Hls({
       ...HLS_WORKER_CONFIG,
-      ...LIVE_HLS_TRANSPORT,
+      ...(completedSegments ? COMPLETED_HLS_TRANSPORT : PUBLISHED_LIVE_HLS_TRANSPORT),
       ...LIVE_PLAYBACK_CONFIG,
       backBufferLength: 15,
       maxBufferLength: 12,
@@ -439,8 +442,9 @@ export default function VideoPlayer({
       debug: false,
     })
     hlsRef.current = hls
+    const disposeBufferedStart = completedSegments ? () => {} : attachBufferedLiveStart(hls, video, isFollowingLive)
     const disposeBootstrap = attachLivePlaylistBootstrap(hls, video, isFollowingLive)
-    const playbackProbe = createPlaybackProbe(video, hls)
+    const playbackProbe = createPlaybackProbe(video, hls, undefined, undefined, readAudioDiagnostics)
     playbackProbeRef.current = playbackProbe
     hls.loadSource(streamUrl)
     hls.attachMedia(video)
@@ -636,6 +640,7 @@ export default function VideoPlayer({
       clearTimeout(statsTimer)
       playbackProbe.stop()
       disposeBootstrap()
+      disposeBufferedStart()
       if (playbackProbeRef.current === playbackProbe) playbackProbeRef.current = null
       if (fallbackTimersRef.current) { clearTimeout(fallbackTimersRef.current); fallbackTimersRef.current = null }
 
@@ -644,7 +649,13 @@ export default function VideoPlayer({
       video.removeEventListener('error', handleVideoError)
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
     }
-  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy, isFollowingLive])
+  }, [streamUrl, channel, fetchStream, onQualityChange, quality, updatePlaybackPolicy, isFollowingLive, completedSegments, readAudioDiagnostics])
+
+  useEffect(() => {
+    const probe = playbackProbeRef.current
+    probe?.setRenderTimingEnabled(showStats)
+    return () => probe?.setRenderTimingEnabled(false)
+  }, [showStats, streamUrl, completedSegments])
 
   useEffect(() => { const v = videoRef.current; if (v) v.volume = muted ? 0 : volume / 100 }, [volume, muted, streamUrl])
 
@@ -831,7 +842,6 @@ export default function VideoPlayer({
       {dropsProgress && playerControls.drops && <button type="button" onClick={() => setShowDrops(true)} className="absolute top-3 right-3 z-40 rounded-xl border border-purple-400/30 bg-bg-secondary/95 px-3 py-2 text-xs text-purple-200 cursor-pointer" title={dropsProgress.drop.benefitName} aria-label={t('drops.indicator').replace('{percent}', dropsProgress.drop.percent)}>
         🎁 {dropsProgress.drop.percent}% · {t('drops.center.remaining').replace('{minutes}', dropsProgress.remaining)}
       </button>}
-      {showQuickAudio && <PlayerQuickAudio volume={volume} onVolumeChange={onVolumeChange} isNightMode={isNightMode} onToggleNightMode={toggleNightMode} onClose={() => setShowQuickAudio(false)} />}
       {showStats && (
         <div className="absolute top-4 left-4 z-40 bg-[#14141d]/95 backdrop-blur-md border border-white/15 rounded-xl p-3 text-[12px] font-mono text-white/90 shadow-2xl select-none space-y-1.5 min-w-[250px] animate-fade-in pointer-events-none">
           <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-1.5 font-sans gap-3">
@@ -849,6 +859,10 @@ export default function VideoPlayer({
             <div className="truncate col-span-2 text-text-muted text-[10px]">📉 <span className="text-white/80 font-medium ml-0.5">{stats.dropped} frames perdidos</span></div>
             <div className="col-span-2 text-white/80">FPS {stats.probe?.presentedFps?.toFixed(1) ?? '—'} · {stats.probe?.playbackRate ?? 1}× · Δ {stats.probe?.droppedInterval ?? '—'}</div>
             <div className="col-span-2 text-white/80 break-all">{stats.probe?.codec || '—'} · Worker {stats.probe?.workerActive ? '✓' : '—'}</div>
+            {stats.probe?.renderTiming && <div className="col-span-2 text-white/75">UI {stats.probe.renderTiming.uiFps?.toFixed(0) ?? '—'} FPS · Decode {stats.probe.renderTiming.decodeAvgMs?.toFixed(1) ?? '—'} ms</div>}
+            <div className="col-span-2 border-t border-white/10 pt-2 pointer-events-auto">
+              <p className="mt-1 text-[10px] leading-relaxed text-text-muted">{t(completedSegments ? 'player.lowLatency.off' : 'player.lowLatency.on')}</p>
+            </div>
             <button type="button" className="pointer-events-auto col-span-2 text-left text-twitch cursor-pointer" onClick={async () => {
               const report = playbackProbeRef.current?.export()
               if (!report) return
@@ -956,16 +970,16 @@ export default function VideoPlayer({
       )}
 
       {/* Controls Bar (only shown when stream is active) */}
-      <div className="player-control-container absolute inset-0 z-50 pointer-events-none">
+      <div ref={controlsLayerRef} className="player-control-container absolute inset-0 z-50 pointer-events-none">
       {!error && !loading && (
-        <div className={`player-controls absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
-        <div className="flex items-center gap-3 text-white">
+        <div ref={controlsRef} className={`player-controls absolute bottom-6 left-6 right-6 z-30 flex items-center justify-between bg-[#101014]/85 backdrop-blur-2xl border border-white/15 px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.7)] ${showControls || showMoreControls || showQuickAudio || showSettingsPanel ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
+        <div className="player-transport flex items-center gap-3 text-white">
           <button onClick={togglePlay} className="hover:text-twitch transition-colors cursor-pointer" aria-label={playing ? t('player.pause', 'Pausar') : t('player.play', 'Reproducir')}>{playing ? <PauseIcon/> : <PlayIcon/>}</button>
           <button onClick={toggleMute} className="hover:text-twitch transition-colors cursor-pointer" aria-label={muted ? t('player.unmute', 'Activar sonido') : t('player.mute', 'Silenciar')}>{muted ? <VolumeMute/> : <VolumeHigh/>}</button>
           <input type="range" min="0" max="100" value={muted ? 0 : volume} onChange={handleVolume} className="w-16 sm:w-20 h-1 accent-twitch bg-white/20 rounded-lg appearance-none cursor-pointer" aria-label="Volumen" aria-valuemin="0" aria-valuemax="100" aria-valuenow={muted ? 0 : volume} />
           <button
             onClick={toggleNightMode}
-            className={`hover:text-white transition-colors cursor-pointer p-1 rounded-lg ${isNightMode ? 'text-amber-300 bg-amber-500/15' : 'text-white/40 hover:bg-white/5'}`}
+            className={`player-night-shortcut hover:text-white transition-colors cursor-pointer p-1 rounded-lg ${isNightMode ? 'text-amber-300 bg-amber-500/15' : 'text-white/40 hover:bg-white/5'}`}
             title={isNightMode ? `${t('player.nightMode', 'Modo Nocturno')}: ON` : `${t('player.nightMode', 'Modo Nocturno')}: OFF`}
             aria-label="Modo Nocturno (Compresor)"
           >
@@ -992,13 +1006,14 @@ export default function VideoPlayer({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-white/60">
-          <div className="flex items-center gap-3">
+        <div className="player-actions flex items-center gap-3 text-white/60">
+            <button type="button" aria-label={t('player.lowLatency')} aria-pressed={!completedSegments} disabled={!streamUrl} title={t(completedSegments ? 'player.lowLatency.off' : 'player.lowLatency.on')} onClick={() => { setCopyDiagnosticsState(''); setCompletedSegments(value => !value) }} className={`inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs cursor-pointer disabled:opacity-40 ${!completedSegments ? 'border-purple-400/50 bg-purple-500/15 text-purple-200' : 'border-white/15 text-white/60'}`}><PhosphorIcon name="Lightning" size={16} /><span className="player-latency-label">{t('player.lowLatency')}</span></button>
+            <button onClick={() => { setShowSettingsPanel(p => !p); setShowQuickAudio(false); setShowMoreControls(false) }} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch animate-pulse' : ''}`} title={t('player.settings', 'Ajustes')} aria-label="Ajustes del reproductor"><SettingsIcon/></button>
+          <div className="player-more-actions" data-open={showMoreControls} onKeyDown={event => { if (event.key === 'Escape') { setShowMoreControls(false); event.currentTarget.querySelector('button')?.focus() } }}>
+            <button type="button" aria-expanded={showMoreControls} onClick={() => setShowMoreControls(value => !value)} aria-label={t('player.moreActions')} title={t('player.moreActions')} className="player-more-summary cursor-pointer rounded-md border border-white/15 p-1.5 hover:text-white"><PhosphorIcon name="DotsThree" size={18} /></button>
+            <div className="player-extra-actions flex items-center gap-3" onClick={event => { if (event.target.closest('button')) setShowMoreControls(false) }}>
             <button hidden={!playerControls.clips} onClick={() => setShowClips(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.clips', 'Clips')} aria-label="Abrir clips"><ClipIcon/></button>
             <button hidden={!playerControls.vods} onClick={() => setShowVods(true)} className="hover:text-white transition-colors cursor-pointer" title={t('player.vods', 'VODs')} aria-label="Ver VODs"><VodIcon/></button>
-            <button hidden={!playerControls.drops} onClick={() => setShowDrops(true)} className="transition-colors cursor-pointer hover:text-purple-400" title="Twitch Drops & Recompensas" aria-label="Abrir Twitch Drops">
-              <PhosphorIcon name="Gift" size={18} weight="duotone" />
-            </button>
             <button hidden={!playerControls.record && !recording} onClick={async () => {
 
               if (recording) {
@@ -1017,13 +1032,7 @@ export default function VideoPlayer({
             >
               <PhosphorIcon name="Camera" size={18} weight="duotone" />
             </button>
-          </div>
-
-          <div className="w-px h-5 bg-white/10 mx-1" />
-
-          <div className="flex items-center gap-3">
             <button hidden={!playerControls.audio} type="button" onClick={() => { setShowQuickAudio(value => !value); setShowSettingsPanel(false) }} aria-label={t('audio.quick')} title={t('audio.quick')} className="hover:text-white cursor-pointer"><PhosphorIcon name="SlidersHorizontal" size={16} /></button>
-            <button onClick={() => setShowSettingsPanel(p => !p)} className={`hover:text-white transition-colors cursor-pointer ${showSettingsPanel ? 'text-twitch animate-pulse' : ''}`} title={t('player.settings', 'Ajustes')} aria-label="Ajustes del reproductor"><SettingsIcon/></button>
             <button hidden={!playerControls.theatre} onClick={onToggleTheatre} className={`hover:text-white transition-colors cursor-pointer ${theatreMode ? 'text-twitch' : ''}`} title={t('player.theatre', 'Teatro (T)')} aria-label="Modo teatro"><TheatreIcon/></button>
             <button hidden={!playerControls.browser} onClick={async () => {
               try { safeOpenUrl(`https://www.twitch.tv/${channel}`, true) } catch {  }
@@ -1033,8 +1042,9 @@ export default function VideoPlayer({
             <button hidden={!playerControls.pip} onClick={togglePiP} className={`hover:text-white transition-colors cursor-pointer ${isPiP ? 'text-twitch' : ''}`} title={t('player.pip', 'Picture-in-Picture')} aria-label="Picture-in-Picture">
               <PhosphorIcon name="PictureInPicture" size={16} weight="regular" />
             </button>
-            <button onClick={toggleFullscreen} className="hover:text-white transition-colors cursor-pointer" title={t('player.fullscreen', 'Fullscreen (F)')} aria-label="Pantalla completa"><FullscreenIcon/></button>
+            </div>
           </div>
+          <button onClick={toggleFullscreen} className="hover:text-white transition-colors cursor-pointer" title={t('player.fullscreen', 'Fullscreen (F)')} aria-label="Pantalla completa"><FullscreenIcon/></button>
         </div>
 
         {/* Interactive DVR Timeline Scrubber */}
@@ -1057,6 +1067,7 @@ export default function VideoPlayer({
       </div>
       )}
 
+      {showQuickAudio && <PlayerQuickAudio volume={volume} onVolumeChange={onVolumeChange} isNightMode={isNightMode} onToggleNightMode={toggleNightMode} onClose={() => setShowQuickAudio(false)} />}
       {showSettingsPanel && (
         <PlayerSettingsPanel
           onClose={() => setShowSettingsPanel(false)}
@@ -1098,17 +1109,7 @@ export default function VideoPlayer({
       {showVods && <VodPlayer channel={channel} onClose={() => setShowVods(false)} />}
       {showDrops && (
         <DropsModal
-          token={twitchToken}
-          channel={channel}
-          nativeWatchEnabled={nativeDropsEnabled}
-          nativeWatchStatus={audioOnly || !streamUrl ? { state: 'paused' } : nativeDropsStatus}
-          onToggleNativeWatch={() => {
-            setNativeDropsEnabled(enabled => {
-              setItem(STORAGE_KEYS.DROPS_NATIVE_WATCH, !enabled)
-              return !enabled
-            })
-            setNativeDropsStatus(null)
-          }}
+          account={isLoggedIn ? (twitchUsername || viewerLogin || '') : ''}
           onClose={() => setShowDrops(false)}
         />
       )}

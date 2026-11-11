@@ -1,3 +1,5 @@
+import Hls from 'hls.js'
+
 // One latency controller for both live players. Keep preloading/DVR buffers separate.
 export const LIVE_PLAYBACK_CONFIG = Object.freeze({
   lowLatencyMode: true,
@@ -50,4 +52,33 @@ export function getBufferedLivePosition(video, { currentRangeOnly = false } = {}
     return Math.max(video.currentTime, start + 0.1, end - 3)
   }
   return null
+}
+
+export function attachBufferedLiveStart(hls, video, isFollowingLive = () => true) {
+  let disposed = false
+  const dispose = () => {
+    if (disposed) return
+    disposed = true
+    hls.off(Hls.Events.FRAG_BUFFERED, attempt)
+    hls.off(Hls.Events.DESTROYING, dispose)
+    video.removeEventListener('playing', attempt)
+  }
+  const attempt = () => {
+    if (disposed) return
+    if (!isFollowingLive()) { dispose(); return }
+    if (!hls.latestLevelDetails?.live || video.paused || video.seeking || video.readyState < 3) return
+    const ranges = video.buffered
+    for (let i = 0; i < ranges.length; i++) {
+      if (ranges.start(i) > video.currentTime || ranges.end(i) < video.currentTime) continue
+      if (ranges.end(i) - video.currentTime < 4.5) return
+      const position = getBufferedLivePosition(video, { currentRangeOnly: true })
+      dispose()
+      if (position !== null && position > video.currentTime + 0.5) video.currentTime = position
+      return
+    }
+  }
+  hls.on(Hls.Events.FRAG_BUFFERED, attempt)
+  hls.on(Hls.Events.DESTROYING, dispose)
+  video.addEventListener('playing', attempt)
+  return dispose
 }

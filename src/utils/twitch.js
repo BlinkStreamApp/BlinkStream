@@ -6,6 +6,7 @@ import { logEvent } from './eventLog'
 import { isTauri } from './tauriEnv'
 
 export { isTauri }
+export { helixFetch as moderationHelix }
 
 export const TWITCH_LOGIN_REGEX = /^[a-z0-9_]{3,25}$/
 
@@ -97,7 +98,7 @@ async function helixFetch(url, opts = {}, meta = {}, signal) {
 
       let msg = `Error de Twitch (HTTP ${status})`
       if (isMissingScope) {
-        msg = 'Permisos de predicciones/encuestas no autorizados en tu cuenta. Haz clic en Iniciar sesión para renovar permisos.'
+        msg = 'Twitch no autoriza esta operación con la sesión actual. Comprueba la cuenta, el rol y los permisos concedidos.'
       } else if (isForbidden) {
         msg = 'Sin permisos de moderador o creador en este canal.'
       } else if (status === 404) {
@@ -785,7 +786,7 @@ export async function deleteCustomReward(broadcasterId, rewardId, manageToken) {
 
 export async function getRedemptions(broadcasterId, rewardId, status = 'UNFULFILLED', manageToken, userId, first = 50, after) {
   if (!broadcasterId || !rewardId) return _cpResult(false, undefined, 'broadcasterId y rewardId requeridos', ErrorCode.CHANNEL_POINTS_LIST_FAILED)
-  if (!manageToken || manageToken === 'viewer') return _cpResult(true, { data: [], cursor: null }) 
+  if (!manageToken || manageToken === 'viewer') return _cpResult(false, undefined, 'La cola completa requiere autorización del creador.', ErrorCode.AUTH_FAILED)
   const tokenRes = _cpResult(true, manageToken)
 
   const params = new URLSearchParams()
@@ -809,7 +810,7 @@ export async function getRedemptions(broadcasterId, rewardId, status = 'UNFULFIL
     )
     if (!res.ok) {
       if (res.status === 401 || res.status === 403 || res.status === 400) {
-        return _cpResult(true, { data: [], cursor: null })
+        return _cpResult(false, undefined, `Twitch HTTP ${res.status}: no se pudo consultar la cola de canjes.`, res.status === 401 ? ErrorCode.AUTH_FAILED : ErrorCode.CHANNEL_POINTS_REDEMPTION_FORBIDDEN)
       }
       const err = new AppError(ErrorCode.CHANNEL_POINTS_LIST_FAILED, `Twitch HTTP ${res.status}`, { action: 'list_redemptions' })
       logError(err, { context: 'channel-points', action: 'list_redemptions' })
@@ -1194,17 +1195,17 @@ export async function manageAutoModMessage(broadcasterId, moderatorId, msgId, ac
   )
 }
 
-export async function getUnbanRequests(broadcasterId, moderatorId, status = 'pending', first = 50, token = null) {
+export async function getUnbanRequests(broadcasterId, moderatorId, status = 'pending', first = 50, token = null, after = '') {
   if (!broadcasterId || !moderatorId) {
     return err(ErrorCode.MOD_ACTION_FAILED, 'broadcasterId y moderatorId requeridos', { action: 'getUnbanRequests' })
   }
   const result = await helixFetch(
-    `https://api.twitch.tv/helix/moderation/unban_requests?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&status=${encodeURIComponent(status)}&first=${first}`,
+    `https://api.twitch.tv/helix/moderation/unban_requests?broadcaster_id=${encodeURIComponent(broadcasterId)}&moderator_id=${encodeURIComponent(moderatorId)}&status=${encodeURIComponent(status)}&first=${first}${after ? `&after=${encodeURIComponent(after)}` : ''}`,
     { method: 'GET', token },
     { component: 'twitch', action: 'getUnbanRequests', broadcasterId, moderatorId, status },
   )
   if (!result.success) return result
-  return ok(result.value?.data || [])
+  return { ...ok(result.value?.data || []), nextCursor: result.value?.pagination?.cursor || '' }
 }
 
 export async function resolveUnbanRequest(broadcasterId, moderatorId, unbanRequestId, status, resolutionText = '', token = null) {
@@ -1355,3 +1356,17 @@ export async function getUserByLogin(login) {
 
 
 
+
+// Consulta fija de Helix para conversaciones con identidad estable.
+export async function getUserById(userId) {
+  if (typeof userId !== 'string' || !/^[0-9]{1,32}$/.test(userId)) {
+    return err(ErrorCode.TWITCH_API_ERROR, 'userId inválido', { action: 'getUserById' })
+  }
+  const result = await helixFetch(
+    `https://api.twitch.tv/helix/users?id=${encodeURIComponent(userId)}`,
+    { method: 'GET' },
+    { component: 'twitch', action: 'getUserById', userId },
+  )
+  if (!result.success) return result
+  return ok(result.value?.data?.[0] || null)
+}

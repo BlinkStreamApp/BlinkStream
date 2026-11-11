@@ -21,6 +21,17 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
 describe('prefetch startup playlist refresh', () => {
+  it('keeps the same initial reload cadence in the completed-segment comparison profile', () => {
+    const { hls, video, data } = fixture()
+    hls.config = { progressive: false }
+    data.networkDetails.blinkstreamPlaylist.prefetchCount = 0
+    const dispose = attachLivePlaylistBootstrap(hls, video)
+    hls.trigger(Hls.Events.LEVEL_LOADED, data)
+    vi.advanceTimersByTime(2000)
+    expect(hls.trigger).toHaveBeenCalledWith(Hls.Events.LEVEL_LOADING, expect.objectContaining({ url: data.levelInfo.uri }))
+    expect(video.currentTime).toBe(26)
+    dispose()
+  })
   it('requests the second playlist at the observed segment cadence, without seeking or restarting playback', () => {
     const { hls, video, data } = fixture()
     const dispose = attachLivePlaylistBootstrap(hls, video)

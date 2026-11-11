@@ -1,3 +1,4 @@
+import { NativePointsSummary } from './NativePointsSummary'
 import { useState } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { RedemptionConnectionNotice } from '../channelpoints/RedemptionConnectionNotice'
@@ -25,6 +26,13 @@ export function RewardsQueuePanel({
   realtime,
   error,
   channel,
+  account,
+  messages,
+  onOpenOfficial,
+  showSummary = true,
+  canManage = true,
+  observedRedemptions = [],
+  feedState,
 }) {
   const t = useT()
   const [tab, setTab] = useState('all') // 'all' | 'pending' | 'fulfilled'
@@ -33,7 +41,7 @@ export function RewardsQueuePanel({
   const [blockedRewards, setBlockedRewards] = useState(() => new Set())
 
   const handleAction = async (redemption, action) => {
-    if (!redemption?.id) return
+    if (!redemption?.id || !canManage || redemption.manageable === false || actionPending[redemption.id]) return
     setActionPending(prev => ({ ...prev, [redemption.id]: true }))
     setActionError(null)
     try {
@@ -54,17 +62,26 @@ export function RewardsQueuePanel({
     }
   }
 
+  const managed = [...pendingRedemptions.map(r => ({ ...r, status: r.status || 'UNFULFILLED' })), ...fulfilledRedemptions]
+  const managedIds = new Set(managed.map(r => r.id))
+  const allRedemptions = [...managed, ...observedRedemptions.filter(r => !managedIds.has(r.id))]
+  const pending = allRedemptions.filter(r => r.status === 'UNFULFILLED')
+  const fulfilled = allRedemptions.filter(r => r.status === 'FULFILLED')
   const displayedList =
     tab === 'pending'
-      ? pendingRedemptions
+      ? pending
       : tab === 'fulfilled'
-      ? fulfilledRedemptions
-      : [...pendingRedemptions, ...fulfilledRedemptions].sort(
+      ? fulfilled
+      : tab === 'observed' ? allRedemptions.filter(r => r.manageable === false)
+      : allRedemptions.sort(
           (a, b) => new Date(b.redeemed_at) - new Date(a.redeemed_at)
         )
 
   return (
     <div className="h-full flex flex-col font-sans">
+      {showSummary && account !== undefined && <NativePointsSummary account={account} channel={channel} messages={messages} onOpenOfficial={onOpenOfficial} />}
+      {!canManage && <p className="native-mod-notice">{t('points.viewer.creatorQueue')}</p>}
+      {feedState && <p className="native-mod-notice">{t(`channel.activity.${feedState}`)} · {t('channel.activity.sessionOnly')}</p>}
       <RedemptionConnectionNotice connection={realtime} />
       <ModDataNotice error={error} />
       {actionError && <p role="alert" className="px-3 py-2 text-xs text-red-400">{actionError}</p>}
@@ -74,7 +91,7 @@ export function RewardsQueuePanel({
         <div className="flex items-center gap-1.5">
           <PhosphorIcon name="Gift" size={16} className="text-twitch-glow" weight="duotone" />
           <span className="text-xs font-bold text-white uppercase tracking-wider">
-            Puntos de Canal ({pendingRedemptions.length + fulfilledRedemptions.length})
+            Puntos de Canal ({allRedemptions.length})
           </span>
         </div>
 
@@ -89,7 +106,7 @@ export function RewardsQueuePanel({
       </div>
 
       {/* Sub Tabs Bar */}
-      <div className="shrink-0 px-2.5 py-1.5 border-b border-white/10 bg-white/[0.01] flex items-center gap-1">
+      <div className="shrink-0 px-2.5 py-1.5 border-b border-white/10 bg-white/[0.01] flex flex-wrap items-center gap-1">
         <button
           onClick={() => setTab('all')}
           className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 ${
@@ -98,7 +115,7 @@ export function RewardsQueuePanel({
               : 'text-white/60 hover:text-white'
           }`}
         >
-          Todos ({pendingRedemptions.length + fulfilledRedemptions.length})
+          Todos ({allRedemptions.length})
         </button>
         <button
           onClick={() => setTab('pending')}
@@ -109,9 +126,9 @@ export function RewardsQueuePanel({
           }`}
         >
           <span>⏳ Solicitudes</span>
-          {pendingRedemptions.length > 0 && (
+          {pending.length > 0 && (
             <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-black text-[10px] font-black">
-              {pendingRedemptions.length}
+              {pending.length}
             </span>
           )}
         </button>
@@ -123,8 +140,9 @@ export function RewardsQueuePanel({
               : 'text-white/60 hover:text-white'
           }`}
         >
-          <span>✅ Completadas ({fulfilledRedemptions.length})</span>
+          <span>✅ Completadas ({fulfilled.length})</span>
         </button>
+        {observedRedemptions.length > 0 && <button type="button" className={`px-2 py-1 rounded-lg text-xs shrink-0 ${tab === 'observed' ? 'bg-twitch/20 text-twitch-glow' : 'text-white/60'}`} onClick={() => setTab('observed')}>{t('channel.activity.notices')} ({observedRedemptions.length})</button>}
       </div>
 
       {/* Redemptions List */}
@@ -140,7 +158,7 @@ export function RewardsQueuePanel({
               <PhosphorIcon name="Gift" size={20} weight="duotone" />
             </div>
             <p className="text-xs font-semibold text-white/70">
-              {tab === 'fulfilled' ? 'Sin canjes registrados' : 'Sin solicitudes pendientes'}
+              {feedState ? t('channel.activity.noNotices') : tab === 'fulfilled' ? 'Sin canjes registrados' : 'Sin solicitudes pendientes'}
             </p>
             <p className="text-[10px] text-text-muted mt-0.5 max-w-[220px]">
               {tab === 'pending'
@@ -152,7 +170,8 @@ export function RewardsQueuePanel({
           displayedList.map(item => {
             const isPending = actionPending[item.id]
             const blocked = blockedRewards.has(item.reward_id || item.reward?.id || `redemption:${item.id}`)
-            const isUnfulfilled = item.status !== 'FULFILLED' && item.status !== 'CANCELED'
+            const isUnfulfilled = item.status === 'UNFULFILLED'
+            const knownOutcome = item.status === 'FULFILLED' || item.status === 'CANCELED'
             const username = item.user_login || item.user_name || 'Espectador'
             const rewardTitle = item.reward_title || item.reward?.title || 'Recompensa'
             const cost = item.reward?.cost || item.cost || 0
@@ -180,7 +199,7 @@ export function RewardsQueuePanel({
                           : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                       }`}
                     >
-                      {isUnfulfilled ? 'Pendiente' : 'Completado'}
+                      {isUnfulfilled ? 'Pendiente' : item.status === 'FULFILLED' ? 'Completado' : item.status === 'CANCELED' ? t('channel.activity.refunded') : t('channel.activity.confirmed')}
                     </span>
                   </div>
                 </div>
@@ -205,12 +224,13 @@ export function RewardsQueuePanel({
                     </p>
                   </div>
                 )}
+                {item.manageable === false && <p className="text-[10px] text-text-muted">{t(item.source === 'local-confirmed' ? 'channel.activity.localReceipt' : 'channel.activity.publicNotice')}{!knownOutcome && !isUnfulfilled && ` · ${t('channel.activity.queueUnknown')}`}</p>}
 
-                {isUnfulfilled && (
+                {isUnfulfilled && canManage && item.manageable !== false && (
                   <div className="flex items-center justify-end gap-1.5 pt-1">
                     <button
                       onClick={() => handleAction(item, 'CANCELED')}
-                      disabled={isPending || blocked}
+                      disabled={!canManage || isPending || blocked}
                       className="flex items-center gap-1 px-2.5 py-1 bg-red-500/15 hover:bg-red-500/30 text-red-300 border border-red-500/30 hover:border-red-500/50 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
                       title="Rechazar y reembolsar puntos"
                     >
@@ -219,7 +239,7 @@ export function RewardsQueuePanel({
                     </button>
                     <button
                       onClick={() => handleAction(item, 'FULFILLED')}
-                      disabled={isPending || blocked}
+                      disabled={!canManage || isPending || blocked}
                       className="flex items-center gap-1 px-2.5 py-1 bg-green-500/15 hover:bg-green-500/30 text-green-300 border border-green-500/30 hover:border-green-500/50 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
                       title="Marcar como cumplida"
                     >
@@ -228,6 +248,7 @@ export function RewardsQueuePanel({
                     </button>
                   </div>
                 )}
+                {isUnfulfilled && item.manageable === false && onOpenOfficial && <button type="button" className="text-xs text-twitch-glow" onClick={onOpenOfficial}>{t('mod.native.openOfficial')}</button>}
               </div>
             )
           })

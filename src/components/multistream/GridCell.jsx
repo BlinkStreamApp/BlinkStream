@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Hls from 'hls.js'
 import { LIVE_PLAYBACK_CONFIG, applyLivePlaybackPolicy } from '../../utils/livePlayback'
 import { measureInvoke } from '../../utils/perf'
-import { LIVE_HLS_TRANSPORT, HLS_WORKER_CONFIG, attachLivePlaylistBootstrap } from '../../utils/tauriHls'
+import { PUBLISHED_LIVE_HLS_TRANSPORT, HLS_WORKER_CONFIG, attachLivePlaylistBootstrap } from '../../utils/tauriHls'
 import { useT, t as translate } from '../../utils/i18n'
 import { useStereoPanner } from '../../hooks/useStereoPanner'
 import PhosphorIcon from '../icons/PhosphorIcon'
@@ -93,7 +93,7 @@ export default function GridCell({
     if (Hls.isSupported()) {
       hls = new Hls({
         ...HLS_WORKER_CONFIG,
-        ...LIVE_HLS_TRANSPORT,
+        ...PUBLISHED_LIVE_HLS_TRANSPORT,
         ...LIVE_PLAYBACK_CONFIG,
         backBufferLength: 15,
         maxBufferLength: 10,

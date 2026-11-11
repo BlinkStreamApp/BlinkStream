@@ -11,25 +11,32 @@ const LS_AUDIT_PREFIX = 'bs.modAudit.'
 
 const _rateWindows = new Map() 
 
-function _auditKey(channelId) {
-  return `${LS_AUDIT_PREFIX}${channelId}`
+// Only mounted scopes retain a fallback when browser storage is unavailable.
+const _auditScopes = new Map()
+
+function _auditKey(accountId, channelId) {
+  return accountId && channelId
+    ? `${LS_AUDIT_PREFIX}v2.${encodeURIComponent(accountId).replaceAll('.', '%2E')}.${encodeURIComponent(channelId).replaceAll('.', '%2E')}`
+    : null
 }
 
-function _loadAudit(channelId) {
+function _loadAudit(key) {
+  if (!key) return []
+  const scope = _auditScopes.get(key)
+  if (scope?.pendingWrite) return scope.rows
   try {
-    const raw = localStorage.getItem(_auditKey(channelId))
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]')
     if (!Array.isArray(parsed)) return []
-
-    return parsed.filter(e => e && typeof e.timestamp === 'number' && typeof e.action === 'string')
-  } catch { return [] }
+    return parsed.filter(e => e && typeof e.timestamp === 'number' && typeof e.action === 'string').slice(-AUDIT_MAX)
+  } catch { return _auditScopes.get(key)?.rows || [] }
 }
 
-function _saveAudit(channelId, log) {
-  try {
-    localStorage.setItem(_auditKey(channelId), JSON.stringify(log.slice(-AUDIT_MAX)))
-  } catch {  }
+function _publishAudit(key, rows, pendingWrite) {
+  const scope = _auditScopes.get(key)
+  if (!scope) return
+  scope.rows = rows
+  if (pendingWrite !== undefined) scope.pendingWrite = pendingWrite
+  for (const listener of scope.listeners) listener({ key, rows })
 }
 
 function _nowMs() { return Date.now() }
@@ -62,22 +69,29 @@ export function clearRateLimitState(channelId) {
 }
 
 export function useModeration({ broadcasterId, userId: moderatorId, maxActions = 20, windowMs = 30000 } = {}) {
-  const [auditLog, setAuditLog] = useState([])
+  const auditKey = _auditKey(moderatorId, broadcasterId)
+  const [auditSnapshot, setAuditSnapshot] = useState({ key: null, rows: [] })
+  const auditLog = auditKey && auditSnapshot.key === auditKey ? auditSnapshot.rows : []
   const [isRateLimited, setIsRateLimited] = useState(false)
   const [remainingActions, setRemainingActions] = useState(maxActions)
   const [rateLimitResetMs, setRateLimitResetMs] = useState(0)
   const resetTimerRef = useRef(null)
 
   useEffect(() => {
-    if (!broadcasterId) {
-
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAuditLog([])
-      return
+    if (!auditKey) return
+    let scope = _auditScopes.get(auditKey)
+    if (!scope) {
+      scope = { rows: _loadAudit(auditKey), pendingWrite: false, listeners: new Set() }
+      _auditScopes.set(auditKey, scope)
     }
-
-    setAuditLog(_loadAudit(broadcasterId))
-  }, [broadcasterId])
+    scope.listeners.add(setAuditSnapshot)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAuditSnapshot({ key: auditKey, rows: scope.rows })
+    return () => {
+      scope.listeners.delete(setAuditSnapshot)
+      if (!scope.listeners.size) _auditScopes.delete(auditKey)
+    }
+  }, [auditKey])
 
   useEffect(() => {
     if (!broadcasterId) {
@@ -121,20 +135,20 @@ export function useModeration({ broadcasterId, userId: moderatorId, maxActions =
   }, [isRateLimited, rateLimitResetMs, broadcasterId, maxActions, windowMs])
 
   const _appendAudit = useCallback((entry) => {
-    if (!broadcasterId) return
+    if (!auditKey) return
     const full = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, timestamp: Date.now(), ...entry }
-    setAuditLog(prev => {
-      const next = [...prev, full].slice(-AUDIT_MAX)
-      _saveAudit(broadcasterId, next)
-      return next
-    })
+    // Merge synchronously with storage, never with another render's rows.
+    const next = [..._loadAudit(auditKey), full].slice(-AUDIT_MAX)
+    let pendingWrite = false
+    try { localStorage.setItem(auditKey, JSON.stringify(next)) } catch { pendingWrite = true }
+    _publishAudit(auditKey, next, pendingWrite)
     logEvent('mod', `${entry.action}.${entry.success ? 'ok' : 'fail'}`, {
       target: entry.targetName,
       reason: entry.reason,
       duration: entry.duration,
       error: entry.error,
     })
-  }, [broadcasterId])
+  }, [auditKey])
 
   const _checkAndClaimSlot = useCallback(() => {
     if (!broadcasterId) return false
@@ -306,15 +320,16 @@ export function useModeration({ broadcasterId, userId: moderatorId, maxActions =
   }, [broadcasterId, moderatorId])
 
   const clearAuditLog = useCallback(() => {
-    if (!broadcasterId) return
-    try { localStorage.removeItem(_auditKey(broadcasterId)) } catch {  }
-    setAuditLog([])
-  }, [broadcasterId])
+    if (!auditKey) return
+    let pendingWrite = false
+    try { localStorage.removeItem(auditKey) } catch { pendingWrite = true }
+    _publishAudit(auditKey, [], pendingWrite)
+  }, [auditKey])
 
   const reloadAuditLog = useCallback(() => {
-    if (!broadcasterId) return
-    setAuditLog(_loadAudit(broadcasterId))
-  }, [broadcasterId])
+    if (!auditKey) return
+    _publishAudit(auditKey, _loadAudit(auditKey))
+  }, [auditKey])
 
   return {
     auditLog,

@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
+import { BRAND_ICON_THEMES, getBrandIconTheme, saveAndApplyBrandIconTheme, subscribeToIconStyle } from '../../utils/hslTheme'
+import BrandIcon from '../icons/BrandIcon'
 import { useT } from '../../utils/i18n'
 import { HSL_PRESETS, FONT_PRESETS, ICON_STYLES, applyStoredHslTheme, saveAndApplyHslTheme, applyStoredCustomFont, saveAndApplyCustomFont, applyStoredCustomIconStyle, saveAndApplyCustomIconStyle } from '../../utils/hslTheme'
 import PhosphorIcon from '../icons/PhosphorIcon'
 
 export default function HslThemeStudio() {
   const t = useT()
+  const brandTheme = useSyncExternalStore(subscribeToIconStyle, getBrandIconTheme, () => 'classic')
   const [current, setCurrent] = useState(() => applyStoredHslTheme())
   const [currentFont, setCurrentFont] = useState(() => applyStoredCustomFont())
   const [currentIconStyle, setCurrentIconStyle] = useState(() => applyStoredCustomIconStyle())
@@ -44,16 +47,26 @@ export default function HslThemeStudio() {
         </div>
         <div className="min-w-0 flex-1 z-10">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-extrabold text-white tracking-tight">{t('hsl.title', 'Estudio Completo de Personalización & Temas')}</h3>
-            <span className="text-[10px] bg-twitch/30 border border-twitch px-2 py-0.5 rounded-full text-twitch-light font-bold uppercase tracking-wider">v2.2 Engine</span>
+            <h3 className="text-base font-extrabold text-white tracking-tight">{t('settings.appearance', 'Personalización')}</h3>
           </div>
-          <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-            {t('hsl.desc', 'Configura y esculpe la identidad visual de tu cliente en tiempo real. Todos los cambios de tipografía, iconografía y color de neón se aplican en vivo y se guardan al instante.')}
+          <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
+            {t('settings.appearanceDescription')}
           </p>
         </div>
       </div>
 
       {}
+      <section className="rounded-2xl border border-white/10 bg-bg-tertiary/25 p-4 sm:p-5 space-y-4" aria-label={t('icons.theme.title')}>
+        <div><h3 className="font-semibold">{t('icons.theme.title')}</h3><p className="mt-1 text-sm text-text-secondary">{t('icons.theme.description')}</p></div>
+        <div className="grid grid-cols-1 min-[480px]:grid-cols-2 xl:grid-cols-3 gap-3">
+          {BRAND_ICON_THEMES.map(theme => <button type="button" key={theme.id} aria-pressed={brandTheme === theme.id} onClick={() => saveAndApplyBrandIconTheme(theme.id)} className={`flex min-h-24 items-center gap-3 rounded-xl border p-3 text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-twitch ${brandTheme === theme.id ? 'border-twitch bg-twitch/10' : 'border-white/10 hover:bg-white/5'}`}>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-black/30"><BrandIcon name="settings" theme={theme.id} size={34} /></span>
+            <span className="min-w-0 flex-1 text-sm font-semibold">{theme.id === 'classic' ? t('icons.theme.classic') : theme.name}</span>
+            <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: theme.color }} />
+          </button>)}
+        </div>
+      </section>
+
       <div className="bg-[#12121a]/60 border border-white/[0.06] rounded-2xl p-5 space-y-4 backdrop-blur-md shadow-sm">
         <div className="flex items-center justify-between">
           <h4 className="text-[13px] font-bold text-text-primary flex items-center gap-2">

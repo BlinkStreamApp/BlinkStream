@@ -36,7 +36,7 @@ keeps its own interface. All new search controls support the eight interface lan
 | 🌍 **Global Localization** | Core interface supports 8 languages (ES, EN, FR, DE, PT, JA, KO, RU); new experimental screens may still contain Spanish copy |
 | 💬 **Twitch Popout Chat & Channel Points** | Official Twitch chat embeds in the individual chat panel, with a separate native window available manually. It provides channel points, viewer reward redemption and emotes. The BlinkStream rewards catalog links to official chat; creator management uses the permissions Twitch grants to the app. |
 | **Twitch GIFs in lightweight chat** | Native Twitch GIF messages render alongside text and emotes, with bounded lazy-loaded images, descriptive fallback and retry. GIF metadata comes from the documented IRC tags; sending GIFs is not part of this feature. |
-| 🛡️ **Pro Mod View Workspace** | Dedicated multi-dock command center (`Ctrl+M`) with live mod logs, AutoMod queue, unban appeals, active viewers, predictions, and channel point redemptions |
+| 🛡️ **Pro Mod View Workspace** | Redesigned workspace (`Ctrl+M`) with Activity search/filters, account/channel-scoped local Log and official fallback; available actions depend on role, granted scopes and connected data sources |
 | ⚡ **Low Latency (LL-HLS)** | Live-edge synchronization, dynamic catchup and one-click live resync; latency depends on stream/network conditions |
 | 💬 **Rich IRC Chat & Badges** | Real-time chat with 7TV/BTTV/FFZ emotes, optimistic badge rendering (Sub, Mod, VIP, Founder, Turbo), and custom colors |
 | 🎮 **Gamer Chat Overlay (HUD)** | Transparent always-on-top HUD with click-through and opacity controls to read chat over full-screen games |
@@ -67,7 +67,7 @@ Store installations receive updates through Microsoft Store; GitHub installation
 use the separate signed updater below.
 
 Download an already published installer from [GitHub Releases](https://github.com/BlinkStreamApp/BlinkStream/releases/latest).
-**Source 1.5.4 is a release candidate for Mod View and enhanced-broadcast playback fixes.** Real-account 1440p playback acceptance is still required before publication. GitHub downloads/updater remain on verified 1.5.3; Microsoft Store submissions are separate (last confirmed public version: 1.5.2). The maintainer handles Store submissions. See [MSIX packaging](docs/guides/MSIX_STORE.md). Updater signatures are not Windows Authenticode.
+**Source 1.5.4 prepares the redesigned Mod View, Community, native whispers, Activity search/filters and playback improvements.** The user confirmed Activity search, filters and a real interruption notice in candidate 63 on 2026-11-11; this is scoped acceptance. Public downloads/updater remain on verified 1.5.3 until 1.5.4 signatures and release gates are confirmed. Microsoft Store is separate (last confirmed: 1.5.2); see [MSIX packaging](docs/guides/MSIX_STORE.md). Official Drops catalog/inventory remain the fallback; native catalog, Auto-Claim and native redemption require the experimental compile-time flag and are excluded from Store. Updater signatures are not Windows Authenticode.
 
 The Store edition includes Streamlink/Python/FFmpeg with their original notices;
 WebView2 Evergreen remains an external prerequisite. The maintainer confirms 1.5.2

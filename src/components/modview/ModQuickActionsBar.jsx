@@ -13,11 +13,14 @@ export function ModQuickActionsBar({
   remainingActions = 20,
   isRateLimited = false,
   onOpenLayoutDrawer,
+  shieldActive = false,
+  onShieldChange,
+  shieldAvailable = false,
+  shieldPending = false,
 }) {
   const t = useT()
   const [activeMenu, setActiveMenu] = useState(null) // 'slow' | 'followers' | null
   const [confirmClear, setConfirmClear] = useState(false)
-  const [shieldActive, setShieldActive] = useState(false)
   const menuContainerRef = useRef(null)
 
   // Notify Webview to hide when a dropdown menu is open, and restore when closed
@@ -26,6 +29,7 @@ export function ModQuickActionsBar({
       window.dispatchEvent(new CustomEvent('bs:modal-state-change', {
         detail: { open: Boolean(activeMenu) }
       }))
+      return () => window.dispatchEvent(new CustomEvent('bs:modal-state-change', { detail: { open: false } }))
     }
   }, [activeMenu])
 
@@ -87,18 +91,7 @@ export function ModQuickActionsBar({
 
   const handleShieldToggle = () => {
     setActiveMenu(null)
-    if (!shieldActive) {
-      // Enable extreme protection: Emote-only + Sub-only + Slow 30s
-      onSetMode?.('emoteonly')
-      onSetMode?.('subscribers')
-      onSetMode?.('slow', '30')
-      setShieldActive(true)
-    } else {
-      onSetMode?.('emoteonlyoff')
-      onSetMode?.('subscribersoff')
-      onSetMode?.('slowoff')
-      setShieldActive(false)
-    }
+    if (shieldAvailable && !shieldPending) onShieldChange?.(!shieldActive)
   }
 
   return (
@@ -120,6 +113,7 @@ export function ModQuickActionsBar({
         {/* Shield Mode */}
         <button
           onClick={handleShieldToggle}
+          disabled={!shieldAvailable || shieldPending}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all border ${
             shieldActive
               ? 'bg-red-500/20 border-red-500/60 text-red-300 shadow-lg shadow-red-500/20 animate-pulse'

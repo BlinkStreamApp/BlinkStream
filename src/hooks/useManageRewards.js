@@ -197,7 +197,7 @@ export function useManageRewards({ broadcasterId, channel, token, pollIntervalMs
             detail: {
               id: rd.id, broadcaster_id: String(broadcasterId), eventType: 'reward', isReward: true,
               user: rd.user_name || rd.user_login, user_id: rd.user_id,
-              reward_title: rd.reward_title, cost: rd.cost,
+              reward_title: rd.reward_title, reward_id: rd.reward_id, cost: rd.cost, status: rd.status, redeemed_at: rd.redeemed_at,
               eventHeader: `🎁 ${rd.user_name || rd.user_login} ha canjeado ${rd.reward_title} (${rd.cost} pts)`,
               message: rd.user_input || '', text: rd.user_input || '',
               timestamp: new Date(rd.redeemed_at).getTime() || Date.now(),

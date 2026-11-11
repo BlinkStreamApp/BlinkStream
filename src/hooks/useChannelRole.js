@@ -34,12 +34,15 @@ function setCached(broadcasterId, userId, channel, role) {
 }
 
 export function useChannelRole({ broadcasterId, userId, channel } = {}) {
-  const [role, setRole] = useState('unknown')
+  const [resolvedRole, setResolvedRole] = useState(null)
+  const role = resolvedRole && resolvedRole.broadcasterId === broadcasterId && resolvedRole?.userId === userId && resolvedRole?.channel === channel ? resolvedRole.role : 'unknown'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const abortRef = useRef(null)
 
   const fetchRole = useCallback(async (bId, uId, ch) => {
+    abortRef.current?.abort()
+    const setRole = role => setResolvedRole({ broadcasterId: bId, userId: uId, channel: ch, role })
     if (!ch && !bId) {
       setRole('unknown')
       setLoading(false)
@@ -54,7 +57,6 @@ export function useChannelRole({ broadcasterId, userId, channel } = {}) {
       return
     }
 
-    abortRef.current?.abort()
     const ac = new AbortController()
     abortRef.current = ac
     setLoading(true)
@@ -82,12 +84,17 @@ export function useChannelRole({ broadcasterId, userId, channel } = {}) {
   useEffect(() => {
     const handleRoleEvent = (e) => {
       const detail = e?.detail
-      if (detail && detail.channel && channel && detail.channel.toLowerCase() === channel.toLowerCase()) {
-        if (detail.role && detail.role !== 'unknown') {
-          setRole(detail.role)
-          setCached(broadcasterId, userId, channel, detail.role)
-        }
-      }
+      if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return
+      if (typeof userId !== 'string' || !/^[1-9][0-9]*$/.test(userId)) return
+      if (typeof detail.userId !== 'string' || detail.userId !== userId) return
+      if (typeof channel !== 'string' || typeof detail.channel !== 'string') return
+      if (!/^[a-zA-Z0-9_]{1,25}$/.test(detail.channel) || detail.channel.toLowerCase() !== channel.toLowerCase()) return
+      if (!['viewer', 'vip', 'mod', 'broadcaster'].includes(detail.role)) return
+      abortRef.current?.abort()
+      setLoading(false)
+      setError(null)
+      setResolvedRole({ broadcasterId, userId, channel, role: detail.role })
+      setCached(broadcasterId, userId, channel, detail.role)
     }
     window.addEventListener('bs:user-role-detected', handleRoleEvent)
     return () => window.removeEventListener('bs:user-role-detected', handleRoleEvent)

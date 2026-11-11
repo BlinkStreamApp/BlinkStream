@@ -1,10 +1,15 @@
+import { createElement } from 'react'
 
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import NativeWhispers from '../components/chat/NativeWhispers'
+import { startRewardEventSub } from '../utils/twitchEventSub'
+import { getWhisperUnread, openWhisperInbox } from '../utils/whispers'
 import { mockResponse } from '../test/__mocks__/response'
 
-const invokeMock = vi.fn(async () => null)
+const invokeMock = vi.hoisted(() => vi.fn(async () => null))
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }))
@@ -12,6 +17,8 @@ vi.mock('@tauri-apps/api/core', () => ({
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn(async () => undefined),
 }))
+
+vi.mock('../utils/twitchEventSub', () => ({ startRewardEventSub: vi.fn(() => vi.fn()) }))
 
 const { useAuth } = await import('./useAuth')
 
@@ -242,4 +249,37 @@ describe('useAuth', () => {
     expect(result.current.user.username).toBe('bob')
     expect(result.current.error).toBeNull()
   })
+})
+
+it('manual same-account authorization restarts actual whisper reception and keeps history', async () => {
+  const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse({
+    ok: true, json: async () => ({ data: [{ id: '1', login: 'fixture_user' }] }),
+  }))
+  invokeMock.mockResolvedValue(null)
+  startRewardEventSub.mockClear()
+  const { result } = renderHook(() => useAuth())
+  await waitFor(() => expect(result.current.loading).toBe(false))
+  render(createElement(NativeWhispers, { account: '1' }))
+  const first = startRewardEventSub.mock.calls[0][0]
+  const stop = startRewardEventSub.mock.results[0].value
+  act(() => first.moderation.onEvent({ event: {
+    whisper_id: 'manual-fixture', from_user_id: '2', from_user_login: 'fixture_peer',
+    to_user_id: '1', whisper: { text: 'Synthetic history' },
+  } }))
+  expect(getWhisperUnread('1')).toBe(1)
+  await act(async () => { await result.current.loginWithToken('oauth:synthetic-manual-token') })
+  expect(stop).toHaveBeenCalledOnce()
+  expect(startRewardEventSub).toHaveBeenCalledTimes(2)
+  expect(result.current.getTwitchToken()).toBe('synthetic-manual-token')
+  expect(getWhisperUnread('1')).toBe(1)
+  const secondStop = startRewardEventSub.mock.results[1].value
+  await act(async () => { await result.current.loginWithToken('synthetic-renewed-token') })
+  expect(secondStop).toHaveBeenCalledOnce()
+  expect(startRewardEventSub).toHaveBeenCalledTimes(3)
+  expect(getWhisperUnread('1')).toBe(1)
+  fetchMock.mockResolvedValue(mockResponse({ ok: false, status: 401 }))
+  await act(async () => { await result.current.loginWithToken('synthetic-invalid-token') })
+  expect(startRewardEventSub).toHaveBeenCalledTimes(3)
+  act(openWhisperInbox)
+  expect(screen.getByText('Synthetic history')).toBeVisible()
 })

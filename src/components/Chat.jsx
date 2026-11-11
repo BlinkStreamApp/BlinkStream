@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { PUBLIC_CLIENT_ID, sanitizeChannelForGraphQL, getHeaders, banUser, unbanUser, clearChatMessages, updateChatSettings, getUserIdByLogin } from '../utils/twitch'
 import PhosphorIcon from './icons/PhosphorIcon'
+import BrandIcon from './icons/BrandIcon'
+import { createPortal } from 'react-dom'
+import DropsModal from './drops/DropsModal'
 import { adjustColorContrast } from '../utils/format'
 
 import { MessageContextMenu } from './moderation/MessageContextMenu'
@@ -17,7 +20,10 @@ import ChatSearchPanel from './chat/ChatSearchPanel'
 import { ActiveModsPanel } from './modview/ActiveModsPanel'
 import TwitchChatGif from './chat/TwitchChatGif'
 import { parseChatGifs } from '../utils/chatGifs'
+import { buildEmoteTrie, matchEmotesInText } from '../utils/chatEmotes'
 import { CHAT_URL_REGEX as URL_REGEX, EMPTY_CHAT_SEARCH, createChatSearchMatcher } from '../utils/chatSearch'
+import { useChannelActivity } from '../hooks/useChannelActivity'
+import { mergeRedemptionMessages, recordChannelRedemption } from '../utils/channelActivity'
 
 async function gqlGetUserIdByLogin(channel) {
   const login = sanitizeChannelForGraphQL(channel)
@@ -39,6 +45,9 @@ async function gqlGetUserIdByLogin(channel) {
 }
 
 import logo7tv from '../assets/7tv.png'
+
+const CHAT_TOOL_BUTTON = 'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 transition-colors hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer'
+
 import logoBttv from '../assets/bttv.png'
 import logoFfz from '../assets/ffz.png'
 
@@ -51,7 +60,7 @@ function _saveCustomClientId(id) {
   try { localStorage.setItem('blinkstream_custom_client_id', id || '') } catch {  }
 }
 
-const EMOTE_RE = /^[\w-]+$/
+
 
 function parseMessageTags(tags) {
   const obj = {}
@@ -107,99 +116,6 @@ function renderTextWithLinks(text, partIdx, t) {
   })
   if (lastIdx < text.length) {
     parts.push(text.slice(lastIdx))
-  }
-  return parts
-}
-
-function buildEmoteTrie(emotes) {
-  const root = {}
-  for (const [code, data] of Object.entries(emotes)) {
-    if (!EMOTE_RE.test(code)) continue
-    const key = code.toLowerCase()
-    let node = root
-    for (const ch of key) {
-      if (!node[ch]) node[ch] = {}
-      node = node[ch]
-    }
-    node.$ = data
-  }
-  return root
-}
-
-function matchEmotesInText(text, twitchEmotesStr, trie, gifs = []) {
-  const emoteMap = {}
-  const gifMap = new Map(gifs.map(gif => [gif.start, gif]))
-  if (twitchEmotesStr) {
-    twitchEmotesStr.split('/').forEach(pair => {
-      const [id, positions] = pair.split(':')
-      if (id && positions) {
-        positions.split(',').forEach(range => {
-          const [start, end] = range.split('-')
-          const span = { id, start: Number(start), end: Number(end) + 1 }
-          if (!gifs.some(gif => span.start < gif.end && span.end > gif.start)) emoteMap[span.start] = span
-        })
-      }
-    })
-  }
-
-  const isWordChar = (ch) => /[\w\u00C0-\u024F]/.test(ch)
-
-  const hasWordBoundaries = (start, end) => {
-    const beforeOk = start === 0 || !isWordChar(text[start - 1])
-    const afterOk = end >= text.length || !isWordChar(text[end])
-    return beforeOk && afterOk
-  }
-
-  const parts = []
-  let i = 0
-  while (i < text.length) {
-    if (gifMap.has(i)) {
-      const gif = gifMap.get(i)
-      parts.push({ type: 'gif', ...gif })
-      i = gif.end
-      continue
-    }
-    if (emoteMap[i]) {
-      const em = emoteMap[i]
-      parts.push({ type: 'twitch-emote', id: em.id, text: text.slice(em.start, em.end) })
-      i = em.end
-      continue
-    }
-
-    let node = trie
-    let bestMatch = null
-    let bestLen = 0
-    const lowerText = text.slice(i).toLowerCase()
-    for (let j = 0; j < lowerText.length && node[lowerText[j]]; j++) {
-      node = node[lowerText[j]]
-      if (node.$ && j + 1 > bestLen && hasWordBoundaries(i, i + j + 1) && !gifs.some(gif => i < gif.end && i + j + 1 > gif.start)) {
-        bestMatch = node.$
-        bestLen = j + 1
-      }
-    }
-    if (bestMatch) {
-      parts.push({ type: 'third-party-emote', urls: bestMatch.urls, name: text.slice(i, i + bestLen) })
-      i += bestLen
-      continue
-    }
-
-    let textStart = i
-    i++
-    while (i < text.length) {
-      if (emoteMap[i] || gifMap.has(i)) break
-      let found = false
-      const ch = text[i].toLowerCase()
-      if (trie[ch] && hasWordBoundaries(i, i + 1)) {
-        let n = trie[ch]
-        for (let j = i + 1; j < text.length && n[text[j].toLowerCase()]; j++) {
-          n = n[text[j].toLowerCase()]
-          if (n.$ && hasWordBoundaries(i, j + 1)) { found = true; break }
-        }
-      }
-      if (found) break
-      i++
-    }
-    parts.push({ type: 'text', text: text.slice(textStart, i) })
   }
   return parts
 }
@@ -498,8 +414,23 @@ export default function Chat({
   const channelsKey = normalizeChatChannels(isUnified ? chatChannels : [channel]).sort().join(',')
   const subscribedChannels = useMemo(() => channelsKey ? channelsKey.split(',') : [], [channelsKey])
   const [joinedChannels, setJoinedChannels] = useState([])
-  const [messages, setMessages] = useState([])
+  const [chatMessages, setMessages] = useState([])
+  const activity = useChannelActivity({ accountId: String(userId || ''), channel, channelId: broadcasterId, enabled: !isUnified && !isOverlay })
+  const messages = useMemo(() => mergeRedemptionMessages(chatMessages, activity.redemptions), [chatMessages, activity.redemptions])
+  useEffect(() => {
+    const onRedemption = ({ detail }) => {
+      if (String(detail?.broadcaster_id) !== String(broadcasterId)) return
+      recordChannelRedemption({ accountId: String(userId || ''), channel, channelId: broadcasterId }, { ...detail, reward_id: detail.reward_id || detail.custom_reward_id }, 'eventsub')
+    }
+    window.addEventListener('bs:reward-redemption', onRedemption)
+    return () => window.removeEventListener('bs:reward-redemption', onRedemption)
+  }, [broadcasterId, channel, userId])
   const [showCommunity, setShowCommunity] = useState(false)
+  const [showDrops, setShowDrops] = useState(false)
+  const communityButtonRef = useRef(null)
+  const communityBackRef = useRef(null)
+  const closeCommunity = () => { setShowCommunity(false); requestAnimationFrame(() => communityButtonRef.current?.focus()) }
+  useEffect(() => { if (showCommunity) communityBackRef.current?.focus() }, [showCommunity])
 
   useEffect(() => {
     onMessagesUpdate?.(messages)
@@ -1188,9 +1119,11 @@ export default function Chat({
       lineBufferRef.current = ''
       const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443')
       wsRef.current = ws
+      let authenticated = false
+      let socketUserId = ''
 
       ws.onopen = () => {
-        if (cancelled) { ws.close(); return }
+        if (cancelled || wsRef.current !== ws) { ws.close(); return }
         retryDelay = 1000
         ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership')
 
@@ -1198,6 +1131,7 @@ export default function Chat({
           const cleanToken = auth.token.replace(/^oauth:/i, '')
           ws.send(`PASS oauth:${cleanToken}`)
           ws.send(`NICK ${auth.username.toLowerCase()}`)
+          authenticated = true
         } else {
           ws.send('PASS SCHMOOPIIE')
           ws.send('NICK justinfan12345')
@@ -1253,12 +1187,17 @@ export default function Chat({
             seenIds.add(identity)
             if (seenIds.size > 1000) seenIds.delete(seenIds.values().next().value)
           }
-          const usernoticeIdx = parts.indexOf('USERNOTICE')
-          const privmsgIdx = parts.indexOf('PRIVMSG')
-          const userstateIdx = parts.indexOf('USERSTATE')
-          const globaluserstateIdx = parts.indexOf('GLOBALUSERSTATE')
+          const usernoticeIdx = command === 'USERNOTICE' ? parts.indexOf('USERNOTICE') : -1
+          const privmsgIdx = command === 'PRIVMSG' ? parts.indexOf('PRIVMSG') : -1
 
-          if (userstateIdx !== -1 || globaluserstateIdx !== -1) {
+          if (command === 'USERSTATE' || command === 'GLOBALUSERSTATE') {
+            if (prefix !== 'tmi.twitch.tv') continue
+            if (command === 'USERSTATE' && !channel) continue
+            // Identity belongs to this physical authenticated socket, never current props/storage.
+            if (command === 'GLOBALUSERSTATE' && authenticated && !channel) {
+              const id = parsedTags['user-id']
+              socketUserId = typeof id === 'string' && /^[1-9][0-9]*$/.test(id) ? id : ''
+            }
             const parsed = parseMessageTags(tags)
             if (parsed.badges) {
               const badgeList = parsed.badges.split(',').map(b => {
@@ -1285,10 +1224,11 @@ export default function Chat({
             const isIrcVip = badges.some(b => b.set === 'vip')
 
             const detectedRole = isIrcBroadcaster ? 'broadcaster' : isIrcMod ? 'mod' : isIrcVip ? 'vip' : 'viewer'
-            if (typeof window !== 'undefined' && channel) {
+            if (typeof window !== 'undefined' && command === 'USERSTATE' && channel && socketUserId) {
               window.dispatchEvent(new CustomEvent('bs:user-role-detected', {
                 detail: {
                   channel: channel.toLowerCase(),
+                  userId: socketUserId,
                   role: detectedRole,
                   isModerator: isIrcMod || isIrcBroadcaster,
                   isBroadcaster: isIrcBroadcaster,
@@ -1791,76 +1731,26 @@ export default function Chat({
           }}
         />
       )}
-      <div className={`h-full min-h-0 flex flex-col ${!isMod && !isUnified && useTwitchPopout ? 'invisible pointer-events-none absolute inset-0' : ''}`}>
-        <div className="shrink-0 px-2.5 py-1.5 bg-bg-secondary/50 backdrop-blur-sm border-b border-bg-tertiary/50 flex items-center justify-between gap-1.5 select-none">
+      {showCommunity && !isUnified && <section aria-label={t('community.title')} className="absolute inset-0 z-40 flex min-h-0 flex-col bg-bg-secondary" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); closeCommunity() } }}>
+        <header className="flex shrink-0 items-center gap-3 border-b border-white/10 px-3 py-3">
+          <button ref={communityBackRef} type="button" onClick={closeCommunity} aria-label={t('chat.layout.back')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-text-secondary hover:bg-white/10 cursor-pointer"><PhosphorIcon name="ArrowLeft" size={16} /></button>
+          <BrandIcon name="community" size={26} /><div className="min-w-0"><h3 className="text-sm font-semibold text-text-primary">{t('community.title')}</h3><p className="truncate text-xs text-text-muted">{channel}</p></div>
+        </header>
+        <div className="flex-1 min-h-0 overflow-hidden"><ActiveModsPanel key={`${channel}:${userId || auth.userId || ''}`} broadcasterId={broadcasterId} channelLogin={channel} userId={userId || auth.userId} recentMessages={messages} initialTab="groups" onInspectUser={user => { setShowCommunity(false); if (onSelectUserForInspection) onSelectUserForInspection(user); else setUserCard({ username: user.username, userId: user.userId, displayName: user.displayName }) }} /></div>
+      </section>}
+      <div inert={showCommunity && !isUnified ? true : undefined} aria-hidden={showCommunity && !isUnified ? true : undefined} className={`h-full min-h-0 flex flex-col ${showCommunity && !isUnified ? 'invisible pointer-events-none' : ''} ${!isMod && !isUnified && useTwitchPopout ? 'invisible pointer-events-none absolute inset-0' : ''}`}>
+        <div className="shrink-0 px-3 py-2 bg-bg-secondary/50 border-b border-bg-tertiary/50 flex flex-col gap-2 select-none">
           {/* Left: Channel indicator */}
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex w-full items-center gap-1.5 min-w-0">
             <span className={`w-2 h-2 rounded-full shrink-0 ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-xs text-text-primary font-bold truncate max-w-[100px] sm:max-w-[130px]">
+            <span className="min-w-0 text-xs text-text-primary font-bold truncate">
               {isUnified ? t('grid.unifiedChat', 'Chat unificado') : isOverlay ? t('chat', 'Chat') : channel}
             </span>
-          </div>
-
-        {/* Right: Action Buttons toolbar */}
-        <div className="flex items-center gap-1 shrink-0">
-          {!isUnified && <button type="button" aria-label={t('community.title')} title={t('community.title')} aria-expanded={showCommunity} onClick={() => setShowCommunity(value => !value)} className="rounded-lg p-1.5 text-text-muted hover:bg-white/10 cursor-pointer"><PhosphorIcon name="Users" size={15} /></button>}
-          <button ref={searchButtonRef} type="button" aria-label={t('chat.search.title', 'Buscar en el chat')} title={t('chat.search.title', 'Buscar en el chat')} aria-expanded={search.open} onClick={() => search.open ? closeSearch() : updateSearch({ open: true })} className={`rounded-lg p-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-twitch ${search.open ? 'bg-twitch/20 text-twitch-light' : 'text-text-muted hover:bg-white/10 hover:text-text-primary'}`}>
-            <PhosphorIcon name="MagnifyingGlass" size={15} weight="bold" />
-          </button>
-          {!isOverlay && !isUnified && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setUseTwitchPopout(true)
-                  try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
-                }}
-                className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg border border-twitch/40 bg-twitch/15 hover:bg-twitch/30 text-white transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95"
-                title={t('chat.ui.officialHint', 'Incrustar Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)')}
-                aria-label={t('chat.ui.official', 'Incrustar Popout Oficial de Twitch')}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-twitch shrink-0">
-                  <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z" />
-                </svg>
-                <span>Popout</span>
-              </button>
-
-              {/* Popout Floating Window Button */}
-              <button
-                type="button"
-                onClick={() => openTwitchChatPopoutWindow(channel, false, auth.token, auth.username)}
-                className="p-1.5 rounded-lg text-text-muted hover:text-cyan-300 hover:bg-white/10 transition-colors cursor-pointer"
-                title={t('chat.ui.floatingHint', 'Abrir Chat de Twitch en Ventana Flotante (Popout)')}
-                aria-label={t('chat.ui.floating', 'Abrir Popout Flotante')}
-              >
-                <PhosphorIcon name="ArrowSquareOut" size={15} weight="bold" />
-              </button>
-
-              {/* Gamer Overlay Launcher */}
-              {isTauri() && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await invoke('open_gamer_overlay', { channel })
-                    } catch (err) {
-                      console.warn('Failed to open gamer overlay:', err)
-                    }
-                  }}
-                  className="p-1.5 rounded-lg text-text-muted hover:text-cyan-400 hover:bg-white/10 transition-colors cursor-pointer"
-                  title={t('chat.ui.overlay', 'Abrir Overlay Gamer Transparente')}
-                  aria-label={t('chat.ui.overlay', 'Abrir Overlay Gamer Transparente')}
-                >
-                  <PhosphorIcon name="PictureInPicture" size={15} weight="duotone" />
-                </button>
-              )}
-            </>
-          )}
-
+            <span className="ml-auto shrink-0 text-[11px] tabular-nums text-text-muted" aria-live={isUnified ? 'polite' : undefined}>{isUnified ? `${joinedChannels.filter(name => subscribedChannels.includes(name)).length}/${subscribedChannels.length} ${t('grid.channels', 'canales')}` : messages.length}</span>
           {/* User Auth status */}
           {auth.token ? (
-            <div className="flex items-center gap-1 pl-1 border-l border-white/10 ml-0.5">
-              <span className="text-[11px] text-twitch/90 font-bold truncate max-w-[70px] sm:max-w-[100px]">
+            <div className="flex min-w-0 max-w-[45%] items-center gap-1.5 rounded-md bg-white/[0.04] px-2 py-1">
+              <BrandIcon name="account" size={16} /><span title={auth.username || t('chat.connected', 'Conectado')} className="min-w-0 text-[11px] text-text-secondary font-medium truncate">
                 {auth.username || t('chat.connected', 'Conectado')}
               </span>
               <span className="text-[9px] text-green-400 font-bold">✓</span>
@@ -1917,8 +1807,77 @@ export default function Chat({
             )}
           </div>
         )}
+          </div>
 
-        <span className={`ml-1 text-[11px] tabular-nums ${isUnified ? 'text-text-secondary' : 'text-text-muted/40'}`} aria-live={isUnified ? 'polite' : undefined}>{isUnified ? `${joinedChannels.filter(name => subscribedChannels.includes(name)).length}/${subscribedChannels.length} ${t('grid.channels', 'canales')}` : messages.length}</span>
+        {/* Right: Action Buttons toolbar */}
+        <div role="toolbar" aria-label={t('chat.tools')} onKeyDown={event => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+          const buttons = Array.from(event.currentTarget.querySelectorAll('button:not([disabled])'))
+          const index = buttons.indexOf(document.activeElement)
+          if (index < 0) return
+          event.preventDefault()
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length
+          buttons[next]?.focus()
+        }} className="flex w-full min-w-0 items-center justify-between gap-2 text-text-secondary">
+          <div className="flex items-center gap-1">
+          {!isUnified && <button ref={communityButtonRef} type="button" aria-label={t('community.title')} title={t('community.title')} aria-expanded={showCommunity} onClick={() => setShowCommunity(value => !value)} className={CHAT_TOOL_BUTTON}><BrandIcon name="community" size={20} /></button>}
+          <button ref={searchButtonRef} type="button" aria-label={t('chat.search.title', 'Buscar en el chat')} title={t('chat.search.title', 'Buscar en el chat')} aria-expanded={search.open} onClick={() => search.open ? closeSearch() : updateSearch({ open: true })} className={`${CHAT_TOOL_BUTTON} ${search.open ? 'bg-twitch/20 text-twitch-light' : 'text-text-muted hover:bg-white/10 hover:text-text-primary'}`}>
+            <BrandIcon name="search" size={20} />
+          </button>
+          </div>
+          <div className="flex items-center gap-1">
+          {!isOverlay && !isUnified && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setUseTwitchPopout(true)
+                  try { localStorage.setItem('bs.chat.use_twitch_popout', 'true') } catch { /* ignore */ }
+                }}
+                className="flex h-9 shrink-0 items-center gap-1.5 text-xs font-semibold px-2.5 rounded-lg border border-twitch/40 bg-twitch/15 hover:bg-twitch/30 text-white transition-colors cursor-pointer"
+                title={t('chat.ui.officialHint', 'Incrustar Chat Oficial de Twitch (Puntos de Canal, Recompensas y Emotes)')}
+                aria-label={t('chat.ui.official', 'Incrustar Popout Oficial de Twitch')}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-twitch shrink-0">
+                  <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.428l-3 3v-3H6.857V1.714h13.714z" />
+                </svg>
+                <span>Twitch</span>
+              </button>
+
+              {/* Popout Floating Window Button */}
+              <button
+                type="button"
+                onClick={() => openTwitchChatPopoutWindow(channel, false, auth.token, auth.username)}
+                className={CHAT_TOOL_BUTTON}
+                title={t('chat.ui.floatingHint', 'Abrir Chat de Twitch en Ventana Flotante (Popout)')}
+                aria-label={t('chat.ui.floating', 'Abrir Popout Flotante')}
+              >
+                <BrandIcon name="window" size={20} />
+              </button>
+
+              {/* Gamer Overlay Launcher */}
+              {isTauri() && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await invoke('open_gamer_overlay', { channel })
+                    } catch (err) {
+                      console.warn('Failed to open gamer overlay:', err)
+                    }
+                  }}
+                  className={CHAT_TOOL_BUTTON}
+                  title={t('chat.ui.overlay', 'Abrir Overlay Gamer Transparente')}
+                  aria-label={t('chat.ui.overlay', 'Abrir Overlay Gamer Transparente')}
+                >
+                  <BrandIcon name="overlay" size={20} />
+                </button>
+              )}
+            </>
+          )}
+
+
+          </div>
 
         {isOverlay && onCloseOverlay && (
           <button
@@ -1934,16 +1893,16 @@ export default function Chat({
       </div>
 
       {/* Selector de Pestañas de Chat (Todos | Menciones | Destacados) */}
-      <div className="shrink-0 px-2 py-1.5 bg-[#121218]/95 border-b border-white/[0.06] flex items-center justify-around gap-1.5 select-none text-[11px] font-bold">
+      <div role="group" aria-label={t('chat.filters')} className="shrink-0 px-2 py-1.5 bg-[#121218]/95 border-b border-white/[0.06] flex items-center justify-around gap-1.5 select-none text-[11px] font-bold">
         <button
-          onClick={() => setActiveTab('all')}
+          aria-pressed={activeTab === 'all'} onClick={() => setActiveTab('all')}
           className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap overflow-hidden border ${
             activeTab === 'all'
               ? 'bg-twitch/30 text-white shadow-[0_2px_10px_rgba(145,70,255,0.35)] border-twitch/60 font-bold'
               : 'text-text-muted hover:text-white hover:bg-white/[0.04] border-transparent font-bold'
           }`}
         >
-          <span className="shrink-0">💬</span>
+          <BrandIcon name="chat" size={18} />
           <span className="truncate">{t('chat.tab.all', 'Todos')}</span>
         </button>
 
@@ -1957,9 +1916,9 @@ export default function Chat({
               ? 'bg-twitch/30 text-white shadow-[0_2px_10px_rgba(145,70,255,0.35)] border-twitch/60 font-bold'
               : 'text-text-muted hover:text-white hover:bg-white/[0.04] border-transparent font-bold'
           }`}
-          title={t('chat.ui.mentionsHint', 'Mensajes donde te mencionan (@TuUsuario)')}
+          aria-pressed={activeTab === 'mentions'} title={t('chat.ui.mentionsHint', 'Mensajes donde te mencionan (@TuUsuario)')}
         >
-          <span className="shrink-0">🔔</span>
+          <BrandIcon name="bell" size={18} />
           <span className="truncate">{t('chat.ui.mentions', 'Menciones')}</span>
           {unreadMentions > 0 && (
             <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-black animate-bounce shadow-sm leading-none shrink-0">
@@ -1969,7 +1928,7 @@ export default function Chat({
         </button>
 
         <button
-          onClick={() => setActiveTab('featured')}
+          aria-pressed={activeTab === 'featured'} onClick={() => setActiveTab('featured')}
           className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap overflow-hidden border ${
             activeTab === 'featured'
               ? 'bg-twitch/30 text-white shadow-[0_2px_10px_rgba(145,70,255,0.35)] border-twitch/60 font-bold'
@@ -1977,12 +1936,11 @@ export default function Chat({
           }`}
           title={t('chat.ui.featuredHint', 'Eventos del canal, Mods, VIPs y Recompensas')}
         >
-          <span className="shrink-0">⭐</span>
+          <BrandIcon name="featured" size={18} />
           <span className="truncate">{t('chat.ui.featured', 'Destacados')}</span>
         </button>
       </div>
 
-      {showCommunity && !isUnified && <div className="h-80 min-h-0 shrink-0 overflow-auto border-b border-white/10"><ActiveModsPanel key={`${channel}:${userId || auth.userId || ''}`} broadcasterId={broadcasterId} userId={userId || auth.userId} recentMessages={messages} initialTab="groups" onInspectUser={onSelectUserForInspection || (user => setUserCard({ username: user.username, userId: user.userId, displayName: user.displayName }))} /></div>}
       {search.open && <ChatSearchPanel search={search} channels={subscribedChannels} count={chatHidden ? 0 : visibleMessages.length} onChange={updateSearch} onClose={closeSearch} />}
 
       {authing && authCode && (
@@ -2122,17 +2080,42 @@ export default function Chat({
             <span><strong className="text-text-secondary">/raid</strong> canal</span>
           </div>
         )}
-        <form onSubmit={sendMessage} className="relative flex items-center gap-2 p-2.5 bg-gradient-to-b from-[#18181b] to-[#121215] border-t border-white/[0.06] shadow-[0_-4px_20px_rgba(0,0,0,0.4)]">
+        <form onSubmit={sendMessage} className="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 p-2.5 bg-gradient-to-b from-[#18181b] to-[#121215] border-t border-white/[0.06] shadow-[0_-4px_20px_rgba(0,0,0,0.4)]">
+          {/* WT-20260628-47: Input al centro con diseño envolvente */}
+          <div className="relative min-w-0 col-span-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={draftMatchesDestination ? inputText : ''}
+              onChange={(e) => { setInputText(e.target.value); setDraftChannel(channel) }}
+              placeholder={
+                !connected ? t('chat.placeholder.connecting', 'Conectando al chat...') :
+                !auth.token ? t('chat.placeholder.login', 'Inicia sesión para participar') :
+                t('chat.placeholder.send', 'Enviar un mensaje al chat...')
+              }
+              aria-label={isUnified ? `${t('grid.messageFor', 'Mensaje para')} ${channel || t('grid.chooseDestination', 'Elige un canal')}` : t('chat.placeholder.send', 'Enviar un mensaje al chat...')}
+              disabled={!canSend || !auth.token}
+              maxLength={500}
+              className="w-full pl-4 pr-12 py-2 rounded-xl bg-[#202024]/80 hover:bg-[#202024] text-white placeholder-text-muted/50 text-[13px] border border-white/[0.08] focus:border-twitch focus:bg-[#25252b] focus:ring-2 focus:ring-twitch/30 focus:outline-none transition-all disabled:opacity-40"
+            />
+            {inputText.length > 400 && (
+              <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-mono pointer-events-none ${inputText.length >= 500 ? 'text-red-400 font-bold' : 'text-text-muted/50'}`}>
+                {inputText.length}/500
+              </span>
+            )}
+          </div>
+
           {/* Action buttons on left */}
           <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => { setShowEmoteMenu(p => !p); setEmoteSearch(''); if (!showEmoteMenu) setEmoteTab('all') }}
-              className={`p-2 rounded-xl cursor-pointer transition-all ${showEmoteMenu ? 'bg-twitch text-white shadow-lg shadow-twitch/40 scale-105' : 'text-text-muted hover:text-white hover:bg-white/10'}`}
+              aria-expanded={showEmoteMenu}
+              className={`${CHAT_TOOL_BUTTON} ${showEmoteMenu ? 'bg-twitch/20 text-twitch-light' : 'text-text-secondary'}`}
               title={t('chat.ui.emotes', 'Selector de Emotes')}
               aria-label={t('chat.ui.emotes', 'Selector de Emotes')}
             >
-              <PhosphorIcon name="Smiley" size={20} weight="duotone" />
+              <BrandIcon name="emotes" size={20} />
             </button>
 
             {/* Anti-Spam Torneo Toggle */}
@@ -2146,7 +2129,7 @@ export default function Chat({
                   return n
                 })
               }}
-              className={`p-2 rounded-xl cursor-pointer transition-all border ${
+              aria-pressed={antiSpam} className={`${CHAT_TOOL_BUTTON} ${
                 antiSpam
                   ? 'bg-purple-600/20 text-purple-300 border-purple-500/60 shadow-sm shadow-purple-500/20'
                   : 'text-text-muted hover:text-white hover:bg-white/10 border-transparent'
@@ -2154,7 +2137,11 @@ export default function Chat({
               title={antiSpam ? t('chat.antispam.on', 'Anti-Spam Torneo activado') : t('chat.antispam.off', 'Activar Anti-Spam Torneo (agrupa mensajes repetitivos)')}
               aria-label={t('chat.ui.toggleAntispam', 'Alternar antispam')}
             >
-              <PhosphorIcon name="ShieldCheck" size={20} weight={antiSpam ? 'fill' : 'duotone'} />
+              <BrandIcon name="shield" size={20} />
+            </button>
+            <button type="button" onClick={() => setShowDrops(true)} className={CHAT_TOOL_BUTTON}
+              title={t('drops.center.title')} aria-label={t('drops.center.title')} aria-haspopup="dialog" aria-expanded={showDrops}>
+              <BrandIcon name="drops" size={20} />
             </button>
           </div>
 
@@ -2293,34 +2280,11 @@ export default function Chat({
             </div>
           )}
 
-          {/* WT-20260628-47: Input al centro con diseño envolvente */}
-          <div className="relative flex-1">
-            <input
-              ref={inputRef}
-              type="text"
-              value={draftMatchesDestination ? inputText : ''}
-              onChange={(e) => { setInputText(e.target.value); setDraftChannel(channel) }}
-              placeholder={
-                !connected ? t('chat.placeholder.connecting', 'Conectando al chat...') :
-                !auth.token ? t('chat.placeholder.login', 'Inicia sesión para participar') :
-                t('chat.placeholder.send', 'Enviar un mensaje al chat...')
-              }
-              aria-label={isUnified ? `${t('grid.messageFor', 'Mensaje para')} ${channel || t('grid.chooseDestination', 'Elige un canal')}` : t('chat.placeholder.send', 'Enviar un mensaje al chat...')}
-              disabled={!canSend || !auth.token}
-              maxLength={500}
-              className="w-full pl-4 pr-12 py-2 rounded-xl bg-[#202024]/80 hover:bg-[#202024] text-white placeholder-text-muted/50 text-[13px] border border-white/[0.08] focus:border-twitch focus:bg-[#25252b] focus:ring-2 focus:ring-twitch/30 focus:outline-none transition-all disabled:opacity-40"
-            />
-            {inputText.length > 400 && (
-              <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-mono pointer-events-none ${inputText.length >= 500 ? 'text-red-400 font-bold' : 'text-text-muted/50'}`}>
-                {inputText.length}/500
-              </span>
-            )}
-          </div>
 
           <button
             type="submit"
             disabled={!canSend || !draftMatchesDestination || !inputText.trim() || !auth.token}
-            className="shrink-0 px-4 py-2 rounded-xl bg-gradient-to-r from-twitch via-purple-600 to-indigo-600 hover:from-twitch-dark hover:via-purple-700 hover:to-indigo-700 text-white text-[13px] font-bold cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed transition-all shadow-lg shadow-twitch/25 hover:shadow-twitch/40 hover:scale-[1.02] active:scale-95"
+            className="h-9 shrink-0 px-4 rounded-lg bg-gradient-to-r from-twitch via-purple-600 to-indigo-600 hover:from-twitch-dark hover:via-purple-700 hover:to-indigo-700 text-white text-[13px] font-bold cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed transition-all shadow-lg shadow-twitch/25 hover:shadow-twitch/40 hover:scale-[1.02] active:scale-95"
           >
             {t('chat.sendBtn', 'Enviar')}
           </button>
@@ -2328,6 +2292,7 @@ export default function Chat({
       </div>
       </div>
 
+      {showDrops && createPortal(<DropsModal account={auth.token ? (auth.username || viewerLogin || '') : ''} onClose={() => setShowDrops(false)} />, document.body)}
       {userCard && (
         <UserCardPopup
           username={userCard.username}

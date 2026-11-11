@@ -38,7 +38,7 @@ export function ModActionFeed({ auditLog = [], onInspectUser }) {
 
   return (
     <div className="h-full overflow-y-auto space-y-2 p-3 font-sans">
-      <p className="text-xs text-text-muted">{t('mod.audit.localSource')}</p>
+      <p className="text-xs text-text-muted">{auditLog.some(entry => entry.source === 'eventsub') ? 'Acciones recibidas de Twitch y acciones locales' : t('mod.audit.localSource')}</p>
       {auditLog.slice().reverse().map((entry, index) => {
         const style = formatActionTitle(entry)
         const timeStr = entry.timestamp
@@ -53,6 +53,7 @@ export function ModActionFeed({ auditLog = [], onInspectUser }) {
             }`}
           >
             <div className="flex items-center justify-between gap-2 mb-1">
+              {entry.moderator && <span className="text-xs text-text-muted">{entry.moderator}</span>}
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${style.color}`}>
                 {style.label}
               </span>

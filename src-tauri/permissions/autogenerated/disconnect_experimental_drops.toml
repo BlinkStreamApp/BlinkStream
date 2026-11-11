@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-disconnect-experimental-drops"
+description = "Enables the disconnect_experimental_drops command without any pre-configured scope."
+commands.allow = ["disconnect_experimental_drops"]
+
+[[permission]]
+identifier = "deny-disconnect-experimental-drops"
+description = "Denies the disconnect_experimental_drops command without any pre-configured scope."
+commands.deny = ["disconnect_experimental_drops"]

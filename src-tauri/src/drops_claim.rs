@@ -1,15 +1,13 @@
 use serde_json::{json, Value};
 
-const QUERY: &str = "mutation ClaimDrop($input: ClaimDropRewardsInput!) { claimDropRewards(input: $input) { status } }";
-
 #[derive(Debug, PartialEq)]
-enum ClaimResponse {
+pub(crate) enum ClaimResponse {
     Accepted,
     Rejected,
     Unknown,
 }
 
-fn classify(response: &Value) -> ClaimResponse {
+pub(crate) fn classify(response: &Value) -> ClaimResponse {
     if response
         .get("errors")
         .and_then(Value::as_array)
@@ -28,35 +26,36 @@ fn classify(response: &Value) -> ClaimResponse {
     }
 }
 
-pub(crate) async fn try_web_claim(
-    token: &str,
-    instance: &str,
-    drop_id: &str,
-) -> Result<bool, String> {
-    let response = super::fetch_twitch_gql(
-        QUERY.to_string(),
-        Some(json!({"input":{"dropInstanceID":instance}})),
-        Some(token.to_string()),
-        None,
-    )
-    .await?;
-    match classify(&response) {
-        ClaimResponse::Rejected => Ok(false),
-        ClaimResponse::Unknown => Err("Twitch no confirmó la solicitud de reclamo. Actualiza el inventario antes de volver a intentarlo.".to_string()),
-        ClaimResponse::Accepted => {
-            for _ in 0..3 {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                let inventory = super::fetch_twitch_gql(super::TWITCH_DROPS_INVENTORY_QUERY.to_string(), None, Some(token.to_string()), None).await?;
-                if super::official_drop_claim_confirmed(&inventory, drop_id)? { return Ok(true); }
-            }
-            Err("Twitch recibió el reclamo, pero el inventario aún no lo confirma. Actualiza el panel; el reclamo automático queda en pausa.".to_string())
-        }
-    }
+pub(crate) fn persisted_claim_request(instance: &str) -> Value {
+    json!({
+        "operationName": "DropsPage_ClaimDropRewards",
+        "variables": {"input": {"dropInstanceID": instance}},
+        "extensions": {"persistedQuery": {"version": 1,
+            "sha256Hash": "a455deea71bdc9015b78eb49f4acfbce8baa7ccbedd28e549bb025bd0f751930"}}
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn experimental_payload_uses_the_exact_issued_instance_and_fixed_operation() {
+        let payload = persisted_claim_request("issued-instance");
+        assert_eq!(payload["operationName"], "DropsPage_ClaimDropRewards");
+        assert_eq!(
+            payload["variables"]["input"],
+            json!({"dropInstanceID":"issued-instance"})
+        );
+        assert_eq!(payload["extensions"]["persistedQuery"]["version"], 1);
+        assert_eq!(
+            payload["extensions"]["persistedQuery"]["sha256Hash"]
+                .as_str()
+                .unwrap()
+                .len(),
+            64
+        );
+        assert!(payload.get("query").is_none());
+    }
     #[test]
     fn only_explicit_status_is_an_acknowledgement_and_never_a_claim_confirmation() {
         assert_eq!(

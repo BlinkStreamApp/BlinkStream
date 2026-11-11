@@ -1,3 +1,4 @@
+import { acquireModerationSession } from './moderationSession'
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest'
 import { startRewardEventSub } from './twitchEventSub'
 import { measureFetch } from './perf'
@@ -48,6 +49,40 @@ afterEach(() => {
   vi.useRealTimers(); vi.unstubAllGlobals()
 })
 describe('reward EventSub lifecycle', () => {
+  it('routes private messages only to the subscribed recipient and deduplicates them', async () => {
+    const onEvent = vi.fn()
+    const moderation = { userId: '123', topics: [{ type: 'user.whisper.message', version: '1', condition: { user_id: '123' } }], onEvent }
+    const { onRedemption } = await start({ moderation })
+    await sockets[0].welcome()
+    const event = { from_user_id: '2', to_user_id: '123', whisper: { text: 'Private' } }
+    await sockets[0].notification('user.whisper.message', event, 'private1')
+    await sockets[0].notification('user.whisper.message', event, 'private1')
+    await sockets[0].notification('user.whisper.message', { ...event, to_user_id: '456' }, 'wrong-owner')
+    expect(onEvent).toHaveBeenCalledOnce()
+    expect(onRedemption).not.toHaveBeenCalled()
+  })
+  it('keeps permitted moderation topics connected, deduplicates events and isolates revocation', async () => {
+    const onEvent = vi.fn(), onTopics = vi.fn(), onIdentity = vi.fn()
+    measureFetch.mockImplementation(async (url, opts) => url.includes('/validate') ? identity({ user_id: '456', scopes: ['moderator:manage:automod'] }) : response(JSON.parse(opts.body).type === 'channel.moderate' ? 403 : 202))
+    const moderation = { userId: '456', topics: [{ type: 'automod.message.hold', version: '2', condition: { broadcaster_user_id: '123', moderator_user_id: '456' } }, { type: 'channel.moderate', version: '2', condition: { broadcaster_user_id: '123', moderator_user_id: '456' } }], onEvent, onTopics, onIdentity }
+    const { onStatus } = await start({ moderation })
+    await sockets[0].welcome()
+    expect(onIdentity).toHaveBeenCalledWith({ userId: '456', scopes: ['moderator:manage:automod'] })
+    expect(onTopics).toHaveBeenCalledWith([{ type: 'automod.message.hold', status: 202 }, { type: 'channel.moderate', status: 403 }])
+    expect(onStatus).toHaveBeenLastCalledWith({ state: 'connected', message: '' })
+    await sockets[0].notification('automod.message.hold', { message_id: 'held' })
+    await sockets[0].notification('automod.message.hold', { message_id: 'held' })
+    await sockets[0].notification('automod.message.hold', { broadcaster_user_id: '999' }, 'wrong-channel')
+    expect(onEvent).toHaveBeenCalledOnce()
+    await sockets[0].message('revocation', { subscription: { type: 'channel.moderate' } })
+    expect(onTopics).toHaveBeenLastCalledWith([{ type: 'channel.moderate', status: 403 }])
+    expect(sockets[0].close).not.toHaveBeenCalled()
+  })
+  it('rejects a moderation token belonging to another account', async () => {
+    const { onStatus } = await start({ moderation: { userId: '456', topics: [] } })
+    expect(sockets).toHaveLength(0)
+    expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'unavailable' }))
+  })
   it('subscribes only after welcome with the client ID belonging to the token', async () => {
     const { onStatus } = await start()
     expect(measureFetch).toHaveBeenCalledTimes(1)
@@ -149,4 +184,31 @@ describe('reward EventSub lifecycle', () => {
     await vi.advanceTimersByTimeAsync(60000)
     expect(vi.getTimerCount()).toBe(0)
   })
+})
+
+it.each([false, true])('integrates Activity continuity across Twitch migration (failed=%s)', async failed => {
+  const session = acquireModerationSession({ broadcasterId: '123', userId: '123', token: 'test-token' })
+  cleanups.push(session.release)
+  await vi.advanceTimersByTimeAsync(0)
+  await sockets[0].welcome()
+  expect(session.snapshot().topics['channel.follow']).toBe(202)
+  const old = sockets[0]
+  await old.message('session_reconnect', { session: { reconnect_url: 'wss://eventsub.wss.twitch.tv/ws?reconnect=synthetic' } })
+  expect(old.close).not.toHaveBeenCalled()
+  expect(session.snapshot().activityPossibleGap).toBe(false)
+  if (failed) {
+    sockets[1].onerror()
+    expect(session.snapshot().activityPossibleGap).toBe(false)
+    sockets[1].onclose()
+    expect(session.snapshot().activityPossibleGap).toBe(true)
+    await vi.advanceTimersByTimeAsync(1000)
+    await sockets[2].welcome('restarted')
+    expect(session.snapshot().activityPossibleGap).toBe(true)
+  } else {
+    await sockets[1].welcome('migrated')
+    expect(old.close).toHaveBeenCalledOnce()
+    expect(session.snapshot().activityPossibleGap).toBe(false)
+    expect(session.snapshot().topics['channel.follow']).toBe(202)
+    expect(measureFetch).toHaveBeenCalledTimes(15)
+  }
 })

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import PhosphorIcon from '../icons/PhosphorIcon'
 import { getUnbanRequests, resolveUnbanRequest } from '../../utils/twitch'
 import { ModDataNotice } from './ModDataNotice'
 
-export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = true, onLoginWithToken, onInspectUser }) {
+export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = true, onLoginWithToken, onInspectUser, refreshKey = 0 }) {
   const [requests, setRequests] = useState([])
   const [statusFilter, setStatusFilter] = useState('pending') // 'pending' | 'approved' | 'denied'
   const [loading, setLoading] = useState(false)
@@ -12,24 +12,32 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
   const [showInputFor, setShowInputFor] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [readError, setReadError] = useState(null)
+  const [nextCursor, setNextCursor] = useState('')
+  const readSequence = useRef(0)
+  const invalidateReads = useCallback(() => { readSequence.current++ }, [])
 
-  const loadRequests = useCallback(async () => {
+  const loadRequests = useCallback(async (after = '') => {
     if (!broadcasterId || !userId || !isLoggedIn) return
+    const sequence = ++readSequence.current
     setLoading(true)
     setErrorMsg('')
     setReadError(null)
     try {
-      const res = await getUnbanRequests(broadcasterId, userId, statusFilter, 50, token)
+      const res = await getUnbanRequests(broadcasterId, userId, statusFilter, 50, token, after)
+      if (readSequence.current !== sequence) return
       if (res.success) {
-        setRequests(res.value || [])
+        setRequests(previous => after ? [...new Map([...previous, ...(res.value || [])].map(item => [item.id, item])).values()] : res.value || [])
+        setNextCursor(res.nextCursor && res.nextCursor !== after ? res.nextCursor : '')
       } else {
         setRequests([])
         setReadError(res.error || {})
+        setNextCursor('')
       }
     } catch (error) {
+      if (readSequence.current !== sequence) return
       setReadError(error || {})
     }
-    setLoading(false)
+    if (readSequence.current === sequence) setLoading(false)
   }, [broadcasterId, userId, statusFilter, isLoggedIn, token])
 
   useEffect(() => {
@@ -37,7 +45,8 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
       // eslint-disable-next-line react-hooks/set-state-in-effect
       loadRequests()
     }
-  }, [loadRequests, isLoggedIn, userId])
+    return invalidateReads
+  }, [loadRequests, isLoggedIn, userId, refreshKey, invalidateReads])
 
   const handleResolve = async (reqId, status) => {
     if (!broadcasterId || !userId || !reqId) return
@@ -94,7 +103,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
         </div>
 
         <button
-          onClick={loadRequests}
+          onClick={() => loadRequests()}
           disabled={loading}
           className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-1"
           title="Recargar solicitudes"
@@ -104,6 +113,7 @@ export function UnbanRequestsPanel({ broadcasterId, userId, token, isLoggedIn = 
       </div>
 
       <ModDataNotice error={readError} />
+      {nextCursor && <button type="button" disabled={loading} onClick={() => loadRequests(nextCursor)} className="p-2 text-xs text-twitch-glow">Cargar más solicitudes</button>}
       {errorMsg && (
         <div className="p-2 bg-red-500/10 border-b border-red-500/20 text-[11px] text-red-300">
           {errorMsg}

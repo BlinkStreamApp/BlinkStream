@@ -8,7 +8,7 @@ describe('moderator layout normalization', () => {
   })
   it('preserves explicit visibility choices and valid ordering, without unknown or duplicate tools', () => {
     expect(normalizeModViewConfig({ preset: 'chat_left', showPlayer: false, showInspector: false, enabledTabs: ['users', 'invalid', 'users', 'audit'], activeTab: 'users' }))
-      .toEqual({ preset: 'chat_left', showPlayer: false, showInspector: false, enabledTabs: ['users', 'audit'], activeTab: 'users' })
+      .toEqual({ preset: 'chat_left', showPlayer: false, showInspector: false, showCommunity: true, enabledTabs: ['users', 'audit'], activeTab: 'users', workWeight: 1 })
   })
   it('restores a usable tool when every saved tab is invalid or disabled', () => {
     expect(normalizeModViewConfig({ enabledTabs: ['removed'], activeTab: 'removed' })).toMatchObject({ enabledTabs: ['audit'], activeTab: 'audit' })

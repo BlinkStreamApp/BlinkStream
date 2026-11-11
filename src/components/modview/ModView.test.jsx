@@ -41,21 +41,32 @@ describe('ModQuickActionsBar', () => {
 
   it('triggers Shield Mode when clicked', () => {
     const onSetMode = vi.fn()
+    const onShieldChange = vi.fn()
 
     render(
       <ModQuickActionsBar
         channel="testchannel"
         activeModes={{}}
         onSetMode={onSetMode}
+        onShieldChange={onShieldChange}
+        shieldAvailable
       />
     )
 
     const shieldBtn = screen.getByTitle(/Activar Modo Escudo/i)
     fireEvent.click(shieldBtn)
 
-    expect(onSetMode).toHaveBeenCalledWith('emoteonly')
-    expect(onSetMode).toHaveBeenCalledWith('subscribers')
-    expect(onSetMode).toHaveBeenCalledWith('slow', '30')
+    expect(onShieldChange).toHaveBeenCalledWith(true)
+    expect(onSetMode).not.toHaveBeenCalled()
+  })
+
+  it('does not simulate Shield Mode when the capability is unavailable', () => {
+    const onShieldChange = vi.fn()
+    render(<ModQuickActionsBar channel="test" onShieldChange={onShieldChange} />)
+    const button = screen.getByTitle(/Activar Modo Escudo/i)
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(onShieldChange).not.toHaveBeenCalled()
   })
 
   it('handles Clear Chat with confirmation dialog', () => {
@@ -241,7 +252,7 @@ describe('AutoModQueue', () => {
 describe('ActivityFeed', () => {
   it('renders empty state when no activities present', () => {
     render(<ActivityFeed messages={[]} />)
-    expect(screen.getByText('Sin actividad reciente')).toBeInTheDocument()
+    expect(screen.getByText('Aún no se han observado eventos en esta sesión')).toBeInTheDocument()
   })
 
   it('renders parsed subscription, raid, bits, and channel point reward events', () => {

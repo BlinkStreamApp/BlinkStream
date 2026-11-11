@@ -11,6 +11,13 @@ const props = () => ({ campaigns, claimingIds: new Set(), claimDrop: vi.fn(), op
 afterEach(() => { cleanup(); setLanguage('es') })
 
 describe('Drops campaign browser', () => {
+  it('keeps experimental results read-only even for an issued claimable instance', () => {
+    const handlers = props()
+    render(<DropsCampaignBrowser {...handlers} readOnly />)
+    expect(screen.queryByRole('button', { name: t('drops.center.claim') })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Skin Chest' })).toBeInTheDocument()
+    expect(handlers.claimDrop).not.toHaveBeenCalled()
+  })
   it('renders available campaign art and reward cards even when no watch minutes exist', () => {
     render(<DropsCampaignBrowser {...props()} campaigns={[{ id: 'new', name: 'New Campaign', gameName: 'Other Game', status: 'ACTIVE', imageUrl: 'https://static-cdn.jtvnw.net/campaign.jpg', endAt: '2099-01-01T00:00:00Z', drops: [
       { id: 'chest', benefitName: 'New Chest', benefitImage: 'https://static-cdn.jtvnw.net/chest.png', requiredMinutes: 60, currentMinutes: 0, hasProgress: false },

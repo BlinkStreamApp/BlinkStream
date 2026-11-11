@@ -1,38 +1,33 @@
-# BlinkStream 1.5.4 — Mod View and enhanced-broadcast playback
+# BlinkStream 1.5.4 — Mod View, Community and playback
 
-Release candidate, 2026-10-25. Public downloads/updater remain 1.5.3 pending
-real-account Mod View and 1440p acceptance and release gates.
+Release preparation, 2026-11-11. Public downloads/updater remain on verified 1.5.3 until 1.5.4 signatures and release gates are confirmed.
 Version-specific release body: [1.5.4 ES/EN](docs/releases/1.5.4.md).
 
 ## ES
 
-- Corregida la pantalla negra de Mod View por configuración inicial o antigua incompleta, conservando las preferencias válidas.
-- Reproducción y listado de calidades solicitan H.264, HEVC y AV1, sin limitar los canales de alta resolución a H.264.
-- Streamlink usa la cabecera OAuth documentada y puede aprovechar la sesión oficial integrada solo cuando su identidad validada coincide con la cuenta de la aplicación.
-- Corregido el procesamiento de calidades y los mensajes de reproducción, fuente de vídeo inaccesible y códec incompatible en ocho idiomas.
-- Zod transitivo de las herramientas de desarrollo actualizado a 4.6.7 para corregir GHSA-mrhx-c7xc-m3w5; auditoría sin excepciones.
-- Perfil de estabilidad para vídeo 1440p o superior: velocidad normal, objetivo de latencia de tres segundos y sin reiniciar HLS al redimensionar el reproductor. Pendiente de aceptación del ajuste de latencia.
-- Mod View deja de ocultar consultas denegadas/fallidas como si fueran listas vacías; auditoría local y cola AutoMod sin eventos identificadas explícitamente. Esto no concede permisos ni conecta AutoMod.
-- Tokio actualizado a 1.53.3 contra RUSTSEC-2026-0386.
-- Worker de HLS empaquetado explícitamente para el build ESM en directo, grid, previsualización y VOD; se evita el procesamiento de segmentos en el hilo de la interfaz por falta de workerPath.
-- Login solicita moderator:read:chatters tras consentimiento; twitch-auth v39 desplegada con autorización expresa. Las sesiones anteriores siguen siendo válidas, pero requieren nuevo login para conceder el permiso.
-- DVR conserva la política de reproducción activa en vez de restablecer 1.1x cada medio segundo. Diagnóstico de vídeo acotado y sin credenciales disponible desde estadísticas; búfer continuo y FPS medidos, sin inventar resolución o FPS de origen.
-- Objetivo de latencia de alta resolución reducido a tres segundos, manteniendo velocidad normal; la latencia real depende también del canal y Twitch. Ajuste pendiente de aceptación real.
+- Mod View rediseñada con herramientas nativas y acceso a la vista oficial. Comunidad agrupa creador, moderadores, VIP y participantes; distingue listas parciales, permisos y errores de consulta.
+- Susurros nativos con bandeja por cuenta, recepción con el panel cerrado, contador y lectura. Envío y recepción validados por el usuario en sus muestras; historial y reconexión siguen siendo comprobaciones separadas.
+- Actividad incorpora búsqueda local y filtros combinables. El usuario confirmó búsqueda, filtros y aviso real de interrupción con la candidata 63 el 2026-11-11. El aviso conserva filas, indica una posible discontinuidad y no recupera historial ni demuestra pérdida efectiva. Registro local y moderación confirmada se distinguen por fuente.
+- Perfiles de usuario enriquecidos y controles de reproducción configurables, búsqueda en Ajustes y acceso rápido al audio. Menús adaptados al contenedor y vídeo estable al redimensionar.
+- Chat ligero: GIF de Twitch, correcciones de escapes IRC, búsqueda en memoria, controles y recuperación de foco con comprobaciones de regresión. Chat oficial incrustado disponible también en Windows según la preferencia guardada.
+- Reproducción H.264/HEVC/AV1, worker HLS empaquetado y correcciones de búfer/DVR. La latencia y disponibilidad de calidad dependen del canal, Twitch y los códecs del sistema.
+- Drops conserva catálogo e inventario oficiales como fallback. Catálogo nativo, Auto-Claim y canje nativo requieren una build experimental con el flag de compilación `BLINKSTREAM_EXPERIMENTAL_DROPS_CLIENT_ID`; quedan fuera de Store. Progreso y reclamos solo se confirman con datos remotos; abrir Twitch no confirma un canje.
+- Dependencias auditadas actualizadas: minimatch 11.0.1 y rustix 1.1.6, junto con las correcciones previas de Zod y Tokio. No implica aceptación de todas las cuentas, canales, permisos o plataformas.
+
+Microsoft Store y GitHub son canales separados; esta salida no envía una actualización a Store. Las firmas del updater no acreditan Authenticode ni notarización Apple.
 
 ## EN
 
-- Fixed Mod View black screens caused by incomplete fresh or legacy settings while preserving valid preferences.
-- Playback and quality discovery request H.264, HEVC and AV1 instead of limiting high-resolution channels to H.264.
-- Streamlink uses its documented OAuth header and can reuse the embedded official session only when its validated identity matches the app account.
-- Fixed quality parsing and playback, inaccessible-video-source and unsupported-codec messages in all eight languages.
-- Updated development tooling's transitive Zod dependency to 4.6.7 for GHSA-mrhx-c7xc-m3w5 without audit exceptions.
-- Stability profile for 1440p and higher: normal playback speed, a three-second target latency and no HLS restart on player resize. Acceptance of the latency adjustment is pending.
-- Mod View distinguishes denied/failed reads from empty results and explicitly identifies its local audit and disconnected AutoMod queue. This does not grant permissions or connect AutoMod.
-- Updated Tokio to 1.53.3 for RUSTSEC-2026-0386.
-- Explicitly bundled the HLS worker for ESM in live, grid, preview and VOD playback, avoiding main-thread segment processing caused by a missing workerPath.
-- Login requests moderator:read:chatters with consent; twitch-auth v39 deployed with explicit authorization. Existing sessions remain valid but need a new login to grant this permission.
-- DVR preserves the active playback policy instead of restoring 1.1x every half-second. Bounded, credential-free video diagnostics available in statistics; contiguous buffer and measured FPS without invented source resolution or frame rate.
-- High-resolution target latency reduced to three seconds at normal speed; actual latency also depends on the channel and Twitch. Live acceptance of this adjustment remains pending.
+- Redesigned Mod View with native tools and access to the official view. Community groups broadcaster, moderators, VIPs and participants, distinguishing partial lists, permissions and failed reads.
+- Account-scoped native whisper inbox with background reception, unread count and read state. Sending and receiving were validated in the user's samples; history and reconnection remain separate checks.
+- Activity adds local search and combined filters. The user confirmed search, filters and a real interruption notice in candidate 63 on 2026-11-11. The notice retains rows, flags possible discontinuity and neither restores history nor proves actual loss. Local Log and confirmed moderation are distinguished by source.
+- Enriched user profiles, configurable playback controls, settings search and quick audio access. Menus adapt to the player container and resizing preserves the video.
+- Lightweight chat: Twitch GIFs, IRC escape fixes, in-memory search, controls and focus recovery covered by regression checks. Inline official chat is available on Windows according to the saved preference.
+- H.264/HEVC/AV1 playback, bundled HLS worker and buffer/DVR fixes. Latency and quality availability depend on the channel, Twitch and system codecs.
+- Drops retains the official catalog and inventory as fallback. Native catalog, Auto-Claim and native redemption require an experimental build with the `BLINKSTREAM_EXPERIMENTAL_DROPS_CLIENT_ID` compile-time flag and are excluded from Store. Progress and claims require remote confirmation; opening Twitch does not confirm redemption.
+- Audited dependency updates: minimatch 11.0.1 and rustix 1.1.6, alongside earlier Zod and Tokio fixes. This does not establish acceptance across all accounts, channels, permissions or platforms.
+
+Microsoft Store and GitHub use separate distribution channels; this release does not submit a Store update. Updater signatures do not establish Authenticode signing or Apple notarization.
 
 ## Previous release
 

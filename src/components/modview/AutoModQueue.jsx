@@ -3,7 +3,7 @@ import PhosphorIcon from '../icons/PhosphorIcon'
 import { manageAutoModMessage } from '../../utils/twitch'
 import { useT } from '../../utils/i18n'
 
-export function AutoModQueue({ broadcasterId, userId, token, isLoggedIn = true, onLoginWithToken, heldMessages = [], onRemoveMessage, onInspectUser }) {
+export function AutoModQueue({ broadcasterId, userId, token, isLoggedIn = true, onLoginWithToken, heldMessages = [], onRemoveMessage, onInspectUser, connected = false }) {
   const t = useT()
   const [actionPending, setActionPending] = useState({})
   const [statusMessage, setStatusMessage] = useState('')
@@ -62,7 +62,7 @@ export function AutoModQueue({ broadcasterId, userId, token, isLoggedIn = true, 
             <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-2 text-white/30">
               <PhosphorIcon name="ShieldCheck" size={20} weight="duotone" />
             </div>
-            <p role="status" className="text-xs font-semibold text-white/70">{t('mod.data.automodDisconnected')}</p>
+            <p role="status" className="text-xs font-semibold text-white/70">{t(connected ? 'mod.native.empty' : 'mod.data.automodDisconnected')}</p>
           </div>
         ) : (
           heldMessages.map(msg => {

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-experimental-drops-probe"
+description = "Enables the experimental_drops_probe command without any pre-configured scope."
+commands.allow = ["experimental_drops_probe"]
+
+[[permission]]
+identifier = "deny-experimental-drops-probe"
+description = "Denies the experimental_drops_probe command without any pre-configured scope."
+commands.deny = ["experimental_drops_probe"]

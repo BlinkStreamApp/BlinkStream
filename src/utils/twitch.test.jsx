@@ -10,6 +10,7 @@ import {
   getDirectStreamUrl,
   secureRandomInt,
   redeemCustomReward,
+  getUserById,
 } from './twitch'
 import { mockResponse } from '../test/__mocks__/response'
 
@@ -221,4 +222,17 @@ describe('secureRandomInt', () => {
 
     expect(values.size).toBeGreaterThan(95)
   })
+})
+
+it('looks up stable whisper identities using only the fixed numeric Helix users route', async () => {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse({
+    ok: true, json: async () => ({ data: [{ id: '2', login: 'renamed_user' }] }),
+  }))
+  for (const invalid of ['', '2&login=other', 'https://example.com', '2/3', '9'.repeat(33)]) {
+    expect((await getUserById(invalid)).success).toBe(false)
+  }
+  expect(fetchSpy).not.toHaveBeenCalled()
+  localStorage.setItem('blinkstream_twitch_token', 'synthetic-profile-token')
+  expect(await getUserById('2')).toMatchObject({ success: true, value: { id: '2' } })
+  expect(fetchSpy).toHaveBeenCalledWith('https://api.twitch.tv/helix/users?id=2', expect.any(Object))
 })

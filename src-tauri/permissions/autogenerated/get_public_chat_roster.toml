@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-public-chat-roster"
+description = "Enables the get_public_chat_roster command without any pre-configured scope."
+commands.allow = ["get_public_chat_roster"]
+
+[[permission]]
+identifier = "deny-get-public-chat-roster"
+description = "Denies the get_public_chat_roster command without any pre-configured scope."
+commands.deny = ["get_public_chat_roster"]

@@ -1,10 +1,12 @@
-export default function ToggleSwitch({ active, onClick, label }) {
+export default function ToggleSwitch({ active, onClick, label, disabled = false, describedBy }) {
   return (
     <button
       onClick={onClick}
       type="button"
       aria-label={label}
-      className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer"
+      aria-describedby={describedBy}
+      disabled={disabled}
+      className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-twitch cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
       role="switch"
       aria-checked={active}
     >
