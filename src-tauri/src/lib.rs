@@ -19,6 +19,10 @@ mod embedded_modview;
 mod media_security;
 mod mod_tools;
 mod modview_clip;
+#[cfg(target_os = "windows")]
+mod playback_install;
+#[cfg(target_os = "windows")]
+mod playback_runtime;
 mod recorder;
 mod viewer_rewards;
 mod whispers;
@@ -1033,15 +1037,169 @@ fn validate_playback_quality(quality: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
+async fn playback_session_is_current(webview: &Webview, primary: &str, token: &str) -> bool {
+    require_playback_ui(webview).is_ok()
+        && get_secret("twitch_token".into()).await.ok().as_deref() == Some(primary)
+        && twitch_webview_auth_token(webview)
+            .await
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some(token)
+}
+
+#[cfg(target_os = "windows")]
+async fn query_with_playback_session(
+    webview: &Webview,
+    channel: String,
+    quality: Option<String>,
+) -> Result<playback_runtime::PlaybackResult, String> {
+    if webview.label() != "main" || cfg!(feature = "microsoft-store") {
+        return Err("La prueba de reproducción 2K no está disponible aquí".into());
+    }
+    require_playback_ui(webview)?;
+    let root = playback_install::runtime_root(webview.app_handle())?;
+    let primary = get_secret("twitch_token".into())
+        .await
+        .map_err(|_| "Inicia sesión en BlinkStream")?;
+    let token = twitch_webview_auth_token(webview)
+        .await
+        .ok()
+        .flatten()
+        .ok_or("Inicia sesión en Twitch oficial con la misma cuenta")?;
+    let client = reqwest::Client::builder()
+        .use_rustls_tls()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(8))
+        .build()
+        .map_err(|_| "No se pudo comprobar la sesión de Twitch")?;
+    let (web_id, primary_id) = tokio::join!(
+        playback_user_id(&client, &token),
+        playback_user_id(&client, &primary)
+    );
+    if web_id.is_none() || web_id != primary_id {
+        return Err("La sesión de Twitch oficial debe coincidir con BlinkStream".into());
+    }
+    if !playback_session_is_current(webview, &primary, &token).await {
+        return Err("La sesión cambió durante la comprobación".into());
+    }
+    let (result, token) = tokio::task::spawn_blocking(move || {
+        let result = playback_runtime::query(&root, &token, &channel, quality.as_deref());
+        (result, token)
+    })
+    .await
+    .map_err(|_| "No se pudo iniciar la consulta de reproducción")?;
+    if !playback_session_is_current(webview, &primary, &token).await {
+        return Err("La sesión cambió durante la consulta".into());
+    }
+    let (web_after, primary_after) = tokio::join!(
+        playback_user_id(&client, &token),
+        playback_user_id(&client, &primary)
+    );
+    if web_after != web_id
+        || primary_after != primary_id
+        || !playback_session_is_current(webview, &primary, &token).await
+    {
+        return Err("La sesión cambió durante la consulta".into());
+    }
+    result.map_err(|_| "Twitch no devolvió una variante mediante la conexión de prueba".into())
+}
+
+fn playback_origin_allowed(url: &tauri::Url) -> bool {
+    let bundled = matches!(
+        (url.scheme(), url.host_str()),
+        ("tauri", Some("localhost")) | ("http" | "https", Some("tauri.localhost"))
+    );
+    let dev = cfg!(debug_assertions)
+        && url.scheme() == "http"
+        && url.host_str() == Some("localhost")
+        && url.port() == Some(5173);
+    (bundled || dev)
+        && url.username().is_empty()
+        && url.password().is_none()
+        && (dev || url.port().is_none())
+}
+
+#[cfg(test)]
+#[test]
+fn playback_origin_contract() {
+    for url in [
+        "tauri://localhost/index.html",
+        "http://tauri.localhost/index.html",
+    ] {
+        assert!(playback_origin_allowed(&url.parse().unwrap()));
+    }
+    for url in [
+        "https://www.twitch.tv/",
+        "https://localhost/",
+        "http://localhost:9999/",
+        "tauri://evil/index.html",
+        "http://tauri.localhost:9999/",
+        "http://user@tauri.localhost/",
+    ] {
+        assert!(!playback_origin_allowed(&url.parse().unwrap()));
+    }
+}
+
+fn require_playback_ui(webview: &Webview) -> Result<(), String> {
+    if !cfg!(target_os = "windows")
+        || cfg!(feature = "microsoft-store")
+        || webview.label() != "main"
+    {
+        return Err("Runtime 2K disponible solo en Windows GitHub".into());
+    }
+    embedded_drops::require_ui(webview)?;
+    let url = webview
+        .url()
+        .map_err(|_| "No se pudo verificar el origen")?;
+    if !playback_origin_allowed(&url) {
+        return Err("Origen de reproducción no autorizado".into());
+    }
+    Ok(())
+}
+
+/// Called only after the user explicitly chooses to prepare the optional runtime.
+#[tauri::command]
+async fn setup_playback_runtime(webview: Webview) -> Result<bool, String> {
+    require_playback_ui(&webview)?;
+    #[cfg(target_os = "windows")]
+    {
+        let root = playback_install::runtime_root(webview.app_handle())?;
+        playback_install::setup(root).await?;
+        require_playback_ui(&webview)?;
+        Ok(true)
+    }
+    #[cfg(not(target_os = "windows"))]
+    Err("Runtime no disponible".into())
+}
+
 #[tauri::command]
 async fn get_stream_url(
     app: AppHandle,
+    webview: Webview,
     channel: String,
     quality: String,
+    use_twitch_session: Option<bool>,
 ) -> Result<String, String> {
     validate_channel(&channel)?;
 
     validate_playback_quality(&quality)?;
+
+    #[cfg(target_os = "windows")]
+    if use_twitch_session == Some(true) {
+        return query_with_playback_session(&webview, channel, Some(quality))
+            .await?
+            .url
+            .ok_or_else(|| "Twitch no devolvió la calidad solicitada".into());
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = webview;
+        if use_twitch_session == Some(true) {
+            return Err("La prueba 2K solo está disponible en Windows".into());
+        }
+    }
 
     let args = streamlink_playback_args(&channel, Some(&quality));
 
@@ -1187,8 +1345,26 @@ async fn fetch_segment(url: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
-async fn get_available_qualities(app: AppHandle, channel: String) -> Result<Vec<String>, String> {
+async fn get_available_qualities(
+    app: AppHandle,
+    webview: Webview,
+    channel: String,
+    use_twitch_session: Option<bool>,
+) -> Result<Vec<String>, String> {
     validate_channel(&channel)?;
+    #[cfg(target_os = "windows")]
+    if use_twitch_session == Some(true) {
+        return query_with_playback_session(&webview, channel, None)
+            .await
+            .map(|result| result.variants);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = webview;
+        if use_twitch_session == Some(true) {
+            return Err("La prueba 2K solo está disponible en Windows".into());
+        }
+    }
     tokio::task::spawn_blocking(move || {
         let args = streamlink_playback_args(&channel, None);
         let refs: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -2585,6 +2761,7 @@ pub fn run() {
             get_secret,
             delete_secret,
             get_stream_url,
+            setup_playback_runtime,
             ensure_stream_dependencies,
             get_available_qualities,
             get_direct_stream_url,

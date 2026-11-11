@@ -40,7 +40,7 @@ const deferred = () => {
 }
 const sources = () => Hls.instances.flatMap(hls => hls.loadSource.mock.calls.map(([url]) => url))
 const network = vi.fn(() => { throw new Error('Unexpected network') })
-afterEach(() => { expect(network).not.toHaveBeenCalled(); vi.unstubAllGlobals() })
+afterEach(() => { expect(network).not.toHaveBeenCalled(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 beforeEach(() => {
   vi.stubGlobal('fetch', network)
   Hls.instances.length = 0
@@ -220,4 +220,92 @@ it('keeps offline classification without exposing native output', async () => {
   render(<VideoPlayer {...props} />)
   await screen.findByText('first está Offline')
   expect(document.body).not.toHaveTextContent('example.test/private')
+})
+
+function enableWindowsDesktop() {
+  vi.stubGlobal('isTauri', true)
+  vi.stubGlobal('navigator', Object.create(navigator, { userAgent: { value: 'Windows NT 10.0' } }))
+}
+
+it('requires opt-in and discards the previous account playback after logout', async () => {
+  enableWindowsDesktop()
+  const pending = deferred()
+  measureInvoke.mockImplementation(async (command, args) => {
+    if (command === 'setup_playback_runtime') return true
+    if (command === 'get_available_qualities') return args.useTwitchSession ? ['1440p60'] : ['1080p60']
+    return args.useTwitchSession ? pending.promise : 'https://example.test/public.m3u8'
+  })
+  const session = { isLoggedIn: true, twitchUsername: 'alice' }
+  const { rerender } = render(<VideoPlayer {...props} {...session} />)
+  await waitFor(() => expect(sources()).toContain('https://example.test/public.m3u8'))
+  expect(measureInvoke.mock.calls.some(([command, args]) => command === 'setup_playback_runtime' || args?.useTwitchSession)).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'Ajustes del reproductor' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /Usar mi sesión de Twitch/ }))
+  await waitFor(() => expect(measureInvoke).toHaveBeenCalledWith('get_stream_url', { channel: 'first', quality: 'best', useTwitchSession: true }))
+  rerender(<VideoPlayer {...props} isLoggedIn={false} twitchUsername="alice" />)
+  await act(async () => pending.resolve('https://example.test/stale-private.m3u8'))
+  expect(sources()).not.toContain('https://example.test/stale-private.m3u8')
+  rerender(<VideoPlayer {...props} {...session} />)
+  expect(screen.getByRole('checkbox', { name: /Usar mi sesión de Twitch/ })).not.toBeChecked()
+})
+
+it('preserves public playback if setup fails and ignores setup success from an earlier account', async () => {
+  enableWindowsDesktop()
+  const setup = deferred()
+  measureInvoke.mockImplementation(async command => {
+    if (command === 'setup_playback_runtime') return setup.promise
+    if (command === 'get_available_qualities') return ['1080p60']
+    return 'https://example.test/public.m3u8'
+  })
+  const { rerender } = render(<VideoPlayer {...props} isLoggedIn twitchUsername="alice" />)
+  await waitFor(() => expect(sources()).toContain('https://example.test/public.m3u8'))
+  fireEvent.click(screen.getByRole('button', { name: 'Ajustes del reproductor' }))
+  const toggle = () => screen.getByRole('checkbox', { name: /Usar mi sesión de Twitch/ })
+  fireEvent.click(toggle())
+  expect(toggle()).toBeDisabled()
+  expect(Hls.instances).toHaveLength(1)
+  rerender(<VideoPlayer {...props} isLoggedIn twitchUsername="bob" />)
+  await act(async () => setup.resolve(true))
+  expect(toggle()).not.toBeChecked()
+  measureInvoke.mockRejectedValueOnce(new Error('No se pudo descargar Streamlink'))
+  fireEvent.click(toggle())
+  await screen.findByText(/No se pudo preparar Streamlink/)
+  expect(toggle()).toBeEnabled()
+  expect(Hls.instances).toHaveLength(1)
+  expect(measureInvoke.mock.calls.some(([, args]) => args?.useTwitchSession)).toBe(false)
+})
+
+it('reports public qualities and falls back to public playback if Twitch rejects the session', async () => {
+  enableWindowsDesktop()
+  measureInvoke.mockImplementation(async (command, args) => {
+    if (command === 'setup_playback_runtime') return true
+    if (args.useTwitchSession) throw new Error('La sesión de Twitch oficial debe coincidir con BlinkStream')
+    return command === 'get_available_qualities' ? ['1080p60'] : 'https://example.test/public.m3u8'
+  })
+  render(<VideoPlayer {...props} isLoggedIn twitchUsername="alice" />)
+  await waitFor(() => expect(sources()).toHaveLength(1))
+  fireEvent.click(screen.getByRole('button', { name: 'Ajustes del reproductor' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /Usar mi sesión de Twitch/ }))
+  await screen.findByText(/Se muestran las calidades públicas/)
+  await waitFor(() => expect(sources()).toEqual(['https://example.test/public.m3u8', 'https://example.test/public.m3u8']))
+  expect(screen.queryByRole('option', { name: /1440p/ })).not.toBeInTheDocument()
+})
+
+it('clears the native HLS source when the playback context is removed', async () => {
+  const support = vi.spyOn(Hls, 'isSupported').mockReturnValue(false)
+  const native = vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('maybe')
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+  const { container, rerender, unmount } = render(<VideoPlayer {...props} />)
+  try {
+    const video = container.querySelector('video')
+    await waitFor(() => expect(video).toHaveAttribute('src', 'https://example.test/live.m3u8'))
+    rerender(<VideoPlayer {...props} channel="" />)
+    expect(video).not.toHaveAttribute('src')
+    expect(load).toHaveBeenCalledOnce()
+  } finally {
+    unmount()
+    support.mockRestore()
+    native.mockRestore()
+    load.mockRestore()
+  }
 })

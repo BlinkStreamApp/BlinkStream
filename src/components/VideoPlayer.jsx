@@ -10,7 +10,8 @@ import { measureInvoke } from '../utils/perf'
 import { PUBLISHED_LIVE_HLS_TRANSPORT, COMPLETED_HLS_TRANSPORT, HLS_WORKER_CONFIG, attachLivePlaylistBootstrap } from '../utils/tauriHls'
 import { validateProps, isString, isNumber, isBoolean, optional } from '../utils/validateProps'
 import { useRecording } from '../hooks/useRecording'
-import { safeOpenUrl } from '../utils/tauriEnv'
+import { isTauri, safeOpenUrl } from '../utils/tauriEnv'
+import { IS_STORE_BUILD } from '../utils/distribution'
 import { useT } from '../utils/i18n'
 import QualitySelector from './QualitySelector'
 import ClipPlayer from './ClipPlayer'
@@ -63,6 +64,7 @@ export function PlayerSettingsPanel({
   availableQualities,
   playbackStatus,
   onOpenTwitch,
+  sessionControl,
 }) {
   const t = useT()
   const compactValue = compact || false
@@ -103,6 +105,8 @@ export function PlayerSettingsPanel({
           </>
         )}
       </div>
+
+      {sessionControl}
 
       <div className="player-settings-toggles space-y-0.5 text-[11px]">
         {}
@@ -235,16 +239,38 @@ export default function VideoPlayer({
   const fallbackTimersRef = useRef(null)
   const [playing, setPlaying] = useState(true)
   const [muted, setMuted] = useState(false)
+  const playbackAccount = isLoggedIn ? (twitchUsername || viewerLogin || null) : null
+  const showPlaybackSession = Boolean(playbackAccount) && isTauri() && !IS_STORE_BUILD && /\bWindows\b/i.test(navigator.userAgent)
+  const [playbackSession, setPlaybackSession] = useState({ account: playbackAccount, status: 'off' })
+  if (playbackSession.account !== playbackAccount) setPlaybackSession({ account: playbackAccount, status: 'off' })
+  const playbackScope = showPlaybackSession && playbackSession.account === playbackAccount && playbackSession.status === 'ready' ? playbackSession : null
+  const preparingPlayback = playbackSession.status === 'preparing'
+
+  const changePlaybackSession = async enabled => {
+    if (!enabled) {
+      setPlaybackSession({ account: playbackAccount, status: 'off' })
+      return
+    }
+    const pending = { account: playbackAccount, status: 'preparing' }
+    setPlaybackSession(pending)
+    let ready = false
+    try {
+      ready = await measureInvoke('setup_playback_runtime') === true
+    } catch {
+      // Continue using the public source if preparation fails.
+    }
+    setPlaybackSession(current => current === pending ? { account: playbackAccount, status: ready ? 'ready' : 'failed' } : current)
+  }
   const [streamSource, setStreamSource] = useState(null)
-  const streamUrl = streamSource?.channel === channel && streamSource?.preference === quality ? streamSource.url : ''
+  const streamUrl = streamSource?.channel === channel && streamSource?.preference === quality && streamSource?.playbackScope === playbackScope ? streamSource.url : ''
   const requestIdRef = useRef(0)
   const catalogIdRef = useRef(0)
-  const identityRef = useRef({ channel, quality })
+  const identityRef = useRef({ channel, quality, playbackScope })
   useLayoutEffect(() => {
-    identityRef.current = { channel, quality }
+    identityRef.current = { channel, quality, playbackScope }
     const requests = requestIdRef
     return () => { identityRef.current = null; requests.current++ }
-  }, [channel, quality])
+  }, [channel, quality, playbackScope])
   const [effectiveVideo, setEffectiveVideo] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -255,7 +281,14 @@ export default function VideoPlayer({
   // hlsDebug_unused workaround to make eslint happy since the overlay is currently removed
   useEffect(() => { if (hlsDebug) {} }, [hlsDebug])
   const [qualityCatalog, setQualityCatalog] = useState(null)
-  const availableQualities = qualityCatalog?.channel === channel ? qualityCatalog.items : null
+  const currentCatalog = qualityCatalog?.channel === channel && qualityCatalog?.playbackScope === playbackScope ? qualityCatalog : null
+  const availableQualities = currentCatalog?.items ?? null
+  let playbackSessionMessage = 'player.sessionSetupHint'
+  if (preparingPlayback) playbackSessionMessage = 'player.sessionPreparing'
+  else if (playbackSession.status === 'failed') playbackSessionMessage = 'player.sessionSetupFailed'
+  else if (playbackScope) {
+    playbackSessionMessage = currentCatalog ? (currentCatalog.sessionConfirmed ? 'player.sessionCatalog' : 'player.sessionPublic') : 'player.sessionChecking'
+  }
   const [showClips, setShowClips] = useState(false)
   const [showDrops, setShowDrops] = useState(false)
   const playerControls = usePlayerControls()
@@ -339,9 +372,19 @@ export default function VideoPlayer({
   }, [streamUrl, channel, recording, startRecording])
 
   const fetchStream = useCallback(async (ch, q) => {
-    if (!ch || identityRef.current?.channel !== ch || identityRef.current?.quality !== quality) return
+    if (!ch || identityRef.current?.channel !== ch || identityRef.current?.quality !== quality || identityRef.current?.playbackScope !== playbackScope) return
     const id = ++requestIdRef.current
     const isCurrent = () => requestIdRef.current === id
+    const fetchUrl = async quality => {
+      if (playbackScope) {
+        try {
+          return await measureInvoke('get_stream_url', { channel: ch, quality, useTwitchSession: true })
+        } catch {
+          if (!isCurrent()) return null
+        }
+      }
+      return measureInvoke('get_stream_url', { channel: ch, quality })
+    }
     let resolvedQuality = q === 'audio' ? 'audio_only' : q || preferredQuality
     isFetchingRef.current = true
     setLoading(true); setError(''); setStreamSource(null); setEffectiveVideo(null)
@@ -351,16 +394,16 @@ export default function VideoPlayer({
       let url
       let fallback = resolvedQuality !== preferredQuality
       try {
-        url = await measureInvoke('get_stream_url', { channel: ch, quality: resolvedQuality })
+        url = await fetchUrl(resolvedQuality)
       } catch (error) {
         if (!isCurrent()) return
         if (!canUseAutomaticQuality(resolvedQuality)) throw error
         resolvedQuality = 'best'
-        url = await measureInvoke('get_stream_url', { channel: ch, quality: resolvedQuality })
+        url = await fetchUrl(resolvedQuality)
         fallback = true
       }
       if (!isCurrent()) return
-      setStreamSource({ url, channel: ch, preference: quality, resolvedQuality })
+      setStreamSource({ url, channel: ch, preference: quality, resolvedQuality, playbackScope })
       setUsingFallback(fallback)
     } catch (error) {
       if (isCurrent()) {
@@ -371,19 +414,29 @@ export default function VideoPlayer({
     } finally {
       if (isCurrent()) { setLoading(false); isFetchingRef.current = false }
     }
-  }, [quality, preferredQuality])
+  }, [quality, preferredQuality, playbackScope])
 
   const fetchQualities = useCallback(async (ch) => {
     if (!ch) return
     const id = ++catalogIdRef.current
     setQualityCatalog(null)
     try {
+      if (playbackScope) {
+        try {
+          const quals = await measureInvoke('get_available_qualities', { channel: ch, useTwitchSession: true })
+          if (!Array.isArray(quals)) throw new Error('Unexpected quality catalog')
+          if (id === catalogIdRef.current) setQualityCatalog({ channel: ch, items: quals, playbackScope, sessionConfirmed: true })
+          return
+        } catch {
+          if (id !== catalogIdRef.current) return
+        }
+      }
       const quals = await measureInvoke('get_available_qualities', { channel: ch })
-      if (id === catalogIdRef.current) setQualityCatalog({ channel: ch, items: Array.isArray(quals) ? quals : [] })
+      if (id === catalogIdRef.current) setQualityCatalog({ channel: ch, items: Array.isArray(quals) ? quals : [], playbackScope })
     } catch {
-      if (id === catalogIdRef.current) setQualityCatalog({ channel: ch, items: [] })
+      if (id === catalogIdRef.current) setQualityCatalog({ channel: ch, items: [], playbackScope })
     }
-  }, [])
+  }, [playbackScope])
 
   const handleQualityChange = useCallback((newQuality) => {
     onQualityChange(newQuality)
@@ -397,7 +450,6 @@ export default function VideoPlayer({
   }, [channel, fetchQualities])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchStream(channel)
     let cancelled = false
     let timer
@@ -435,6 +487,10 @@ export default function VideoPlayer({
     if (!Hls.isSupported()) {
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = streamUrl
+        return () => {
+          video.removeAttribute('src')
+          video.load()
+        }
       } else {
         setError('HLS no soportado')
       }
@@ -1114,6 +1170,17 @@ export default function VideoPlayer({
         <PlayerSettingsPanel
           onClose={() => setShowSettingsPanel(false)}
           playbackStatus={`${audioOnly ? 'Solo audio' : (effectiveVideo?.url === streamUrl ? effectiveVideo.label : t('player.qualityPending'))}${usingFallback && streamUrl ? ` · ${t('player.qualityFallback')}` : ''}`}
+          sessionControl={showPlaybackSession && (
+            <label className="flex items-start gap-2 py-1 text-[11px] text-white/80">
+              <input type="checkbox" checked={Boolean(playbackScope)} disabled={preparingPlayback} onChange={event => changePlaybackSession(event.target.checked)} />
+              <span>
+                {t('player.sessionQuality')}
+                <span role="status" className="block text-white/60">
+                  {t(playbackSessionMessage)}
+                </span>
+              </span>
+            </label>
+          )}
           onOpenTwitch={availableQualities && (availableQualities.length === 0 || usingFallback || (preferredQuality !== 'best' && !availableQualities.includes(preferredQuality)))
             ? () => safeOpenUrl(`https://www.twitch.tv/${channel}`, true)
             : undefined}

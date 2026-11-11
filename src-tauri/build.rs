@@ -8,6 +8,7 @@ fn main() {
             "get_secret",
             "delete_secret",
             "get_stream_url",
+            "setup_playback_runtime",
             "ensure_stream_dependencies",
             "get_available_qualities",
             "get_direct_stream_url",

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-setup-playback-runtime"
+description = "Enables the setup_playback_runtime command without any pre-configured scope."
+commands.allow = ["setup_playback_runtime"]
+
+[[permission]]
+identifier = "deny-setup-playback-runtime"
+description = "Denies the setup_playback_runtime command without any pre-configured scope."
+commands.deny = ["setup_playback_runtime"]
